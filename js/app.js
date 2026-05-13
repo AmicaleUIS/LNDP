@@ -59,6 +59,22 @@ const App = {
     return Boolean(p?.profile_setup_done && p?.pseudo && p?.office_team_id && p?.avatar_key && p?.badge_shape && p?.badge_color);
   },
 
+  teamColorForProfile(profile = {}) {
+    const team = this.state.officeTeams.find((t) =>
+      t.id === profile.office_team_id ||
+      t.slug === profile.office_team_slug ||
+      t.name === profile.office_team_name
+    );
+    return team?.color || profile.office_team_color || profile.team_color || profile.badge_color || "#facc15";
+  },
+
+  visualProfile(profile = {}) {
+    return {
+      ...profile,
+      office_team_color: this.teamColorForProfile(profile)
+    };
+  },
+
   avatarChoices() {
     return Object.entries(H.AVATAR_LABELS).map(([key, label]) => ({ key, label }));
   },
@@ -89,21 +105,22 @@ const App = {
           <div>
             <p class="eyebrow">Crédits cachés</p>
             <h2 id="creditsTitle">Le Nid des Pronos</h2>
-            <p class="muted">Version <strong>0.24.2</strong> · pré-déploiement. Le passage en <strong>1.0.0</strong> se fera au déploiement officiel.</p>
+            <p class="muted">Version <strong>0.24.3</strong> · pré-déploiement. Le passage en <strong>1.0.0</strong> se fera au déploiement officiel.</p>
           </div>
           <button class="ghost-btn" id="closeCreditsBtn" type="button">Fermer</button>
         </div>
         <div class="credits-grid">
           <section>
             <h3>Principe de version</h3>
-            <p><strong>0.24.2</strong> = version non déployée · évolution majeure n°24 · correction mineure 2.</p>
+            <p><strong>0.24.3</strong> = version non déployée · évolution majeure n°24 · correction mineure 2.</p>
             <p><strong>1.x.x</strong> = version publique déployée.</p>
           </section>
           <section>
             <h3>Évolutions récentes</h3>
             <ul class="changelog-list">
+              <li><strong>0.24.3</strong> — correction des avatars : vraies chouettes sans bande colorée parasite et fond basé sur la couleur de team.</li>
               <li><strong>0.24.2</strong> — avatar joueur affiché dans les classements, à gauche des scores.</li>
-              <li><strong>0.24.2</strong> — choix d’avatar sans fond parasite, galerie teintée par la couleur de la team et suppression du carré jaune derrière l’avatar du menu.</li>
+              <li><strong>0.24.3</strong> — choix d’avatar sans fond parasite, galerie teintée par la couleur de la team et suppression du carré jaune derrière l’avatar du menu.</li>
               <li><strong>0.24.0</strong> — 90 avatars chouette pris en charge, galerie d’avatars masquée par défaut et ouverture via “Personnaliser l’avatar”.</li>
               <li><strong>0.23.0</strong> — menu Coupe du monde, déplacement des crédits/déconnexion dans Profil et suppression des raccourcis d’accueil.</li>
               <li><strong>0.22.5</strong> — affichage des lieux au format <code>drapeau pays hôte - ville - stade</code>, avec drapeaux locaux Canada / États-Unis / Mexique.</li>
@@ -253,7 +270,7 @@ const App = {
     H.$("#userPseudo").textContent = profile.pseudo || "Joueur";
     H.$("#userTeam").textContent = team ? team.name : "Team à choisir";
     const userAvatar = H.$("#userAvatar");
-    if (userAvatar) userAvatar.innerHTML = H.profileBadgeHtml(profile, "profile-badge small");
+    if (userAvatar) userAvatar.innerHTML = H.profileBadgeHtml(this.visualProfile(profile), "profile-badge small");
 
     const isAdmin = profile.role === "admin";
 
@@ -1466,12 +1483,16 @@ const App = {
     return `
       <div class="leaderboard-list">
         ${rows.map((r) => {
-          const playerProfile = {
+          const playerProfile = this.visualProfile({
             pseudo: r.pseudo,
+            office_team_id: r.office_team_id,
+            office_team_name: r.office_team_name,
+            office_team_slug: r.office_team_slug,
+            office_team_color: r.office_team_color,
             avatar_key: r.avatar_key || "owl-01",
             badge_shape: r.badge_shape || "rounded",
             badge_color: r.badge_color || "#facc15"
-          };
+          });
           return `
           <details class="leader-details ${r.user_id === this.state.session.user.id ? "me" : ""}">
             <summary class="leader-row">
@@ -1513,7 +1534,7 @@ const App = {
 
     const { data, error } = await window.sb
       .from("v_leaderboard_overall")
-      .select("user_id,pseudo,office_team_name,avatar_key,badge_shape,badge_color")
+      .select("user_id,pseudo,office_team_id,office_team_name,office_team_slug,avatar_key,badge_shape,badge_color")
       .order("pseudo");
 
     if (error) {
@@ -1598,7 +1619,7 @@ const App = {
           <details class="badge-player-card ${row.user_id === this.state.session.user.id ? "me" : ""}">
             <summary>
               <div class="badge-player-summary-main">
-                ${H.profileBadgeHtml(row, "profile-badge leaderboard-badge")}
+                ${H.profileBadgeHtml(this.visualProfile(row), "profile-badge leaderboard-badge")}
                 <div>
                   <strong>#${row.rank} — ${H.escapeHtml(row.pseudo)}</strong>
                   <small>${H.escapeHtml(row.office_team_name || "Sans team")} · ${badges.length} badge${badges.length > 1 ? "s" : ""}</small>
@@ -1814,7 +1835,7 @@ const App = {
 
       <section class="card profile-card profile-card-custom">
         <div class="profile-avatar-preview" id="profileAvatarPreview">
-          ${H.profileBadgeHtml(profile, "profile-badge large")}
+          ${H.profileBadgeHtml(this.visualProfile(profile), "profile-badge large")}
         </div>
         <div>
           <h2>${H.escapeHtml(profile.pseudo || "Joueur")}</h2>
@@ -1846,7 +1867,7 @@ const App = {
             <p class="muted">Déconnexion, crédits et historique des évolutions.</p>
           </div>
           <div class="profile-account-actions">
-            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v0.24.2</button>
+            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v0.24.3</button>
             <button class="danger-btn" id="profileLogoutBtn" type="button">Déconnexion</button>
           </div>
         </div>
@@ -1856,7 +1877,7 @@ const App = {
         <div class="card-title-row">
           <div>
             <h3>${setupDone ? "Modifier mon profil" : "Configuration du joueur"}</h3>
-            <p class="muted">Avatar supporter, couleur, forme du badge et team bureau.</p>
+            <p class="muted">Avatar supporter, forme du badge et team bureau. La couleur du badge vient automatiquement de ta team.</p>
           </div>
         </div>
         <form id="profileForm" class="form-stack profile-setup-form" style="--avatar-team-color:${H.escapeHtml(teamColor)}">
@@ -1896,7 +1917,14 @@ const App = {
             </div>
             <div>
               <span class="field-title">Couleur du badge</span>
-              <div class="color-choice-grid">${colorOptions}</div>
+              <input type="hidden" name="badge_color" value="${H.escapeHtml(teamColor)}">
+              <div class="team-color-linked-card" id="teamColorLinkedCard" style="--choice-color:${H.escapeHtml(teamColor)}">
+                <span class="team-color-dot"></span>
+                <div>
+                  <strong>${H.escapeHtml(team?.name || "Team à choisir")}</strong>
+                  <small>Couleur héritée automatiquement de ta team.</small>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -1966,16 +1994,27 @@ const App = {
       const selectedTeam = this.state.officeTeams.find((t) => t.id === selectedTeamId);
       const nextTeamColor = selectedTeam?.color || teamColor || "#facc15";
       form.style.setProperty("--avatar-team-color", nextTeamColor);
+      const hiddenBadgeColor = form.querySelector('input[name="badge_color"]');
+      if (hiddenBadgeColor) hiddenBadgeColor.value = nextTeamColor;
+      const teamColorCard = H.$("#teamColorLinkedCard");
+      if (teamColorCard) {
+        teamColorCard.style.setProperty("--choice-color", nextTeamColor);
+        const strong = teamColorCard.querySelector("strong");
+        if (strong) strong.textContent = selectedTeam?.name || "Team à choisir";
+      }
       const next = {
         pseudo: formData.get("pseudo") || profile.pseudo,
+        office_team_id: selectedTeamId,
+        office_team_name: selectedTeam?.name,
+        office_team_slug: selectedTeam?.slug,
+        office_team_color: nextTeamColor,
         avatar_key: formData.get("avatar_key") || currentAvatar,
         badge_shape: formData.get("badge_shape") || currentShape,
-        badge_color: formData.get("badge_color") || currentColor
+        badge_color: nextTeamColor
       };
       preview.innerHTML = H.profileBadgeHtml(next, "profile-badge large");
       H.$$(".avatar-choice", form).forEach((label) => label.classList.toggle("selected", label.querySelector("input")?.checked));
       H.$$(".shape-choice", form).forEach((label) => label.classList.toggle("selected", label.querySelector("input")?.checked));
-      H.$$(".color-choice", form).forEach((label) => label.classList.toggle("selected", label.querySelector("input")?.checked));
     };
 
     H.$$("#profileForm input, #profileForm select").forEach((input) => input.addEventListener("input", updatePreview));
@@ -2058,7 +2097,7 @@ const App = {
           office_team_id: officeTeamId,
           avatar_key: formData.get("avatar_key") || "owl-01",
           badge_shape: formData.get("badge_shape") || "rounded",
-          badge_color: formData.get("badge_color") || "#facc15",
+          badge_color: formData.get("badge_color") || this.teamColorForProfile({ office_team_id: formData.get("office_team_id") }),
           profile_setup_done: true
         })
         .eq("id", this.state.session.user.id);

@@ -1,4 +1,4 @@
-# Le Nid des Pronos — V0.24.2
+# Le Nid des Pronos — V0.24.3
 
 ## Nouveautés
 
@@ -15,7 +15,7 @@
 Garde ton `js/config.js` lors du remplacement.
 
 
-## V0.24.2
+## V0.24.3
 
 - Galerie avatars sans fond image parasite.
 - Fond de la zone avatar teinté avec la couleur de la team.

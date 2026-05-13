@@ -317,7 +317,9 @@ function avatarLabel(key = "owl-01") {
 function profileBadgeHtml(profile = {}, className = "profile-badge") {
   const avatarKey = normalizeAvatarKey(profile.avatar_key);
   const shape = String(profile.badge_shape || "rounded").replace(/[^a-z0-9_-]/gi, "") || "rounded";
-  const color = String(profile.badge_color || "#facc15");
+  // La couleur de fond du badge avatar vient de la team bureau.
+  // badge_color reste en secours pour les anciens profils ou les tests.
+  const color = String(profile.office_team_color || profile.team_color || profile.teamColor || profile.badge_color || "#facc15");
   const pseudo = profile.pseudo || avatarLabel(avatarKey);
   return `<span class="${escapeHtml(className)} badge-shape-${escapeHtml(shape)}" style="--badge-color:${escapeHtml(color)}" title="${escapeHtml(pseudo)}">
     <img src="${escapeHtml(avatarUrl(avatarKey))}" alt="Avatar ${escapeHtml(pseudo)}" loading="lazy" onerror="this.onerror=null;this.src='assets/avatars/owl-01.png';">

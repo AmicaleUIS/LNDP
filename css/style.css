@@ -1,5 +1,5 @@
 /* ============================================================
-   LE NID DES PRONOS — STYLE V0.24.1
+   LE NID DES PRONOS — STYLE V0.24.3
    ============================================================ */
 
 :root {
@@ -4229,4 +4229,69 @@ button:disabled {
     min-width: 58px;
     font-size: 1.25rem;
   }
+}
+
+/* ============================================================
+   V0.24.3 — Avatar sans bande parasite + couleur de team
+   ============================================================ */
+.profile-badge {
+  background: linear-gradient(145deg,
+    color-mix(in srgb, var(--badge-color), white 10%),
+    color-mix(in srgb, var(--badge-color), black 24%)
+  ) !important;
+}
+
+.profile-badge img {
+  width: 112% !important;
+  height: 112% !important;
+  object-fit: contain !important;
+  object-position: center center !important;
+  transform: translateY(2%) scale(1.04);
+}
+
+.profile-badge.small img,
+.profile-badge.leader img,
+.profile-badge.leaderboard-badge img {
+  width: 116% !important;
+  height: 116% !important;
+  transform: translateY(3%) scale(1.06);
+}
+
+.avatar-choice img {
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.team-color-linked-card {
+  min-height: 74px;
+  border-radius: 18px;
+  border: 1px solid color-mix(in srgb, var(--choice-color), white 20%);
+  background:
+    linear-gradient(135deg,
+      color-mix(in srgb, var(--choice-color), transparent 70%),
+      rgba(15, 29, 51, .82)
+    );
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+}
+
+.team-color-dot {
+  width: 40px;
+  height: 40px;
+  border-radius: 14px;
+  background: var(--choice-color);
+  box-shadow: 0 0 0 3px rgba(255,255,255,.12) inset, 0 10px 24px rgba(0,0,0,.22);
+  flex: 0 0 auto;
+}
+
+.team-color-linked-card strong,
+.team-color-linked-card small {
+  display: block;
+}
+
+.team-color-linked-card small {
+  color: var(--muted);
+  margin-top: 3px;
 }
