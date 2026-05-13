@@ -1,10 +1,11 @@
 // ============================================================
-// LE NID DES PRONOS — SERVICE WORKER V0.23.0
+// LE NID DES PRONOS — SERVICE WORKER V0.24.1
 // Cache corrigé : config.js non caché + format lieux pays-ville-stade.
 // ============================================================
 
-const CACHE_NAME = "le-nid-des-pronos-v0-23-0";
+const CACHE_NAME = "le-nid-des-pronos-v0-24-1";
 
+// Les avatars ne sont pas précachés : ils peuvent aller de owl-01.png à owl-90.png et être ajoutés/remplacés librement.
 const ASSETS = [
   "./",
   "./index.html",
@@ -12,13 +13,13 @@ const ASSETS = [
   "./register.html",
   "./app.html",
   "./admin.html",
-  "./css/style.css?v=0.23.0",
-  "./js/supabaseClient.js?v=0.23.0",
-  "./js/auth.js?v=0.23.0",
-  "./js/common.js?v=0.23.0",
-  "./js/app.js?v=0.23.0",
-  "./js/admin.js?v=0.23.0",
-  "./manifest.json?v=0.23.0",
+  "./css/style.css?v=0.24.1",
+  "./js/supabaseClient.js?v=0.24.1",
+  "./js/auth.js?v=0.24.1",
+  "./js/common.js?v=0.24.1",
+  "./js/app.js?v=0.24.1",
+  "./js/admin.js?v=0.24.1",
+  "./manifest.json?v=0.24.1",
   "./assets/icons/icon-192.png",
   "./assets/icons/icon-512.png",
   "./assets/icons/owl-icons.svg",
@@ -53,36 +54,6 @@ const ASSETS = [
   "./assets/icons/flags/us.png",
   "./assets/icons/flags/ca.png",
   "./assets/badges/README.md",
-  "./assets/avatars/owl-01.png",
-  "./assets/avatars/owl-02.png",
-  "./assets/avatars/owl-03.png",
-  "./assets/avatars/owl-04.png",
-  "./assets/avatars/owl-05.png",
-  "./assets/avatars/owl-06.png",
-  "./assets/avatars/owl-07.png",
-  "./assets/avatars/owl-08.png",
-  "./assets/avatars/owl-09.png",
-  "./assets/avatars/owl-10.png",
-  "./assets/avatars/owl-11.png",
-  "./assets/avatars/owl-12.png",
-  "./assets/avatars/owl-13.png",
-  "./assets/avatars/owl-14.png",
-  "./assets/avatars/owl-15.png",
-  "./assets/avatars/owl-16.png",
-  "./assets/avatars/owl-17.png",
-  "./assets/avatars/owl-18.png",
-  "./assets/avatars/owl-19.png",
-  "./assets/avatars/owl-20.png",
-  "./assets/avatars/owl-21.png",
-  "./assets/avatars/owl-22.png",
-  "./assets/avatars/owl-23.png",
-  "./assets/avatars/owl-24.png",
-  "./assets/avatars/owl-25.png",
-  "./assets/avatars/owl-26.png",
-  "./assets/avatars/owl-27.png",
-  "./assets/avatars/owl-28.png",
-  "./assets/avatars/owl-29.png",
-  "./assets/avatars/owl-30.png",
   "./assets/avatars/avatars.json"
 ];
 

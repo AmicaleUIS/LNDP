@@ -89,20 +89,22 @@ const App = {
           <div>
             <p class="eyebrow">Crédits cachés</p>
             <h2 id="creditsTitle">Le Nid des Pronos</h2>
-            <p class="muted">Version <strong>0.23.0</strong> · pré-déploiement. Le passage en <strong>1.0.0</strong> se fera au déploiement officiel.</p>
+            <p class="muted">Version <strong>0.24.1</strong> · pré-déploiement. Le passage en <strong>1.0.0</strong> se fera au déploiement officiel.</p>
           </div>
           <button class="ghost-btn" id="closeCreditsBtn" type="button">Fermer</button>
         </div>
         <div class="credits-grid">
           <section>
             <h3>Principe de version</h3>
-            <p><strong>0.23.0</strong> = version non déployée · évolution majeure n°22 · correction mineure 5.</p>
+            <p><strong>0.24.1</strong> = version non déployée · évolution majeure n°24 · correction mineure 0.</p>
             <p><strong>1.x.x</strong> = version publique déployée.</p>
           </section>
           <section>
             <h3>Évolutions récentes</h3>
             <ul class="changelog-list">
-              <li><strong>0.23.0</strong> — correction responsive mobile : menu gauche masqué sur mobile, navigation basse conservée, et ligne lieu du prochain match allégée.</li>
+              <li><strong>0.24.1</strong> — choix d’avatar sans fond parasite, galerie teintée par la couleur de la team et suppression du carré jaune derrière l’avatar du menu.</li>
+              <li><strong>0.24.0</strong> — 90 avatars chouette pris en charge, galerie d’avatars masquée par défaut et ouverture via “Personnaliser l’avatar”.</li>
+              <li><strong>0.23.0</strong> — menu Coupe du monde, déplacement des crédits/déconnexion dans Profil et suppression des raccourcis d’accueil.</li>
               <li><strong>0.22.5</strong> — affichage des lieux au format <code>drapeau pays hôte - ville - stade</code>, avec drapeaux locaux Canada / États-Unis / Mexique.</li>
               <li><strong>0.22.4</strong> — correctif sauvegardes/restauration : suppression sécurisée avec <code>WHERE true</code> pour éviter l’erreur <code>DELETE requires a WHERE clause</code>.</li>
               <li><strong>0.22.3</strong> — correctif sauvegardes/restauration : suppression de l’erreur <code>points_total</code> sur le choix champion.</li>
@@ -1760,11 +1762,12 @@ const App = {
     const currentAvatar = H.normalizeAvatarKey(profile.avatar_key);
     const currentShape = profile.badge_shape || "rounded";
     const currentColor = profile.badge_color || "#facc15";
+    const teamColor = team?.color || currentColor || "#facc15";
 
     const avatarOptions = this.avatarChoices().map((avatar) => `
       <label class="avatar-choice ${currentAvatar === avatar.key ? "selected" : ""}">
         <input type="radio" name="avatar_key" value="${H.escapeHtml(avatar.key)}" ${currentAvatar === avatar.key ? "checked" : ""}>
-        <img src="${H.escapeHtml(H.avatarUrl(avatar.key))}" alt="${H.escapeHtml(avatar.label)}" loading="lazy">
+        <img src="${H.escapeHtml(H.avatarUrl(avatar.key))}" alt="${H.escapeHtml(avatar.label)}" loading="lazy" onerror="this.onerror=null;this.src='assets/avatars/owl-01.png';">
         <span>${H.escapeHtml(avatar.label)}</span>
       </label>
     `).join("");
@@ -1829,7 +1832,7 @@ const App = {
             <p class="muted">Déconnexion, crédits et historique des évolutions.</p>
           </div>
           <div class="profile-account-actions">
-            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v0.23.0</button>
+            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v0.24.1</button>
             <button class="danger-btn" id="profileLogoutBtn" type="button">Déconnexion</button>
           </div>
         </div>
@@ -1842,7 +1845,7 @@ const App = {
             <p class="muted">Avatar supporter, couleur, forme du badge et team bureau.</p>
           </div>
         </div>
-        <form id="profileForm" class="form-stack profile-setup-form">
+        <form id="profileForm" class="form-stack profile-setup-form" style="--avatar-team-color:${H.escapeHtml(teamColor)}">
           <div class="grid two profile-form-main">
             <label>
               <span>Pseudo</span>
@@ -1859,9 +1862,17 @@ const App = {
             </label>
           </div>
 
-          <div>
-            <span class="field-title">Avatar chouette</span>
-            <div class="avatar-choice-grid">${avatarOptions}</div>
+          <div class="avatar-customizer-block">
+            <div class="field-title-row">
+              <div>
+                <span class="field-title">Avatar chouette</span>
+                <p class="muted small-note">90 chouettes disponibles. La galerie reste rangée tant que tu n’en as pas besoin.</p>
+              </div>
+              <button class="ghost-btn avatar-toggle-btn" id="toggleAvatarPanel" type="button" aria-expanded="false" aria-controls="avatarChoicePanel">Personnaliser l’avatar</button>
+            </div>
+            <div class="avatar-choice-panel" id="avatarChoicePanel" hidden>
+              <div class="avatar-choice-grid">${avatarOptions}</div>
+            </div>
           </div>
 
           <div class="grid two badge-settings-grid">
@@ -1937,6 +1948,10 @@ const App = {
       const preview = H.$("#profileAvatarPreview");
       if (!form || !preview) return;
       const formData = new FormData(form);
+      const selectedTeamId = formData.get("office_team_id") || profile.office_team_id;
+      const selectedTeam = this.state.officeTeams.find((t) => t.id === selectedTeamId);
+      const nextTeamColor = selectedTeam?.color || teamColor || "#facc15";
+      form.style.setProperty("--avatar-team-color", nextTeamColor);
       const next = {
         pseudo: formData.get("pseudo") || profile.pseudo,
         avatar_key: formData.get("avatar_key") || currentAvatar,
@@ -1951,6 +1966,21 @@ const App = {
 
     H.$$("#profileForm input, #profileForm select").forEach((input) => input.addEventListener("input", updatePreview));
     H.$$("#profileForm input[type=radio]").forEach((input) => input.addEventListener("change", updatePreview));
+
+    const toggleAvatarPanel = H.$("#toggleAvatarPanel");
+    const avatarChoicePanel = H.$("#avatarChoicePanel");
+    if (toggleAvatarPanel && avatarChoicePanel) {
+      toggleAvatarPanel.addEventListener("click", () => {
+        const willOpen = avatarChoicePanel.hidden;
+        avatarChoicePanel.hidden = !willOpen;
+        toggleAvatarPanel.setAttribute("aria-expanded", String(willOpen));
+        toggleAvatarPanel.textContent = willOpen ? "Masquer les avatars" : "Personnaliser l’avatar";
+        if (willOpen) {
+          const selected = H.$(".avatar-choice.selected", avatarChoicePanel);
+          selected?.scrollIntoView({ block: "nearest", inline: "nearest" });
+        }
+      });
+    }
 
     const championForm = H.$("#championPickForm");
     if (championForm && !championLocked) {
@@ -2050,7 +2080,7 @@ const App = {
 
   setupRealtime() {
     window.sb
-      .channel("app-realtime-v0-23-0")
+      .channel("app-realtime-v0-24-1")
       .on("postgres_changes", { event: "*", schema: "public", table: "matches" }, async () => {
         await this.refreshCurrentViewFromRealtime("matches");
       })
