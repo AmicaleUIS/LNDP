@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Le Nid des Pronos</title>
+  <meta name="description" content="Application de pronostics entre collègues pour la Coupe du Monde.">
+  <meta name="theme-color" content="#07111f">
+  <link rel="manifest" href="manifest.json?v=0.23.0">
+  <link rel="icon" href="assets/icons/icon-192.png">
+  <link rel="apple-touch-icon" href="assets/icons/icon-192.png">
+  <link rel="stylesheet" href="css/style.css?v=0.23.0">
+</head>
+<body class="auth-layout">
+  <main class="auth-card">
+    <div class="brand-lockup">
+      <img src="assets/icons/icon-192.png" alt="Icône Le Nid des Pronos">
+      <div>
+        <h1>Le Nid des Pronos</h1>
+        <p>Pronostics, chouette flair et classement du bureau.</p>
+      </div>
+    </div>
+
+    <h2><img class="owl-icon title-icon" src="assets/icons/owl-png/accueil.png" alt="" aria-hidden="true" loading="lazy"> Bienvenue</h2>
+    <p class="muted">Connecte-toi ou crée ton compte pour rejoindre le nid.</p>
+
+    <div class="quick-actions">
+      <a class="primary-btn" href="login.html">Connexion</a>
+      <a class="ghost-btn" href="register.html">Créer un compte</a>
+    </div>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="js/config.js?v=0.23.0"></script>
+  <script src="js/supabaseClient.js?v=0.23.0"></script>
+  <script src="js/auth.js?v=0.23.0"></script>
+  <script>
+    window.addEventListener('DOMContentLoaded', async () => {
+      try {
+        const session = await Auth.getSession();
+        if (session) window.location.href = 'app.html';
+      } catch (error) {
+        console.warn(error);
+      }
+    });
+
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => navigator.serviceWorker.register('service-worker.js'));
+    }
+  </script>
+</body>
+</html>

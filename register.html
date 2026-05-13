@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Inscription — Le Nid des Pronos</title>
+  <meta name="theme-color" content="#07111f">
+  <link rel="manifest" href="manifest.json?v=0.23.0">
+  <link rel="icon" href="assets/icons/icon-192.png">
+  <link rel="stylesheet" href="css/style.css?v=0.23.0">
+</head>
+<body class="auth-layout">
+  <main class="auth-card">
+    <div class="brand-lockup">
+      <img src="assets/icons/icon-192.png" alt="Icône Le Nid des Pronos">
+      <div>
+        <h1>Le Nid des Pronos</h1>
+        <p>Rejoins le classement du bureau.</p>
+      </div>
+    </div>
+
+    <h2>Créer un compte</h2>
+    <p class="muted">Crée ton accès. À la première connexion, tu choisiras ton pseudo, ton avatar, ton badge et ta team bureau.</p>
+
+    <form id="registerForm" class="form-stack">
+      <label>
+        <span>Email</span>
+        <input type="email" name="email" autocomplete="email" required>
+      </label>
+      <label>
+        <span>Mot de passe</span>
+        <input type="password" name="password" autocomplete="new-password" minlength="6" required>
+      </label>
+      <button class="primary-btn" type="submit">Créer mon compte</button>
+    </form>
+
+    <p class="auth-switch">Déjà inscrit ? <a href="login.html">Connexion</a></p>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="js/config.js?v=0.23.0"></script>
+  <script src="js/supabaseClient.js?v=0.23.0"></script>
+  <script src="js/auth.js?v=0.23.0"></script>
+  <script src="js/common.js?v=0.23.0"></script>
+  <script>
+    window.addEventListener('DOMContentLoaded', async () => {
+      await Auth.redirectIfLoggedIn();
+      document.querySelector('#registerForm').addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const formData = new FormData(event.currentTarget);
+        try {
+          await Auth.register(formData.get('email'), formData.get('password'), null);
+          Helpers.toast('Compte créé. Vérifie ton email si Supabase demande une confirmation.', 'success');
+          setTimeout(() => window.location.href = 'app.html?view=profile', 900);
+        } catch (error) {
+          Helpers.toast(error.message || 'Inscription impossible', 'error');
+        }
+      });
+    });
+  </script>
+</body>
+</html>

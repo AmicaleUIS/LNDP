@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Admin — Le Nid des Pronos</title>
+  <meta name="theme-color" content="#07111f">
+  <link rel="manifest" href="manifest.json?v=0.23.0">
+  <link rel="icon" href="assets/icons/icon-192.png">
+  <link rel="stylesheet" href="css/style.css?v=0.23.0">
+</head>
+<body>
+  <div class="admin-shell">
+    <aside class="admin-sidebar">
+      <a class="brand-lockup" href="app.html">
+        <img src="assets/icons/icon-192.png" alt="Icône Le Nid des Pronos">
+        <div>
+          <h1>Admin<br>du Nid</h1>
+          <p>Mode gestion</p>
+        </div>
+      </a>
+
+      <nav class="admin-nav" id="adminNav" aria-label="Navigation admin">
+        <button class="admin-nav-btn active" type="button" data-admin-section="quick">
+          <img class="owl-icon" src="assets/icons/owl-png/admin.png" alt="" aria-hidden="true" loading="lazy"><span>Saisie rapide</span>
+        </button>
+        <button class="admin-nav-btn" type="button" data-admin-section="teams">
+          <img class="owl-icon" src="assets/icons/owl-png/classements.png" alt="" aria-hidden="true" loading="lazy"><span>Équipes</span>
+        </button>
+        <button class="admin-nav-btn" type="button" data-admin-section="scores">
+          <img class="owl-icon" src="assets/icons/owl-png/score-exact.png" alt="" aria-hidden="true" loading="lazy"><span>Scores</span>
+        </button>
+        <button class="admin-nav-btn" type="button" data-admin-section="backups">
+          <img class="owl-icon" src="assets/icons/owl-png/verrouille.png" alt="" aria-hidden="true" loading="lazy"><span>Sauvegardes</span>
+        </button>
+        <button class="admin-nav-btn" type="button" data-admin-section="users">
+          <img class="owl-icon" src="assets/icons/owl-png/profil.png" alt="" aria-hidden="true" loading="lazy"><span>Joueurs</span>
+        </button>
+      </nav>
+
+      <div class="admin-sidebar-footer">
+        <a class="ghost-btn" href="app.html">Retour app</a>
+        <button class="ghost-btn" id="refreshAdmin">Rafraîchir</button>
+        <button class="danger-btn" id="logoutBtn">Déconnexion</button>
+      </div>
+    </aside>
+
+    <main class="admin-main-area">
+      <header class="admin-header admin-page-header">
+        <div>
+          <p class="eyebrow">Administration · v0.23.0</p>
+          <h1 id="adminPageTitle"><img class="owl-icon title-icon" src="assets/icons/owl-png/admin.png" alt="" aria-hidden="true" loading="lazy"> Saisie rapide des scores</h1>
+          <p class="muted" id="adminPageSubtitle">Prochains matchs en haut, scores manuels, classement recalculé automatiquement.</p>
+        </div>
+      </header>
+
+      <div class="admin-container admin-container-narrow">
+        <section class="card admin-section active" data-section-panel="quick">
+          <div class="card-title-row">
+            <div>
+              <h2><img class="owl-icon title-icon" src="assets/icons/owl-png/admin.png" alt="" aria-hidden="true" loading="lazy"> Saisie rapide des scores</h2>
+              <p class="muted">Pensé pour mobile : prochains matchs en haut, matchs validés en bas, groupes par journée de poule / 16èmes / 8èmes / quarts / demies / finale.</p>
+            </div>
+            <div class="segmented-control" id="quickScoreFilters" aria-label="Filtrer les matchs">
+              <button class="chip-btn active" type="button" data-filter="work">À traiter</button>
+              <button class="chip-btn" type="button" data-filter="next">Prochains</button>
+              <button class="chip-btn" type="button" data-filter="today">Aujourd’hui</button>
+              <button class="chip-btn" type="button" data-filter="finished">Validés</button>
+              <button class="chip-btn" type="button" data-filter="all">Tous</button>
+            </div>
+          </div>
+          <div id="quickScoresAdmin" class="quick-score-grid"></div>
+        </section>
+
+        <section class="card admin-section" data-section-panel="teams">
+          <div class="card-title-row">
+            <div>
+              <h2>Gestion des équipes</h2>
+              <p class="muted">Création, renommage, changement de couleur et suppression des teams bureau.</p>
+            </div>
+          </div>
+          <div id="teamsAdmin"></div>
+          <form id="addOfficeTeamForm" class="inline-form">
+            <input type="text" name="name" placeholder="Nom de la team, ex : SNA" required>
+            <input type="color" name="color" value="#facc15" aria-label="Couleur de la team">
+            <button class="primary-btn" type="submit">Ajouter / mettre à jour</button>
+          </form>
+        </section>
+
+        <section class="card admin-section" data-section-panel="scores">
+          <div class="card-title-row">
+            <div>
+              <h2>Gestion complète des scores</h2>
+              <p class="muted">Vue complète des matchs, modification horaire / lieu / statut / scores / diffusion.</p>
+            </div>
+            <button class="primary-btn" id="recalcAllBtn">Recalculer tous les points</button>
+          </div>
+          <div id="matchesAdmin"></div>
+        </section>
+
+        <section class="card admin-section" data-section-panel="backups">
+          <div class="card-title-row">
+            <div>
+              <h2>Sauvegardes & remise à zéro</h2>
+              <p class="muted">Sauvegarde des pronos joueurs et des résultats de matchs. Une sauvegarde automatique est prévue tous les jours à midi via le patch SQL.</p>
+            </div>
+            <button class="primary-btn" id="createBackupBtn" type="button">Créer une sauvegarde maintenant</button>
+          </div>
+
+          <div class="backup-panel-grid">
+            <section class="backup-box">
+              <h3>Charger une sauvegarde</h3>
+              <p class="muted">Choisis une sauvegarde, puis restaure les pronos et les résultats des matchs.</p>
+              <select id="backupSelect">
+                <option value="">Chargement des sauvegardes...</option>
+              </select>
+              <button class="ghost-btn" id="restoreBackupBtn" type="button">Charger la sauvegarde</button>
+              <div id="backupListAdmin" class="backup-list"></div>
+            </section>
+
+            <section class="backup-box danger-zone">
+              <h3>Remise à zéro sécurisée</h3>
+              <p class="muted">Supprime tous les pronostics joueurs, les pronos champion et les points/badges calculés. Les matchs et résultats restent en place.</p>
+              <label>
+                Tape exactement <strong>REMISE A ZERO</strong>
+                <input id="resetConfirmInput" type="text" placeholder="REMISE A ZERO" autocomplete="off">
+              </label>
+              <button class="danger-btn" id="resetPredictionsBtn" type="button">Remise à zéro des pronos</button>
+            </section>
+          </div>
+        </section>
+
+        <section class="card admin-section" data-section-panel="users">
+          <h2>Joueurs</h2>
+          <p class="muted">Association team, rôle admin/joueur, activation ou désactivation.</p>
+          <div id="usersAdmin"></div>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>  <script src="js/config.js?v=0.23.0"></script>
+  <script src="js/supabaseClient.js?v=0.23.0"></script>
+  <script src="js/auth.js?v=0.23.0"></script>
+  <script src="js/common.js?v=0.23.0"></script>
+  <script src="js/admin.js?v=0.23.0"></script>
+</body>
+</html>
