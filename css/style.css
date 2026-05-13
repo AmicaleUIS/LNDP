@@ -4169,3 +4169,64 @@ button:disabled {
 .sidebar-footer .avatar .profile-badge {
   margin: 0;
 }
+
+/* ============================================================
+   V0.24.2 — avatars dans les classements
+   ============================================================ */
+.leader-avatar {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+}
+
+.profile-badge.leader {
+  width: 64px;
+  height: 64px;
+  padding: 4px;
+}
+
+.leader-row {
+  gap: 14px;
+}
+
+.leader-row .rank {
+  flex: 0 0 52px;
+}
+
+.badge-player-summary-main {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.profile-badge.leaderboard-badge {
+  width: 54px;
+  height: 54px;
+  padding: 3px;
+}
+
+@media (max-width: 640px) {
+  .profile-badge.leader {
+    width: 54px;
+    height: 54px;
+  }
+
+  .leader-row {
+    align-items: center;
+    gap: 10px;
+  }
+
+  .leader-row .rank {
+    flex-basis: 44px;
+    min-width: 44px;
+    width: 44px;
+    height: 44px;
+    border-radius: 14px;
+  }
+
+  .leader-row .points {
+    min-width: 58px;
+    font-size: 1.25rem;
+  }
+}

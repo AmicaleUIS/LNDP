@@ -89,20 +89,21 @@ const App = {
           <div>
             <p class="eyebrow">Crédits cachés</p>
             <h2 id="creditsTitle">Le Nid des Pronos</h2>
-            <p class="muted">Version <strong>0.24.1</strong> · pré-déploiement. Le passage en <strong>1.0.0</strong> se fera au déploiement officiel.</p>
+            <p class="muted">Version <strong>0.24.2</strong> · pré-déploiement. Le passage en <strong>1.0.0</strong> se fera au déploiement officiel.</p>
           </div>
           <button class="ghost-btn" id="closeCreditsBtn" type="button">Fermer</button>
         </div>
         <div class="credits-grid">
           <section>
             <h3>Principe de version</h3>
-            <p><strong>0.24.1</strong> = version non déployée · évolution majeure n°24 · correction mineure 0.</p>
+            <p><strong>0.24.2</strong> = version non déployée · évolution majeure n°24 · correction mineure 2.</p>
             <p><strong>1.x.x</strong> = version publique déployée.</p>
           </section>
           <section>
             <h3>Évolutions récentes</h3>
             <ul class="changelog-list">
-              <li><strong>0.24.1</strong> — choix d’avatar sans fond parasite, galerie teintée par la couleur de la team et suppression du carré jaune derrière l’avatar du menu.</li>
+              <li><strong>0.24.2</strong> — avatar joueur affiché dans les classements, à gauche des scores.</li>
+              <li><strong>0.24.2</strong> — choix d’avatar sans fond parasite, galerie teintée par la couleur de la team et suppression du carré jaune derrière l’avatar du menu.</li>
               <li><strong>0.24.0</strong> — 90 avatars chouette pris en charge, galerie d’avatars masquée par défaut et ouverture via “Personnaliser l’avatar”.</li>
               <li><strong>0.23.0</strong> — menu Coupe du monde, déplacement des crédits/déconnexion dans Profil et suppression des raccourcis d’accueil.</li>
               <li><strong>0.22.5</strong> — affichage des lieux au format <code>drapeau pays hôte - ville - stade</code>, avec drapeaux locaux Canada / États-Unis / Mexique.</li>
@@ -1464,10 +1465,20 @@ const App = {
 
     return `
       <div class="leaderboard-list">
-        ${rows.map((r) => `
+        ${rows.map((r) => {
+          const playerProfile = {
+            pseudo: r.pseudo,
+            avatar_key: r.avatar_key || "owl-01",
+            badge_shape: r.badge_shape || "rounded",
+            badge_color: r.badge_color || "#facc15"
+          };
+          return `
           <details class="leader-details ${r.user_id === this.state.session.user.id ? "me" : ""}">
             <summary class="leader-row">
               <div class="rank">#${r.rank}</div>
+              <div class="leader-avatar" aria-hidden="true">
+                ${H.profileBadgeHtml(playerProfile, "profile-badge leader")}
+              </div>
               <div class="leader-main">
                 <strong>${H.escapeHtml(r.pseudo)}</strong>
                 <small>${H.escapeHtml(r.office_team_name || "Sans team")}</small>
@@ -1483,8 +1494,8 @@ const App = {
               <h4>Badges d’exploit</h4>
               ${this.badgesPanelHtml(r.user_id)}
             </div>
-          </details>
-        `).join("")}
+          </details>`;
+        }).join("")}
       </div>
     `;
   },
@@ -1502,7 +1513,7 @@ const App = {
 
     const { data, error } = await window.sb
       .from("v_leaderboard_overall")
-      .select("user_id,pseudo,office_team_name")
+      .select("user_id,pseudo,office_team_name,avatar_key,badge_shape,badge_color")
       .order("pseudo");
 
     if (error) {
@@ -1586,9 +1597,12 @@ const App = {
         ${rows.length ? rows.map(({ row, badges }) => `
           <details class="badge-player-card ${row.user_id === this.state.session.user.id ? "me" : ""}">
             <summary>
-              <div>
-                <strong>#${row.rank} — ${H.escapeHtml(row.pseudo)}</strong>
-                <small>${H.escapeHtml(row.office_team_name || "Sans team")} · ${badges.length} badge${badges.length > 1 ? "s" : ""}</small>
+              <div class="badge-player-summary-main">
+                ${H.profileBadgeHtml(row, "profile-badge leaderboard-badge")}
+                <div>
+                  <strong>#${row.rank} — ${H.escapeHtml(row.pseudo)}</strong>
+                  <small>${H.escapeHtml(row.office_team_name || "Sans team")} · ${badges.length} badge${badges.length > 1 ? "s" : ""}</small>
+                </div>
               </div>
               <div class="points">${row.total_points || 0}<small>pts</small></div>
             </summary>
@@ -1832,7 +1846,7 @@ const App = {
             <p class="muted">Déconnexion, crédits et historique des évolutions.</p>
           </div>
           <div class="profile-account-actions">
-            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v0.24.1</button>
+            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v0.24.2</button>
             <button class="danger-btn" id="profileLogoutBtn" type="button">Déconnexion</button>
           </div>
         </div>
@@ -2080,7 +2094,7 @@ const App = {
 
   setupRealtime() {
     window.sb
-      .channel("app-realtime-v0-24-1")
+      .channel("app-realtime-v0-24-2")
       .on("postgres_changes", { event: "*", schema: "public", table: "matches" }, async () => {
         await this.refreshCurrentViewFromRealtime("matches");
       })
