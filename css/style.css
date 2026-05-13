@@ -1,5 +1,5 @@
 /* ============================================================
-   LE NID DES PRONOS — STYLE V0.23.0
+   LE NID DES PRONOS — STYLE V0.24.1
    ============================================================ */
 
 :root {
@@ -3884,7 +3884,7 @@ button:disabled {
 
 
 /* ============================================================
-   V0.23.0 — menu Coupe du monde + profil/compte
+   V0.24.1 — menu Coupe du monde + profil/compte
    ============================================================ */
 .sidebar-footer .profile-shortcut {
   margin-bottom: 0;
@@ -4036,4 +4036,136 @@ button:disabled {
     justify-content: center;
     text-align: center;
   }
+}
+
+/* ============================================================
+   V0.24.1 — 90 avatars + galerie masquée par défaut
+   ============================================================ */
+.profile-badge img {
+  object-fit: contain !important;
+}
+
+.field-title-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.avatar-customizer-block {
+  border: 1px solid rgba(255,255,255,.09);
+  border-radius: 20px;
+  padding: 14px;
+  background: rgba(255,255,255,.03);
+}
+
+.avatar-toggle-btn {
+  white-space: nowrap;
+}
+
+.avatar-choice-panel[hidden] {
+  display: none !important;
+}
+
+.avatar-choice-panel {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255,255,255,.08);
+}
+
+.avatar-choice-grid {
+  grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+  max-height: 470px;
+}
+
+.avatar-choice img {
+  width: 82px;
+  height: 82px;
+  object-fit: contain !important;
+  border-radius: 16px;
+  background: rgba(5, 12, 24, .22);
+}
+
+.avatar-choice span {
+  line-height: 1.15;
+}
+
+@media (max-width: 760px) {
+  .field-title-row {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .avatar-toggle-btn {
+    width: 100%;
+  }
+
+  .avatar-choice-grid {
+    grid-template-columns: repeat(auto-fill, minmax(86px, 1fr));
+    max-height: 360px;
+  }
+
+  .avatar-choice {
+    padding: 8px;
+  }
+
+  .avatar-choice img {
+    width: 68px;
+    height: 68px;
+  }
+}
+
+
+/* ============================================================
+   V0.24.1 — Avatars sans fond parasite + fond team
+   ============================================================ */
+.profile-setup-form {
+  --avatar-team-color: var(--gold);
+}
+
+.avatar-customizer-block {
+  background:
+    linear-gradient(135deg,
+      color-mix(in srgb, var(--avatar-team-color), transparent 90%),
+      rgba(255,255,255,.025)
+    ) !important;
+  border-color: color-mix(in srgb, var(--avatar-team-color), transparent 70%) !important;
+}
+
+.avatar-choice {
+  background: color-mix(in srgb, var(--avatar-team-color), transparent 88%) !important;
+  border-color: color-mix(in srgb, var(--avatar-team-color), transparent 68%) !important;
+  box-shadow: none;
+}
+
+.avatar-choice img {
+  background: transparent !important;
+  box-shadow: none !important;
+  border: 0 !important;
+  padding: 0 !important;
+  object-fit: contain !important;
+}
+
+.avatar-choice.selected,
+.avatar-choice:hover {
+  background: color-mix(in srgb, var(--avatar-team-color), transparent 76%) !important;
+  border-color: color-mix(in srgb, var(--avatar-team-color), white 18%) !important;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--avatar-team-color), transparent 78%) !important;
+}
+
+/* Le conteneur du badge joueur ne doit pas ajouter un carré jaune derrière l’avatar. */
+.user-pill .avatar,
+.sidebar-footer .avatar {
+  background: transparent !important;
+  box-shadow: none !important;
+  border: 0 !important;
+  padding: 0 !important;
+  color: inherit !important;
+}
+
+.user-pill .avatar .profile-badge,
+.sidebar-footer .avatar .profile-badge {
+  margin: 0;
 }
