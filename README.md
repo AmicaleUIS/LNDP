@@ -1,16 +1,15 @@
-# Le Nid des Pronos — V0.25.15
+# Le Nid des Pronos — V0.25.16
 
-## Nouveauté V0.25.15
+## Nouveauté V0.25.16
 
-- Refonte visuelle de la page **Coupe du monde > Phase finale**.
-- Nouveau tableau façon bracket : les seizièmes partent des deux côtés et le parcours converge vers la finale au centre.
-- Cartes compactes par match avec date, équipes, score/statut et lieu.
-- Ambiance harmonisée avec Le Nid : fond sombre, doré, halos et rubans colorés plus propres que l’ancien affichage en colonnes.
-- Sur mobile/tablette, le tableau devient horizontalement navigable pour garder une vraie lecture de phase finale sans tout écraser.
+- Correction de la page **Coupe du monde > Phase finale** : les cartouches de match ne se chevauchent plus.
+- Tableau de phase finale plus aéré, avec colonnes plus larges, espacements renforcés et scroll horizontal propre sur mobile/tablette.
+- Correction de l’affichage **Admin mobile > Saisie rapide des scores** : largeur verrouillée, filtres mieux rangés, cartes plus compactes et plus lisibles.
+- Réduction du bloc de titre admin mobile pour éviter la répétition énorme et limiter le scroll.
 
 ## Base de données
 
-Aucun nouveau patch SQL pour la V0.25.15.
+Aucun nouveau patch SQL pour la V0.25.16.
 
 Si tu viens d’une version avant V0.25.10, lance toujours :
 
