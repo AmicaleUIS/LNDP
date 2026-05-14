@@ -6039,3 +6039,45 @@ button:disabled {
     grid-template-columns: 1fr;
   }
 }
+
+/* ============================================================
+   V0.25.13 — Header mobile pleine largeur écran
+   ============================================================ */
+@media (max-width: 920px) {
+  html,
+  body {
+    width: 100%;
+    overflow-x: hidden;
+  }
+
+  .topbar {
+    width: 100vw !important;
+    max-width: 100vw !important;
+    margin-left: calc(50% - 50vw) !important;
+    margin-right: calc(50% - 50vw) !important;
+    border-left: 0 !important;
+    border-right: 0 !important;
+    padding-left: max(16px, env(safe-area-inset-left)) !important;
+    padding-right: max(16px, env(safe-area-inset-right)) !important;
+  }
+}
+
+@media (max-width: 760px) {
+  .admin-page-header.admin-header {
+    width: 100vw !important;
+    max-width: 100vw !important;
+    margin-left: calc(50% - 50vw) !important;
+    margin-right: calc(50% - 50vw) !important;
+    border-left: 0 !important;
+    border-right: 0 !important;
+    padding-left: max(16px, env(safe-area-inset-left)) !important;
+    padding-right: max(16px, env(safe-area-inset-right)) !important;
+  }
+}
+
+@media (max-width: 620px) {
+  .topbar,
+  .admin-page-header.admin-header {
+    border-radius: 0 0 22px 22px !important;
+  }
+}
