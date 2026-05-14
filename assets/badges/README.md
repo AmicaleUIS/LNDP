@@ -8,7 +8,15 @@ Donc pour un exploit dont l’identifiant est `egg-hatched`, l’image attendue 
 
 `assets/badges/egg-hatched.png`
 
-## Nouveaux exploits à illustrer
+Format conseillé : PNG carré `512x512` ou `1024x1024`, fond transparent, avec une petite marge de sécurité.
+L’image est affichée dans un rond : elle doit rester lisible même en petite taille.
+
+## Badges préparation à ajouter maintenant
+
+- `preparation-two-picks.png` — Préparation du nid
+- `prep-good-pick.png` — Test concluant
+
+## Autres nouveaux exploits à illustrer
 
 - `egg-hatched.png`
 - `young-feathers.png`
@@ -23,4 +31,5 @@ Donc pour un exploit dont l’identifiant est `egg-hatched`, l’image attendue 
 - `final-winner-oracle.png`
 - `final-perfect-score.png`
 
+Si un fichier manque, l’application affiche automatiquement l’icône de secours.
 Les planches sources générées sont dans `assets/badges/sheets/` si ce dossier existe dans ta version locale.
