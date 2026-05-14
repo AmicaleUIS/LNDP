@@ -1,9 +1,9 @@
 // ============================================================
-// LE NID DES PRONOS — SERVICE WORKER V0.25.8
-// Cache mis à jour : choix des 3 badges affichés dans les classements.
+// LE NID DES PRONOS — SERVICE WORKER V0.25.9
+// Cache mis à jour : popup exploits instantané, menu burger mobile et onglet teams renommé.
 // ============================================================
 
-const CACHE_NAME = "le-nid-des-pronos-v0-25-8";
+const CACHE_NAME = "le-nid-des-pronos-v0-25-9";
 
 // Les avatars ne sont pas précachés : ils peuvent aller de owl-01.png à owl-90.png et être ajoutés/remplacés librement.
 const ASSETS = [
@@ -13,13 +13,13 @@ const ASSETS = [
   "./register.html",
   "./app.html",
   "./admin.html",
-  "./css/style.css?v=0.25.8",
+  "./css/style.css?v=0.25.9",
   "./js/supabaseClient.js?v=0.24.3",
   "./js/auth.js?v=0.24.3",
-  "./js/common.js?v=0.25.8",
-  "./js/app.js?v=0.25.8",
-  "./js/admin.js?v=0.25.8",
-  "./manifest.json?v=0.25.8",
+  "./js/common.js?v=0.25.9",
+  "./js/app.js?v=0.25.9",
+  "./js/admin.js?v=0.25.9",
+  "./manifest.json?v=0.25.9",
   "./assets/icons/icon-192.png",
   "./assets/icons/icon-512.png",
   "./assets/icons/owl-icons.svg",

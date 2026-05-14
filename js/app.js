@@ -45,6 +45,7 @@ const App = {
     if (!this.state.session) return;
 
     this.bindNavigation();
+    this.bindMobileMenu();
     this.bindGlobalActions();
     await this.loadBaseData();
     const rawRequestedView = new URLSearchParams(window.location.search).get("view") || "home";
@@ -58,9 +59,58 @@ const App = {
   },
 
   bindNavigation() {
-    H.$$("[data-view]").forEach((btn) => {
-      btn.addEventListener("click", () => this.loadView(btn.dataset.view));
+    H.$$('[data-view]').forEach((btn) => {
+      if (btn.dataset.navBound === 'true') return;
+      btn.dataset.navBound = 'true';
+      btn.addEventListener('click', () => {
+        this.closeMobileMenu();
+        this.loadView(btn.dataset.view);
+      });
     });
+  },
+
+  bindMobileMenu() {
+    const toggle = H.$('#mobileMenuToggle');
+    const closeBtn = H.$('#mobileMenuClose');
+    const backdrop = H.$('#mobileMenuBackdrop');
+    const adminLink = H.$('#mobileAdminLink');
+
+    toggle?.addEventListener('click', () => this.openMobileMenu());
+    closeBtn?.addEventListener('click', () => this.closeMobileMenu());
+    backdrop?.addEventListener('click', () => this.closeMobileMenu());
+    adminLink?.addEventListener('click', () => this.closeMobileMenu());
+
+    window.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') this.closeMobileMenu();
+    });
+  },
+
+  openMobileMenu() {
+    const toggle = H.$('#mobileMenuToggle');
+    const panel = H.$('#mobileMenuPanel');
+    const backdrop = H.$('#mobileMenuBackdrop');
+    if (!panel || !backdrop) return;
+
+    panel.hidden = false;
+    backdrop.hidden = false;
+    document.body.classList.add('mobile-menu-open');
+    toggle?.setAttribute('aria-expanded', 'true');
+  },
+
+  closeMobileMenu() {
+    const toggle = H.$('#mobileMenuToggle');
+    const panel = H.$('#mobileMenuPanel');
+    const backdrop = H.$('#mobileMenuBackdrop');
+
+    document.body.classList.remove('mobile-menu-open');
+    toggle?.setAttribute('aria-expanded', 'false');
+
+    window.setTimeout(() => {
+      if (!document.body.classList.contains('mobile-menu-open')) {
+        if (panel) panel.hidden = true;
+        if (backdrop) backdrop.hidden = true;
+      }
+    }, 160);
   },
 
   bindGlobalActions() {
@@ -122,19 +172,20 @@ const App = {
           <div>
             <p class="eyebrow">Crédits cachés</p>
             <h2 id="creditsTitle">Le Nid des Pronos</h2>
-            <p class="muted">Version <strong>0.25.8</strong> · pré-déploiement. Le passage en <strong>1.0.0</strong> se fera au déploiement officiel.</p>
+            <p class="muted">Version <strong>0.25.9</strong> · pré-déploiement. Le passage en <strong>1.0.0</strong> se fera au déploiement officiel.</p>
           </div>
           <button class="ghost-btn" id="closeCreditsBtn" type="button">Fermer</button>
         </div>
         <div class="credits-grid">
           <section>
             <h3>Principe de version</h3>
-            <p><strong>0.25.8</strong> = version non déployée · évolution majeure n°25 · correction mineure 8.</p>
+            <p><strong>0.25.9</strong> = version non déployée · évolution majeure n°25 · correction mineure 9.</p>
             <p><strong>1.x.x</strong> = version publique déployée.</p>
           </section>
           <section>
             <h3>Évolutions récentes</h3>
             <ul class="changelog-list">
+              <li><strong>0.25.9</strong> — popup exploits instantané, badge plein rond, suppression du récap rapide, “Les teams du nid” et menu burger mobile.</li>
               <li><strong>0.25.8</strong> — choix joueur des 3 badges d’exploit affichés dans les classements.</li>
               <li><strong>0.25.7</strong> — exploits affinés : 3 badges max affichés dans les classements, dates d’obtention visibles et Hall du nid plus détaillé.</li>
               <li><strong>0.25.6</strong> — popup d’exploit déclenchée plus vite après un prono ou une mise à jour des points, avec arrivée visuelle plus nette.</li>
@@ -439,7 +490,7 @@ const App = {
     }
 
     const mobileAdminLink = H.$("#mobileAdminLink");
-    const mobileNav = H.$(".mobile-nav");
+    const mobileNav = H.$("#mobileMenuPanel");
     if (mobileAdminLink) {
       mobileAdminLink.hidden = !isAdmin;
     }
@@ -468,7 +519,7 @@ const App = {
       matches: "Matchs & pronos",
       worldcup: "Coupe du monde",
       leaderboard: "Classements",
-      teams: "Les teams",
+      teams: "Les teams du nid",
       achievements: "Exploits",
       profile: "Profil"
     };
@@ -747,7 +798,7 @@ const App = {
       <section class="toolbar-card">
         <div>
           <h2>Matchs & pronos</h2>
-          <p class="muted">Matchs, saisie des scores et récap de tes pronos sont maintenant réunis ici.</p>
+          <p class="muted">Tous les matchs et la saisie de tes scores sont réunis ici.</p>
         </div>
         <button class="ghost-btn" id="refreshMatchesBtn">Rafraîchir</button>
       </section>
@@ -781,7 +832,6 @@ const App = {
 
     this.bindPhaseNavigation("matchPhaseIndex", () => this.renderMatches());
     this.bindPredictionForms();
-    this.bindCombinedPredictionSummaryActions();
     this.bindGoToNearestMissingActions();
   },
 
@@ -789,8 +839,6 @@ const App = {
     const allMissing = this.missingPredictions();
     const allDone = this.state.matches.filter((match) => this.getMyPrediction(match.id));
     const locked = this.state.matches.filter((match) => H.isKickoffPassed(match.kickoff_at));
-    const phaseDone = group.matches.filter((match) => this.getMyPrediction(match.id)).length;
-    const phaseMissing = group.matches.filter((match) => !H.isKickoffPassed(match.kickoff_at) && !this.getMyPrediction(match.id)).length;
 
     return `
       <section class="grid three stats-grid combined-prono-stats">
@@ -801,35 +849,6 @@ const App = {
           </button>
         ` : `<article class="stat-card"><strong>0</strong><span>À faire</span></article>`}
         <article class="stat-card"><strong>${locked.length}</strong><span>Verrouillés</span></article>
-      </section>
-
-      <section class="card combined-prono-summary">
-        <div class="card-title-row">
-          <div>
-            <h3>${H.icon("pronos")} Récap rapide — ${H.escapeHtml(group.key)}</h3>
-            <p class="muted">${phaseDone}/${group.matches.length} posé${phaseDone > 1 ? "s" : ""} · ${phaseMissing} manquant${phaseMissing > 1 ? "s" : ""} à venir</p>
-          </div>
-          <span class="pill neutral">${H.matchDateRangeLabel(group.matches)}</span>
-        </div>
-        <div class="combined-prono-list">
-          ${group.matches.map((match) => {
-            const prediction = this.getMyPrediction(match.id);
-            const points = this.state.visiblePredictions.find((row) => row.match_id === match.id && row.user_id === this.state.session.user.id);
-            const canEdit = !H.isKickoffPassed(match.kickoff_at);
-            return `
-              <button class="combined-prono-row" type="button" data-jump-match="${H.escapeHtml(match.id)}">
-                <span>
-                  <strong>${H.matchFlagHtml(match, "home")} ${H.escapeHtml(match.home_team_name)} <em>vs</em> ${H.matchFlagHtml(match, "away")} ${H.escapeHtml(match.away_team_name)}</strong>
-                  <small>${H.formatDateTime(match.kickoff_at)} · ${H.stageLabel(match.stage)}${match.stage === "group" && match.pool_round ? ` · J. poule ${match.pool_round}` : ""}</small>
-                </span>
-                <span class="combined-prono-row-status">
-                  ${prediction ? `<strong>${prediction.home_score_pred} - ${prediction.away_score_pred}</strong>` : `<strong class="missing">À faire</strong>`}
-                  ${points ? `<small>${points.points_total ?? 0} pts · ${H.escapeHtml(this.predictionReasonLabel(points))}</small>` : `<small>${canEdit ? "Cliquer pour pronostiquer" : "Verrouillé"}</small>`}
-                </span>
-              </button>
-            `;
-          }).join("")}
-        </div>
       </section>
     `;
   },
@@ -2291,22 +2310,16 @@ const App = {
     if (!freshBadges.length) return;
 
     this.state.achievementNotificationQueue.push(...freshBadges);
-    this.scheduleAchievementModal();
+    this.showNextAchievementModal();
   },
 
   scheduleAchievementModal() {
     if (this.state.achievementNotificationTimer) return;
 
-    const run = () => {
+    this.state.achievementNotificationTimer = window.setTimeout(() => {
       this.state.achievementNotificationTimer = null;
       this.showNextAchievementModal();
-    };
-
-    if (typeof window.requestAnimationFrame === "function") {
-      this.state.achievementNotificationTimer = window.requestAnimationFrame(run);
-    } else {
-      this.state.achievementNotificationTimer = window.setTimeout(run, 0);
-    }
+    }, 0);
   },
 
   achievementModalTone(badge) {
@@ -2332,6 +2345,10 @@ const App = {
   },
 
   showNextAchievementModal() {
+    if (this.state.achievementNotificationTimer) {
+      window.clearTimeout(this.state.achievementNotificationTimer);
+      this.state.achievementNotificationTimer = null;
+    }
     if (this.state.achievementModalOpen && !H.$("#achievementUnlockModal")) {
       this.state.achievementModalOpen = false;
     }
@@ -2884,7 +2901,7 @@ const App = {
     root.innerHTML = `
       <section class="hero-card teams-hero">
         <div>
-          <p class="eyebrow">${H.icon("profile")} Les teams</p>
+          <p class="eyebrow">${H.icon("profile")} Les teams du nid</p>
           <h2>Les joueurs du nid, par équipe.</h2>
           <p class="muted">Retrouve tous les joueurs actifs, leur team bureau et le chat du tournoi.</p>
         </div>
@@ -2899,7 +2916,7 @@ const App = {
         <section class="card teams-directory-card">
           <div class="card-title-row">
             <div>
-              <h3>Annuaire des teams</h3>
+              <h3>Annuaire des teams du nid</h3>
               <p class="muted">Clique sur un joueur pour voir sa fiche : scores, badges et champion choisi.</p>
             </div>
             <button class="ghost-btn" id="refreshTeamsBtn" type="button">Rafraîchir</button>
@@ -3190,7 +3207,7 @@ const App = {
             <p class="muted">Déconnexion, crédits et historique des évolutions.</p>
           </div>
           <div class="profile-account-actions">
-            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v0.25.8</button>
+            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v0.25.9</button>
             <button class="danger-btn" id="profileLogoutBtn" type="button">Déconnexion</button>
           </div>
         </div>
@@ -3461,7 +3478,7 @@ const App = {
 
   setupRealtime() {
     window.sb
-      .channel("app-realtime-v0-25-2")
+      .channel("app-realtime-v0-25-9")
       .on("postgres_changes", { event: "*", schema: "public", table: "matches" }, async () => {
         await this.refreshCurrentViewFromRealtime("matches");
       })

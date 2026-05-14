@@ -1,27 +1,24 @@
-# Le Nid des Pronos — V0.25.8
+# Le Nid des Pronos — V0.25.9
 
-## Nouveautés V0.25.8
+## Nouveautés V0.25.9
 
-- Le joueur choisit lui-même les **3 badges d’exploit** affichés dans les classements.
-- Le choix se fait dans **Exploits > Mes exploits**.
-- Les autres badges restent visibles dans le détail du joueur et dans le Hall du nid.
-- Si un joueur n’a encore rien choisi, l’app garde un aperçu automatique de ses 3 premiers exploits pour éviter un classement vide.
-- Ajout du patch SQL `patch_v0_25_8_badges_mis_en_avant.sql` avec la colonne `profiles.featured_badge_ids`.
+- Le popup d’exploit s’ouvre **immédiatement** quand un nouvel exploit est détecté, sans attendre `requestAnimationFrame`.
+- Dans le popup, l’image du badge remplit maintenant **tout le rond**.
+- Suppression complète du bloc **Récap rapide** dans l’onglet Matchs.
+- L’onglet **Les teams** devient **Les teams du nid**.
+- Sur mobile, la barre de navigation du bas est remplacée par un **menu burger** avec tous les onglets.
 
 ## À lancer dans Supabase
 
-Si la V0.25.7 est déjà installée, lance uniquement :
+Aucun nouveau patch SQL pour la V0.25.9.
+
+Si tu viens d’une version avant V0.25.8, pense toujours à lancer :
 
 ```sql
 patch_v0_25_8_badges_mis_en_avant.sql
 ```
 
-Ce patch ajoute :
-
-- `profiles.featured_badge_ids text[]` ;
-- une limite de 3 badges maximum ;
-- l’exposition de ces badges dans `v_public_profiles` ;
-- l’exposition de ces badges dans `v_leaderboard_overall`.
+Ce patch permet à chaque joueur de choisir les 3 badges affichés dans les classements.
 
 ## Images des exploits
 
