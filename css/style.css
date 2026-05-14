@@ -5175,3 +5175,134 @@ button:disabled {
   from { opacity: 1; transform: translateY(0) scale(1); }
   to { opacity: 0; transform: translateY(10px) scale(.96); }
 }
+
+/* ---------- V0.25.7 — exploits visibles par 3 + dates ---------- */
+.achievement-chip.achievement-more {
+  color: var(--gold);
+  border-color: rgba(250,204,21,.32);
+  background: rgba(250,204,21,.11);
+  font-weight: 900;
+}
+
+.achievement-date {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 8px;
+  color: var(--gold);
+  font-size: .74rem;
+  font-weight: 800;
+}
+
+.achievement-date .owl-icon {
+  width: 14px;
+  height: 14px;
+}
+
+.achievement-panel-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 14px;
+  padding: 12px 0 2px;
+}
+
+.achievement-panel-title strong,
+.achievement-panel-title small {
+  display: block;
+}
+
+.achievement-panel-title strong {
+  color: var(--gold);
+}
+
+.achievement-panel-title small {
+  color: var(--muted);
+  font-size: .78rem;
+}
+
+.badge-player-summary-main .achievement-preview {
+  margin-top: 7px;
+}
+
+@media (max-width: 720px) {
+  .achievement-panel-title {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 2px;
+    margin-inline: 12px;
+  }
+}
+
+/* ---------- V0.25.8 — choix joueur des badges affichés ---------- */
+.featured-badges-card {
+  border-color: rgba(250, 204, 21, .20);
+}
+
+.featured-badges-selected {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-height: 42px;
+  margin: 12px 0 14px;
+  padding: 12px;
+  border-radius: 18px;
+  border: 1px dashed rgba(250, 204, 21, .22);
+  background: rgba(250, 204, 21, .06);
+}
+
+.featured-badge-picker {
+  margin-top: 0;
+}
+
+.featured-badge-option {
+  position: relative;
+}
+
+.featured-badge-option.is-featured {
+  border-color: rgba(250, 204, 21, .55);
+  background:
+    radial-gradient(circle at top right, rgba(250, 204, 21, .20), transparent 42%),
+    rgba(255, 255, 255, .055);
+  box-shadow: 0 0 0 1px rgba(250, 204, 21, .18), 0 14px 34px rgba(0, 0, 0, .18);
+}
+
+.featured-badge-option.is-featured::after {
+  content: "Affiché";
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  color: #07111f;
+  background: var(--gold);
+  font-size: .68rem;
+  font-weight: 900;
+}
+
+.featured-badge-toggle {
+  margin-top: 10px;
+}
+
+.featured-badge-toggle.small {
+  min-height: 32px;
+  padding: 7px 10px;
+  font-size: .78rem;
+}
+
+@media (max-width: 760px) {
+  .featured-badges-card .card-title-row {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .featured-badge-option.is-featured::after {
+    position: static;
+    justify-self: start;
+    width: fit-content;
+    margin-top: 8px;
+    grid-column: 1 / -1;
+  }
+}

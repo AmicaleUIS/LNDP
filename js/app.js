@@ -122,19 +122,21 @@ const App = {
           <div>
             <p class="eyebrow">Crédits cachés</p>
             <h2 id="creditsTitle">Le Nid des Pronos</h2>
-            <p class="muted">Version <strong>0.25.6</strong> · pré-déploiement. Le passage en <strong>1.0.0</strong> se fera au déploiement officiel.</p>
+            <p class="muted">Version <strong>0.25.8</strong> · pré-déploiement. Le passage en <strong>1.0.0</strong> se fera au déploiement officiel.</p>
           </div>
           <button class="ghost-btn" id="closeCreditsBtn" type="button">Fermer</button>
         </div>
         <div class="credits-grid">
           <section>
             <h3>Principe de version</h3>
-            <p><strong>0.25.6</strong> = version non déployée · évolution majeure n°25 · correction mineure 6.</p>
+            <p><strong>0.25.8</strong> = version non déployée · évolution majeure n°25 · correction mineure 8.</p>
             <p><strong>1.x.x</strong> = version publique déployée.</p>
           </section>
           <section>
             <h3>Évolutions récentes</h3>
             <ul class="changelog-list">
+              <li><strong>0.25.8</strong> — choix joueur des 3 badges d’exploit affichés dans les classements.</li>
+              <li><strong>0.25.7</strong> — exploits affinés : 3 badges max affichés dans les classements, dates d’obtention visibles et Hall du nid plus détaillé.</li>
               <li><strong>0.25.6</strong> — popup d’exploit déclenchée plus vite après un prono ou une mise à jour des points, avec arrivée visuelle plus nette.</li>
               <li><strong>0.25.5</strong> — catalogue d’exploits sans pastille “Débloqué” et deux exploits de finale : champion choisi et score parfait.</li>
               <li><strong>0.25.4</strong> — nouveaux exploits de progression/fidélité, catalogue nettoyé et affichage du Hall du nid corrigé.</li>
@@ -193,7 +195,7 @@ const App = {
     const userId = this.state.session.user.id;
     const { data, error } = await window.sb
       .from("profiles")
-      .select("id,email,pseudo,role,office_team_id,is_active,avatar_key,badge_shape,badge_color,profile_setup_done")
+      .select("id,email,pseudo,role,office_team_id,is_active,avatar_key,badge_shape,badge_color,profile_setup_done,featured_badge_ids")
       .eq("id", userId)
       .single();
 
@@ -370,7 +372,7 @@ const App = {
     console.warn("v_public_profiles indisponible, fallback profiles", error);
     const { data: fallback, error: fallbackError } = await window.sb
       .from("profiles")
-      .select("id,pseudo,office_team_id,is_active,avatar_key,badge_shape,badge_color,profile_setup_done")
+      .select("id,pseudo,office_team_id,is_active,avatar_key,badge_shape,badge_color,profile_setup_done,featured_badge_ids")
       .eq("is_active", true)
       .order("pseudo", { ascending: true });
 
@@ -1238,6 +1240,7 @@ const App = {
         <article class="stat-card"><strong>${positives}</strong><span>coups de maître</span></article>
         <article class="stat-card"><strong>${negatives}</strong><span>casseroles assumées</span></article>
       </section>
+      ${this.featuredBadgePickerHtml(badges)}
       <section class="card">
         <div class="card-title-row">
           <div>
@@ -1248,6 +1251,8 @@ const App = {
         ${badges.length ? `<div class="achievement-grid large">${badges.map((badge) => this.badgeCardHtml(badge, true)).join("")}</div>` : `<p class="muted">Aucun exploit pour l’instant. Premier prono validé, première coquille qui craque.</p>`}
       </section>
     `;
+
+    this.bindFeaturedBadgePicker(badges);
   },
 
   async renderAchievementHall() {
@@ -1271,13 +1276,17 @@ const App = {
         ${rows.length ? rows.map(({ row, badges }, index) => `
           <details class="badge-player-card ${row.user_id === this.state.session.user.id ? "me" : ""}" ${index < 3 ? "open" : ""}>
             <summary>
-              <div>
-                <strong>#${index + 1} exploits — ${H.escapeHtml(row.pseudo)}</strong>
-                <small>${H.escapeHtml(row.office_team_name || "Sans team")} · ${badges.length} exploit${badges.length > 1 ? "s" : ""} · classement général #${row.rank}</small>
+              <div class="badge-player-summary-main">
+                ${H.profileBadgeHtml(this.visualProfile(row), "profile-badge leaderboard-badge")}
+                <div>
+                  <strong>#${index + 1} exploits — ${H.escapeHtml(row.pseudo)}</strong>
+                  <small>${H.escapeHtml(row.office_team_name || "Sans team")} · ${badges.length} exploit${badges.length > 1 ? "s" : ""} · classement général #${row.rank}</small>
+                  ${this.badgesPreviewHtml(row.user_id, 3, row)}
+                </div>
               </div>
               <div class="points">${row.total_points || 0}<small>pts</small></div>
             </summary>
-            ${this.badgesPanelHtml(row.user_id)}
+            ${this.badgesPanelHtml(row.user_id, { title: "Détail des exploits" })}
           </details>
         `).join("") : `<section class="card"><p class="muted">Aucun exploit pour le moment.</p></section>`}
       </div>
@@ -1548,6 +1557,106 @@ const App = {
     return best;
   },
 
+  safeDate(value) {
+    if (!value) return null;
+    const date = value instanceof Date ? value : new Date(value);
+    return Number.isNaN(date.getTime()) ? null : date;
+  },
+
+  matchResultDate(match = {}) {
+    return this.safeDate(match.finished_at || match.completed_at || match.updated_at || match.kickoff_at);
+  },
+
+  scoreRowResultDate(row = {}) {
+    return this.matchResultDate(row.match) || this.predictionActivityDate(row.prediction);
+  },
+
+  firstScoreRowDate(rows = []) {
+    for (const row of rows) {
+      const date = this.scoreRowResultDate(row);
+      if (date) return date;
+    }
+    return null;
+  },
+
+  nthScoreRowDate(rows = [], n = 1) {
+    const row = rows[Math.max(0, n - 1)];
+    return row ? this.scoreRowResultDate(row) : null;
+  },
+
+  predictionDateAt(predictions = [], n = 1) {
+    const row = predictions[Math.max(0, n - 1)];
+    return row ? this.predictionActivityDate(row) : null;
+  },
+
+  dateWhenBooleanStreakReached(items = [], predicate, target = 1, dateSelector = (item) => this.scoreRowResultDate(item)) {
+    let current = 0;
+    for (const item of items) {
+      if (predicate(item)) {
+        current += 1;
+        if (current >= target) return dateSelector(item);
+      } else {
+        current = 0;
+      }
+    }
+    return null;
+  },
+
+  dateWhenTotalPointsReached(rows = [], threshold = 0) {
+    let total = 0;
+    for (const row of rows) {
+      total += Number(row.prediction?.points_total || 0);
+      if (total >= threshold) return this.scoreRowResultDate(row);
+    }
+    return null;
+  },
+
+  dateWhenAverageReached(rows = [], minRows = 1, threshold = 0) {
+    let total = 0;
+    for (let index = 0; index < rows.length; index += 1) {
+      total += Number(rows[index].prediction?.points_total || 0);
+      const count = index + 1;
+      if (count >= minRows && total / count >= threshold) return this.scoreRowResultDate(rows[index]);
+    }
+    return null;
+  },
+
+  dateWhenActiveDaysReached(dates = [], target = 1) {
+    const byDay = new Map();
+    dates.forEach((date) => {
+      const key = this.localDayKey(date);
+      const previous = byDay.get(key);
+      if (!previous || date < previous) byDay.set(key, date);
+    });
+    const days = [...byDay.entries()].sort(([a], [b]) => a.localeCompare(b));
+    return days[target - 1]?.[1] || null;
+  },
+
+  dateWhenConsecutiveDaysReached(dates = [], target = 1) {
+    const byDay = new Map();
+    dates.forEach((date) => {
+      const key = this.localDayKey(date);
+      const previous = byDay.get(key);
+      if (!previous || date < previous) byDay.set(key, date);
+    });
+
+    const days = [...byDay.entries()]
+      .map(([key, date]) => ({ key, date, midnight: new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime() }))
+      .sort((a, b) => a.midnight - b.midnight);
+
+    let current = 0;
+    let previous = null;
+    const oneDay = 24 * 60 * 60 * 1000;
+
+    for (const day of days) {
+      current = previous !== null && day.midnight - previous === oneDay ? current + 1 : 1;
+      if (current >= target) return day.date;
+      previous = day.midnight;
+    }
+
+    return null;
+  },
+
   outcomeFromScores(home, away) {
     if (home > away) return "home";
     if (home < away) return "away";
@@ -1661,77 +1770,93 @@ const App = {
     const goodQualified = rows.filter(({ prediction }) => prediction.is_good_qualified).length;
     const zeros = rows.filter(({ prediction }) => Number(prediction.points_total || 0) === 0).length;
     const totalPoints = rows.reduce((sum, { prediction }) => sum + Number(prediction.points_total || 0), 0);
-    const avg = totalPoints / rows.length;
+    const avg = rows.length ? totalPoints / rows.length : 0;
+
+    const exactRows = rows.filter(({ prediction }) => prediction.is_exact_score);
+    const goodResultRows = rows.filter(({ prediction }) => prediction.is_good_result);
+    const goodDiffRows = rows.filter(({ prediction }) => prediction.is_good_goal_diff);
+    const zeroRows = rows.filter(({ prediction }) => Number(prediction.points_total || 0) === 0);
 
     const exactStreak = this.maxBooleanStreak(rows, ({ prediction }) => prediction.is_exact_score);
     const zeroStreak = this.maxBooleanStreak(rows, ({ prediction }) => Number(prediction.points_total || 0) === 0);
     const resultStreak = this.maxBooleanStreak(rows, ({ prediction }) => prediction.is_good_result);
 
-    const reversePicks = rows.filter(({ prediction, match }) => {
+    const reversePickRows = rows.filter(({ prediction, match }) => {
       const pred = this.outcomeFromScores(prediction.home_score_pred, prediction.away_score_pred);
       const real = this.outcomeFromScores(match.home_score, match.away_score);
       return (pred === "home" && real === "away") || (pred === "away" && real === "home");
-    }).length;
+    });
+    const reversePicks = reversePickRows.length;
 
-    const bustedDraws = rows.filter(({ prediction, match }) => {
+    const bustedDrawRows = rows.filter(({ prediction, match }) => {
       const pred = this.outcomeFromScores(prediction.home_score_pred, prediction.away_score_pred);
       const real = this.outcomeFromScores(match.home_score, match.away_score);
       return pred === "draw" && real !== "draw";
-    }).length;
+    });
+    const bustedDraws = bustedDrawRows.length;
 
-    const correctDraws = rows.filter(({ prediction, match }) => {
+    const correctDrawRows = rows.filter(({ prediction, match }) => {
       const pred = this.outcomeFromScores(prediction.home_score_pred, prediction.away_score_pred);
       const real = this.outcomeFromScores(match.home_score, match.away_score);
       return pred === "draw" && real === "draw";
-    }).length;
+    });
+    const correctDraws = correctDrawRows.length;
 
-    const perfectKnockouts = rows.filter(({ prediction, match }) =>
+    const perfectKnockoutRows = rows.filter(({ prediction, match }) =>
       match.stage !== "group" && prediction.is_exact_score && prediction.is_good_qualified
-    ).length;
+    );
+    const perfectKnockouts = perfectKnockoutRows.length;
 
-    const wrongQualified = rows.filter(({ prediction, match }) =>
+    const wrongQualifiedRows = rows.filter(({ prediction, match }) =>
       match.stage !== "group"
       && prediction.qualified_team_pred
       && match.winner_team_id
       && prediction.qualified_team_pred !== match.winner_team_id
-    ).length;
+    );
+    const wrongQualified = wrongQualifiedRows.length;
 
-    const smallExactScores = rows.filter(({ prediction, match }) =>
+    const smallExactScoreRows = rows.filter(({ prediction, match }) =>
       prediction.is_exact_score && Math.abs(Number(match.home_score) - Number(match.away_score)) === 1
-    ).length;
+    );
+    const smallExactScores = smallExactScoreRows.length;
 
-    const highExactScores = rows.filter(({ prediction, match }) =>
+    const highExactScoreRows = rows.filter(({ prediction, match }) =>
       prediction.is_exact_score && Number(match.home_score || 0) + Number(match.away_score || 0) >= 5
-    ).length;
+    );
+    const highExactScores = highExactScoreRows.length;
 
-    const bigWrongWay = rows.filter(({ prediction, match }) => {
+    const bigWrongWayRows = rows.filter(({ prediction, match }) => {
       const pred = this.outcomeFromScores(prediction.home_score_pred, prediction.away_score_pred);
       const real = this.outcomeFromScores(match.home_score, match.away_score);
       const predDiff = Number(prediction.home_score_pred) - Number(prediction.away_score_pred);
       const realDiff = Number(match.home_score) - Number(match.away_score);
       return pred !== real && Math.abs(predDiff) >= 3 && Math.sign(predDiff) !== Math.sign(realDiff);
-    }).length;
+    });
+    const bigWrongWay = bigWrongWayRows.length;
 
-    const round16Good = rows.filter(({ prediction, match }) =>
+    const round16GoodRows = rows.filter(({ prediction, match }) =>
       match.stage === "round_of_16" && Number(prediction.points_total || 0) >= 3
-    ).length;
+    );
+    const round16Good = round16GoodRows.length;
 
-    const knockoutQualifiedNoExact = rows.filter(({ prediction, match }) =>
+    const knockoutQualifiedNoExactRows = rows.filter(({ prediction, match }) =>
       match.stage !== "group" && prediction.is_good_qualified && !prediction.is_exact_score
-    ).length;
+    );
+    const knockoutQualifiedNoExact = knockoutQualifiedNoExactRows.length;
 
-    const hasComeback = (() => {
+    const comebackDate = (() => {
       let zeroRun = 0;
       for (const row of rows) {
         if (Number(row.prediction.points_total || 0) === 0) {
           zeroRun += 1;
         } else {
-          if (zeroRun >= 2 && row.prediction.is_exact_score) return true;
+          if (zeroRun >= 2 && row.prediction.is_exact_score) return this.scoreRowResultDate(row);
           zeroRun = 0;
         }
       }
-      return false;
+      return null;
     })();
+    const hasComeback = Boolean(comebackDate);
 
     const roundGroups = rows.reduce((acc, row) => {
       const round = Number(row.match.pool_round || 0);
@@ -1746,6 +1871,11 @@ const App = {
     let crystalRounds = 0;
     let emptyPoolRounds = 0;
     let bestPoolRoundPoints = 0;
+    let fullPoolRoundDate = null;
+    let noCrumbRoundDate = null;
+    let crystalRoundDate = null;
+    let emptyPoolRoundDate = null;
+    let featherHarvestDate = null;
 
     Object.entries(roundGroups).forEach(([round, roundRows]) => {
       const finishedInRound = this.state.matches.filter((match) =>
@@ -1754,21 +1884,41 @@ const App = {
         && Number(match.pool_round || 0) === Number(round)
       ).length;
       const roundPoints = roundRows.reduce((sum, { prediction }) => sum + Number(prediction.points_total || 0), 0);
+      const roundDate = this.firstScoreRowDate([...roundRows].sort((a, b) =>
+        (this.scoreRowResultDate(b)?.getTime() || 0) - (this.scoreRowResultDate(a)?.getTime() || 0)
+      ));
       bestPoolRoundPoints = Math.max(bestPoolRoundPoints, roundPoints);
+      if (roundPoints >= 30 && !featherHarvestDate) featherHarvestDate = roundDate;
 
       if (finishedInRound >= 3 && roundRows.length === finishedInRound) {
         fullPoolRounds += 1;
-        if (roundRows.every(({ prediction }) => Number(prediction.points_total || 0) > 0)) noCrumbRounds += 1;
-        if (roundRows.every(({ prediction }) => prediction.is_exact_score)) crystalRounds += 1;
-        if (roundRows.every(({ prediction }) => Number(prediction.points_total || 0) === 0)) emptyPoolRounds += 1;
+        if (!fullPoolRoundDate) fullPoolRoundDate = roundDate;
+        if (roundRows.every(({ prediction }) => Number(prediction.points_total || 0) > 0)) {
+          noCrumbRounds += 1;
+          if (!noCrumbRoundDate) noCrumbRoundDate = roundDate;
+        }
+        if (roundRows.every(({ prediction }) => prediction.is_exact_score)) {
+          crystalRounds += 1;
+          if (!crystalRoundDate) crystalRoundDate = roundDate;
+        }
+        if (roundRows.every(({ prediction }) => Number(prediction.points_total || 0) === 0)) {
+          emptyPoolRounds += 1;
+          if (!emptyPoolRoundDate) emptyPoolRoundDate = roundDate;
+        }
       }
     });
 
     const badges = [];
-    const unlock = (id) => {
+    const unlock = (id, unlockedAt = null) => {
       const badge = this.badgeById(id);
-      if (badge && !badges.some((b) => b.id === id)) badges.push({ ...badge });
+      if (badge && !badges.some((b) => b.id === id)) {
+        badges.push({ ...badge, unlockedAt: this.safeDate(unlockedAt) });
+      }
     };
+
+    const dateWhenCountReached = (sourceRows, count) => this.nthScoreRowDate(sourceRows, count);
+    const dateWhenPredictionCountReached = (count) => this.predictionDateAt(predictionRows, count);
+    const firstDateFromRows = (sourceRows) => this.firstScoreRowDate(sourceRows);
 
     const predictionCount = predictionRows.length;
     const availableMatchCount = this.availablePredictionMatches().length;
@@ -1777,8 +1927,9 @@ const App = {
       .filter(Boolean);
     const activeDayCount = new Set(activityDates.map((date) => this.localDayKey(date))).size;
     const consecutiveDays = this.maxConsecutiveDayStreak(activityDates);
-    const hasNightPrediction = activityDates.some((date) => date.getHours() >= 0 && date.getHours() < 6);
-    const hasLastWingbeat = predictionRows.some((prediction) => {
+    const nightPredictionDate = activityDates.find((date) => date.getHours() >= 0 && date.getHours() < 6) || null;
+    const hasNightPrediction = Boolean(nightPredictionDate);
+    const lastWingbeatPrediction = predictionRows.find((prediction) => {
       const activityDate = this.predictionActivityDate(prediction);
       const match = this.state.matches.find((m) => m.id === prediction.match_id);
       if (!activityDate || !match?.kickoff_at) return false;
@@ -1786,76 +1937,79 @@ const App = {
       const diff = kickoff.getTime() - activityDate.getTime();
       return diff >= 0 && diff <= 2 * 60 * 60 * 1000;
     });
+    const hasLastWingbeat = Boolean(lastWingbeatPrediction);
 
     const final = this.finalMatch();
     const finalWinnerPick = earlyWinnerPick || this.winnerPredictionForUser(userId);
+    const finalDate = this.matchResultDate(final);
     const hasFinalWinnerPick = Boolean(
       final?.status === "finished"
       && final?.winner_team_id
       && finalWinnerPick?.predicted_team_id === final.winner_team_id
     );
-    const hasPerfectFinalScore = rows.some(({ prediction, match }) =>
+    const finalPerfectRow = rows.find(({ prediction, match }) =>
       match.stage === "final" && prediction.is_exact_score
     );
+    const hasPerfectFinalScore = Boolean(finalPerfectRow);
 
-    if (predictionCount >= 1) unlock("egg-hatched");
-    if (predictionCount >= 10) unlock("young-feathers");
-    if (availableMatchCount > 0 && predictionCount >= Math.ceil(availableMatchCount / 2)) unlock("half-nest");
-    if (availableMatchCount > 0 && predictionCount >= Math.ceil(availableMatchCount * 0.75)) unlock("three-quarter-perch");
-    if (availableMatchCount > 0 && predictionCount >= availableMatchCount) unlock("all-picks-in");
+    if (predictionCount >= 1) unlock("egg-hatched", dateWhenPredictionCountReached(1));
+    if (predictionCount >= 10) unlock("young-feathers", dateWhenPredictionCountReached(10));
+    if (availableMatchCount > 0 && predictionCount >= Math.ceil(availableMatchCount / 2)) unlock("half-nest", dateWhenPredictionCountReached(Math.ceil(availableMatchCount / 2)));
+    if (availableMatchCount > 0 && predictionCount >= Math.ceil(availableMatchCount * 0.75)) unlock("three-quarter-perch", dateWhenPredictionCountReached(Math.ceil(availableMatchCount * 0.75)));
+    if (availableMatchCount > 0 && predictionCount >= availableMatchCount) unlock("all-picks-in", dateWhenPredictionCountReached(availableMatchCount));
 
-    if (hasNightPrediction) unlock("night-owl");
-    if (consecutiveDays >= 3) unlock("three-day-ritual");
-    if (consecutiveDays >= 7) unlock("seven-day-streak");
-    if (activeDayCount >= 14) unlock("many-active-days");
-    if (hasLastWingbeat) unlock("last-wingbeat");
+    if (hasNightPrediction) unlock("night-owl", nightPredictionDate);
+    if (consecutiveDays >= 3) unlock("three-day-ritual", this.dateWhenConsecutiveDaysReached(activityDates, 3));
+    if (consecutiveDays >= 7) unlock("seven-day-streak", this.dateWhenConsecutiveDaysReached(activityDates, 7));
+    if (activeDayCount >= 14) unlock("many-active-days", this.dateWhenActiveDaysReached(activityDates, 14));
+    if (hasLastWingbeat) unlock("last-wingbeat", this.predictionActivityDate(lastWingbeatPrediction));
 
-    if (hasFinalWinnerPick) unlock("final-winner-oracle");
-    if (hasPerfectFinalScore) unlock("final-perfect-score");
+    if (hasFinalWinnerPick) unlock("final-winner-oracle", finalDate);
+    if (hasPerfectFinalScore) unlock("final-perfect-score", this.scoreRowResultDate(finalPerfectRow));
 
-    if (rows.length >= 1) unlock("first-flight");
-    if (exact >= 1) unlock("first-perfect");
-    if (exact >= 3) unlock("surgical-beak");
-    if (exactStreak >= 3) unlock("streak-3-exact");
-    if (exactStreak >= 5) unlock("streak-5-exact");
-    if (exact >= 10) unlock("owl-sniper");
-    if (goodResults >= 10) unlock("accountant");
-    if (resultStreak >= 5) unlock("safe-flight");
-    if (resultStreak >= 10) unlock("autopilot");
-    if (goodDiffs >= 5) unlock("geometry");
-    if (goodDiffs >= 10) unlock("architect");
-    if (goodQualified >= 1) unlock("knife-edge");
-    if (goodQualified >= 2) unlock("qualified-oracle");
-    if (perfectKnockouts >= 1) unlock("scenario");
-    if (round16Good >= 1) unlock("round16-lord");
-    if (totalPoints >= 40) unlock("high-branch");
-    if (knockoutQualifiedNoExact >= 1) unlock("no-net");
-    if (hasComeback) unlock("comeback");
-    if (totalPoints >= 50) unlock("gold-nest");
-    if (totalPoints >= 100) unlock("platinum-nest");
-    if (rows.length >= 10 && avg >= 4) unlock("machine");
-    if (rows.length >= 10 && avg >= 5) unlock("crystal-wing");
-    if (fullPoolRounds >= 1) unlock("full-perch");
-    if (noCrumbRounds >= 1) unlock("no-crumbs");
-    if (crystalRounds >= 1) unlock("pool-crystal");
-    if (correctDraws >= 3) unlock("draw-master");
-    if (smallExactScores >= 3) unlock("small-score");
-    if (highExactScores >= 1) unlock("fireworks");
-    if (bestPoolRoundPoints >= 30) unlock("feather-harvest");
+    if (rows.length >= 1) unlock("first-flight", this.nthScoreRowDate(rows, 1));
+    if (exact >= 1) unlock("first-perfect", dateWhenCountReached(exactRows, 1));
+    if (exact >= 3) unlock("surgical-beak", dateWhenCountReached(exactRows, 3));
+    if (exactStreak >= 3) unlock("streak-3-exact", this.dateWhenBooleanStreakReached(rows, ({ prediction }) => prediction.is_exact_score, 3));
+    if (exactStreak >= 5) unlock("streak-5-exact", this.dateWhenBooleanStreakReached(rows, ({ prediction }) => prediction.is_exact_score, 5));
+    if (exact >= 10) unlock("owl-sniper", dateWhenCountReached(exactRows, 10));
+    if (goodResults >= 10) unlock("accountant", dateWhenCountReached(goodResultRows, 10));
+    if (resultStreak >= 5) unlock("safe-flight", this.dateWhenBooleanStreakReached(rows, ({ prediction }) => prediction.is_good_result, 5));
+    if (resultStreak >= 10) unlock("autopilot", this.dateWhenBooleanStreakReached(rows, ({ prediction }) => prediction.is_good_result, 10));
+    if (goodDiffs >= 5) unlock("geometry", dateWhenCountReached(goodDiffRows, 5));
+    if (goodDiffs >= 10) unlock("architect", dateWhenCountReached(goodDiffRows, 10));
+    if (goodQualified >= 1) unlock("knife-edge", firstDateFromRows(rows.filter(({ prediction }) => prediction.is_good_qualified)));
+    if (goodQualified >= 2) unlock("qualified-oracle", dateWhenCountReached(rows.filter(({ prediction }) => prediction.is_good_qualified), 2));
+    if (perfectKnockouts >= 1) unlock("scenario", firstDateFromRows(perfectKnockoutRows));
+    if (round16Good >= 1) unlock("round16-lord", firstDateFromRows(round16GoodRows));
+    if (totalPoints >= 40) unlock("high-branch", this.dateWhenTotalPointsReached(rows, 40));
+    if (knockoutQualifiedNoExact >= 1) unlock("no-net", firstDateFromRows(knockoutQualifiedNoExactRows));
+    if (hasComeback) unlock("comeback", comebackDate);
+    if (totalPoints >= 50) unlock("gold-nest", this.dateWhenTotalPointsReached(rows, 50));
+    if (totalPoints >= 100) unlock("platinum-nest", this.dateWhenTotalPointsReached(rows, 100));
+    if (rows.length >= 10 && avg >= 4) unlock("machine", this.dateWhenAverageReached(rows, 10, 4));
+    if (rows.length >= 10 && avg >= 5) unlock("crystal-wing", this.dateWhenAverageReached(rows, 10, 5));
+    if (fullPoolRounds >= 1) unlock("full-perch", fullPoolRoundDate);
+    if (noCrumbRounds >= 1) unlock("no-crumbs", noCrumbRoundDate);
+    if (crystalRounds >= 1) unlock("pool-crystal", crystalRoundDate);
+    if (correctDraws >= 3) unlock("draw-master", dateWhenCountReached(correctDrawRows, 3));
+    if (smallExactScores >= 3) unlock("small-score", dateWhenCountReached(smallExactScoreRows, 3));
+    if (highExactScores >= 1) unlock("fireworks", firstDateFromRows(highExactScoreRows));
+    if (bestPoolRoundPoints >= 30) unlock("feather-harvest", featherHarvestDate);
 
-    if (zeros >= 5) unlock("zero-tunnel");
-    if (zeroStreak >= 3) unlock("myopic");
-    if (zeroStreak >= 5) unlock("blackout");
-    if (emptyPoolRounds >= 1) unlock("pool-disaster");
-    if (reversePicks >= 3) unlock("broken-compass");
-    if (bustedDraws >= 3) unlock("cracked-wall");
-    if (rows.length >= 3 && totalPoints === 0) unlock("empty-nest");
-    if (rows.length >= 10 && exact === 0) unlock("anti-sniper");
-    if (rows.length >= 10 && avg < 1) unlock("cold-perch");
-    if (bustedDraws >= 5) unlock("draw-trap");
-    if (wrongQualified >= 2) unlock("wrong-exit");
-    if (bigWrongWay >= 1) unlock("big-owch");
-    if (rows.length >= 5 && zeros >= 3) unlock("wet-feathers");
+    if (zeros >= 5) unlock("zero-tunnel", dateWhenCountReached(zeroRows, 5));
+    if (zeroStreak >= 3) unlock("myopic", this.dateWhenBooleanStreakReached(rows, ({ prediction }) => Number(prediction.points_total || 0) === 0, 3));
+    if (zeroStreak >= 5) unlock("blackout", this.dateWhenBooleanStreakReached(rows, ({ prediction }) => Number(prediction.points_total || 0) === 0, 5));
+    if (emptyPoolRounds >= 1) unlock("pool-disaster", emptyPoolRoundDate);
+    if (reversePicks >= 3) unlock("broken-compass", dateWhenCountReached(reversePickRows, 3));
+    if (bustedDraws >= 3) unlock("cracked-wall", dateWhenCountReached(bustedDrawRows, 3));
+    if (rows.length >= 3 && totalPoints === 0) unlock("empty-nest", this.nthScoreRowDate(rows, 3));
+    if (rows.length >= 10 && exact === 0) unlock("anti-sniper", this.nthScoreRowDate(rows, 10));
+    if (rows.length >= 10 && avg < 1) unlock("cold-perch", this.nthScoreRowDate(rows, 10));
+    if (bustedDraws >= 5) unlock("draw-trap", dateWhenCountReached(bustedDrawRows, 5));
+    if (wrongQualified >= 2) unlock("wrong-exit", dateWhenCountReached(wrongQualifiedRows, 2));
+    if (bigWrongWay >= 1) unlock("big-owch", firstDateFromRows(bigWrongWayRows));
+    if (rows.length >= 5 && zeros >= 3) unlock("wet-feathers", dateWhenCountReached(zeroRows, 3));
 
     return badges;
   },
@@ -1877,38 +2031,208 @@ const App = {
     `;
   },
 
+  achievementDateLabel(badge) {
+    if (!badge?.unlockedAt) return "";
+    return H.formatDateTime(badge.unlockedAt);
+  },
+
   badgeChipHtml(badge) {
+    const dateLabel = this.achievementDateLabel(badge);
+    const title = `${badge.description}${dateLabel ? ` · Obtenu le ${dateLabel}` : ""}`;
     return `
-      <span class="achievement-chip ${H.escapeHtml(badge.type)}" title="${H.escapeHtml(badge.description)}">
+      <span class="achievement-chip ${H.escapeHtml(badge.type)}" title="${H.escapeHtml(title)}">
         ${this.badgeArtHtml(badge)}
         <span>${H.escapeHtml(badge.title)}</span>
       </span>
     `;
   },
 
-  badgesPreviewHtml(userId, limit = 3) {
-    const badges = this.computeBadgesForUser(userId);
-    if (!badges.length) return "";
-    return `<div class="achievement-preview">${badges.slice(0, limit).map((badge) => this.badgeChipHtml(badge)).join("")}</div>`;
+  normalizeFeaturedBadgeIds(value) {
+    if (Array.isArray(value)) {
+      return [...new Set(value.map((id) => String(id || "").trim()).filter(Boolean))].slice(0, 3);
+    }
+    if (typeof value === "string") {
+      const trimmed = value.trim();
+      if (!trimmed) return [];
+      try {
+        const parsed = JSON.parse(trimmed);
+        if (Array.isArray(parsed)) return this.normalizeFeaturedBadgeIds(parsed);
+      } catch (_) {
+        // Supabase/Postgres peut renvoyer un tableau text[] sous forme {id-a,id-b} selon le contexte.
+      }
+      return trimmed
+        .replace(/^\{|\}$/g, "")
+        .split(",")
+        .map((id) => id.replace(/^"|"$/g, "").trim())
+        .filter(Boolean)
+        .slice(0, 3);
+    }
+    return [];
   },
 
-  badgeCardHtml(badge, unlocked = true) {
+  profileLikeForUser(userId, sourceProfile = null) {
+    const candidates = [
+      sourceProfile,
+      this.state.profile?.id === userId ? this.state.profile : null,
+      this.state.publicProfiles.find((profile) => profile.id === userId || profile.user_id === userId),
+      this.state.playerScoreRows.find((row) => row.user_id === userId || row.id === userId)
+    ];
+    return candidates.find((profile) => profile && Object.prototype.hasOwnProperty.call(profile, "featured_badge_ids")) || null;
+  },
+
+  featuredBadgeIdsForUser(userId, sourceProfile = null) {
+    return this.normalizeFeaturedBadgeIds(this.profileLikeForUser(userId, sourceProfile)?.featured_badge_ids);
+  },
+
+  featuredBadgesForUser(userId, limit = 3, sourceProfile = null) {
+    const badges = this.computeBadgesForUser(userId);
+    const selectedIds = this.featuredBadgeIdsForUser(userId, sourceProfile);
+    const byId = new Map(badges.map((badge) => [badge.id, badge]));
+    const selected = selectedIds.map((id) => byId.get(id)).filter(Boolean).slice(0, limit);
+    const shown = selected.length ? selected : badges.slice(0, limit);
+    return { badges, shown, selectedIds };
+  },
+
+  badgesPreviewHtml(userId, limit = 3, sourceProfile = null) {
+    const { badges, shown, selectedIds } = this.featuredBadgesForUser(userId, limit, sourceProfile);
+    if (!badges.length) return "";
+    const hiddenCount = Math.max(0, badges.length - shown.length);
+    const customTitle = selectedIds.length ? "Badges choisis par le joueur" : "Aucun choix personnalisé : aperçu automatique";
+    return `
+      <div class="achievement-preview" aria-label="${H.escapeHtml(shown.length)} exploit${shown.length > 1 ? "s" : ""} affiché${shown.length > 1 ? "s" : ""} sur ${H.escapeHtml(badges.length)}" title="${H.escapeHtml(customTitle)}">
+        ${shown.map((badge) => this.badgeChipHtml(badge)).join("")}
+        ${hiddenCount ? `<span class="achievement-chip achievement-more" title="Les autres exploits sont visibles en ouvrant le détail">+${hiddenCount} autre${hiddenCount > 1 ? "s" : ""}</span>` : ""}
+      </div>
+    `;
+  },
+
+  featuredBadgePickerHtml(badges = []) {
+    if (!badges.length) return `
+      <section class="card featured-badges-card">
+        <div class="card-title-row">
+          <div>
+            <h3>${H.icon("star")} Mes badges affichés</h3>
+            <p class="muted">Tu pourras choisir jusqu’à 3 badges à afficher dans les classements dès que tu auras débloqué ton premier exploit.</p>
+          </div>
+        </div>
+      </section>
+    `;
+
+    const selectedIds = this.featuredBadgeIdsForUser(this.state.session.user.id, this.state.profile)
+      .filter((id) => badges.some((badge) => badge.id === id));
+    const selected = selectedIds
+      .map((id) => badges.find((badge) => badge.id === id))
+      .filter(Boolean);
+    const selectedLabel = selected.length
+      ? selected.map((badge) => this.badgeChipHtml(badge)).join("")
+      : `<span class="muted">Aucun choix personnalisé : le classement affiche automatiquement tes 3 premiers exploits.</span>`;
+
+    return `
+      <section class="card featured-badges-card">
+        <div class="card-title-row">
+          <div>
+            <h3>${H.icon("star")} Mes badges affichés</h3>
+            <p class="muted">Choisis les 3 exploits que tu veux montrer sur le classement général. Les autres restent visibles dans le détail.</p>
+          </div>
+          <span class="pill neutral">${selected.length}/3 choisis</span>
+        </div>
+        <div class="featured-badges-selected">
+          ${selectedLabel}
+        </div>
+        <div class="achievement-grid large featured-badge-picker">
+          ${badges.map((badge) => {
+            const isSelected = selectedIds.includes(badge.id);
+            return `
+              <article class="achievement-card ${H.escapeHtml(badge.type)} featured-badge-option ${isSelected ? "is-featured" : ""}">
+                ${this.badgeArtHtml(badge, true)}
+                <div>
+                  <strong>${H.escapeHtml(badge.title)}</strong>
+                  <p>${H.escapeHtml(badge.description)}</p>
+                  <button class="${isSelected ? "danger-btn" : "ghost-btn"} small featured-badge-toggle" type="button" data-featured-badge-id="${H.escapeHtml(badge.id)}">
+                    ${isSelected ? "Retirer du classement" : "Afficher sur le classement"}
+                  </button>
+                </div>
+              </article>
+            `;
+          }).join("")}
+        </div>
+      </section>
+    `;
+  },
+
+  bindFeaturedBadgePicker(badges = []) {
+    const unlockedIds = new Set(badges.map((badge) => badge.id));
+    H.$$("[data-featured-badge-id]").forEach((button) => {
+      button.addEventListener("click", async () => {
+        const badgeId = button.dataset.featuredBadgeId;
+        if (!badgeId || !unlockedIds.has(badgeId)) return;
+
+        const current = this.featuredBadgeIdsForUser(this.state.session.user.id, this.state.profile)
+          .filter((id) => unlockedIds.has(id));
+        const alreadySelected = current.includes(badgeId);
+        const next = alreadySelected
+          ? current.filter((id) => id !== badgeId)
+          : [...current, badgeId];
+
+        if (next.length > 3) {
+          H.toast("Tu peux afficher 3 badges maximum dans les classements.", "info");
+          return;
+        }
+
+        button.disabled = true;
+        try {
+          await this.saveFeaturedBadgeIds(next);
+          H.toast(alreadySelected ? "Badge retiré du classement" : "Badge mis en avant", "success");
+          await this.renderAchievementsContent();
+        } finally {
+          button.disabled = false;
+        }
+      });
+    });
+  },
+
+  async saveFeaturedBadgeIds(ids = []) {
+    const cleanIds = this.normalizeFeaturedBadgeIds(ids);
+    const { error } = await window.sb
+      .from("profiles")
+      .update({ featured_badge_ids: cleanIds })
+      .eq("id", this.state.session.user.id);
+
+    if (error) {
+      H.toast(error.message, "error");
+      throw error;
+    }
+
+    this.state.profile = { ...this.state.profile, featured_badge_ids: cleanIds };
+    this.state.publicProfiles = this.state.publicProfiles.map((profile) =>
+      profile.id === this.state.session.user.id ? { ...profile, featured_badge_ids: cleanIds } : profile
+    );
+    this.state.playerScoreRows = this.state.playerScoreRows.map((row) =>
+      row.user_id === this.state.session.user.id ? { ...row, featured_badge_ids: cleanIds } : row
+    );
+  },
+
+  badgeCardHtml(badge, unlocked = true, options = {}) {
+    const showDate = options.showDate !== false;
+    const dateLabel = unlocked && showDate ? this.achievementDateLabel(badge) : "";
     return `
       <article class="achievement-card ${H.escapeHtml(badge.type)} ${unlocked ? "" : "locked"}">
         ${this.badgeArtHtml(badge, unlocked)}
         <div>
           <strong>${H.escapeHtml(badge.title)}</strong>
           <p>${H.escapeHtml(badge.description)}</p>
+          ${dateLabel ? `<small class="achievement-date">${H.icon("time")} Obtenu le ${H.escapeHtml(dateLabel)}</small>` : ""}
           ${unlocked ? "" : `<small class="achievement-state locked">À débloquer</small>`}
         </div>
       </article>
     `;
   },
 
-  badgesPanelHtml(userId) {
+  badgesPanelHtml(userId, options = {}) {
     const badges = this.computeBadgesForUser(userId);
     if (!badges.length) return `<p class="muted detail-empty">Aucun exploit pour le moment. Le nid observe en silence.</p>`;
-    return `<div class="achievement-grid">${badges.map((badge) => this.badgeCardHtml(badge, true)).join("")}</div>`;
+    const title = options.title ? `<div class="achievement-panel-title"><strong>${H.escapeHtml(options.title)}</strong><small>${badges.length} exploit${badges.length > 1 ? "s" : ""} débloqué${badges.length > 1 ? "s" : ""}</small></div>` : "";
+    return `${title}<div class="achievement-grid">${badges.map((badge) => this.badgeCardHtml(badge, true, { showDate: options.showDates !== false })).join("")}</div>`;
   },
   achievementStorageKey() {
     return `nid-achievements-notified:${this.state.session?.user?.id || "anonymous"}`;
@@ -2136,7 +2460,7 @@ const App = {
                 <strong>${H.escapeHtml(r.pseudo)}</strong>
                 <small>${H.escapeHtml(r.office_team_name || "Sans team")}</small>
                 ${this.pointsBreakdownHtml(r)}
-                ${this.badgesPreviewHtml(r.user_id)}
+                ${this.badgesPreviewHtml(r.user_id, 3, r)}
               </div>
               <div class="points">${r.total_points || 0}<small>pts</small></div>
             </summary>
@@ -2145,7 +2469,7 @@ const App = {
               ${this.playerScoreDetailsHtml(r.user_id, filters)}
               ${r.winner_points ? `<div class="winner-bonus-line">${H.icon("trophy")} Bonus champion du monde : <strong>+${r.winner_points} pts</strong></div>` : ""}
               <h4>Badges d’exploit</h4>
-              ${this.badgesPanelHtml(r.user_id)}
+              ${this.badgesPanelHtml(r.user_id, { title: "Tous les exploits visibles" })}
             </div>
           </details>`;
         }).join("")}
@@ -2166,7 +2490,7 @@ const App = {
 
     const { data, error } = await window.sb
       .from("v_leaderboard_overall")
-      .select("user_id,pseudo,office_team_id,office_team_name,office_team_slug,avatar_key,badge_shape,badge_color")
+      .select("user_id,pseudo,office_team_id,office_team_name,office_team_slug,avatar_key,badge_shape,badge_color,featured_badge_ids")
       .order("pseudo");
 
     if (error) {
@@ -2255,11 +2579,12 @@ const App = {
                 <div>
                   <strong>#${row.rank} — ${H.escapeHtml(row.pseudo)}</strong>
                   <small>${H.escapeHtml(row.office_team_name || "Sans team")} · ${badges.length} badge${badges.length > 1 ? "s" : ""}</small>
+                  ${this.badgesPreviewHtml(row.user_id, 3, row)}
                 </div>
               </div>
               <div class="points">${row.total_points || 0}<small>pts</small></div>
             </summary>
-            ${this.badgesPanelHtml(row.user_id)}
+            ${this.badgesPanelHtml(row.user_id, { title: "Tous les exploits du joueur" })}
           </details>
         `).join("") : `<section class="card"><p class="muted">Aucun badge pour le moment.</p></section>`}
       </div>
@@ -2865,7 +3190,7 @@ const App = {
             <p class="muted">Déconnexion, crédits et historique des évolutions.</p>
           </div>
           <div class="profile-account-actions">
-            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v0.25.6</button>
+            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v0.25.8</button>
             <button class="danger-btn" id="profileLogoutBtn" type="button">Déconnexion</button>
           </div>
         </div>
