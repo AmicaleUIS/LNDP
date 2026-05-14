@@ -1,4 +1,10 @@
-# Le Nid des Pronos — V0.26.0
+# Le Nid des Pronos — V0.26.1
+
+## Nouveautés V0.26.1
+
+- Règles du nid clarifiées dans la modal d’accueil.
+- Bonus phase finale expliqué clairement : bon qualifié = +2 pts, y compris après prolongation ou tirs au but.
+- Matchs de préparation expliqués comme tests hors classement et hors exploits normaux.
 
 ## Nouveautés V0.26.0
 

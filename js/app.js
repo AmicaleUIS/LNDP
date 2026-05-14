@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — APP PRINCIPALE V0.26.0
+// LE NID DES PRONOS — APP PRINCIPALE V0.26.1
 // ============================================================
 
 const H = window.Helpers;
@@ -302,19 +302,20 @@ const App = {
           <div>
             <p class="eyebrow">Crédits cachés</p>
             <h2 id="creditsTitle">Le Nid des Pronos</h2>
-            <p class="muted">Version <strong>0.26.0</strong> · pré-déploiement. Le passage en <strong>1.0.0</strong> se fera au déploiement officiel.</p>
+            <p class="muted">Version <strong>0.26.1</strong> · pré-déploiement. Le passage en <strong>1.0.0</strong> se fera au déploiement officiel.</p>
           </div>
           <button class="ghost-btn" id="closeCreditsBtn" type="button">Fermer</button>
         </div>
         <div class="credits-grid">
           <section>
             <h3>Principe de version</h3>
-            <p><strong>0.26.0</strong> = version non déployée · évolution majeure n°26 · préparation, règles et classements clarifiés.</p>
+            <p><strong>0.26.1</strong> = version non déployée · règles du nid clarifiées, avec bonus qualifié expliqué.</p>
             <p><strong>1.x.x</strong> = version publique déployée.</p>
           </section>
           <section>
             <h3>Évolutions récentes</h3>
             <ul class="changelog-list">
+              <li><strong>0.26.1</strong> — règles du nid clarifiées : score exact, bon résultat, bon écart, bonus qualifié +2 pts, champion et matchs test.</li>
               <li><strong>0.26.0</strong> — matchs de préparation test, bouton règles, classements clarifiés, phase finale draggable et reset scores de préparation.</li>
               <li><strong>0.25.17</strong> — phase finale réellement anti-chevauchement : colonnes plus larges, cartes contenues et scroll horizontal propre.</li>
               <li><strong>0.25.16</strong> — phase finale aérée sans chevauchement et saisie rapide admin mobile corrigée.</li>
@@ -380,16 +381,17 @@ const App = {
           <button class="ghost-btn" id="closeRulesBtn" type="button">Fermer</button>
         </div>
         <div class="rules-grid">
-          <article><strong>Score exact</strong><span>Le score est parfaitement trouvé.</span><b>+5 pts</b></article>
-          <article><strong>Bon résultat</strong><span>Victoire / nul / défaite correctement senti.</span><b>+3 pts</b></article>
-          <article><strong>Bon écart</strong><span>Le bon écart de buts est trouvé.</span><b>+1 pt</b></article>
-          <article><strong>Phase finale</strong><span>Le bon qualifié est choisi sur un match couperet.</span><b>bonus</b></article>
-          <article><strong>Champion du monde</strong><span>Ton équipe choisie avant le début gagne la finale.</span><b>+100 pts</b></article>
-          <article><strong>Matchs test</strong><span>France–Côte d’Ivoire et France–Irlande du Nord servent à tester le site.</span><b>0 pt classement</b></article>
+          <article><strong>Score exact</strong><span>Tu poses le score pile comme au coup de sifflet final. Le hibou sort les confettis.</span><b>+5 pts</b></article>
+          <article><strong>Bon résultat</strong><span>Tu trouves le bon sens du match : victoire, nul ou défaite, même si le score n’est pas exact.</span><b>+3 pts</b></article>
+          <article><strong>Bon écart</strong><span>Tu ne trouves pas forcément le score, mais tu trouves le bon écart de buts. Exemple : tu pronostiques 2-0 et le match finit 3-1.</span><b>+1 pt</b></article>
+          <article><strong>Phase finale</strong><span>Dans un match couperet, l’important est aussi de deviner quel oiseau reste perché. Si tu choisis la bonne équipe qualifiée, même après prolongation ou tirs au but, tu gagnes le bonus.</span><b>+2 pts</b></article>
+          <article><strong>Champion du monde</strong><span>Ton grand favori, choisi avant le début de la Coupe du monde, soulève le trophée à la fin.</span><b>+100 pts</b></article>
+          <article><strong>Matchs test</strong><span>France–Côte d’Ivoire et France–Irlande du Nord servent uniquement à tester le nid avant le vrai envol.</span><b>0 pt classement</b></article>
         </div>
         <div class="rules-note">
-          <strong>Préparation</strong>
-          <p>Les 2 matchs test peuvent débloquer seulement les badges de préparation : “Préparation du nid” et “Test concluant”. Ils ne déclenchent pas les exploits normaux.</p>
+          <strong>Préparation du nid</strong>
+          <p>Les 2 matchs de préparation sont bien des matchs test : ils ne comptent pas dans le classement Coupe du monde, ne comptent pas dans les graphiques et ne débloquent pas les exploits normaux. Ils servent à vérifier que les pronos, les scores et les popups fonctionnent avant le début officiel.</p>
+          <p>Ils peuvent seulement débloquer les badges spéciaux de préparation : <strong>Préparation du nid</strong> si tu pronostiques les 2 matchs, et <strong>Test concluant</strong> si tu pronostiques bien au moins 1 match sur les 2.</p>
         </div>
       </div>
     `;
@@ -4094,7 +4096,7 @@ const App = {
             <p class="muted">Déconnexion, crédits et historique des évolutions.</p>
           </div>
           <div class="profile-account-actions">
-            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v0.26.0</button>
+            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v0.26.1</button>
             <button class="danger-btn" id="profileLogoutBtn" type="button">Déconnexion</button>
           </div>
         </div>
@@ -4365,7 +4367,7 @@ const App = {
 
   setupRealtime() {
     window.sb
-      .channel("app-realtime-v0-26-0")
+      .channel("app-realtime-v0-26-1")
       .on("postgres_changes", { event: "*", schema: "public", table: "matches" }, async () => {
         await this.refreshCurrentViewFromRealtime("matches");
       })
