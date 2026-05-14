@@ -1,30 +1,38 @@
-# Le Nid des Pronos — V0.25.9
+# Le Nid des Pronos — V0.25.11
 
-## Nouveautés V0.25.9
+## Nouveautés V0.25.11
 
-- Le popup d’exploit s’ouvre **immédiatement** quand un nouvel exploit est détecté, sans attendre `requestAnimationFrame`.
-- Dans le popup, l’image du badge remplit maintenant **tout le rond**.
-- Suppression complète du bloc **Récap rapide** dans l’onglet Matchs.
-- L’onglet **Les teams** devient **Les teams du nid**.
-- Sur mobile, la barre de navigation du bas est remplacée par un **menu burger** avec tous les onglets.
+- Popup d’exploit ajusté : l’image est un peu plus petite et reste complète dans le rond.
+- Le popup d’exploit affiche maintenant la date d’obtention quand elle est connue.
+- Après validation d’un prono, les nouveaux exploits sont comparés avant/après et mis en file de popup directement.
+- Dans l’admin, la zone **Charger une sauvegarde** garde uniquement le menu déroulant + le bouton de chargement.
+- Sur mobile, le header reste visible en haut avec le bouton burger.
+- Ajout d’un bouton flottant “chouette volante” pour revenir rapidement en haut de page.
+- Même bouton de retour en haut ajouté côté admin mobile.
 
-## À lancer dans Supabase
+## Base de données
 
-Aucun nouveau patch SQL pour la V0.25.9.
+Aucun nouveau patch SQL pour la V0.25.11.
 
-Si tu viens d’une version avant V0.25.8, pense toujours à lancer :
+Si tu viens d’une version avant V0.25.10, lance toujours :
+
+```sql
+patch_v0_25_10_reset_messages_backup.sql
+```
+
+Si tu viens d’une version avant V0.25.8, lance aussi :
 
 ```sql
 patch_v0_25_8_badges_mis_en_avant.sql
 ```
 
-Ce patch permet à chaque joueur de choisir les 3 badges affichés dans les classements.
+## Exploits
 
-## Images des exploits
+Les 54 exploits présents dans le catalogue sont câblés dans `computeBadgesForUser()`.
 
-Les nouveaux exploits utilisent le même système d’image que les anciens : ajoute simplement un PNG nommé comme l’identifiant du badge dans `assets/badges/`.
+Les images des exploits utilisent le même système que les anciens badges : ajoute un PNG nommé comme l’identifiant du badge dans `assets/badges/`.
 
-Fichiers PNG attendus pour les derniers exploits ajoutés :
+Derniers fichiers PNG attendus :
 
 - `assets/badges/egg-hatched.png`
 - `assets/badges/young-feathers.png`

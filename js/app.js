@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — APP PRINCIPALE
+// LE NID DES PRONOS — APP PRINCIPALE V0.25.11
 // ============================================================
 
 const H = window.Helpers;
@@ -27,6 +27,7 @@ const App = {
     teamChatPageSize: 30,
     teamChatHasMore: false,
     teamChatError: null,
+    hasUnreadTeamMessages: false,
     currentView: "home",
     leaderboardTab: "overall",
     teamTab: "average",
@@ -37,7 +38,9 @@ const App = {
     leaderboardPhaseIndex: 0,
     achievementNotificationQueue: [],
     achievementModalOpen: false,
-    achievementNotificationTimer: null
+    achievementNotificationTimer: null,
+    achievementResyncTimers: [],
+    lastAchievementIds: null
   },
 
   async init() {
@@ -54,6 +57,7 @@ const App = {
     const mustCompleteProfile = !this.profileSetupComplete();
     this.syncAchievementNotifications({ silent: !this.hasAchievementNotificationStore() });
     await this.loadView(mustCompleteProfile ? "profile" : (allowedViews.includes(requestedView) ? requestedView : "home"));
+    await this.refreshTeamChatUnreadIndicator();
     if (mustCompleteProfile) H.toast("Bienvenue ! Choisis ton pseudo, ton avatar, ton badge et ta team pour entrer dans le nid.", "info");
     this.setupRealtime();
   },
@@ -113,12 +117,135 @@ const App = {
     }, 160);
   },
 
+  teamChatSeenKey() {
+    return `nid-team-chat-last-seen:${this.state.session?.user?.id || "anonymous"}`;
+  },
+
+  getTeamChatLastSeenAt() {
+    try {
+      const raw = localStorage.getItem(this.teamChatSeenKey());
+      return raw ? new Date(raw) : null;
+    } catch (error) {
+      return null;
+    }
+  },
+
+  setTeamChatLastSeenNow() {
+    try {
+      localStorage.setItem(this.teamChatSeenKey(), new Date().toISOString());
+    } catch (error) {
+      console.warn("Impossible d’enregistrer la lecture du chat", error);
+    }
+  },
+
+  markTeamChatAsSeen() {
+    this.setTeamChatLastSeenNow();
+    this.state.hasUnreadTeamMessages = false;
+    this.updateTeamUnreadIndicators();
+  },
+
+  updateTeamUnreadIndicators() {
+    const shouldShow = Boolean(this.state.hasUnreadTeamMessages && this.state.currentView !== "teams");
+    H.$$('[data-view="teams"]').forEach((btn) => {
+      btn.classList.toggle("has-unread", shouldShow);
+      btn.setAttribute("aria-label", shouldShow ? "Les teams du nid — nouveau message non lu" : "Les teams du nid");
+    });
+  },
+
+  async refreshTeamChatUnreadIndicator() {
+    if (!this.state.session?.user?.id) return;
+    const lastSeen = this.getTeamChatLastSeenAt();
+    if (!lastSeen || Number.isNaN(lastSeen.getTime())) {
+      this.setTeamChatLastSeenNow();
+      this.state.hasUnreadTeamMessages = false;
+      this.updateTeamUnreadIndicators();
+      return;
+    }
+
+    const after = lastSeen.toISOString();
+    const ownUserId = this.state.session.user.id;
+
+    const hasUnreadInQuery = async (query) => {
+      const { data, error } = await query;
+      if (error) {
+        console.warn("Indicateur messages non lus indisponible", error);
+        return false;
+      }
+      return Boolean((data || []).length);
+    };
+
+    const checks = [
+      hasUnreadInQuery(
+        window.sb
+          .from("v_team_chat_messages")
+          .select("id,created_at,user_id")
+          .eq("scope", "global")
+          .neq("user_id", ownUserId)
+          .gt("created_at", after)
+          .order("created_at", { ascending: false })
+          .limit(1)
+      )
+    ];
+
+    if (this.state.profile?.office_team_id) {
+      checks.push(hasUnreadInQuery(
+        window.sb
+          .from("v_team_chat_messages")
+          .select("id,created_at,user_id")
+          .eq("scope", "team")
+          .eq("office_team_id", this.state.profile.office_team_id)
+          .neq("user_id", ownUserId)
+          .gt("created_at", after)
+          .order("created_at", { ascending: false })
+          .limit(1)
+      ));
+    }
+
+    const results = await Promise.all(checks);
+    this.state.hasUnreadTeamMessages = results.some(Boolean);
+    this.updateTeamUnreadIndicators();
+  },
+
+  teamChatRealtimeMessageIsVisible(message = {}) {
+    if (!message || message.user_id === this.state.session?.user?.id) return false;
+    if (message.deleted_at) return false;
+    if (message.scope === "global") return true;
+    return message.scope === "team" && message.office_team_id === this.state.profile?.office_team_id;
+  },
+
+  async handleTeamChatRealtime(payload = {}) {
+    if (this.state.currentView === "teams") {
+      await this.loadTeamChatMessages();
+      await this.renderTeamsPage();
+      return;
+    }
+
+    if (payload.eventType === "INSERT" && this.teamChatRealtimeMessageIsVisible(payload.new)) {
+      this.state.hasUnreadTeamMessages = true;
+      this.updateTeamUnreadIndicators();
+      return;
+    }
+
+    await this.refreshTeamChatUnreadIndicator();
+  },
+
   bindGlobalActions() {
     const logoutBtn = H.$("#logoutBtn");
     if (logoutBtn) logoutBtn.addEventListener("click", () => Auth.logout());
 
     const creditsBtn = H.$("#creditsBtn");
     if (creditsBtn) creditsBtn.addEventListener("click", () => this.openCreditsModal());
+
+    const scrollTopBtn = H.$("#mobileScrollTopOwl");
+    if (scrollTopBtn && scrollTopBtn.dataset.bound !== "true") {
+      scrollTopBtn.dataset.bound = "true";
+      const updateScrollTopButton = () => {
+        scrollTopBtn.classList.toggle("is-visible", window.scrollY > 360);
+      };
+      scrollTopBtn.addEventListener("click", () => window.scrollTo({ top: 0, behavior: "smooth" }));
+      window.addEventListener("scroll", updateScrollTopButton, { passive: true });
+      updateScrollTopButton();
+    }
   },
 
   profileSetupComplete() {
@@ -172,19 +299,21 @@ const App = {
           <div>
             <p class="eyebrow">Crédits cachés</p>
             <h2 id="creditsTitle">Le Nid des Pronos</h2>
-            <p class="muted">Version <strong>0.25.9</strong> · pré-déploiement. Le passage en <strong>1.0.0</strong> se fera au déploiement officiel.</p>
+            <p class="muted">Version <strong>0.25.11</strong> · pré-déploiement. Le passage en <strong>1.0.0</strong> se fera au déploiement officiel.</p>
           </div>
           <button class="ghost-btn" id="closeCreditsBtn" type="button">Fermer</button>
         </div>
         <div class="credits-grid">
           <section>
             <h3>Principe de version</h3>
-            <p><strong>0.25.9</strong> = version non déployée · évolution majeure n°25 · correction mineure 9.</p>
+            <p><strong>0.25.11</strong> = version non déployée · évolution majeure n°25 · correction mineure 11.</p>
             <p><strong>1.x.x</strong> = version publique déployée.</p>
           </section>
           <section>
             <h3>Évolutions récentes</h3>
             <ul class="changelog-list">
+              <li><strong>0.25.11</strong> — popup exploit ajusté avec date, sauvegardes en menu déroulant seul, header mobile fixe et chouette volante de retour en haut.</li>
+              <li><strong>0.25.10</strong> — menu admin burger mobile, reset des messages avec sauvegarde, chat Teams en haut, point rouge de message non lu et exploits rejouables au clic.</li>
               <li><strong>0.25.9</strong> — popup exploits instantané, badge plein rond, suppression du récap rapide, “Les teams du nid” et menu burger mobile.</li>
               <li><strong>0.25.8</strong> — choix joueur des 3 badges d’exploit affichés dans les classements.</li>
               <li><strong>0.25.7</strong> — exploits affinés : 3 badges max affichés dans les classements, dates d’obtention visibles et Hall du nid plus détaillé.</li>
@@ -503,6 +632,7 @@ const App = {
     H.$$("[data-view]").forEach((btn) => {
       btn.classList.toggle("active", btn.dataset.view === viewName);
     });
+    this.updateTeamUnreadIndicators();
   },
 
   async loadView(viewName) {
@@ -695,6 +825,8 @@ const App = {
     }
 
     await this.loadWinnerPrediction();
+    this.syncAchievementNotifications();
+    this.scheduleAchievementResync();
     H.toast("Champion enregistré : 100 points si ça passe !", "success");
     await this.renderProfile();
   },
@@ -1111,6 +1243,7 @@ const App = {
     const matchId = form.dataset.matchId;
     const isFinalPhase = form.dataset.finalPhase === "true";
     const formData = new FormData(form);
+    const achievementIdsBeforeSave = new Set(this.computeBadgesForUser(this.state.session.user.id).map((badge) => badge.id));
 
     const payload = {
       user_id: this.state.session.user.id,
@@ -1138,10 +1271,13 @@ const App = {
     await this.loadVisiblePredictions().catch((refreshError) => {
       console.warn("Impossible de rafraîchir les pronos visibles avant l’annonce d’exploit", refreshError);
     });
+    this.queueAchievementDiffFromSnapshot(achievementIdsBeforeSave);
     this.syncAchievementNotifications();
+    this.scheduleAchievementResync([120, 700, 1800]);
     H.toast("Prono enregistré", "success");
     await this.loadView(this.state.currentView);
     this.syncAchievementNotifications();
+    this.scheduleAchievementResync([300, 1200, 3500]);
   },
 
   async renderMyPredictions() {
@@ -1272,6 +1408,7 @@ const App = {
     `;
 
     this.bindFeaturedBadgePicker(badges);
+    this.bindAchievementReplay(root);
   },
 
   async renderAchievementHall() {
@@ -1310,6 +1447,7 @@ const App = {
         `).join("") : `<section class="card"><p class="muted">Aucun exploit pour le moment.</p></section>`}
       </div>
     `;
+    this.bindAchievementReplay(root);
   },
 
   renderAchievementCatalog() {
@@ -1346,6 +1484,7 @@ const App = {
       ${block("Coups de maître", positives)}
       ${block("Casseroles du nid", negatives)}
     `;
+    this.bindAchievementReplay(root);
   },
 
   async renderWorldCup() {
@@ -2231,11 +2370,74 @@ const App = {
     );
   },
 
+  bindAchievementReplay(root = document) {
+    H.$$('[data-achievement-replay-id]', root).forEach((card) => {
+      if (card.dataset.replayBound === "true") return;
+      card.dataset.replayBound = "true";
+      const replay = () => this.replayAchievementPopup(card.dataset.achievementReplayId);
+      card.addEventListener("click", (event) => {
+        if (event.target.closest("button, a, input, select, textarea")) return;
+        replay();
+      });
+      card.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          replay();
+        }
+      });
+    });
+  },
+
+  replayAchievementPopup(badgeId) {
+    const unlockedBadge = this.computeBadgesForUser(this.state.session?.user?.id).find((badge) => badge.id === badgeId);
+    const badge = unlockedBadge || this.badgeById(badgeId);
+    if (!badge) return;
+    this.queueAchievementModals([{ ...badge, replayed: true }]);
+  },
+
+  queueAchievementDiffFromSnapshot(previousIds = new Set()) {
+    if (!this.state.session?.user?.id) return false;
+    const badges = this.computeBadgesForUser(this.state.session.user.id);
+    const currentIds = new Set(badges.map((badge) => badge.id));
+    const newBadges = badges.filter((badge) => !previousIds.has(badge.id));
+    this.state.lastAchievementIds = currentIds;
+
+    if (!newBadges.length) return false;
+
+    const notifiedIds = this.getNotifiedAchievementIds();
+    newBadges.forEach((badge) => notifiedIds.add(badge.id));
+    this.setNotifiedAchievementIds(notifiedIds);
+    this.queueAchievementModals(newBadges);
+    return true;
+  },
+
+  scheduleAchievementResync(delays = [250, 1000, 2500]) {
+    if (!this.state.session?.user?.id) return;
+    delays.forEach((delay) => {
+      const timer = window.setTimeout(async () => {
+        this.state.achievementResyncTimers = this.state.achievementResyncTimers.filter((item) => item !== timer);
+        try {
+          await Promise.all([
+            this.loadMyPredictions(),
+            this.loadVisiblePredictions(),
+            this.loadWinnerPrediction(),
+            this.loadWinnerPredictionsForTeams().catch(() => null)
+          ]);
+          this.syncAchievementNotifications();
+        } catch (error) {
+          console.warn("Resynchronisation des exploits impossible", error);
+        }
+      }, delay);
+      this.state.achievementResyncTimers.push(timer);
+    });
+  },
+
   badgeCardHtml(badge, unlocked = true, options = {}) {
     const showDate = options.showDate !== false;
+    const replayable = Boolean(unlocked && options.replay !== false);
     const dateLabel = unlocked && showDate ? this.achievementDateLabel(badge) : "";
     return `
-      <article class="achievement-card ${H.escapeHtml(badge.type)} ${unlocked ? "" : "locked"}">
+      <article class="achievement-card ${H.escapeHtml(badge.type)} ${unlocked ? "" : "locked"} ${replayable ? "replayable-achievement" : ""}" ${replayable ? `data-achievement-replay-id="${H.escapeHtml(badge.id)}" role="button" tabindex="0" title="Revoir le popup de cet exploit"` : ""}>
         ${this.badgeArtHtml(badge, unlocked)}
         <div>
           <strong>${H.escapeHtml(badge.title)}</strong>
@@ -2290,11 +2492,17 @@ const App = {
 
     if (silent) {
       this.setNotifiedAchievementIds(currentIds);
+      this.state.lastAchievementIds = currentIds;
       return;
     }
 
     const notifiedIds = this.getNotifiedAchievementIds();
-    const newBadges = badges.filter((badge) => !notifiedIds.has(badge.id));
+    const previousIds = this.state.lastAchievementIds;
+    const reappearedAfterReset = (badge) => previousIds instanceof Set && !previousIds.has(badge.id);
+    const newBadges = badges.filter((badge) => !notifiedIds.has(badge.id) || reappearedAfterReset(badge));
+
+    this.state.lastAchievementIds = currentIds;
+
     if (!newBadges.length) return;
 
     newBadges.forEach((badge) => notifiedIds.add(badge.id));
@@ -2362,6 +2570,7 @@ const App = {
 
     const tone = this.achievementModalTone(badge);
     const remaining = this.state.achievementNotificationQueue.length;
+    const unlockedDateLabel = this.achievementDateLabel(badge);
     const modal = document.createElement("div");
     modal.id = "achievementUnlockModal";
     modal.className = `modal-backdrop achievement-unlock-modal achievement-unlock-${H.escapeHtml(badge.type)}`;
@@ -2377,6 +2586,7 @@ const App = {
         </div>
         <h2 id="achievementUnlockTitle">${H.escapeHtml(badge.title)}</h2>
         <p class="achievement-unlock-headline">${H.escapeHtml(tone.headline)} ${tone.emoji}</p>
+        ${unlockedDateLabel ? `<p class="achievement-unlock-date">${H.icon("time")} Obtenu le ${H.escapeHtml(unlockedDateLabel)}</p>` : ""}
         <p class="muted achievement-unlock-description">${H.escapeHtml(badge.description)}</p>
         <div class="achievement-unlock-actions">
           ${remaining ? `<small>${remaining} autre${remaining > 1 ? "s" : ""} exploit${remaining > 1 ? "s" : ""} en attente…</small>` : `<small>Le grimoire est à jour.</small>`}
@@ -2447,6 +2657,7 @@ const App = {
         ${this.leaderboardRowsHtml(data || [])}
       </section>
     `;
+    this.bindAchievementReplay(root);
   },
 
   leaderboardRowsHtml(rows, options = {}) {
@@ -2606,6 +2817,7 @@ const App = {
         `).join("") : `<section class="card"><p class="muted">Aucun badge pour le moment.</p></section>`}
       </div>
     `;
+    this.bindAchievementReplay(root);
   },
 
   async renderTeamLeaderboard() {
@@ -2811,6 +3023,7 @@ const App = {
     const close = () => this.closeTeamPlayerModal();
     H.$("#closeTeamPlayerModalBtn", modal)?.addEventListener("click", close);
     modal.addEventListener("click", (event) => { if (event.target === modal) close(); });
+    this.bindAchievementReplay(modal);
   },
 
   closeTeamPlayerModal() {
@@ -2912,26 +3125,12 @@ const App = {
         </div>
       </section>
 
-      <section class="grid two teams-page-grid">
-        <section class="card teams-directory-card">
-          <div class="card-title-row">
-            <div>
-              <h3>Annuaire des teams du nid</h3>
-              <p class="muted">Clique sur un joueur pour voir sa fiche : scores, badges et champion choisi.</p>
-            </div>
-            <button class="ghost-btn" id="refreshTeamsBtn" type="button">Rafraîchir</button>
-          </div>
-          <div class="teams-directory-grid">
-            ${teamsWithPlayers.map(({ team, players }) => this.teamCardHtml(team, players)).join("")}
-            ${playersWithoutTeam.length ? this.teamCardHtml({ name: "Sans team", color: "#94a3b8" }, playersWithoutTeam) : ""}
-          </div>
-        </section>
-
-        <section class="card team-chat-card">
+      <section class="grid teams-page-grid teams-chat-first">
+        <section class="card team-chat-card is-top">
           <div class="card-title-row">
             <div>
               <h3>Messages</h3>
-              <p class="muted">Écris à tout le monde ou seulement à ta team. Les messages sont chargés par paquets de ${this.state.teamChatPageSize}.</p>
+              <p class="muted">Le chat est placé en haut du nid. Écris à tout le monde ou seulement à ta team, par paquets de ${this.state.teamChatPageSize} messages.</p>
             </div>
           </div>
 
@@ -2957,6 +3156,20 @@ const App = {
               <button class="primary-btn" type="submit">Envoyer</button>
             </form>
           `}
+        </section>
+
+        <section class="card teams-directory-card">
+          <div class="card-title-row">
+            <div>
+              <h3>Annuaire des teams du nid</h3>
+              <p class="muted">Clique sur un joueur pour voir sa fiche : scores, badges et champion choisi.</p>
+            </div>
+            <button class="ghost-btn" id="refreshTeamsBtn" type="button">Rafraîchir</button>
+          </div>
+          <div class="teams-directory-grid">
+            ${teamsWithPlayers.map(({ team, players }) => this.teamCardHtml(team, players)).join("")}
+            ${playersWithoutTeam.length ? this.teamCardHtml({ name: "Sans team", color: "#94a3b8" }, playersWithoutTeam) : ""}
+          </div>
         </section>
       </section>
     `;
@@ -2987,6 +3200,7 @@ const App = {
 
     const chatList = H.$("#teamChatList");
     if (chatList) chatList.scrollTop = chatList.scrollHeight;
+    this.markTeamChatAsSeen();
   },
 
   async sendTeamChatMessage(event) {
@@ -3207,7 +3421,7 @@ const App = {
             <p class="muted">Déconnexion, crédits et historique des évolutions.</p>
           </div>
           <div class="profile-account-actions">
-            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v0.25.9</button>
+            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v0.25.11</button>
             <button class="danger-btn" id="profileLogoutBtn" type="button">Déconnexion</button>
           </div>
         </div>
@@ -3478,7 +3692,7 @@ const App = {
 
   setupRealtime() {
     window.sb
-      .channel("app-realtime-v0-25-9")
+      .channel("app-realtime-v0-25-11")
       .on("postgres_changes", { event: "*", schema: "public", table: "matches" }, async () => {
         await this.refreshCurrentViewFromRealtime("matches");
       })
@@ -3495,11 +3709,8 @@ const App = {
       .on("postgres_changes", { event: "*", schema: "public", table: "winner_predictions" }, async () => {
         await this.refreshCurrentViewFromRealtime("winner");
       })
-      .on("postgres_changes", { event: "*", schema: "public", table: "team_chat_messages" }, async () => {
-        if (this.state.currentView === "teams") {
-          await this.loadTeamChatMessages();
-          await this.renderTeamsPage();
-        }
+      .on("postgres_changes", { event: "*", schema: "public", table: "team_chat_messages" }, async (payload) => {
+        await this.handleTeamChatRealtime(payload);
       })
       .subscribe((status) => {
         console.info("[Le Nid des Pronos] Realtime app:", status);

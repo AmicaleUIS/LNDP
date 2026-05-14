@@ -5,9 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Admin — Le Nid des Pronos</title>
   <meta name="theme-color" content="#07111f">
-  <link rel="manifest" href="manifest.json?v=0.25.1">
+  <link rel="manifest" href="manifest.json?v=0.25.11">
   <link rel="icon" href="assets/icons/icon-192.png">
-  <link rel="stylesheet" href="css/style.css?v=0.25.1">
+  <link rel="stylesheet" href="css/style.css?v=0.25.11">
 </head>
 <body>
   <div class="admin-shell">
@@ -51,10 +51,13 @@
     <main class="admin-main-area">
       <header class="admin-header admin-page-header">
         <div>
-          <p class="eyebrow">Administration · v0.25.1</p>
+          <p class="eyebrow">Administration · v0.25.11</p>
           <h1 id="adminPageTitle"><img class="owl-icon title-icon" src="assets/icons/owl-png/admin.png" alt="" aria-hidden="true" loading="lazy"> Saisie rapide des scores</h1>
           <p class="muted" id="adminPageSubtitle">Prochains matchs en haut, scores manuels, classement recalculé automatiquement.</p>
         </div>
+        <button class="mobile-menu-toggle admin-mobile-menu-toggle" id="adminMobileMenuToggle" type="button" aria-label="Ouvrir le menu admin" aria-controls="adminMobileMenuPanel" aria-expanded="false">
+          <span></span><span></span><span></span>
+        </button>
       </header>
 
       <div class="admin-container admin-container-narrow">
@@ -128,17 +131,16 @@
                 <option value="">Chargement des sauvegardes...</option>
               </select>
               <button class="ghost-btn" id="restoreBackupBtn" type="button">Charger la sauvegarde</button>
-              <div id="backupListAdmin" class="backup-list"></div>
             </section>
 
             <section class="backup-box danger-zone">
               <h3>Remise à zéro sécurisée</h3>
-              <p class="muted">Supprime tous les pronostics joueurs, les pronos champion et les points/badges calculés. Les matchs et résultats restent en place.</p>
+              <p class="muted">Supprime tous les pronostics joueurs, les pronos champion, les points/badges calculés et les messages du chat. Une sauvegarde est créée avant la remise à zéro.</p>
               <label>
                 Tape exactement <strong>REMISE A ZERO</strong>
                 <input id="resetConfirmInput" type="text" placeholder="REMISE A ZERO" autocomplete="off">
               </label>
-              <button class="danger-btn" id="resetPredictionsBtn" type="button">Remise à zéro des pronos</button>
+              <button class="danger-btn" id="resetPredictionsBtn" type="button">Remise à zéro pronos + messages</button>
             </section>
           </div>
         </section>
@@ -152,10 +154,33 @@
     </main>
   </div>
 
+  <div class="mobile-menu-backdrop" id="adminMobileMenuBackdrop" hidden></div>
+  <nav class="mobile-menu-panel admin-mobile-menu-panel" id="adminMobileMenuPanel" aria-label="Navigation admin mobile" hidden>
+    <div class="mobile-menu-head">
+      <strong>Menu admin</strong>
+      <button class="ghost-btn mobile-menu-close" id="adminMobileMenuClose" type="button">Fermer</button>
+    </div>
+    <button class="nav-btn active" type="button" data-admin-section="quick"><img class="owl-icon" src="assets/icons/owl-png/admin.png" alt="" aria-hidden="true" loading="lazy"><span>Saisie rapide</span></button>
+    <button class="nav-btn" type="button" data-admin-section="teams"><img class="owl-icon" src="assets/icons/owl-png/classements.png" alt="" aria-hidden="true" loading="lazy"><span>Équipes</span></button>
+    <button class="nav-btn" type="button" data-admin-section="messages"><img class="owl-icon" src="assets/icons/owl-png/diffusion.png" alt="" aria-hidden="true" loading="lazy"><span>Messages</span></button>
+    <button class="nav-btn" type="button" data-admin-section="scores"><img class="owl-icon" src="assets/icons/owl-png/score-exact.png" alt="" aria-hidden="true" loading="lazy"><span>Scores</span></button>
+    <button class="nav-btn" type="button" data-admin-section="backups"><img class="owl-icon" src="assets/icons/owl-png/verrouille.png" alt="" aria-hidden="true" loading="lazy"><span>Sauvegardes</span></button>
+    <button class="nav-btn" type="button" data-admin-section="users"><img class="owl-icon" src="assets/icons/owl-png/profil.png" alt="" aria-hidden="true" loading="lazy"><span>Joueurs</span></button>
+    <div class="admin-mobile-menu-actions">
+      <a class="ghost-btn" href="app.html">Retour app</a>
+      <button class="ghost-btn" id="refreshAdminMobile" type="button">Rafraîchir</button>
+      <button class="danger-btn" id="logoutBtnMobile" type="button">Déconnexion</button>
+    </div>
+  </nav>
+
+  <button class="mobile-scroll-top-owl admin-scroll-top-owl" id="adminScrollTopOwl" type="button" aria-label="Revenir en haut de la page admin">
+    <img src="assets/icons/owl-png/accueil.png" alt="" aria-hidden="true" loading="lazy">
+  </button>
+
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>  <script src="js/config.js?v=0.24.3"></script>
   <script src="js/supabaseClient.js?v=0.24.3"></script>
   <script src="js/auth.js?v=0.24.3"></script>
-  <script src="js/common.js?v=0.25.1"></script>
-  <script src="js/admin.js?v=0.25.1"></script>
+  <script src="js/common.js?v=0.25.11"></script>
+  <script src="js/admin.js?v=0.25.11"></script>
 </body>
 </html>

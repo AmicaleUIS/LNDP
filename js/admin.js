@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — ADMIN V0.25.1
+// LE NID DES PRONOS — ADMIN V0.25.11
 // ============================================================
 
 const H = window.Helpers;
@@ -15,7 +15,7 @@ const Admin = {
     chatMessages: [],
     chatModerationError: null,
     chatModerationScope: "all",
-    chatModerationLimit: 80,
+    chatModerationLimit: 30,
     quickScoreFilter: "work",
     adminSection: "quick",
     backups: []
@@ -39,12 +39,26 @@ const Admin = {
   bindActions() {
     H.$("#backToApp")?.addEventListener("click", () => window.location.href = "app.html");
     H.$("#logoutBtn")?.addEventListener("click", () => Auth.logout());
+    H.$("#logoutBtnMobile")?.addEventListener("click", () => Auth.logout());
     H.$("#refreshAdmin")?.addEventListener("click", () => this.reloadAll());
+    H.$("#refreshAdminMobile")?.addEventListener("click", () => { this.closeMobileMenu(); this.reloadAll(); });
+    this.bindMobileMenu();
     H.$("#recalcAllBtn")?.addEventListener("click", () => this.recalcAll());
     H.$("#addOfficeTeamForm")?.addEventListener("submit", (event) => this.addOfficeTeam(event));
     H.$("#createBackupBtn")?.addEventListener("click", () => this.createBackup());
     H.$("#restoreBackupBtn")?.addEventListener("click", () => this.restoreSelectedBackup());
     H.$("#resetPredictionsBtn")?.addEventListener("click", () => this.resetAllPredictions());
+
+    const scrollTopBtn = H.$("#adminScrollTopOwl");
+    if (scrollTopBtn && scrollTopBtn.dataset.bound !== "true") {
+      scrollTopBtn.dataset.bound = "true";
+      const updateScrollTopButton = () => {
+        scrollTopBtn.classList.toggle("is-visible", window.scrollY > 360);
+      };
+      scrollTopBtn.addEventListener("click", () => window.scrollTo({ top: 0, behavior: "smooth" }));
+      window.addEventListener("scroll", updateScrollTopButton, { passive: true });
+      updateScrollTopButton();
+    }
 
     H.$$("[data-admin-section]").forEach((button) => {
       button.addEventListener("click", () => this.setAdminSection(button.dataset.adminSection || "quick"));
@@ -59,7 +73,50 @@ const Admin = {
     });
   },
 
+  bindMobileMenu() {
+    const toggle = H.$("#adminMobileMenuToggle");
+    const closeBtn = H.$("#adminMobileMenuClose");
+    const backdrop = H.$("#adminMobileMenuBackdrop");
+
+    toggle?.addEventListener("click", () => this.openMobileMenu());
+    closeBtn?.addEventListener("click", () => this.closeMobileMenu());
+    backdrop?.addEventListener("click", () => this.closeMobileMenu());
+
+    window.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") this.closeMobileMenu();
+    });
+  },
+
+  openMobileMenu() {
+    const toggle = H.$("#adminMobileMenuToggle");
+    const panel = H.$("#adminMobileMenuPanel");
+    const backdrop = H.$("#adminMobileMenuBackdrop");
+    if (!panel || !backdrop) return;
+
+    panel.hidden = false;
+    backdrop.hidden = false;
+    document.body.classList.add("mobile-menu-open");
+    toggle?.setAttribute("aria-expanded", "true");
+  },
+
+  closeMobileMenu() {
+    const toggle = H.$("#adminMobileMenuToggle");
+    const panel = H.$("#adminMobileMenuPanel");
+    const backdrop = H.$("#adminMobileMenuBackdrop");
+
+    document.body.classList.remove("mobile-menu-open");
+    toggle?.setAttribute("aria-expanded", "false");
+
+    window.setTimeout(() => {
+      if (!document.body.classList.contains("mobile-menu-open")) {
+        if (panel) panel.hidden = true;
+        if (backdrop) backdrop.hidden = true;
+      }
+    }, 160);
+  },
+
   setAdminSection(section = "quick") {
+    this.closeMobileMenu();
     this.state.adminSection = section;
     const titles = {
       quick: ["Saisie rapide des scores", "Prochains matchs en haut, validation rapide et scores manuels."],
@@ -280,7 +337,7 @@ const Admin = {
       .from("app_backups")
       .select("id,label,backup_type,created_at,created_by")
       .order("created_at", { ascending: false })
-      .limit(60);
+      .limit(10);
 
     if (error) {
       console.warn("Sauvegardes indisponibles : lance le patch SQL V0.22.0", error);
@@ -298,7 +355,7 @@ const Admin = {
       .from("v_admin_team_chat_messages")
       .select("*")
       .order("created_at", { ascending: false })
-      .limit(Math.max(20, Number(this.state.chatModerationLimit || 80)));
+      .limit(Math.max(10, Number(this.state.chatModerationLimit || 30)));
 
     if (scope === "global") query = query.eq("scope", "global");
     if (scope === "team") query = query.eq("scope", "team");
@@ -567,7 +624,7 @@ const Admin = {
     H.$$('[data-chat-admin-filter]', root).forEach((button) => {
       button.addEventListener("click", async () => {
         this.state.chatModerationScope = button.dataset.chatAdminFilter || "all";
-        this.state.chatModerationLimit = 80;
+        this.state.chatModerationLimit = 30;
         await this.loadChatMessages();
         this.renderChatModeration();
       });
@@ -580,7 +637,7 @@ const Admin = {
     });
 
     H.$("#loadMoreAdminChatBtn", root)?.addEventListener("click", async () => {
-      this.state.chatModerationLimit += 80;
+      this.state.chatModerationLimit += 30;
       await this.loadChatMessages();
       this.renderChatModeration();
     });
@@ -1072,29 +1129,20 @@ const Admin = {
   renderBackups() {
     const select = H.$("#backupSelect");
     const list = H.$("#backupListAdmin");
-    if (!select || !list) return;
+    if (!select) return;
 
     if (!this.state.backups.length) {
       select.innerHTML = `<option value="">Aucune sauvegarde disponible</option>`;
-      list.innerHTML = `<p class="muted">Aucune sauvegarde trouvée. Lance le patch SQL V0.22.0 puis crée une sauvegarde.</p>`;
+      if (list) list.innerHTML = "";
       return;
     }
 
-    select.innerHTML = this.state.backups.map((backup) => {
+    select.innerHTML = this.state.backups.slice(0, 10).map((backup) => {
       const label = `${backup.label || backup.backup_type || "Sauvegarde"} · ${H.formatDateTime(backup.created_at)}`;
       return `<option value="${H.escapeHtml(backup.id)}">${H.escapeHtml(label)}</option>`;
     }).join("");
 
-    list.innerHTML = `
-      <div class="backup-list-items">
-        ${this.state.backups.slice(0, 8).map((backup) => `
-          <article class="backup-item">
-            <strong>${H.escapeHtml(backup.label || "Sauvegarde")}</strong>
-            <small>${H.escapeHtml(backup.backup_type || "manual")} · ${H.formatDateTime(backup.created_at)}</small>
-          </article>
-        `).join("")}
-      </div>
-    `;
+    if (list) list.innerHTML = "";
   },
 
   async createBackup() {
@@ -1137,7 +1185,7 @@ const Admin = {
       H.toast("Tape exactement : REMISE A ZERO", "error");
       return;
     }
-    if (!confirm("Dernière sécurité : supprimer tous les pronostics et badges calculés ? Les matchs restent conservés.")) return;
+    if (!confirm("Dernière sécurité : supprimer tous les pronostics, badges calculés et messages du chat ? Une sauvegarde est créée avant. Les matchs restent conservés.")) return;
 
     const { error } = await window.sb.rpc("reset_all_predictions_secure", { p_confirm: "REMISE A ZERO" });
     if (error) {
@@ -1146,13 +1194,13 @@ const Admin = {
     }
 
     H.$("#resetConfirmInput").value = "";
-    H.toast("Pronos remis à zéro", "success");
+    H.toast("Pronos et messages remis à zéro", "success");
     await this.reloadAll();
   },
 
   setupRealtime() {
     window.sb
-      .channel("admin-realtime-v0-25-1")
+      .channel("admin-realtime-v0-25-10")
       .on("postgres_changes", { event: "*", schema: "public", table: "matches" }, async () => {
         await this.loadMatches();
         this.renderQuickScores();
