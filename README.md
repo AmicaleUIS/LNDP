@@ -1,21 +1,54 @@
-# Le Nid des Pronos — V0.25.17
+# Le Nid des Pronos — V0.26.0
 
-## Nouveauté V0.25.17
+## Nouveautés V0.26.0
 
-Correction ciblée de la phase finale :
+Cette version prépare le site pour les tests grandeur nature avant le début de la Coupe du Monde.
 
-- colonnes du bracket élargies ;
-- cartes de match contenues dans leur colonne ;
-- textes tronqués proprement au lieu de pousser les cartes sur les voisines ;
-- connecteurs placés derrière les cartes ;
-- scroll horizontal propre en mobile/tablette ;
-- plus de chevauchement entre seizièmes, huitièmes, quarts, demies et centre.
+### Matchs de préparation TEST
+
+Ajout de 2 matchs de préparation :
+
+- France - Côte d’Ivoire, jeudi 4 juin 2026 à Nantes ;
+- France - Irlande du Nord, lundi 8 juin 2026 à Lille.
+
+Ces matchs sont clairement indiqués comme **matchs test**. Ils ne comptent pas dans le vrai classement Coupe du Monde et ne déclenchent pas les exploits normaux.
+
+### Exploits préparation
+
+Ajout de 2 exploits dédiés au test :
+
+- `preparation-two-picks` : les 2 matchs de préparation sont pronostiqués ;
+- `prep-good-pick` : au moins 1 bon résultat sur les 2 matchs de préparation.
+
+### Classements
+
+La page Classements est réorganisée :
+
+- **Classement joueurs** avec Général et Par phase ;
+- **Teams bureau** par phase, avec choix Moyenne ou Par points ;
+- **Évolution** conservé pour les graphiques.
+
+Les exploits ne sont plus affichés dans la ligne principale du classement pour éviter l’effet fouillis.
+
+### Mobile et phase finale
+
+- Les cartes matchs mobiles affichent les deux équipes sur une seule ligne pour réduire le scroll.
+- Le tableau de phase finale peut être déplacé horizontalement au doigt ou à la souris.
+- Les chaînes TV sont affichées dans les cartouches de phase finale.
+
+### Admin
+
+Ajout d’un bouton de reset des **scores de préparation uniquement**. Les pronos des joueurs sont conservés.
 
 ## SQL
 
-Aucun nouveau patch SQL pour la V0.25.17.
+À lancer dans Supabase SQL Editor :
 
-Si tu viens d’une version avant V0.25.10, lance toujours :
+```sql
+patch_v0_26_0_preparation_classements.sql
+```
+
+Si tu viens d’une version avant V0.25.10, lance aussi :
 
 ```sql
 patch_v0_25_10_reset_messages_backup.sql

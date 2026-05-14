@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — APP PRINCIPALE V0.25.17
+// LE NID DES PRONOS — APP PRINCIPALE V0.26.0
 // ============================================================
 
 const H = window.Helpers;
@@ -29,7 +29,8 @@ const App = {
     teamChatError: null,
     hasUnreadTeamMessages: false,
     currentView: "home",
-    leaderboardTab: "overall",
+    leaderboardTab: "players",
+    playerLeaderboardMode: "overall",
     teamTab: "average",
     achievementsTab: "mine",
     worldcupTab: "groups",
@@ -301,19 +302,20 @@ const App = {
           <div>
             <p class="eyebrow">Crédits cachés</p>
             <h2 id="creditsTitle">Le Nid des Pronos</h2>
-            <p class="muted">Version <strong>0.25.17</strong> · pré-déploiement. Le passage en <strong>1.0.0</strong> se fera au déploiement officiel.</p>
+            <p class="muted">Version <strong>0.26.0</strong> · pré-déploiement. Le passage en <strong>1.0.0</strong> se fera au déploiement officiel.</p>
           </div>
           <button class="ghost-btn" id="closeCreditsBtn" type="button">Fermer</button>
         </div>
         <div class="credits-grid">
           <section>
             <h3>Principe de version</h3>
-            <p><strong>0.25.17</strong> = version non déployée · évolution majeure n°25 · correction mineure 17.</p>
+            <p><strong>0.26.0</strong> = version non déployée · évolution majeure n°26 · préparation, règles et classements clarifiés.</p>
             <p><strong>1.x.x</strong> = version publique déployée.</p>
           </section>
           <section>
             <h3>Évolutions récentes</h3>
             <ul class="changelog-list">
+              <li><strong>0.26.0</strong> — matchs de préparation test, bouton règles, classements clarifiés, phase finale draggable et reset scores de préparation.</li>
               <li><strong>0.25.17</strong> — phase finale réellement anti-chevauchement : colonnes plus larges, cartes contenues et scroll horizontal propre.</li>
               <li><strong>0.25.16</strong> — phase finale aérée sans chevauchement et saisie rapide admin mobile corrigée.</li>
               <li><strong>0.25.15</strong> — tableau visuel de phase finale façon bracket officiel.</li>
@@ -359,6 +361,41 @@ const App = {
     document.body.appendChild(modal);
     const close = () => modal.remove();
     H.$("#closeCreditsBtn", modal).addEventListener("click", close);
+    modal.addEventListener("click", (event) => { if (event.target === modal) close(); });
+  },
+
+  openRulesModal() {
+    H.$("#rulesModal")?.remove();
+    const modal = document.createElement("div");
+    modal.id = "rulesModal";
+    modal.className = "modal-backdrop rules-modal";
+    modal.innerHTML = `
+      <div class="modal-card rules-card" role="dialog" aria-modal="true" aria-labelledby="rulesTitle">
+        <div class="card-title-row">
+          <div>
+            <p class="eyebrow">${H.icon("list")} Règles du nid</p>
+            <h2 id="rulesTitle">Comment les points tombent</h2>
+            <p class="muted">Les matchs de préparation sont des tests : ils ne comptent pas dans le classement Coupe du monde.</p>
+          </div>
+          <button class="ghost-btn" id="closeRulesBtn" type="button">Fermer</button>
+        </div>
+        <div class="rules-grid">
+          <article><strong>Score exact</strong><span>Le score est parfaitement trouvé.</span><b>+5 pts</b></article>
+          <article><strong>Bon résultat</strong><span>Victoire / nul / défaite correctement senti.</span><b>+3 pts</b></article>
+          <article><strong>Bon écart</strong><span>Le bon écart de buts est trouvé.</span><b>+1 pt</b></article>
+          <article><strong>Phase finale</strong><span>Le bon qualifié est choisi sur un match couperet.</span><b>bonus</b></article>
+          <article><strong>Champion du monde</strong><span>Ton équipe choisie avant le début gagne la finale.</span><b>+100 pts</b></article>
+          <article><strong>Matchs test</strong><span>France–Côte d’Ivoire et France–Irlande du Nord servent à tester le site.</span><b>0 pt classement</b></article>
+        </div>
+        <div class="rules-note">
+          <strong>Préparation</strong>
+          <p>Les 2 matchs test peuvent débloquer seulement les badges de préparation : “Préparation du nid” et “Test concluant”. Ils ne déclenchent pas les exploits normaux.</p>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+    const close = () => modal.remove();
+    H.$("#closeRulesBtn", modal)?.addEventListener("click", close);
     modal.addEventListener("click", (event) => { if (event.target === modal) close(); });
   },
 
@@ -691,10 +728,25 @@ const App = {
   },
 
   availablePredictionMatches() {
-    return this.state.matches.filter((m) => !["cancelled", "postponed"].includes(m.status));
+    return this.state.matches.filter((m) => !m.is_test_match && !["cancelled", "postponed"].includes(m.status));
   },
 
-  predictionRowsForUser(userId) {
+  preparationMatches() {
+    return this.state.matches.filter((m) => m.is_test_match);
+  },
+
+  isPreparationMatch(matchOrId) {
+    const match = typeof matchOrId === "string"
+      ? this.state.matches.find((m) => m.id === matchOrId)
+      : matchOrId;
+    return Boolean(match?.is_test_match);
+  },
+
+  competitionMatches() {
+    return this.state.matches.filter((m) => !m.is_test_match);
+  },
+
+  predictionRowsForUser(userId, options = {}) {
     const byMatch = new Map();
     const addRow = (row = {}) => {
       if (!row.match_id) return;
@@ -708,12 +760,15 @@ const App = {
       });
     };
 
+    const includeTest = Boolean(options.includeTest);
+    const keepPrediction = (p) => includeTest || !this.isPreparationMatch(p.match_id);
+
     this.state.visiblePredictions
-      .filter((p) => p.user_id === userId)
+      .filter((p) => p.user_id === userId && keepPrediction(p))
       .forEach(addRow);
 
     if (userId === this.state.session?.user?.id) {
-      this.state.myPredictions.forEach(addRow);
+      this.state.myPredictions.filter(keepPrediction).forEach(addRow);
     }
 
     return [...byMatch.values()].sort((a, b) => {
@@ -762,7 +817,7 @@ const App = {
   },
 
   competitionStartAt() {
-    const dates = this.state.matches
+    const dates = this.competitionMatches()
       .map((m) => m.kickoff_at ? new Date(m.kickoff_at) : null)
       .filter(Boolean)
       .sort((a, b) => a - b);
@@ -851,6 +906,7 @@ const App = {
           <p class="eyebrow">${H.icon("nest")} Bienvenue dans le nid</p>
           <h2>Fais tes scores avant le coup d’envoi.</h2>
           <p class="muted">Les pronos des autres restent cachés jusqu’au début du match. Pas de copie, que du flair.</p>
+          <button class="ghost-btn rules-home-btn" id="rulesHomeBtn" type="button">${H.icon("list")} Règles & points</button>
         </div>
         <div class="hero-score">
           <span>${myRank ? `#${myRank.rank}` : "—"}</span>
@@ -880,6 +936,7 @@ const App = {
       </section>
     `;
 
+    H.$("#rulesHomeBtn")?.addEventListener("click", () => this.openRulesModal());
     this.bindNavigation();
     this.bindGoToNearestMissingActions();
   },
@@ -892,6 +949,7 @@ const App = {
           <span>vs</span>
           <strong>${H.matchFlagHtml(match, "away")} ${H.escapeHtml(match.away_team_name)}</strong>
         </div>
+        ${match.is_test_match ? `<p class="test-match-mini-label">MATCH TEST · hors classement Coupe du monde</p>` : ""}
         <p class="muted mini-location-line">${H.matchLocationHtml(match, true)}</p>
         <p class="muted mini-tv-line">${H.formatDateTime(match.kickoff_at)} · ${H.tvChannelLogosHtml(match.tv_channel)}</p>
       </div>
@@ -1115,9 +1173,11 @@ const App = {
     const standing = this.standingForTeam(match, side);
     const groupName = standing?.group_name || match.group_name;
     const rank = standing?.group_rank ? this.groupRankLabel(standing.group_rank) : null;
-    const meta = match.stage === "group" && groupName
-      ? `${H.escapeHtml(groupName)}${rank ? ` · ${H.escapeHtml(rank)}` : ""}`
-      : "";
+    const meta = match.is_test_match
+      ? "Match test"
+      : match.stage === "group" && groupName
+        ? `${H.escapeHtml(groupName)}${rank ? ` · ${H.escapeHtml(rank)}` : ""}`
+        : "";
 
     return `
       <div class="team-side ${isRight ? "right" : ""}">
@@ -1138,9 +1198,11 @@ const App = {
     if (!prediction) return "";
     const points = this.myPointsForMatch(match.id);
     const isFinished = match.status === "finished";
-    const pointsText = points
-      ? `${Number(points.points_total ?? 0)} pt${Number(points.points_total ?? 0) > 1 ? "s" : ""} · ${H.escapeHtml(this.predictionReasonLabel(points))}`
-      : "Points en attente";
+    const pointsText = match.is_test_match
+      ? "Match test · hors classement"
+      : points
+        ? `${Number(points.points_total ?? 0)} pt${Number(points.points_total ?? 0) > 1 ? "s" : ""} · ${H.escapeHtml(this.predictionReasonLabel(points))}`
+        : "Points en attente";
 
     return `
       <div class="my-prono-result ${isFinished ? "finished" : ""}">
@@ -1150,7 +1212,7 @@ const App = {
         </div>
         ${isFinished ? `
           <div class="my-prono-points">
-            <small>Points gagnés</small>
+            <small>${match.is_test_match ? "Résultat test" : "Points gagnés"}</small>
             <strong>${pointsText}</strong>
           </div>
         ` : ""}
@@ -1166,10 +1228,11 @@ const App = {
     const canSeeOthers = locked;
 
     return `
-      <article class="match-card ${match.status === "live" ? "live" : ""}" id="match-${H.escapeHtml(match.id)}">
+      <article class="match-card ${match.status === "live" ? "live" : ""} ${match.is_test_match ? "test-match-card" : ""}" id="match-${H.escapeHtml(match.id)}">
         <div class="match-head">
           <div>
             <span class="pill ${match.status}">${H.statusLabel(match.status)}</span>
+            ${match.is_test_match ? `<span class="pill warning test-match-pill">MATCH TEST</span>` : ""}
             ${match.stage !== "group" ? `<span class="pill neutral">${H.stageLabel(match.stage)}</span>` : ""}
           </div>
           <span class="match-time">${H.formatDateTime(match.kickoff_at)}</span>
@@ -1185,6 +1248,8 @@ const App = {
           <span>${H.matchLocationHtml(match)}</span>
           <span class="match-tv-meta">${H.icon("tv")} ${H.tvChannelLogosHtml(match.tv_channel)}</span>
         </div>
+
+        ${match.is_test_match ? `<div class="test-match-notice">${H.icon("info")} Match de préparation : il sert à tester le site. Il ne compte pas dans le classement Coupe du monde ni dans les exploits normaux.</div>` : ""}
 
         <form class="prediction-form" data-match-id="${match.id}" data-final-phase="${isFinalPhase}">
           <div class="prediction-inputs">
@@ -1465,10 +1530,11 @@ const App = {
     const unlocked = new Set(this.computeBadgesForUser(this.state.session.user.id).map((badge) => badge.id));
     const catalog = this.badgeCatalog();
     const progression = catalog.filter((b) => b.category === "progression");
+    const preparation = catalog.filter((b) => b.category === "preparation");
     const fidelity = catalog.filter((b) => b.category === "fidelity");
-    const positives = catalog.filter((b) => b.type === "positive" && !["progression", "fidelity"].includes(b.category));
+    const positives = catalog.filter((b) => b.type === "positive" && !["progression", "fidelity", "preparation"].includes(b.category));
     const negatives = catalog.filter((b) => b.type === "negative");
-    const otherNeutral = catalog.filter((b) => b.type === "neutral" && !["progression", "fidelity"].includes(b.category));
+    const otherNeutral = catalog.filter((b) => b.type === "neutral" && !["progression", "fidelity", "preparation"].includes(b.category));
 
     const block = (title, rows) => `
       <section class="card achievement-catalog-block">
@@ -1489,6 +1555,7 @@ const App = {
         </div>
       </section>
       ${block("Progression des pronos", progression)}
+      ${preparation.length ? block("Matchs de préparation test", preparation) : ""}
       ${block("Fidélité au nid", fidelity)}
       ${otherNeutral.length ? block("Autres exploits", otherNeutral) : ""}
       ${block("Coups de maître", positives)}
@@ -1698,11 +1765,13 @@ const App = {
       return;
     }
 
-    const grouped = (data || []).reduce((acc, row) => {
-      acc[row.group_name] ||= [];
-      acc[row.group_name].push(row);
-      return acc;
-    }, {});
+    const grouped = (data || [])
+      .filter((row) => String(row.group_name || "").toLowerCase() !== "préparation")
+      .reduce((acc, row) => {
+        acc[row.group_name] ||= [];
+        acc[row.group_name].push(row);
+        return acc;
+      }, {});
 
     root.innerHTML = Object.keys(grouped).length ? `
       <section class="toolbar-card compact-toolbar">
@@ -1736,6 +1805,41 @@ const App = {
       </section>
       ${totalFinalMatches ? this.finalBracketHtml(byStage) : `<section class="card"><p class="muted">Aucune phase finale à afficher pour le moment.</p></section>`}
     `;
+    this.bindFinalBracketDrag();
+  },
+
+  bindFinalBracketDrag() {
+    const scroller = H.$("#finalBracketScroll");
+    if (!scroller || scroller.dataset.dragBound === "true") return;
+    scroller.dataset.dragBound = "true";
+
+    let isDown = false;
+    let startX = 0;
+    let startScrollLeft = 0;
+
+    const stop = () => {
+      isDown = false;
+      scroller.classList.remove("is-dragging");
+    };
+
+    scroller.addEventListener("pointerdown", (event) => {
+      if (event.target.closest("button, a, input, select, textarea")) return;
+      isDown = true;
+      startX = event.clientX;
+      startScrollLeft = scroller.scrollLeft;
+      scroller.classList.add("is-dragging");
+      scroller.setPointerCapture?.(event.pointerId);
+    });
+
+    scroller.addEventListener("pointermove", (event) => {
+      if (!isDown) return;
+      event.preventDefault();
+      scroller.scrollLeft = startScrollLeft - (event.clientX - startX);
+    });
+
+    scroller.addEventListener("pointerup", stop);
+    scroller.addEventListener("pointercancel", stop);
+    scroller.addEventListener("mouseleave", stop);
   },
 
   finalBracketSortValue(match) {
@@ -1786,7 +1890,7 @@ const App = {
     const thirdPlaceMatch = byStage.third_place[0];
 
     return `
-      <section class="final-bracket-shell" aria-label="Tableau de la phase finale">
+      <section class="final-bracket-shell draggable-bracket" id="finalBracketScroll" aria-label="Tableau de la phase finale" tabindex="0">
         <div class="final-bracket-ribbon ribbon-left-a"></div>
         <div class="final-bracket-ribbon ribbon-left-b"></div>
         <div class="final-bracket-ribbon ribbon-right-a"></div>
@@ -1870,6 +1974,7 @@ const App = {
         </div>
         <div class="final-bracket-match-foot muted">
           ${location ? `<span>${H.escapeHtml(location)}</span>` : `<span>Lieu à confirmer</span>`}
+          <span class="final-bracket-tv">${H.icon("tv")} ${H.tvChannelLogosHtml(match.tv_channel, "tv-logo-strip final-tv-strip")}</span>
         </div>
       </article>
     `;
@@ -1895,20 +2000,21 @@ const App = {
     await Promise.all([this.loadMatches(), this.loadVisiblePredictions(), this.loadPublicProfiles()]);
 
     const root = H.$("#viewRoot");
+    const tab = ["players", "team", "evolution"].includes(this.state.leaderboardTab) ? this.state.leaderboardTab : "players";
+    this.state.leaderboardTab = tab;
     root.innerHTML = `
       <section class="toolbar-card leaderboard-hero-card">
         <div>
           <p class="eyebrow">${H.icon("trophy")} Le perchoir des scores</p>
           <h2>Classements</h2>
-          <p class="muted">Général, phases, teams bureau et évolution du nid. Les joueurs inactifs sont exclus automatiquement.</p>
+          <p class="muted">Joueurs, teams bureau et courbes d’évolution. Les matchs de préparation test restent hors classement Coupe du monde.</p>
         </div>
       </section>
 
-      <div class="segmented leaderboard-tabs">
-        <button class="${this.state.leaderboardTab === "overall" ? "active" : ""}" data-leaderboard-tab="overall">Général</button>
-        <button class="${this.state.leaderboardTab === "poolround" ? "active" : ""}" data-leaderboard-tab="poolround">Par phase</button>
-        <button class="${this.state.leaderboardTab === "team" ? "active" : ""}" data-leaderboard-tab="team">Teams bureau</button>
-        <button class="${this.state.leaderboardTab === "evolution" ? "active" : ""}" data-leaderboard-tab="evolution">Évolution</button>
+      <div class="segmented leaderboard-tabs leaderboard-main-tabs">
+        <button class="${tab === "players" ? "active" : ""}" data-leaderboard-tab="players">Classement joueurs</button>
+        <button class="${tab === "team" ? "active" : ""}" data-leaderboard-tab="team">Teams bureau</button>
+        <button class="${tab === "evolution" ? "active" : ""}" data-leaderboard-tab="evolution">Évolution</button>
       </div>
 
       <section id="leaderboardContent"></section>
@@ -1926,14 +2032,49 @@ const App = {
   },
 
   async renderLeaderboardContent() {
-    if (this.state.leaderboardTab === "overall") return this.renderOverallLeaderboard();
-    if (this.state.leaderboardTab === "poolround") return this.renderPoolRoundLeaderboard();
+    if (this.state.leaderboardTab === "players") return this.renderPlayerLeaderboard();
     if (this.state.leaderboardTab === "team") return this.renderTeamLeaderboard();
     if (this.state.leaderboardTab === "evolution") return this.renderLeaderboardEvolution();
-    return this.renderOverallLeaderboard();
+    return this.renderPlayerLeaderboard();
+  },
+
+  async renderPlayerLeaderboard() {
+    const root = H.$("#leaderboardContent");
+    const mode = this.state.playerLeaderboardMode === "phase" ? "phase" : "overall";
+    this.state.playerLeaderboardMode = mode;
+
+    root.innerHTML = `
+      <section class="card player-leaderboard-card">
+        <div class="card-title-row">
+          <div>
+            <h3>Classement joueurs</h3>
+            <p class="muted">Général ou par phase. Les badges restent visibles dans le détail, mais ne polluent plus la lecture principale.</p>
+          </div>
+        </div>
+        <div class="segmented small player-leaderboard-mode">
+          <button class="${mode === "overall" ? "active" : ""}" type="button" data-player-leaderboard-mode="overall">Général</button>
+          <button class="${mode === "phase" ? "active" : ""}" type="button" data-player-leaderboard-mode="phase">Par phase</button>
+        </div>
+        <div id="playerLeaderboardRows"></div>
+      </section>
+    `;
+
+    H.$$('[data-player-leaderboard-mode]', root).forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        this.state.playerLeaderboardMode = btn.dataset.playerLeaderboardMode;
+        await this.renderPlayerLeaderboard();
+      });
+    });
+
+    if (mode === "phase") {
+      await this.renderPoolRoundLeaderboard("#playerLeaderboardRows");
+    } else {
+      await this.renderOverallLeaderboard("#playerLeaderboardRows");
+    }
   },
 
   scoreDetailRowsForUser(userId, filters = {}) {
+    const includeTest = Boolean(filters.includeTest);
     return this.state.visiblePredictions
       .filter((p) => p.user_id === userId && p.points_total !== null && p.points_total !== undefined)
       .map((p) => {
@@ -1942,6 +2083,7 @@ const App = {
       })
       .filter(({ match }) => match
         && match.status === "finished"
+        && (includeTest || !match.is_test_match)
         && (!filters.matchDay || match.match_day === filters.matchDay)
         && (!filters.poolRound || Number(match.pool_round || 0) === Number(filters.poolRound))
         && (!filters.matchIds || filters.matchIds.includes(match.id))
@@ -2129,6 +2271,9 @@ const App = {
       { id: "three-quarter-perch", title: "Perchoir presque plein", description: "75 % des pronos sont posés. Les branches commencent à craquer.", type: "neutral", category: "progression" },
       { id: "all-picks-in", title: "Couvée complète", description: "Tous les pronos disponibles sont validés. Le nid est verrouillé, rideau.", type: "neutral", category: "progression" },
 
+      { id: "preparation-two-picks", title: "Préparation du nid", description: "Les 2 matchs de préparation test ont été pronostiqués. Le nid vérifie que tout fonctionne avant le grand envol.", type: "neutral", category: "preparation" },
+      { id: "prep-good-pick", title: "Test concluant", description: "Au moins 1 match de préparation a été bien pronostiqué. Ce badge ne compte pas pour le vrai classement, il valide juste le radar.", type: "positive", category: "preparation" },
+
       { id: "night-owl", title: "Chouette de la nuit", description: "Un prono posé entre minuit et 6 h. Même les chauves-souris ont applaudi.", type: "neutral", category: "fidelity" },
       { id: "three-day-ritual", title: "Rituel du perchoir", description: "Des pronos posés 3 jours d’affilée. Petite routine, gros sérieux.", type: "neutral", category: "fidelity" },
       { id: "seven-day-streak", title: "Sept jours sur la branche", description: "7 jours d’affilée avec une activité de prono. Là, c’est de la fidélité de compétition.", type: "neutral", category: "fidelity" },
@@ -2190,9 +2335,25 @@ const App = {
   computeBadgesForUser(userId) {
     const rows = this.scoreDetailRowsForUser(userId);
     const predictionRows = this.predictionRowsForUser(userId);
+    const prepMatches = this.preparationMatches();
+    const prepPredictionRows = this.predictionRowsForUser(userId, { includeTest: true })
+      .filter((prediction) => this.isPreparationMatch(prediction.match_id));
+    const prepPredictionIds = new Set(prepPredictionRows.map((prediction) => prediction.match_id));
+    const prepFinishedRows = prepMatches
+      .filter((match) => match.status === "finished")
+      .map((match) => ({
+        match,
+        prediction: prepPredictionRows.find((prediction) => prediction.match_id === match.id)
+      }))
+      .filter(({ prediction }) => prediction);
+    const prepGoodRows = prepFinishedRows.filter(({ match, prediction }) => {
+      const pred = this.outcomeFromScores(prediction.home_score_pred, prediction.away_score_pred);
+      const real = this.outcomeFromScores(match.home_score, match.away_score);
+      return pred === real;
+    });
     const earlyWinnerPick = this.winnerPredictionForUser(userId);
 
-    if (!rows.length && !predictionRows.length && !earlyWinnerPick?.predicted_team_id) return [];
+    if (!rows.length && !predictionRows.length && !prepPredictionRows.length && !earlyWinnerPick?.predicted_team_id) return [];
 
     const exact = rows.filter(({ prediction }) => prediction.is_exact_score).length;
     const goodResults = rows.filter(({ prediction }) => prediction.is_good_result).length;
@@ -2351,6 +2512,7 @@ const App = {
     const firstDateFromRows = (sourceRows) => this.firstScoreRowDate(sourceRows);
 
     const predictionCount = predictionRows.length;
+    const prepMatchCount = prepMatches.length;
     const availableMatchCount = this.availablePredictionMatches().length;
     const activityDates = predictionRows
       .map((prediction) => this.predictionActivityDate(prediction))
@@ -2396,6 +2558,9 @@ const App = {
 
     if (hasFinalWinnerPick) unlock("final-winner-oracle", finalDate);
     if (hasPerfectFinalScore) unlock("final-perfect-score", this.scoreRowResultDate(finalPerfectRow));
+
+    if (prepMatchCount > 0 && prepPredictionIds.size >= prepMatchCount) unlock("preparation-two-picks", this.predictionDateAt(prepPredictionRows, prepMatchCount));
+    if (prepGoodRows.length >= 1) unlock("prep-good-pick", this.matchResultDate(prepGoodRows[0].match) || this.predictionActivityDate(prepGoodRows[0].prediction));
 
     if (rows.length >= 1) unlock("first-flight", this.nthScoreRowDate(rows, 1));
     if (exact >= 1) unlock("first-perfect", dateWhenCountReached(exactRows, 1));
@@ -2911,23 +3076,24 @@ const App = {
     `;
   },
 
-  async renderOverallLeaderboard() {
+  async renderOverallLeaderboard(targetSelector = "#leaderboardContent") {
     const { data, error } = await window.sb
       .from("v_leaderboard_overall")
       .select("*")
       .order("rank");
 
-    const root = H.$("#leaderboardContent");
+    const root = H.$(targetSelector);
     if (error) {
       root.innerHTML = `<p class="error-text">${H.escapeHtml(error.message)}</p>`;
       return;
     }
 
     root.innerHTML = `
-      <section class="card">
-        <h3>Classement général</h3>
-        ${this.leaderboardRowsHtml(data || [])}
-      </section>
+      <div class="leaderboard-inner-title">
+        <strong>Général</strong>
+        <small>Classement Coupe du monde, hors matchs test</small>
+      </div>
+      ${this.leaderboardRowsHtml(data || [])}
     `;
     this.bindAchievementReplay(root);
   },
@@ -2960,7 +3126,6 @@ const App = {
                 <strong>${H.escapeHtml(r.pseudo)}</strong>
                 <small>${H.escapeHtml(r.office_team_name || "Sans team")}</small>
                 ${this.pointsBreakdownHtml(r)}
-                ${this.badgesPreviewHtml(r.user_id, 3, r)}
               </div>
               <div class="points">${r.total_points || 0}<small>pts</small></div>
             </summary>
@@ -2977,9 +3142,9 @@ const App = {
     `;
   },
 
-  async renderPoolRoundLeaderboard() {
-    const root = H.$("#leaderboardContent");
-    const groups = this.groupMatchesByPouleRound(this.state.matches);
+  async renderPoolRoundLeaderboard(targetSelector = "#leaderboardContent") {
+    const root = H.$(targetSelector);
+    const groups = this.groupMatchesByPouleRound(this.competitionMatches());
     const activeIndex = this.clampPhaseIndex("leaderboardPhaseIndex", groups);
     const group = groups[activeIndex];
 
@@ -3030,19 +3195,15 @@ const App = {
 
     root.innerHTML = `
       ${pager}
-      <section class="card pool-leaderboard-card">
-        <div class="card-title-row">
-          <div>
-            <h3>Classement — ${H.escapeHtml(group.key)}</h3>
-            <p class="muted">${finishedCount}/${group.matches.length} match${group.matches.length > 1 ? "s" : ""} terminé${finishedCount > 1 ? "s" : ""} · ${H.matchDateRangeLabel(group.matches)}</p>
-          </div>
-        </div>
-        ${this.leaderboardRowsHtml(rows, { filters: { matchIds } })}
-      </section>
+      <div class="leaderboard-inner-title">
+        <strong>${H.escapeHtml(group.key)}</strong>
+        <small>${finishedCount}/${group.matches.length} match${group.matches.length > 1 ? "s" : ""} terminé${finishedCount > 1 ? "s" : ""} · ${H.matchDateRangeLabel(group.matches)}</small>
+      </div>
+      ${this.leaderboardRowsHtml(rows, { filters: { matchIds } })}
       ${pager}
     `;
 
-    this.bindPhaseNavigation("leaderboardPhaseIndex", () => this.renderPoolRoundLeaderboard());
+    this.bindPhaseNavigation("leaderboardPhaseIndex", () => this.renderPoolRoundLeaderboard(targetSelector));
   },
 
 
@@ -3097,7 +3258,7 @@ const App = {
     return /^#[0-9a-fA-F]{6}$/.test(raw) ? raw : fallback;
   },
 
-  teamPhaseRows(matchIds = []) {
+  teamPhaseRows(matchIds = [], mode = "average") {
     const matchIdSet = new Set(matchIds);
     const teams = this.state.officeTeams.map((team) => {
       const players = this.teamPlayers(team.id).filter((player) => player.profile_setup_done !== false);
@@ -3123,11 +3284,16 @@ const App = {
       };
     }).filter((row) => row.active_players > 0);
 
+    const byAverage = mode === "average";
     return teams
       .sort((a, b) =>
-        (b.total_points || 0) - (a.total_points || 0)
-        || (b.average_points || 0) - (a.average_points || 0)
-        || String(a.office_team_name || "").localeCompare(String(b.office_team_name || ""), "fr")
+        byAverage
+          ? (b.average_points || 0) - (a.average_points || 0)
+            || (b.total_points || 0) - (a.total_points || 0)
+            || String(a.office_team_name || "").localeCompare(String(b.office_team_name || ""), "fr")
+          : (b.total_points || 0) - (a.total_points || 0)
+            || (b.average_points || 0) - (a.average_points || 0)
+            || String(a.office_team_name || "").localeCompare(String(b.office_team_name || ""), "fr")
       )
       .map((row, index) => ({ ...row, rank: index + 1 }));
   },
@@ -3152,7 +3318,7 @@ const App = {
                   <span title="Scores exacts">${H.icon("target")} ${r.exact_scores || 0}</span>
                   <span title="Bons résultats">${H.icon("check")} ${r.good_results || 0}</span>
                   ${r.scored_matches !== undefined ? `<span title="Pronos comptabilisés">${H.icon("list")} ${r.scored_matches || 0}</span>` : ""}
-                  ${mode === "phase" ? `<span title="Moyenne par joueur">${H.icon("trend")} ${Number(r.average_points || 0).toFixed(1)} pts/j</span>` : ""}
+                  ${mode !== "average" ? `<span title="Moyenne par joueur">${H.icon("trend")} ${Number(r.average_points || 0).toFixed(1)} pts/j</span>` : ""}
                 </div>
               </div>
               <div class="points">${mainValue}<small>${mainLabel}</small></div>
@@ -3164,68 +3330,52 @@ const App = {
 
   async renderTeamLeaderboard() {
     const root = H.$("#leaderboardContent");
-    const teamTab = ["average", "total", "phase"].includes(this.state.teamTab) ? this.state.teamTab : "average";
+    const teamTab = ["average", "points"].includes(this.state.teamTab) ? this.state.teamTab : "average";
     this.state.teamTab = teamTab;
+    const groups = this.groupMatchesByPouleRound(this.competitionMatches());
+    const activeIndex = this.clampPhaseIndex("teamLeaderboardPhaseIndex", groups);
+    const group = groups[activeIndex];
+
+    if (!groups.length || !group) {
+      root.innerHTML = `<section class="card"><p class="muted">Aucune phase à afficher pour le moment.</p></section>`;
+      return;
+    }
+
+    const matchIds = group.matches.map((match) => match.id);
+    const finishedCount = group.matches.filter((match) => match.status === "finished").length;
+    const pager = this.phaseNavigatorHtml(groups, activeIndex, "teamLeaderboardPhaseIndex");
+    const rows = this.teamPhaseRows(matchIds, teamTab);
 
     root.innerHTML = `
       <section class="card team-leaderboard-card">
         <div class="card-title-row">
           <div>
-            <h3>Classement teams bureau</h3>
-            <p class="muted">Le nid compare les équipes par moyenne, par total ou par phase.</p>
+            <h3>Teams bureau par phase</h3>
+            <p class="muted">Choisis une phase, puis classe les teams par moyenne joueur ou par points bruts.</p>
           </div>
         </div>
-        <div class="segmented small">
+        <div class="segmented small team-leaderboard-mode">
           <button class="${teamTab === "average" ? "active" : ""}" data-team-tab="average">Moyenne</button>
-          <button class="${teamTab === "total" ? "active" : ""}" data-team-tab="total">Total</button>
-          <button class="${teamTab === "phase" ? "active" : ""}" data-team-tab="phase">Par phase</button>
+          <button class="${teamTab === "points" ? "active" : ""}" data-team-tab="points">Par points</button>
         </div>
-        <div id="teamLeaderboardRows"></div>
+        ${pager}
+        <div class="team-phase-head">
+          <strong>${H.escapeHtml(group.key)}</strong>
+          <small>${finishedCount}/${group.matches.length} match${group.matches.length > 1 ? "s" : ""} terminé${finishedCount > 1 ? "s" : ""} · ${H.matchDateRangeLabel(group.matches)}</small>
+        </div>
+        ${this.teamLeaderboardRowsHtml(rows, { mode: teamTab })}
+        ${pager}
       </section>
     `;
 
-    H.$$("[data-team-tab]").forEach((btn) => {
+    H.$$('[data-team-tab]', root).forEach((btn) => {
       btn.addEventListener("click", async () => {
         this.state.teamTab = btn.dataset.teamTab;
         await this.renderTeamLeaderboard();
       });
     });
 
-    const list = H.$("#teamLeaderboardRows");
-
-    if (teamTab === "phase") {
-      const groups = this.groupMatchesByPouleRound(this.state.matches);
-      const activeIndex = this.clampPhaseIndex("teamLeaderboardPhaseIndex", groups);
-      const group = groups[activeIndex];
-      if (!groups.length || !group) {
-        list.innerHTML = `<p class="muted">Aucune phase à afficher pour le moment.</p>`;
-        return;
-      }
-      const matchIds = group.matches.map((match) => match.id);
-      const finishedCount = group.matches.filter((match) => match.status === "finished").length;
-      const pager = this.phaseNavigatorHtml(groups, activeIndex, "teamLeaderboardPhaseIndex");
-      const rows = this.teamPhaseRows(matchIds);
-      list.innerHTML = `
-        ${pager}
-        <div class="team-phase-head">
-          <strong>${H.escapeHtml(group.key)}</strong>
-          <small>${finishedCount}/${group.matches.length} match${group.matches.length > 1 ? "s" : ""} terminé${finishedCount > 1 ? "s" : ""} · ${H.matchDateRangeLabel(group.matches)}</small>
-        </div>
-        ${this.teamLeaderboardRowsHtml(rows, { mode: "phase" })}
-      `;
-      this.bindPhaseNavigation("teamLeaderboardPhaseIndex", () => this.renderTeamLeaderboard());
-      return;
-    }
-
-    const view = teamTab === "average" ? "v_team_leaderboard_average" : "v_team_leaderboard_total";
-    const { data, error } = await window.sb.from(view).select("*").order("rank");
-
-    if (error) {
-      list.innerHTML = `<p class="error-text">${H.escapeHtml(error.message)}</p>`;
-      return;
-    }
-
-    list.innerHTML = this.teamLeaderboardRowsHtml(data || [], { mode: teamTab });
+    this.bindPhaseNavigation("teamLeaderboardPhaseIndex", () => this.renderTeamLeaderboard());
   },
 
   profileForUser(userId, source = null) {
@@ -3247,7 +3397,7 @@ const App = {
   playerEvolutionSeries(mode = "day") {
     const finishedRows = this.state.visiblePredictions
       .map((prediction) => ({ prediction, match: this.state.matches.find((m) => m.id === prediction.match_id) }))
-      .filter(({ prediction, match }) => match?.status === "finished" && prediction.points_total !== null && prediction.points_total !== undefined)
+      .filter(({ prediction, match }) => match?.status === "finished" && !match.is_test_match && prediction.points_total !== null && prediction.points_total !== undefined)
       .sort((a, b) => new Date(a.match.kickoff_at || 0) - new Date(b.match.kickoff_at || 0));
 
     const periodKey = (date) => {
@@ -3944,7 +4094,7 @@ const App = {
             <p class="muted">Déconnexion, crédits et historique des évolutions.</p>
           </div>
           <div class="profile-account-actions">
-            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v0.25.17</button>
+            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v0.26.0</button>
             <button class="danger-btn" id="profileLogoutBtn" type="button">Déconnexion</button>
           </div>
         </div>
@@ -4215,7 +4365,7 @@ const App = {
 
   setupRealtime() {
     window.sb
-      .channel("app-realtime-v0-25-17")
+      .channel("app-realtime-v0-26-0")
       .on("postgres_changes", { event: "*", schema: "public", table: "matches" }, async () => {
         await this.refreshCurrentViewFromRealtime("matches");
       })

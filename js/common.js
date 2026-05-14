@@ -66,6 +66,7 @@ function stageLabel(stage) {
 
 function poolRoundLabel(match) {
   if (!match) return "";
+  if (match.is_test_match) return "Match de préparation · TEST";
   if (match.stage === "group") {
     const round = match.pool_round || match.group_round;
     return round ? `Journée de poule ${round}` : "Poule";
@@ -75,6 +76,7 @@ function poolRoundLabel(match) {
 
 function shortPoolRoundLabel(match) {
   if (!match) return "";
+  if (match.is_test_match) return "Prépa · TEST";
   if (match.stage === "group") {
     const round = match.pool_round || match.group_round;
     return round ? `J. poule ${round}` : "Poule";
@@ -107,7 +109,11 @@ function groupMatchesByPouleRound(matches = []) {
   return matches.reduce((acc, match) => {
     let key = "";
     let order = 0;
-    if (match.stage === "group") {
+
+    if (match.is_test_match) {
+      key = "Matchs de préparation · TEST";
+      order = -10;
+    } else if (match.stage === "group") {
       const round = Number(match.pool_round || match.group_round || 0);
       key = round ? `Journée de poule ${round}` : "Poules — non classé";
       order = round || 99;

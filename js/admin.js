@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — ADMIN V0.25.17
+// LE NID DES PRONOS — ADMIN V0.26.0
 // ============================================================
 
 const H = window.Helpers;
@@ -48,6 +48,7 @@ const Admin = {
     H.$("#createBackupBtn")?.addEventListener("click", () => this.createBackup());
     H.$("#restoreBackupBtn")?.addEventListener("click", () => this.restoreSelectedBackup());
     H.$("#resetPredictionsBtn")?.addEventListener("click", () => this.resetAllPredictions());
+    H.$("#resetPreparationScoresBtn")?.addEventListener("click", () => this.resetPreparationScores());
 
     const scrollTopBtn = H.$("#adminScrollTopOwl");
     if (scrollTopBtn && scrollTopBtn.dataset.bound !== "true") {
@@ -861,7 +862,10 @@ const Admin = {
             <small>${H.formatDateTime(match.kickoff_at)} · ${H.shortPoolRoundLabel(match)} · ${H.statusLabel(match.status)}</small>
             <small class="quick-location-line">${H.matchLocationHtml(match, true)}</small>
           </div>
-          <span class="pill ${match.status === "finished" ? "success" : match.status === "live" ? "warning" : ""}">${H.statusLabel(match.status)}</span>
+          <div class="quick-score-pills">
+            ${match.is_test_match ? `<span class="pill warning">TEST</span>` : ""}
+            <span class="pill ${match.status === "finished" ? "success" : match.status === "live" ? "warning" : ""}">${H.statusLabel(match.status)}</span>
+          </div>
         </div>
 
         ${scoreLockHint}
@@ -1198,9 +1202,22 @@ const Admin = {
     await this.reloadAll();
   },
 
+  async resetPreparationScores() {
+    if (!confirm("Remettre à zéro uniquement les scores des matchs de préparation ? Les pronos joueurs restent conservés.")) return;
+
+    const { error } = await window.sb.rpc("reset_preparation_scores_secure");
+    if (error) {
+      H.toast(error.message || "Reset des scores de préparation impossible. As-tu lancé le patch SQL V0.26.0 ?", "error");
+      return;
+    }
+
+    H.toast("Scores de préparation remis à zéro", "success");
+    await this.reloadAll();
+  },
+
   setupRealtime() {
     window.sb
-      .channel("admin-realtime-v0-25-10")
+      .channel("admin-realtime-v0-26-0")
       .on("postgres_changes", { event: "*", schema: "public", table: "matches" }, async () => {
         await this.loadMatches();
         this.renderQuickScores();
