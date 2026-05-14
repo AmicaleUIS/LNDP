@@ -1,9 +1,9 @@
 // ============================================================
-// LE NID DES PRONOS — SERVICE WORKER V0.24.3
+// LE NID DES PRONOS — SERVICE WORKER V0.25.2
 // Cache corrigé : config.js non caché + format lieux pays-ville-stade.
 // ============================================================
 
-const CACHE_NAME = "le-nid-des-pronos-v0-24-3";
+const CACHE_NAME = "le-nid-des-pronos-v0-25-2";
 
 // Les avatars ne sont pas précachés : ils peuvent aller de owl-01.png à owl-90.png et être ajoutés/remplacés librement.
 const ASSETS = [
@@ -13,13 +13,13 @@ const ASSETS = [
   "./register.html",
   "./app.html",
   "./admin.html",
-  "./css/style.css?v=0.24.3",
+  "./css/style.css?v=0.25.2",
   "./js/supabaseClient.js?v=0.24.3",
   "./js/auth.js?v=0.24.3",
-  "./js/common.js?v=0.24.3",
-  "./js/app.js?v=0.24.3",
-  "./js/admin.js?v=0.24.3",
-  "./manifest.json?v=0.24.3",
+  "./js/common.js?v=0.25.2",
+  "./js/app.js?v=0.25.2",
+  "./js/admin.js?v=0.25.2",
+  "./manifest.json?v=0.25.2",
   "./assets/icons/icon-192.png",
   "./assets/icons/icon-512.png",
   "./assets/icons/owl-icons.svg",

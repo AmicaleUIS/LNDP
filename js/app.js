@@ -15,6 +15,17 @@ const App = {
     matches: [],
     myPredictions: [],
     visiblePredictions: [],
+    publicProfiles: [],
+    playerScoreRows: [],
+    winnerPredictions: [],
+    winnerPredictionsError: null,
+    teamSelectedPlayerId: null,
+    teamChatMessages: [],
+    teamChatScope: "global",
+    teamChatLimit: 30,
+    teamChatPageSize: 30,
+    teamChatHasMore: false,
+    teamChatError: null,
     currentView: "home",
     leaderboardTab: "overall",
     teamTab: "average",
@@ -22,7 +33,9 @@ const App = {
     worldcupTab: "groups",
     matchPhaseIndex: 0,
     myPredictionsPhaseIndex: 0,
-    leaderboardPhaseIndex: 0
+    leaderboardPhaseIndex: 0,
+    achievementNotificationQueue: [],
+    achievementModalOpen: false
   },
 
   async init() {
@@ -32,9 +45,11 @@ const App = {
     this.bindNavigation();
     this.bindGlobalActions();
     await this.loadBaseData();
-    const requestedView = new URLSearchParams(window.location.search).get("view") || "home";
-    const allowedViews = ["home", "matches", "worldcup", "mypredictions", "leaderboard", "achievements", "profile"];
+    const rawRequestedView = new URLSearchParams(window.location.search).get("view") || "home";
+    const requestedView = rawRequestedView === "mypredictions" ? "matches" : rawRequestedView;
+    const allowedViews = ["home", "matches", "worldcup", "leaderboard", "teams", "achievements", "profile"];
     const mustCompleteProfile = !this.profileSetupComplete();
+    this.syncAchievementNotifications({ silent: !this.hasAchievementNotificationStore() });
     await this.loadView(mustCompleteProfile ? "profile" : (allowedViews.includes(requestedView) ? requestedView : "home"));
     if (mustCompleteProfile) H.toast("Bienvenue ! Choisis ton pseudo, ton avatar, ton badge et ta team pour entrer dans le nid.", "info");
     this.setupRealtime();
@@ -105,19 +120,21 @@ const App = {
           <div>
             <p class="eyebrow">Crédits cachés</p>
             <h2 id="creditsTitle">Le Nid des Pronos</h2>
-            <p class="muted">Version <strong>0.24.3</strong> · pré-déploiement. Le passage en <strong>1.0.0</strong> se fera au déploiement officiel.</p>
+            <p class="muted">Version <strong>0.25.2</strong> · pré-déploiement. Le passage en <strong>1.0.0</strong> se fera au déploiement officiel.</p>
           </div>
           <button class="ghost-btn" id="closeCreditsBtn" type="button">Fermer</button>
         </div>
         <div class="credits-grid">
           <section>
             <h3>Principe de version</h3>
-            <p><strong>0.24.3</strong> = version non déployée · évolution majeure n°24 · correction mineure 2.</p>
+            <p><strong>0.25.2</strong> = version non déployée · évolution majeure n°25 · correction mineure 2.</p>
             <p><strong>1.x.x</strong> = version publique déployée.</p>
           </section>
           <section>
             <h3>Évolutions récentes</h3>
             <ul class="changelog-list">
+              <li><strong>0.25.2</strong> — fusion Matchs/Mes pronos et modals magiques pour les exploits débloqués un par un.</li>
+              <li><strong>0.25.1</strong> — fiches joueurs dans Les teams, chargement progressif du chat et modération admin des messages.</li>
               <li><strong>0.24.3</strong> — correction des avatars : vraies chouettes sans bande colorée parasite et fond basé sur la couleur de team.</li>
               <li><strong>0.24.2</strong> — avatar joueur affiché dans les classements, à gauche des scores.</li>
               <li><strong>0.24.3</strong> — choix d’avatar sans fond parasite, galerie teintée par la couleur de la team et suppression du carré jaune derrière l’avatar du menu.</li>
@@ -157,7 +174,8 @@ const App = {
       this.loadActiveCompetition(),
       this.loadMatches(),
       this.loadMyPredictions(),
-      this.loadVisiblePredictions()
+      this.loadVisiblePredictions(),
+      this.loadPublicProfiles()
     ]);
 
     await this.loadWinnerPrediction();
@@ -230,6 +248,56 @@ const App = {
     this.state.winnerPrediction = data || null;
   },
 
+  async loadPlayerScoreRows() {
+    const { data, error } = await window.sb
+      .from("v_leaderboard_overall")
+      .select("*")
+      .order("rank");
+
+    if (error) {
+      console.warn("Classement indisponible pour les fiches joueurs", error);
+      this.state.playerScoreRows = [];
+      return;
+    }
+
+    this.state.playerScoreRows = data || [];
+  },
+
+  async loadWinnerPredictionsForTeams() {
+    this.state.winnerPredictionsError = null;
+
+    const selectFields = "user_id,predicted_team_id,predicted_team_name,predicted_team_short_name,predicted_team_country_code,predicted_team_flag_url,is_locked,points_total,competition_id";
+    const runQuery = async (viewName) => {
+      let query = window.sb
+        .from(viewName)
+        .select(selectFields)
+        .order("pseudo", { ascending: true });
+
+      if (this.state.activeCompetition?.id) {
+        query = query.eq("competition_id", this.state.activeCompetition.id);
+      }
+
+      return query;
+    };
+
+    let { data, error } = await runQuery("v_team_public_winner_predictions");
+
+    // Fallback si le patch V0.25.1 n'a pas encore été lancé :
+    // l'ancienne vue respecte le masquage jusqu'au verrouillage.
+    if (error) {
+      ({ data, error } = await runQuery("v_winner_predictions"));
+    }
+
+    if (error) {
+      console.warn("Choix champion indisponibles pour les fiches joueurs", error);
+      this.state.winnerPredictions = [];
+      this.state.winnerPredictionsError = error;
+      return;
+    }
+
+    this.state.winnerPredictions = data || [];
+  },
+
   async loadMatches() {
     const { data, error } = await window.sb
       .from("v_matches")
@@ -261,6 +329,72 @@ const App = {
       return;
     }
     this.state.visiblePredictions = data || [];
+  },
+
+  async loadPublicProfiles() {
+    const { data, error } = await window.sb
+      .from("v_public_profiles")
+      .select("*")
+      .eq("is_active", true)
+      .order("office_team_name", { ascending: true, nullsFirst: false })
+      .order("pseudo", { ascending: true });
+
+    if (!error) {
+      this.state.publicProfiles = data || [];
+      return;
+    }
+
+    console.warn("v_public_profiles indisponible, fallback profiles", error);
+    const { data: fallback, error: fallbackError } = await window.sb
+      .from("profiles")
+      .select("id,pseudo,office_team_id,is_active,avatar_key,badge_shape,badge_color,profile_setup_done")
+      .eq("is_active", true)
+      .order("pseudo", { ascending: true });
+
+    if (fallbackError) {
+      console.warn("profiles indisponible pour Les teams", fallbackError);
+      this.state.publicProfiles = [];
+      return;
+    }
+
+    this.state.publicProfiles = (fallback || []).map((profile) => {
+      const team = this.state.officeTeams.find((t) => t.id === profile.office_team_id);
+      return {
+        ...profile,
+        office_team_name: team?.name || null,
+        office_team_slug: team?.slug || null,
+        office_team_color: team?.color || null
+      };
+    });
+  },
+
+  async loadTeamChatMessages() {
+    this.state.teamChatError = null;
+    const scope = this.state.teamChatScope || "global";
+    const limit = Math.max(10, Number(this.state.teamChatLimit || this.state.teamChatPageSize || 30));
+    let query = window.sb
+      .from("v_team_chat_messages")
+      .select("*")
+      .eq("scope", scope)
+      .order("created_at", { ascending: false })
+      .limit(limit + 1);
+
+    if (scope === "team" && this.state.profile?.office_team_id) {
+      query = query.eq("office_team_id", this.state.profile.office_team_id);
+    }
+
+    const { data, error } = await query;
+    if (error) {
+      console.warn("Chat teams indisponible", error);
+      this.state.teamChatMessages = [];
+      this.state.teamChatHasMore = false;
+      this.state.teamChatError = error;
+      return;
+    }
+
+    const rows = data || [];
+    this.state.teamChatHasMore = rows.length > limit;
+    this.state.teamChatMessages = rows.slice(0, limit).reverse();
   },
 
   renderShell() {
@@ -296,6 +430,7 @@ const App = {
   },
 
   async loadView(viewName) {
+    if (viewName === "mypredictions") viewName = "matches";
     if (viewName !== "profile" && !this.profileSetupComplete()) {
       viewName = "profile";
       H.toast("Complète d’abord ton profil pour accéder au nid.", "info");
@@ -307,8 +442,8 @@ const App = {
       home: "Tableau de bord",
       matches: "Matchs & pronos",
       worldcup: "Coupe du monde",
-      mypredictions: "Mes pronos",
       leaderboard: "Classements",
+      teams: "Les teams",
       achievements: "Exploits",
       profile: "Profil"
     };
@@ -319,8 +454,8 @@ const App = {
     if (viewName === "home") await this.renderHome();
     if (viewName === "matches") await this.renderMatches();
     if (viewName === "worldcup") await this.renderWorldCup();
-    if (viewName === "mypredictions") await this.renderMyPredictions();
     if (viewName === "leaderboard") await this.renderLeaderboard();
+    if (viewName === "teams") await this.renderTeamsPage();
     if (viewName === "achievements") await this.renderAchievements();
     if (viewName === "profile") await this.renderProfile();
   },
@@ -502,7 +637,7 @@ const App = {
       root.innerHTML = `
         <section class="toolbar-card">
           <div>
-            <h2>Matchs</h2>
+            <h2>Matchs & pronos</h2>
             <p class="muted">Aucun match à afficher pour le moment.</p>
           </div>
           <button class="ghost-btn" id="refreshMatchesBtn">Rafraîchir</button>
@@ -518,11 +653,13 @@ const App = {
     root.innerHTML = `
       <section class="toolbar-card">
         <div>
-          <h2>Matchs</h2>
-          <p class="muted">Tu peux modifier ton score jusqu’au coup d’envoi. Navigue phase par phase avec les flèches.</p>
+          <h2>Matchs & pronos</h2>
+          <p class="muted">Matchs, saisie des scores et récap de tes pronos sont maintenant réunis ici.</p>
         </div>
         <button class="ghost-btn" id="refreshMatchesBtn">Rafraîchir</button>
       </section>
+
+      ${this.predictionPhaseSummaryHtml(group)}
 
       ${pager}
 
@@ -551,6 +688,64 @@ const App = {
 
     this.bindPhaseNavigation("matchPhaseIndex", () => this.renderMatches());
     this.bindPredictionForms();
+    this.bindCombinedPredictionSummaryActions();
+  },
+
+  predictionPhaseSummaryHtml(group) {
+    const allMissing = this.missingPredictions();
+    const allDone = this.state.matches.filter((match) => this.getMyPrediction(match.id));
+    const locked = this.state.matches.filter((match) => H.isKickoffPassed(match.kickoff_at));
+    const phaseDone = group.matches.filter((match) => this.getMyPrediction(match.id)).length;
+    const phaseMissing = group.matches.filter((match) => !H.isKickoffPassed(match.kickoff_at) && !this.getMyPrediction(match.id)).length;
+
+    return `
+      <section class="grid three stats-grid combined-prono-stats">
+        <article class="stat-card"><strong>${allDone.length}</strong><span>Pronos posés</span></article>
+        <article class="stat-card"><strong>${allMissing.length}</strong><span>À faire</span></article>
+        <article class="stat-card"><strong>${locked.length}</strong><span>Verrouillés</span></article>
+      </section>
+
+      <section class="card combined-prono-summary">
+        <div class="card-title-row">
+          <div>
+            <h3>${H.icon("pronos")} Mes pronos — ${H.escapeHtml(group.key)}</h3>
+            <p class="muted">${phaseDone}/${group.matches.length} posé${phaseDone > 1 ? "s" : ""} · ${phaseMissing} manquant${phaseMissing > 1 ? "s" : ""} à venir</p>
+          </div>
+          <span class="pill neutral">${H.matchDateRangeLabel(group.matches)}</span>
+        </div>
+        <div class="combined-prono-list">
+          ${group.matches.map((match) => {
+            const prediction = this.getMyPrediction(match.id);
+            const points = this.state.visiblePredictions.find((row) => row.match_id === match.id && row.user_id === this.state.session.user.id);
+            const canEdit = !H.isKickoffPassed(match.kickoff_at);
+            return `
+              <button class="combined-prono-row" type="button" data-jump-match="${H.escapeHtml(match.id)}">
+                <span>
+                  <strong>${H.matchFlagHtml(match, "home")} ${H.escapeHtml(match.home_team_name)} <em>vs</em> ${H.matchFlagHtml(match, "away")} ${H.escapeHtml(match.away_team_name)}</strong>
+                  <small>${H.formatDateTime(match.kickoff_at)} · ${H.stageLabel(match.stage)}${match.stage === "group" && match.pool_round ? ` · J. poule ${match.pool_round}` : ""}</small>
+                </span>
+                <span class="combined-prono-row-status">
+                  ${prediction ? `<strong>${prediction.home_score_pred} - ${prediction.away_score_pred}</strong>` : `<strong class="missing">À faire</strong>`}
+                  ${points ? `<small>${points.points_total ?? 0} pts · ${H.escapeHtml(this.predictionReasonLabel(points))}</small>` : `<small>${canEdit ? "Cliquer pour pronostiquer" : "Verrouillé"}</small>`}
+                </span>
+              </button>
+            `;
+          }).join("")}
+        </div>
+      </section>
+    `;
+  },
+
+  bindCombinedPredictionSummaryActions() {
+    H.$$("[data-jump-match]").forEach((button) => {
+      button.addEventListener("click", () => {
+        const target = document.getElementById(`match-${button.dataset.jumpMatch}`);
+        if (!target) return;
+        target.scrollIntoView({ behavior: "smooth", block: "center" });
+        target.classList.add("match-card-highlight");
+        setTimeout(() => target.classList.remove("match-card-highlight"), 1200);
+      });
+    });
   },
 
   groupMatchesByPouleRound(matches) {
@@ -616,7 +811,7 @@ const App = {
     const canSeeOthers = locked;
 
     return `
-      <article class="match-card ${match.status === "live" ? "live" : ""}">
+      <article class="match-card ${match.status === "live" ? "live" : ""}" id="match-${H.escapeHtml(match.id)}">
         <div class="match-head">
           <div>
             <span class="pill ${match.status}">${H.statusLabel(match.status)}</span>
@@ -1431,6 +1626,128 @@ const App = {
     if (!badges.length) return `<p class="muted detail-empty">Aucun exploit pour le moment. Le nid observe en silence.</p>`;
     return `<div class="achievement-grid">${badges.map((badge) => this.badgeCardHtml(badge, true)).join("")}</div>`;
   },
+  achievementStorageKey() {
+    return `nid-achievements-notified:${this.state.session?.user?.id || "anonymous"}`;
+  },
+
+  hasAchievementNotificationStore() {
+    try {
+      return localStorage.getItem(this.achievementStorageKey()) !== null;
+    } catch (error) {
+      return true;
+    }
+  },
+
+  getNotifiedAchievementIds() {
+    try {
+      const raw = localStorage.getItem(this.achievementStorageKey());
+      const ids = raw ? JSON.parse(raw) : [];
+      return new Set(Array.isArray(ids) ? ids : []);
+    } catch (error) {
+      return new Set();
+    }
+  },
+
+  setNotifiedAchievementIds(ids) {
+    try {
+      localStorage.setItem(this.achievementStorageKey(), JSON.stringify([...ids]));
+    } catch (error) {
+      console.warn("Impossible d’enregistrer les badges déjà annoncés", error);
+    }
+  },
+
+  syncAchievementNotifications({ silent = false } = {}) {
+    if (!this.state.session?.user?.id) return;
+    const badges = this.computeBadgesForUser(this.state.session.user.id);
+    const currentIds = new Set(badges.map((badge) => badge.id));
+
+    if (silent) {
+      this.setNotifiedAchievementIds(currentIds);
+      return;
+    }
+
+    const notifiedIds = this.getNotifiedAchievementIds();
+    const newBadges = badges.filter((badge) => !notifiedIds.has(badge.id));
+    if (!newBadges.length) return;
+
+    newBadges.forEach((badge) => notifiedIds.add(badge.id));
+    this.setNotifiedAchievementIds(notifiedIds);
+    this.queueAchievementModals(newBadges);
+  },
+
+  queueAchievementModals(badges = []) {
+    this.state.achievementNotificationQueue.push(...badges);
+    this.showNextAchievementModal();
+  },
+
+  achievementModalTone(badge) {
+    if (badge.type === "negative") {
+      return {
+        kicker: "Exploit débloqué… avec panache douteux",
+        headline: "Le nid te chambre, mais il applaudit quand même",
+        emoji: "🦉💥"
+      };
+    }
+    if (badge.type === "neutral") {
+      return {
+        kicker: "Nouvel exploit débloqué",
+        headline: "La chouette inscrit ton nom dans le grimoire",
+        emoji: "🦉✨"
+      };
+    }
+    return {
+      kicker: "Badge débloqué !",
+      headline: "Pluie de confettis sur le perchoir",
+      emoji: "🏆✨"
+    };
+  },
+
+  showNextAchievementModal() {
+    if (this.state.achievementModalOpen) return;
+    const badge = this.state.achievementNotificationQueue.shift();
+    if (!badge) return;
+
+    this.state.achievementModalOpen = true;
+    H.$("#achievementUnlockModal")?.remove();
+
+    const tone = this.achievementModalTone(badge);
+    const remaining = this.state.achievementNotificationQueue.length;
+    const modal = document.createElement("div");
+    modal.id = "achievementUnlockModal";
+    modal.className = `modal-backdrop achievement-unlock-modal achievement-unlock-${H.escapeHtml(badge.type)}`;
+    modal.innerHTML = `
+      <div class="modal-card achievement-unlock-card" role="dialog" aria-modal="true" aria-labelledby="achievementUnlockTitle">
+        <div class="magic-confetti" aria-hidden="true">
+          <span></span><span></span><span></span><span></span><span></span><span></span>
+        </div>
+        <div class="achievement-unlock-glow" aria-hidden="true"></div>
+        <p class="eyebrow achievement-unlock-kicker">${H.escapeHtml(tone.kicker)}</p>
+        <div class="achievement-unlock-art">
+          ${this.badgeArtHtml(badge, true)}
+        </div>
+        <h2 id="achievementUnlockTitle">${H.escapeHtml(badge.title)}</h2>
+        <p class="achievement-unlock-headline">${H.escapeHtml(tone.headline)} ${tone.emoji}</p>
+        <p class="muted achievement-unlock-description">${H.escapeHtml(badge.description)}</p>
+        <div class="achievement-unlock-actions">
+          ${remaining ? `<small>${remaining} autre${remaining > 1 ? "s" : ""} exploit${remaining > 1 ? "s" : ""} en attente…</small>` : `<small>Le grimoire est à jour.</small>`}
+          <button class="primary-btn" id="closeAchievementUnlockBtn" type="button">${remaining ? "Voir le suivant" : "Fermer"}</button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(modal);
+    const close = () => {
+      modal.remove();
+      this.state.achievementModalOpen = false;
+      this.showNextAchievementModal();
+    };
+    H.$("#closeAchievementUnlockBtn", modal)?.focus();
+    H.$("#closeAchievementUnlockBtn", modal)?.addEventListener("click", close);
+    modal.addEventListener("click", (event) => {
+      if (event.target === modal) close();
+    });
+  },
+
 
   playerScoreDetailsHtml(userId, filters = {}) {
     const rows = this.scoreDetailRowsForUser(userId, filters);
@@ -1684,6 +2001,372 @@ const App = {
   },
 
 
+  officeTeamById(teamId) {
+    return this.state.officeTeams.find((team) => team.id === teamId) || null;
+  },
+
+  playerPublicProfile(profile = {}) {
+    const team = this.officeTeamById(profile.office_team_id);
+    return this.visualProfile({
+      ...profile,
+      office_team_name: profile.office_team_name || team?.name || "Sans team",
+      office_team_slug: profile.office_team_slug || team?.slug || "",
+      office_team_color: profile.office_team_color || team?.color || profile.badge_color || "#facc15",
+      avatar_key: profile.avatar_key || "owl-01",
+      badge_shape: profile.badge_shape || "rounded",
+      badge_color: profile.badge_color || team?.color || "#facc15"
+    });
+  },
+
+  teamPlayers(teamId = null) {
+    return this.state.publicProfiles
+      .filter((player) => teamId ? player.office_team_id === teamId : !player.office_team_id)
+      .sort((a, b) => String(a.pseudo || "").localeCompare(String(b.pseudo || ""), "fr"));
+  },
+
+  scoreRowForPlayer(userId) {
+    return this.state.playerScoreRows.find((row) => row.user_id === userId) || null;
+  },
+
+  winnerInfoForPlayer(userId) {
+    const publicWinner = this.state.winnerPredictions.find((row) => row.user_id === userId);
+    if (publicWinner) return publicWinner;
+
+    if (userId === this.state.session.user.id && this.state.winnerPrediction?.predicted_team_id) {
+      const team = this.state.footballTeams.find((item) => item.id === this.state.winnerPrediction.predicted_team_id);
+      if (team) {
+        return {
+          user_id: userId,
+          predicted_team_id: team.id,
+          predicted_team_name: team.name,
+          predicted_team_short_name: team.short_name,
+          predicted_team_country_code: team.country_code,
+          predicted_team_flag_url: team.flag_url,
+          points_total: 0
+        };
+      }
+    }
+
+    return null;
+  },
+
+  playerStatsCardsHtml(row, badges) {
+    return `
+      <div class="player-detail-stats">
+        <article><strong>#${row?.rank || "—"}</strong><small>classement</small></article>
+        <article><strong>${row?.total_points || 0}</strong><small>points</small></article>
+        <article><strong>${row?.exact_scores || 0}</strong><small>scores exacts</small></article>
+        <article><strong>${row?.good_results || 0}</strong><small>bons résultats</small></article>
+        <article><strong>${badges.length}</strong><small>badges</small></article>
+      </div>
+    `;
+  },
+
+  playerChampionPickHtml(playerId) {
+    const winner = this.winnerInfoForPlayer(playerId);
+
+    if (winner) {
+      const flag = H.flagImgHtml({
+        flagUrl: winner.predicted_team_flag_url,
+        countryCode: winner.predicted_team_country_code,
+        shortName: winner.predicted_team_short_name,
+        name: winner.predicted_team_name,
+        className: "team-flag-img champion-option-flag"
+      });
+      return `
+        <div class="player-winner-pick picked">
+          ${flag}
+          <div>
+            <strong>${H.escapeHtml(winner.predicted_team_name || "Équipe choisie")}</strong>
+            <small>Champion du monde choisi${winner.points_total ? ` · +${winner.points_total} pts` : ""}</small>
+          </div>
+        </div>
+      `;
+    }
+
+    if (this.state.winnerPredictionsError) {
+      return `
+        <div class="player-winner-pick muted-box">
+          <strong>Choix champion indisponible</strong>
+          <small>${H.escapeHtml(this.state.winnerPredictionsError.message || "Vue Supabase à vérifier")}</small>
+        </div>
+      `;
+    }
+
+    return `
+      <div class="player-winner-pick muted-box">
+        <strong>Choix champion non visible</strong>
+        <small>Soit le joueur ne l’a pas encore choisi, soit le choix reste masqué jusqu’au verrouillage.</small>
+      </div>
+    `;
+  },
+
+  openTeamPlayerModal(playerId) {
+    const player = this.state.publicProfiles.find((item) => item.id === playerId);
+    if (!player) return;
+
+    this.state.teamSelectedPlayerId = playerId;
+    const existing = H.$("#teamPlayerModal");
+    if (existing) existing.remove();
+
+    const profile = this.playerPublicProfile(player);
+    const isMe = player.id === this.state.session.user.id;
+    const scoreRow = this.scoreRowForPlayer(player.id);
+    const badges = this.computeBadgesForUser(player.id);
+
+    const modal = document.createElement("div");
+    modal.id = "teamPlayerModal";
+    modal.className = "modal-backdrop team-player-modal";
+    modal.innerHTML = `
+      <div class="modal-card team-player-modal-card" role="dialog" aria-modal="true" aria-labelledby="teamPlayerModalTitle">
+        <div class="team-player-modal-head" style="--team-color:${H.escapeHtml(profile.office_team_color || profile.badge_color || "#facc15")}">
+          <div class="team-player-identity">
+            ${H.profileBadgeHtml(profile, "profile-badge large")}
+            <div>
+              <p class="eyebrow">Fiche joueur${isMe ? " · toi" : ""}</p>
+              <h2 id="teamPlayerModalTitle">${H.escapeHtml(player.pseudo || "Joueur")}</h2>
+              <p class="muted">${H.escapeHtml(profile.office_team_name || "Sans team")} · ${scoreRow?.scored_matches || 0} match${Number(scoreRow?.scored_matches || 0) > 1 ? "s" : ""} comptabilisé${Number(scoreRow?.scored_matches || 0) > 1 ? "s" : ""}</p>
+            </div>
+          </div>
+          <button class="ghost-btn" id="closeTeamPlayerModalBtn" type="button">Fermer</button>
+        </div>
+
+        ${this.playerStatsCardsHtml(scoreRow, badges)}
+
+        <section class="player-detail-section">
+          <h3>Équipe choisie pour gagner</h3>
+          ${this.playerChampionPickHtml(player.id)}
+        </section>
+
+        <section class="player-detail-section">
+          <h3>Badges</h3>
+          ${badges.length ? `<div class="achievement-grid compact-achievements">${badges.map((badge) => this.badgeCardHtml(badge, true)).join("")}</div>` : `<p class="muted detail-empty">Aucun badge pour l’instant.</p>`}
+        </section>
+
+        <section class="player-detail-section">
+          <h3>Détail des scores</h3>
+          ${this.playerScoreDetailsHtml(player.id)}
+        </section>
+      </div>
+    `;
+
+    document.body.appendChild(modal);
+    const close = () => this.closeTeamPlayerModal();
+    H.$("#closeTeamPlayerModalBtn", modal)?.addEventListener("click", close);
+    modal.addEventListener("click", (event) => { if (event.target === modal) close(); });
+  },
+
+  closeTeamPlayerModal() {
+    H.$("#teamPlayerModal")?.remove();
+  },
+
+  teamCardHtml(team, players) {
+    const color = team?.color || "#facc15";
+    return `
+      <article class="team-directory-card" style="--team-color:${H.escapeHtml(color)}">
+        <div class="team-directory-head">
+          <span class="team-color-dot" aria-hidden="true"></span>
+          <div>
+            <h3>${H.escapeHtml(team?.name || "Sans team")}</h3>
+            <p class="muted">${players.length} joueur${players.length > 1 ? "s" : ""}</p>
+          </div>
+        </div>
+        <div class="team-player-list">
+          ${players.length ? players.map((player) => {
+            const profile = this.playerPublicProfile(player);
+            const isMe = player.id === this.state.session.user.id;
+            return `
+              <button class="team-player-chip ${isMe ? "me" : ""}" type="button" data-player-id="${H.escapeHtml(player.id)}" aria-label="Voir la fiche de ${H.escapeHtml(player.pseudo || "ce joueur")}">
+                ${H.profileBadgeHtml(profile, "profile-badge mini")}
+                <div>
+                  <strong>${H.escapeHtml(player.pseudo || "Joueur")}</strong>
+                  <small>${isMe ? "Toi" : H.escapeHtml(profile.office_team_name || "Sans team")}</small>
+                </div>
+              </button>
+            `;
+          }).join("") : `<p class="muted">Aucun joueur actif dans cette team.</p>`}
+        </div>
+      </article>
+    `;
+  },
+
+  chatMessageHtml(message) {
+    const profile = this.playerPublicProfile({
+      id: message.user_id,
+      pseudo: message.author_pseudo || "Joueur",
+      office_team_id: message.author_office_team_id || message.office_team_id,
+      office_team_name: message.author_office_team_name || message.office_team_name,
+      office_team_slug: message.author_office_team_slug,
+      office_team_color: message.author_office_team_color || message.office_team_color,
+      avatar_key: message.avatar_key || "owl-01",
+      badge_shape: message.badge_shape || "rounded",
+      badge_color: message.badge_color || message.author_office_team_color || message.office_team_color || "#facc15"
+    });
+    const isMe = message.user_id === this.state.session.user.id;
+    return `
+      <article class="team-chat-message ${isMe ? "me" : ""}">
+        ${H.profileBadgeHtml(profile, "profile-badge mini")}
+        <div class="team-chat-bubble">
+          <div class="team-chat-meta">
+            <strong>${H.escapeHtml(message.author_pseudo || "Joueur")}</strong>
+            <span>${H.escapeHtml(message.scope === "team" ? (message.office_team_name || "Ma team") : "Tout le nid")}</span>
+            <time>${H.formatDateTime(message.created_at)}</time>
+          </div>
+          <p>${H.escapeHtml(message.body)}</p>
+        </div>
+      </article>
+    `;
+  },
+
+  async renderTeamsPage() {
+    await Promise.all([
+      this.loadPublicProfiles(),
+      this.loadPlayerScoreRows(),
+      this.loadWinnerPredictionsForTeams()
+    ]);
+
+    if (this.state.teamChatScope === "team" && !this.state.profile?.office_team_id) {
+      this.state.teamChatScope = "global";
+    }
+    await this.loadTeamChatMessages();
+
+    const root = H.$("#viewRoot");
+    const myTeam = this.officeTeamById(this.state.profile?.office_team_id);
+    const activePlayers = this.state.publicProfiles.filter((player) => player.profile_setup_done !== false);
+    const teamsWithPlayers = this.state.officeTeams.map((team) => ({
+      team,
+      players: this.teamPlayers(team.id)
+    }));
+    const playersWithoutTeam = this.teamPlayers(null);
+    const chatScope = this.state.teamChatScope || "global";
+    const chatUnavailable = Boolean(this.state.teamChatError);
+
+    root.innerHTML = `
+      <section class="hero-card teams-hero">
+        <div>
+          <p class="eyebrow">${H.icon("profile")} Les teams</p>
+          <h2>Les joueurs du nid, par équipe.</h2>
+          <p class="muted">Retrouve tous les joueurs actifs, leur team bureau et le chat du tournoi.</p>
+        </div>
+        <div class="teams-hero-stats">
+          <div><strong>${activePlayers.length}</strong><small>joueurs</small></div>
+          <div><strong>${this.state.officeTeams.length}</strong><small>teams</small></div>
+          <div><strong>${H.escapeHtml(myTeam?.name || "—")}</strong><small>ma team</small></div>
+        </div>
+      </section>
+
+      <section class="grid two teams-page-grid">
+        <section class="card teams-directory-card">
+          <div class="card-title-row">
+            <div>
+              <h3>Annuaire des teams</h3>
+              <p class="muted">Clique sur un joueur pour voir sa fiche : scores, badges et champion choisi.</p>
+            </div>
+            <button class="ghost-btn" id="refreshTeamsBtn" type="button">Rafraîchir</button>
+          </div>
+          <div class="teams-directory-grid">
+            ${teamsWithPlayers.map(({ team, players }) => this.teamCardHtml(team, players)).join("")}
+            ${playersWithoutTeam.length ? this.teamCardHtml({ name: "Sans team", color: "#94a3b8" }, playersWithoutTeam) : ""}
+          </div>
+        </section>
+
+        <section class="card team-chat-card">
+          <div class="card-title-row">
+            <div>
+              <h3>Messages</h3>
+              <p class="muted">Écris à tout le monde ou seulement à ta team. Les messages sont chargés par paquets de ${this.state.teamChatPageSize}.</p>
+            </div>
+          </div>
+
+          <div class="segmented small team-chat-scope">
+            <button class="${chatScope === "global" ? "active" : ""}" data-chat-scope="global" type="button">Tout le monde</button>
+            <button class="${chatScope === "team" ? "active" : ""}" data-chat-scope="team" type="button" ${!myTeam ? "disabled" : ""}>Ma team</button>
+          </div>
+
+          ${chatUnavailable ? `
+            <div class="chat-warning">
+              <strong>Chat pas encore branché en base.</strong>
+              <p>Lance les patchs SQL <code>patch_v0_25_0_les_teams_chat.sql</code> puis <code>patch_v0_25_1_teams_details_moderation.sql</code> dans Supabase, puis recharge l’app.</p>
+              <small>${H.escapeHtml(this.state.teamChatError?.message || "Table ou vue manquante")}</small>
+            </div>
+          ` : `
+            ${this.state.teamChatHasMore ? `<button class="ghost-btn load-more-chat-btn" id="loadMoreTeamChatBtn" type="button">Afficher plus de messages</button>` : ""}
+            <div class="team-chat-list" id="teamChatList">
+              ${this.state.teamChatMessages.length ? this.state.teamChatMessages.map((message) => this.chatMessageHtml(message)).join("") : `<p class="muted empty-chat">Aucun message ici pour l’instant. Ouvre le bal 🦉</p>`}
+            </div>
+
+            <form id="teamChatForm" class="team-chat-form">
+              <input type="text" name="body" maxlength="600" placeholder="Ton message..." autocomplete="off" required>
+              <button class="primary-btn" type="submit">Envoyer</button>
+            </form>
+          `}
+        </section>
+      </section>
+    `;
+
+    H.$("#refreshTeamsBtn")?.addEventListener("click", async () => {
+      await this.renderTeamsPage();
+      H.toast("Teams rafraîchies", "success");
+    });
+
+    H.$$('[data-chat-scope]').forEach((button) => {
+      button.addEventListener("click", async () => {
+        this.state.teamChatScope = button.dataset.chatScope || "global";
+        this.state.teamChatLimit = this.state.teamChatPageSize;
+        await this.renderTeamsPage();
+      });
+    });
+
+    H.$$('[data-player-id]', root).forEach((button) => {
+      button.addEventListener("click", () => this.openTeamPlayerModal(button.dataset.playerId));
+    });
+
+    H.$("#loadMoreTeamChatBtn")?.addEventListener("click", async () => {
+      this.state.teamChatLimit += this.state.teamChatPageSize;
+      await this.renderTeamsPage();
+    });
+
+    H.$("#teamChatForm")?.addEventListener("submit", (event) => this.sendTeamChatMessage(event));
+
+    const chatList = H.$("#teamChatList");
+    if (chatList) chatList.scrollTop = chatList.scrollHeight;
+  },
+
+  async sendTeamChatMessage(event) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const formData = new FormData(form);
+    const body = String(formData.get("body") || "").trim();
+    if (!body) return;
+
+    const scope = this.state.teamChatScope === "team" ? "team" : "global";
+    const officeTeamId = scope === "team" ? this.state.profile?.office_team_id : null;
+    if (scope === "team" && !officeTeamId) {
+      H.toast("Tu dois avoir une team pour écrire dans le chat team.", "error");
+      return;
+    }
+
+    const { error } = await window.sb
+      .from("team_chat_messages")
+      .insert({
+        user_id: this.state.session.user.id,
+        scope,
+        office_team_id: officeTeamId,
+        body
+      });
+
+    if (error) {
+      H.toast(error.message, "error");
+      return;
+    }
+
+    form.reset();
+    this.state.teamChatLimit = Math.max(this.state.teamChatLimit, this.state.teamChatPageSize);
+    await this.loadTeamChatMessages();
+    await this.renderTeamsPage();
+  },
+
+
   qualificationLabel(status) {
     const labels = {
       qualified: { text: "Qualifié", className: "success" },
@@ -1867,7 +2550,7 @@ const App = {
             <p class="muted">Déconnexion, crédits et historique des évolutions.</p>
           </div>
           <div class="profile-account-actions">
-            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v0.24.3</button>
+            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v0.25.1</button>
             <button class="danger-btn" id="profileLogoutBtn" type="button">Déconnexion</button>
           </div>
         </div>
@@ -2122,9 +2805,11 @@ const App = {
       this.loadWinnerPrediction()
     ]);
 
-    if (["home", "matches", "worldcup", "mypredictions", "leaderboard", "achievements", "profile"].includes(this.state.currentView)) {
-      await this.loadView(this.state.currentView);
+    if (["home", "matches", "worldcup", "mypredictions", "leaderboard", "teams", "achievements", "profile"].includes(this.state.currentView)) {
+      await this.loadView(this.state.currentView === "mypredictions" ? "matches" : this.state.currentView);
     }
+
+    this.syncAchievementNotifications();
 
     if (reason === "matches") {
       H.toast("Scores / matchs mis à jour", "info");
@@ -2133,7 +2818,7 @@ const App = {
 
   setupRealtime() {
     window.sb
-      .channel("app-realtime-v0-24-2")
+      .channel("app-realtime-v0-25-2")
       .on("postgres_changes", { event: "*", schema: "public", table: "matches" }, async () => {
         await this.refreshCurrentViewFromRealtime("matches");
       })
@@ -2142,10 +2827,16 @@ const App = {
       })
       .on("postgres_changes", { event: "*", schema: "public", table: "predictions" }, async () => {
         await this.loadVisiblePredictions();
-        if (["matches", "mypredictions"].includes(this.state.currentView)) await this.loadView(this.state.currentView);
+        if (["matches", "mypredictions"].includes(this.state.currentView)) await this.loadView(this.state.currentView === "mypredictions" ? "matches" : this.state.currentView);
       })
       .on("postgres_changes", { event: "*", schema: "public", table: "winner_predictions" }, async () => {
         await this.refreshCurrentViewFromRealtime("winner");
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "team_chat_messages" }, async () => {
+        if (this.state.currentView === "teams") {
+          await this.loadTeamChatMessages();
+          await this.renderTeamsPage();
+        }
       })
       .subscribe((status) => {
         console.info("[Le Nid des Pronos] Realtime app:", status);

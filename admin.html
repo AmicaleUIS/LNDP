@@ -5,9 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Admin — Le Nid des Pronos</title>
   <meta name="theme-color" content="#07111f">
-  <link rel="manifest" href="manifest.json?v=0.24.3">
+  <link rel="manifest" href="manifest.json?v=0.25.1">
   <link rel="icon" href="assets/icons/icon-192.png">
-  <link rel="stylesheet" href="css/style.css?v=0.24.3">
+  <link rel="stylesheet" href="css/style.css?v=0.25.1">
 </head>
 <body>
   <div class="admin-shell">
@@ -26,6 +26,9 @@
         </button>
         <button class="admin-nav-btn" type="button" data-admin-section="teams">
           <img class="owl-icon" src="assets/icons/owl-png/classements.png" alt="" aria-hidden="true" loading="lazy"><span>Équipes</span>
+        </button>
+        <button class="admin-nav-btn" type="button" data-admin-section="messages">
+          <img class="owl-icon" src="assets/icons/owl-png/diffusion.png" alt="" aria-hidden="true" loading="lazy"><span>Messages</span>
         </button>
         <button class="admin-nav-btn" type="button" data-admin-section="scores">
           <img class="owl-icon" src="assets/icons/owl-png/score-exact.png" alt="" aria-hidden="true" loading="lazy"><span>Scores</span>
@@ -48,7 +51,7 @@
     <main class="admin-main-area">
       <header class="admin-header admin-page-header">
         <div>
-          <p class="eyebrow">Administration · v0.24.3</p>
+          <p class="eyebrow">Administration · v0.25.1</p>
           <h1 id="adminPageTitle"><img class="owl-icon title-icon" src="assets/icons/owl-png/admin.png" alt="" aria-hidden="true" loading="lazy"> Saisie rapide des scores</h1>
           <p class="muted" id="adminPageSubtitle">Prochains matchs en haut, scores manuels, classement recalculé automatiquement.</p>
         </div>
@@ -85,6 +88,16 @@
             <input type="color" name="color" value="#facc15" aria-label="Couleur de la team">
             <button class="primary-btn" type="submit">Ajouter / mettre à jour</button>
           </form>
+        </section>
+
+        <section class="card admin-section" data-section-panel="messages">
+          <div class="card-title-row">
+            <div>
+              <h2>Modération des messages</h2>
+              <p class="muted">Masque un message du chat global ou d’un chat de team. Il disparaît côté joueurs sans tout supprimer physiquement.</p>
+            </div>
+          </div>
+          <div id="chatModerationAdmin"></div>
         </section>
 
         <section class="card admin-section" data-section-panel="scores">
@@ -142,7 +155,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>  <script src="js/config.js?v=0.24.3"></script>
   <script src="js/supabaseClient.js?v=0.24.3"></script>
   <script src="js/auth.js?v=0.24.3"></script>
-  <script src="js/common.js?v=0.24.3"></script>
-  <script src="js/admin.js?v=0.24.3"></script>
+  <script src="js/common.js?v=0.25.1"></script>
+  <script src="js/admin.js?v=0.25.1"></script>
 </body>
 </html>

@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — ADMIN V0.24.3
+// LE NID DES PRONOS — ADMIN V0.25.1
 // ============================================================
 
 const H = window.Helpers;
@@ -12,6 +12,10 @@ const Admin = {
     matches: [],
     teams: [],
     footballTeams: [],
+    chatMessages: [],
+    chatModerationError: null,
+    chatModerationScope: "all",
+    chatModerationLimit: 80,
     quickScoreFilter: "work",
     adminSection: "quick",
     backups: []
@@ -60,6 +64,7 @@ const Admin = {
     const titles = {
       quick: ["Saisie rapide des scores", "Prochains matchs en haut, validation rapide et scores manuels."],
       teams: ["Gestion des équipes", "Créer, renommer, recolorer ou supprimer les teams bureau."],
+      messages: ["Modération des messages", "Masquer les messages du chat global ou des chats de team."],
       scores: ["Gestion complète des scores", "Modifier les scores, lieux, horaires, diffuseurs et recalculer."],
       backups: ["Sauvegardes", "Sauvegarder, restaurer ou remettre à zéro les pronostics."],
       users: ["Joueurs", "Gérer les joueurs, rôles, teams et statuts actif/inactif."]
@@ -70,7 +75,7 @@ const Admin = {
 
     const title = H.$("#adminPageTitle");
     const subtitle = H.$("#adminPageSubtitle");
-    if (title) title.innerHTML = `${H.icon(section === "teams" ? "classements" : section === "scores" ? "score-exact" : section === "backups" ? "verrouille" : section === "users" ? "profil" : "admin", "")} ${H.escapeHtml(titles[section]?.[0] || "Administration")}`;
+    if (title) title.innerHTML = `${H.icon(section === "teams" ? "classements" : section === "messages" ? "diffusion" : section === "scores" ? "score-exact" : section === "backups" ? "verrouille" : section === "users" ? "profil" : "admin", "")} ${H.escapeHtml(titles[section]?.[0] || "Administration")}`;
     if (subtitle) subtitle.textContent = titles[section]?.[1] || "Mode gestion.";
   },
 
@@ -216,11 +221,13 @@ const Admin = {
       this.loadTeams(),
       this.loadFootballTeams(),
       this.loadMatches(),
-      this.loadBackups()
+      this.loadBackups(),
+      this.loadChatMessages()
     ]);
 
     this.renderUsers();
     this.renderTeams();
+    this.renderChatModeration();
     this.renderQuickScores();
     this.renderMatches();
     this.renderBackups();
@@ -282,6 +289,30 @@ const Admin = {
     }
 
     this.state.backups = data || [];
+  },
+
+  async loadChatMessages() {
+    this.state.chatModerationError = null;
+    const scope = this.state.chatModerationScope || "all";
+    let query = window.sb
+      .from("v_admin_team_chat_messages")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(Math.max(20, Number(this.state.chatModerationLimit || 80)));
+
+    if (scope === "global") query = query.eq("scope", "global");
+    if (scope === "team") query = query.eq("scope", "team");
+    if (scope === "hidden") query = query.not("deleted_at", "is", null);
+
+    const { data, error } = await query;
+    if (error) {
+      console.warn("Modération chat indisponible : lance le patch SQL V0.25.1", error);
+      this.state.chatMessages = [];
+      this.state.chatModerationError = error;
+      return;
+    }
+
+    this.state.chatMessages = data || [];
   },
 
   renderUsers() {
@@ -467,6 +498,118 @@ const Admin = {
     form.reset();
     H.toast("Team ajoutée", "success");
     await this.reloadAll();
+  },
+
+  chatScopeLabel(message) {
+    if (message.scope === "team") return message.office_team_name || "Chat team";
+    return "Tout le monde";
+  },
+
+  renderChatModeration() {
+    const root = H.$("#chatModerationAdmin");
+    if (!root) return;
+
+    const scope = this.state.chatModerationScope || "all";
+
+    if (this.state.chatModerationError) {
+      root.innerHTML = `
+        <div class="chat-warning admin-chat-warning">
+          <strong>Modération chat pas encore branchée.</strong>
+          <p>Lance le patch SQL <code>patch_v0_25_1_teams_details_moderation.sql</code> dans Supabase.</p>
+          <small>${H.escapeHtml(this.state.chatModerationError.message || "Vue admin manquante")}</small>
+        </div>
+      `;
+      return;
+    }
+
+    root.innerHTML = `
+      <div class="admin-chat-toolbar">
+        <div class="segmented small">
+          <button class="${scope === "all" ? "active" : ""}" type="button" data-chat-admin-filter="all">Tous</button>
+          <button class="${scope === "global" ? "active" : ""}" type="button" data-chat-admin-filter="global">Global</button>
+          <button class="${scope === "team" ? "active" : ""}" type="button" data-chat-admin-filter="team">Teams</button>
+          <button class="${scope === "hidden" ? "active" : ""}" type="button" data-chat-admin-filter="hidden">Masqués</button>
+        </div>
+        <div class="admin-chat-actions">
+          <button class="ghost-btn" id="loadMoreAdminChatBtn" type="button">Afficher plus</button>
+          <button class="ghost-btn" id="refreshAdminChatBtn" type="button">Rafraîchir</button>
+        </div>
+      </div>
+
+      <div class="admin-chat-list">
+        ${this.state.chatMessages.length ? this.state.chatMessages.map((message) => `
+          <article class="admin-chat-row ${message.deleted_at ? "hidden-message" : ""}" data-message-id="${H.escapeHtml(message.id)}">
+            <div class="admin-chat-main">
+              ${H.profileBadgeHtml({
+                pseudo: message.author_pseudo,
+                office_team_color: message.author_office_team_color,
+                avatar_key: message.avatar_key || "owl-01",
+                badge_shape: message.badge_shape || "rounded",
+                badge_color: message.badge_color || message.author_office_team_color || "#facc15"
+              }, "profile-badge mini")}
+              <div>
+                <strong>${H.escapeHtml(message.author_pseudo || "Joueur")}</strong>
+                <small>${H.escapeHtml(this.chatScopeLabel(message))} · ${H.formatDateTime(message.created_at)}${message.deleted_at ? ` · masqué le ${H.formatDateTime(message.deleted_at)}` : ""}</small>
+                <p>${H.escapeHtml(message.body)}</p>
+                ${message.deleted_reason ? `<small class="moderation-reason">Raison : ${H.escapeHtml(message.deleted_reason)}</small>` : ""}
+              </div>
+            </div>
+            <div class="admin-chat-row-actions">
+              ${message.deleted_at
+                ? `<span class="pill danger">Masqué</span>`
+                : `<button class="danger-btn hide-chat-message-btn" type="button">Masquer</button>`}
+            </div>
+          </article>
+        `).join("") : `<p class="muted">Aucun message dans ce filtre.</p>`}
+      </div>
+    `;
+
+    H.$$('[data-chat-admin-filter]', root).forEach((button) => {
+      button.addEventListener("click", async () => {
+        this.state.chatModerationScope = button.dataset.chatAdminFilter || "all";
+        this.state.chatModerationLimit = 80;
+        await this.loadChatMessages();
+        this.renderChatModeration();
+      });
+    });
+
+    H.$("#refreshAdminChatBtn", root)?.addEventListener("click", async () => {
+      await this.loadChatMessages();
+      this.renderChatModeration();
+      H.toast("Messages rafraîchis", "success");
+    });
+
+    H.$("#loadMoreAdminChatBtn", root)?.addEventListener("click", async () => {
+      this.state.chatModerationLimit += 80;
+      await this.loadChatMessages();
+      this.renderChatModeration();
+    });
+
+    H.$$(".hide-chat-message-btn", root).forEach((button) => {
+      button.addEventListener("click", (event) => this.hideChatMessage(event.currentTarget.closest(".admin-chat-row")));
+    });
+  },
+
+  async hideChatMessage(row) {
+    const messageId = row?.dataset.messageId;
+    if (!messageId) return;
+
+    const reason = prompt("Raison de modération ?", "Message masqué par admin") || "Message masqué par admin";
+    if (!confirm("Masquer ce message ? Il ne sera plus visible côté joueurs.")) return;
+
+    const { error } = await window.sb.rpc("moderate_team_chat_message", {
+      p_message_id: messageId,
+      p_reason: reason
+    });
+
+    if (error) {
+      H.toast(error.message, "error");
+      return;
+    }
+
+    H.toast("Message masqué", "success");
+    await this.loadChatMessages();
+    this.renderChatModeration();
   },
 
 
@@ -1009,7 +1152,7 @@ const Admin = {
 
   setupRealtime() {
     window.sb
-      .channel("admin-realtime-v0-22-2")
+      .channel("admin-realtime-v0-25-1")
       .on("postgres_changes", { event: "*", schema: "public", table: "matches" }, async () => {
         await this.loadMatches();
         this.renderQuickScores();
@@ -1017,6 +1160,10 @@ const Admin = {
       })
       .on("postgres_changes", { event: "*", schema: "public", table: "prediction_points" }, () => {
         console.info("[Le Nid des Pronos] Points recalculés");
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "team_chat_messages" }, async () => {
+        await this.loadChatMessages();
+        this.renderChatModeration();
       })
       .subscribe((status) => {
         console.info("[Le Nid des Pronos] Realtime admin:", status);
