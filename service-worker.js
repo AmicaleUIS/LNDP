@@ -1,9 +1,9 @@
 // ============================================================
-// LE NID DES PRONOS — SERVICE WORKER V0.26.1
-// Cache mis à jour : matchs de préparation, classements clarifiés et bracket draggable.
+// LE NID DES PRONOS — SERVICE WORKER V0.26.2
+// Cache mis à jour : préparation des assets illustrés du nid.
 // ============================================================
 
-const CACHE_NAME = "le-nid-des-pronos-v0-26-1";
+const CACHE_NAME = "le-nid-des-pronos-v0-26-2";
 
 // Les avatars ne sont pas précachés : ils peuvent aller de owl-01.png à owl-90.png et être ajoutés/remplacés librement.
 const ASSETS = [
@@ -13,13 +13,13 @@ const ASSETS = [
   "./register.html",
   "./app.html",
   "./admin.html",
-  "./css/style.css?v=0.26.1",
+  "./css/style.css?v=0.26.2",
   "./js/supabaseClient.js?v=0.24.3",
   "./js/auth.js?v=0.24.3",
-  "./js/common.js?v=0.26.1",
-  "./js/app.js?v=0.26.1",
-  "./js/admin.js?v=0.26.1",
-  "./manifest.json?v=0.26.1",
+  "./js/common.js?v=0.26.2",
+  "./js/app.js?v=0.26.2",
+  "./js/admin.js?v=0.26.2",
+  "./manifest.json?v=0.26.2",
   "./assets/icons/icon-192.png",
   "./assets/icons/icon-512.png",
   "./assets/icons/owl-icons.svg",
@@ -54,6 +54,8 @@ const ASSETS = [
   "./assets/icons/flags/us.png",
   "./assets/icons/flags/ca.png",
   "./assets/badges/README.md",
+  "./assets/records/README.md",
+  "./assets/icons/owl-png/README.md",
   "./assets/avatars/avatars.json"
 ];
 

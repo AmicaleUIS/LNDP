@@ -1,67 +1,63 @@
-# Le Nid des Pronos — V0.26.1
+# Le Nid des Pronos — V0.26.2
 
-## Nouveautés V0.26.1
+## Nouveautés V0.26.2
 
-- Règles du nid clarifiées dans la modal d’accueil.
-- Bonus phase finale expliqué clairement : bon qualifié = +2 pts, y compris après prolongation ou tirs au but.
-- Matchs de préparation expliqués comme tests hors classement et hors exploits normaux.
+Préparation du site pour ajouter facilement les nouvelles images :
 
-## Nouveautés V0.26.0
+- badges **Préparation du nid** et **Test concluant** ;
+- image de la chouette volante pour le bouton retour rapide vers le haut ;
+- images des **mini-records du nid**.
 
-Cette version prépare le site pour les tests grandeur nature avant le début de la Coupe du Monde.
+Aucun patch SQL nécessaire pour cette version.
 
-### Matchs de préparation TEST
+## Où mettre les images
 
-Ajout de 2 matchs de préparation :
+### Badges préparation
 
-- France - Côte d’Ivoire, jeudi 4 juin 2026 à Nantes ;
-- France - Irlande du Nord, lundi 8 juin 2026 à Lille.
+À déposer dans :
 
-Ces matchs sont clairement indiqués comme **matchs test**. Ils ne comptent pas dans le vrai classement Coupe du Monde et ne déclenchent pas les exploits normaux.
+```txt
+assets/badges/preparation-two-picks.png
+assets/badges/prep-good-pick.png
+```
 
-### Exploits préparation
+### Chouette retour haut
 
-Ajout de 2 exploits dédiés au test :
+À déposer dans :
 
-- `preparation-two-picks` : les 2 matchs de préparation sont pronostiqués ;
-- `prep-good-pick` : au moins 1 bon résultat sur les 2 matchs de préparation.
+```txt
+assets/icons/owl-png/retour-haut-chouette.png
+```
 
-### Classements
+Si l’image n’existe pas encore, l’application utilise automatiquement `accueil.png` en secours.
 
-La page Classements est réorganisée :
+### Mini-records
 
-- **Classement joueurs** avec Général et Par phase ;
-- **Teams bureau** par phase, avec choix Moyenne ou Par points ;
-- **Évolution** conservé pour les graphiques.
+À déposer dans :
 
-Les exploits ne sont plus affichés dans la ligne principale du classement pour éviter l’effet fouillis.
+```txt
+assets/records/<record-id>.png
+```
 
-### Mobile et phase finale
+Liste complète dans :
 
-- Les cartes matchs mobiles affichent les deux équipes sur une seule ligne pour réduire le scroll.
-- Le tableau de phase finale peut être déplacé horizontalement au doigt ou à la souris.
-- Les chaînes TV sont affichées dans les cartouches de phase finale.
+```txt
+assets/records/README.md
+```
 
-### Admin
+## Conseils image
 
-Ajout d’un bouton de reset des **scores de préparation uniquement**. Les pronos des joueurs sont conservés.
+- Format conseillé : PNG carré `512x512` ou `1024x1024`.
+- Fond transparent si possible.
+- Garder une petite marge autour du dessin.
+- Nom de fichier exact, tout en minuscules, avec les tirets.
 
-## SQL
+## Patch SQL
 
-À lancer dans Supabase SQL Editor :
+Le dernier patch SQL nécessaire reste celui de la V0.26.0 :
 
-```sql
+```txt
 patch_v0_26_0_preparation_classements.sql
 ```
 
-Si tu viens d’une version avant V0.25.10, lance aussi :
-
-```sql
-patch_v0_25_10_reset_messages_backup.sql
-```
-
-Si tu viens d’une version avant V0.25.8, lance aussi :
-
-```sql
-patch_v0_25_8_badges_mis_en_avant.sql
-```
+Pour la V0.26.2, il n’y a rien à lancer côté Supabase.

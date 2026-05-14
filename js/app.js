@@ -1667,7 +1667,7 @@ const App = {
     return `
       <article class="record-card ${best ? "has-record" : "empty-record"}">
         <div class="record-card-head">
-          <span class="record-icon">${H.icon(record.icon)}</span>
+          ${this.recordArtHtml(record)}
           <div>
             <strong>${H.escapeHtml(record.title)}</strong>
             <small>${H.escapeHtml(record.subtitle)}</small>
@@ -2624,6 +2624,17 @@ const App = {
       <span class="achievement-art ${unlocked ? "unlocked" : "locked"}">
         <img src="assets/badges/${id}.png" alt="Badge ${title}" loading="lazy" onerror="this.remove()">
         <span class="achievement-fallback">${H.icon(this.badgeIconName(badge))}</span>
+      </span>
+    `;
+  },
+
+  recordArtHtml(record) {
+    const id = H.escapeHtml(record.id);
+    const title = H.escapeHtml(record.title);
+    return `
+      <span class="record-icon record-art">
+        <img src="assets/records/${id}.png" alt="Mini-record ${title}" loading="lazy" onerror="this.remove()">
+        <span class="record-fallback">${H.icon(record.icon)}</span>
       </span>
     `;
   },

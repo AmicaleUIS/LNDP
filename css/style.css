@@ -7876,3 +7876,52 @@ button:disabled {
 }
 .rules-grid article strong { color: var(--gold); }
 .rules-grid article b { color: var(--text); font-size: 1.1rem; }
+
+/* ============================================================
+   V0.26.2 — Assets illustrés : badges test, mini-records, chouette retour haut
+   ============================================================ */
+.record-art {
+  overflow: hidden;
+  padding: 0;
+}
+
+.record-art img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  padding: 4px;
+  border-radius: 14px;
+  filter: drop-shadow(0 7px 12px rgba(0,0,0,.22));
+}
+
+.record-art img + .record-fallback {
+  display: none;
+}
+
+.record-fallback {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+}
+
+.record-fallback .owl-icon {
+  width: 25px;
+  height: 25px;
+}
+
+.mobile-scroll-top-owl img {
+  border-radius: 999px;
+}
+
+.achievement-art img {
+  object-fit: contain;
+  padding: 2px;
+  background: rgba(2, 6, 23, .08);
+}
+
+.achievement-unlock-art .achievement-art img {
+  object-fit: contain !important;
+  padding: 4px;
+  background: transparent;
+}
