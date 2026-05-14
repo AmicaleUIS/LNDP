@@ -1,6 +1,6 @@
-# Le Nid des Pronos — V0.26.2
+# Le Nid des Pronos — V0.26.3
 
-## Nouveautés V0.26.2
+## Nouveautés V0.26.3
 
 Préparation du site pour ajouter facilement les nouvelles images :
 
@@ -61,3 +61,12 @@ patch_v0_26_0_preparation_classements.sql
 ```
 
 Pour la V0.26.2, il n’y a rien à lancer côté Supabase.
+
+
+### Icônes PWA maskable
+
+- Ajout des fichiers `assets/icons/icon-maskable-192.png` et `assets/icons/icon-maskable-512.png`.
+- Mise à jour du `manifest.json` avec des entrées séparées `any` et `maskable`.
+- Ajout de `assets/icons/apple-touch-icon.png` pour iOS.
+
+Pour la V0.26.3, il n’y a rien à lancer côté Supabase.
