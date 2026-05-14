@@ -1,6 +1,6 @@
-# Le Nid des Pronos — V0.25.13
+# Le Nid des Pronos — V0.25.14
 
-## Nouveauté V0.25.13
+## Nouveauté V0.25.14
 
 - Correction mobile : le header de l'application prend maintenant toute la largeur de l'écran.
 - Correction mobile admin : le header admin prend lui aussi toute la largeur de l'écran.
@@ -8,7 +8,7 @@
 
 ## Base de données
 
-Aucun nouveau patch SQL pour la V0.25.13.
+Aucun nouveau patch SQL pour la V0.25.14.
 
 Si tu viens d’une version avant V0.25.10, lance toujours :
 

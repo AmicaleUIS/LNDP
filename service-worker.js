@@ -1,9 +1,9 @@
 // ============================================================
-// LE NID DES PRONOS — SERVICE WORKER V0.25.13
-// Cache mis à jour : classements harmonisés, évolution du nid, teams par phase et mini-records.
+// LE NID DES PRONOS — SERVICE WORKER V0.25.14
+// Cache mis à jour : optimisation mobile accueil, matchs, classements et teams du nid.
 // ============================================================
 
-const CACHE_NAME = "le-nid-des-pronos-v0-25-13";
+const CACHE_NAME = "le-nid-des-pronos-v0-25-14";
 
 // Les avatars ne sont pas précachés : ils peuvent aller de owl-01.png à owl-90.png et être ajoutés/remplacés librement.
 const ASSETS = [
@@ -13,13 +13,13 @@ const ASSETS = [
   "./register.html",
   "./app.html",
   "./admin.html",
-  "./css/style.css?v=0.25.13",
+  "./css/style.css?v=0.25.14",
   "./js/supabaseClient.js?v=0.24.3",
   "./js/auth.js?v=0.24.3",
-  "./js/common.js?v=0.25.13",
-  "./js/app.js?v=0.25.13",
-  "./js/admin.js?v=0.25.13",
-  "./manifest.json?v=0.25.13",
+  "./js/common.js?v=0.25.14",
+  "./js/app.js?v=0.25.14",
+  "./js/admin.js?v=0.25.14",
+  "./manifest.json?v=0.25.14",
   "./assets/icons/icon-192.png",
   "./assets/icons/icon-512.png",
   "./assets/icons/owl-icons.svg",

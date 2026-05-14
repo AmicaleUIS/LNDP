@@ -6081,3 +6081,456 @@ button:disabled {
     border-radius: 0 0 22px 22px !important;
   }
 }
+
+/* ============================================================
+   V0.25.14 — Optimisation mobile : accueil, matchs, classements, teams
+   ============================================================ */
+@media (max-width: 760px) {
+  .main-area {
+    padding: 12px;
+    padding-bottom: 18px;
+  }
+
+  .view-root {
+    gap: 12px;
+  }
+
+  .card,
+  .toolbar-card,
+  .match-card,
+  .hero-card {
+    border-radius: 22px;
+  }
+
+  .card,
+  .toolbar-card {
+    padding: 14px;
+  }
+
+  .hero-card {
+    padding: 16px;
+    gap: 12px;
+  }
+
+  .hero-card h2 {
+    font-size: clamp(1.45rem, 8vw, 2.1rem);
+    line-height: 1.02;
+  }
+
+  .hero-card .muted {
+    margin-block: 8px 0;
+  }
+
+  .grid.two,
+  .grid.three,
+  .stats-grid {
+    gap: 10px;
+  }
+
+  .stat-card {
+    min-height: unset;
+    padding: 12px;
+    border-radius: 18px;
+  }
+
+  .stat-card strong {
+    font-size: 1.55rem;
+  }
+
+  .stat-card span {
+    font-size: .82rem;
+  }
+
+  .card-title-row,
+  .toolbar-card {
+    gap: 8px;
+  }
+
+  .card-title-row .pill,
+  .toolbar-card .pill,
+  .day-title-row .pill {
+    width: fit-content;
+    align-self: flex-start;
+  }
+
+  /* Accueil : prochain match plus compact et moins collé */
+  .next-match-card {
+    padding: 13px 14px;
+  }
+
+  .next-match-card .compact-title-row {
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: space-between;
+  }
+
+  .next-match-card h3 {
+    font-size: 1.05rem;
+  }
+
+  .next-match-card .pill {
+    min-height: 26px;
+    padding: 5px 10px;
+    font-size: .76rem;
+  }
+
+  .next-match-card .mini-match {
+    display: grid;
+    gap: 7px;
+    margin-top: 8px;
+  }
+
+  .next-match-card .teams-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    align-items: center;
+    gap: 8px;
+  }
+
+  .next-match-card .teams-row strong {
+    min-width: 0;
+    font-size: 1.05rem;
+    line-height: 1.1;
+  }
+
+  .next-match-card .teams-row strong:last-child {
+    text-align: right;
+  }
+
+  .next-match-card .teams-row span {
+    font-size: .82rem;
+    font-weight: 900;
+  }
+
+  .next-match-card .mini-location-line,
+  .next-match-card .mini-tv-line {
+    margin: 0;
+    line-height: 1.35;
+    font-size: .9rem;
+  }
+
+  .next-match-card .match-tv-meta img,
+  .next-match-card .mini-tv-line img {
+    max-height: 24px;
+  }
+
+  /* Matchs : diagonale mobile autour du VS */
+  .single-phase-view .match-card {
+    padding: 14px;
+    gap: 12px;
+  }
+
+  .match-card .match-head {
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  .match-card .match-head > div {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .match-card .match-time {
+    text-align: right;
+    font-size: .86rem;
+  }
+
+  .match-card .score-board {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
+    padding: 14px;
+    border-radius: 20px;
+    text-align: left;
+  }
+
+  .match-card .team-side {
+    justify-self: start;
+    justify-content: flex-start;
+    max-width: 88%;
+    text-align: left;
+  }
+
+  .match-card .team-side.right {
+    justify-self: end;
+    justify-content: flex-end;
+    text-align: right;
+  }
+
+  .match-card .official-score {
+    justify-self: center;
+    min-width: 54px;
+    font-size: 1.45rem;
+    line-height: 1;
+    padding-block: 3px;
+  }
+
+  .match-card .team-name-stack strong {
+    font-size: 1.02rem;
+    line-height: 1.1;
+  }
+
+  .match-card .team-group-rank {
+    display: inline-flex;
+    width: fit-content;
+    margin-top: 4px;
+    padding: 4px 8px;
+    border-radius: 999px;
+    background: rgba(255,255,255,.08);
+  }
+
+  .match-card .team-name-stack.right .team-group-rank {
+    margin-left: auto;
+  }
+
+  .match-card .match-meta {
+    gap: 8px;
+    font-size: .88rem;
+  }
+
+  .prediction-form {
+    padding: 12px;
+    border-radius: 18px;
+  }
+
+  .prediction-inputs input {
+    min-height: 48px;
+    font-size: 1.15rem;
+  }
+
+  /* Classements : lignes beaucoup plus lisibles sur téléphone */
+  .leaderboard-hero-card {
+    padding: 14px;
+  }
+
+  .leaderboard-hero-card h2 {
+    font-size: 1.65rem;
+  }
+
+  .leaderboard-hero-card .muted {
+    font-size: .9rem;
+  }
+
+  .leaderboard-tabs {
+    width: 100%;
+    display: flex;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: 5px;
+    gap: 5px;
+  }
+
+  .leaderboard-tabs button {
+    flex: 0 0 auto;
+    padding: 8px 10px;
+    white-space: nowrap;
+    font-size: .82rem;
+  }
+
+  .leaderboard-list {
+    gap: 8px;
+    margin-top: 10px;
+  }
+
+  .leader-details {
+    border-radius: 18px;
+  }
+
+  .leader-details > summary.leader-row,
+  .leaderboard-list .leader-row {
+    display: grid !important;
+    grid-template-columns: 34px 42px minmax(0, 1fr) auto;
+    align-items: center !important;
+    gap: 8px;
+    padding: 10px;
+    min-height: unset;
+  }
+
+  .leaderboard-list .rank {
+    width: 34px !important;
+    min-width: 34px !important;
+    height: 34px !important;
+    border-radius: 12px;
+    font-size: .82rem;
+  }
+
+  .leaderboard-list .leader-avatar,
+  .leaderboard-list .leader-avatar .profile-badge,
+  .leaderboard-list .profile-badge.leader {
+    width: 42px !important;
+    height: 42px !important;
+    min-width: 42px !important;
+  }
+
+  .leaderboard-list .leader-main {
+    min-width: 0;
+  }
+
+  .leaderboard-list .leader-main > strong {
+    font-size: .98rem;
+    line-height: 1.1;
+  }
+
+  .leaderboard-list .leader-main > small {
+    font-size: .76rem;
+  }
+
+  .leaderboard-list summary .score-breakdown {
+    display: none;
+  }
+
+  .leaderboard-list .achievement-preview {
+    flex-wrap: nowrap;
+    gap: 4px;
+    margin-top: 5px;
+    overflow: hidden;
+  }
+
+  .leaderboard-list .achievement-chip {
+    width: 26px;
+    height: 26px;
+    padding: 2px;
+    justify-content: center;
+    overflow: hidden;
+  }
+
+  .leaderboard-list .achievement-chip > span:last-child {
+    display: none;
+  }
+
+  .leaderboard-list .achievement-chip .achievement-art,
+  .leaderboard-list .achievement-chip .achievement-fallback,
+  .leaderboard-list .achievement-chip .owl-icon {
+    width: 22px !important;
+    height: 22px !important;
+    min-width: 22px !important;
+  }
+
+  .leaderboard-list .achievement-more {
+    width: auto;
+    min-width: 34px;
+    padding: 3px 6px;
+    font-size: .66rem;
+  }
+
+  .leaderboard-list .points {
+    min-width: 46px;
+    text-align: right;
+    font-size: 1.25rem;
+  }
+
+  .leaderboard-list .points small {
+    display: block;
+    font-size: .62rem;
+  }
+
+  .leader-expanded {
+    padding: 12px;
+  }
+
+  /* Teams du nid : intro compacte pour voir les messages presque tout de suite */
+  .teams-hero {
+    padding: 12px !important;
+    gap: 10px;
+  }
+
+  .teams-hero h2 {
+    font-size: 1.35rem;
+    line-height: 1.04;
+    letter-spacing: -0.035em;
+    margin-top: 2px;
+  }
+
+  .teams-hero .eyebrow {
+    margin-bottom: 4px;
+    font-size: .72rem;
+  }
+
+  .teams-hero > div:first-child > .muted {
+    display: none;
+  }
+
+  .teams-hero-stats {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    min-width: 0;
+    gap: 7px;
+  }
+
+  .teams-hero-stats > div {
+    min-height: 50px !important;
+    padding: 8px;
+    border-radius: 15px;
+  }
+
+  .teams-hero-stats strong {
+    font-size: 1rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .teams-hero-stats small {
+    font-size: .6rem;
+  }
+
+  .teams-page-grid {
+    gap: 12px;
+  }
+
+  .team-chat-card {
+    gap: 11px;
+  }
+
+  .team-chat-card .card-title-row {
+    flex-direction: row !important;
+    align-items: center !important;
+  }
+
+  .team-chat-card .card-title-row .muted {
+    display: none;
+  }
+
+  .team-chat-scope button {
+    padding: 8px 10px;
+    font-size: .82rem;
+  }
+
+  .team-chat-list {
+    max-height: 360px;
+    padding: 9px;
+    border-radius: 18px;
+  }
+}
+
+@media (max-width: 420px) {
+  .leader-details > summary.leader-row,
+  .leaderboard-list .leader-row {
+    grid-template-columns: 32px 38px minmax(0, 1fr) 42px;
+    gap: 7px;
+  }
+
+  .leaderboard-list .leader-avatar,
+  .leaderboard-list .leader-avatar .profile-badge,
+  .leaderboard-list .profile-badge.leader {
+    width: 38px !important;
+    height: 38px !important;
+    min-width: 38px !important;
+  }
+
+  .leaderboard-list .achievement-chip {
+    width: 24px;
+    height: 24px;
+  }
+
+  .next-match-card .teams-row strong {
+    font-size: .98rem;
+  }
+
+  .teams-hero h2 {
+    font-size: 1.18rem;
+  }
+}

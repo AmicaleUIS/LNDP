@@ -854,8 +854,8 @@ const App = {
       </section>
 
       <section class="grid two">
-        <article class="card">
-          <div class="card-title-row">
+        <article class="card next-match-card">
+          <div class="card-title-row compact-title-row">
             <h3>Prochain match</h3>
             <span class="pill">${next ? H.statusLabel(next.status) : "Aucun"}</span>
           </div>
