@@ -13,6 +13,7 @@ const App = {
     activeCompetition: null,
     winnerPrediction: null,
     matches: [],
+    groupStandings: [],
     myPredictions: [],
     visiblePredictions: [],
     publicProfiles: [],
@@ -35,7 +36,8 @@ const App = {
     myPredictionsPhaseIndex: 0,
     leaderboardPhaseIndex: 0,
     achievementNotificationQueue: [],
-    achievementModalOpen: false
+    achievementModalOpen: false,
+    achievementNotificationTimer: null
   },
 
   async init() {
@@ -120,19 +122,23 @@ const App = {
           <div>
             <p class="eyebrow">Crédits cachés</p>
             <h2 id="creditsTitle">Le Nid des Pronos</h2>
-            <p class="muted">Version <strong>0.25.2</strong> · pré-déploiement. Le passage en <strong>1.0.0</strong> se fera au déploiement officiel.</p>
+            <p class="muted">Version <strong>0.25.6</strong> · pré-déploiement. Le passage en <strong>1.0.0</strong> se fera au déploiement officiel.</p>
           </div>
           <button class="ghost-btn" id="closeCreditsBtn" type="button">Fermer</button>
         </div>
         <div class="credits-grid">
           <section>
             <h3>Principe de version</h3>
-            <p><strong>0.25.2</strong> = version non déployée · évolution majeure n°25 · correction mineure 2.</p>
+            <p><strong>0.25.6</strong> = version non déployée · évolution majeure n°25 · correction mineure 6.</p>
             <p><strong>1.x.x</strong> = version publique déployée.</p>
           </section>
           <section>
             <h3>Évolutions récentes</h3>
             <ul class="changelog-list">
+              <li><strong>0.25.6</strong> — popup d’exploit déclenchée plus vite après un prono ou une mise à jour des points, avec arrivée visuelle plus nette.</li>
+              <li><strong>0.25.5</strong> — catalogue d’exploits sans pastille “Débloqué” et deux exploits de finale : champion choisi et score parfait.</li>
+              <li><strong>0.25.4</strong> — nouveaux exploits de progression/fidélité, catalogue nettoyé et affichage du Hall du nid corrigé.</li>
+              <li><strong>0.25.3</strong> — accès direct au prono manquant le plus proche, points gagnés sous le prono et rang de groupe affiché à côté des équipes.</li>
               <li><strong>0.25.2</strong> — fusion Matchs/Mes pronos et modals magiques pour les exploits débloqués un par un.</li>
               <li><strong>0.25.1</strong> — fiches joueurs dans Les teams, chargement progressif du chat et modération admin des messages.</li>
               <li><strong>0.24.3</strong> — correction des avatars : vraies chouettes sans bande colorée parasite et fond basé sur la couleur de team.</li>
@@ -173,6 +179,7 @@ const App = {
       this.loadFootballTeams(),
       this.loadActiveCompetition(),
       this.loadMatches(),
+      this.loadGroupStandings(),
       this.loadMyPredictions(),
       this.loadVisiblePredictions(),
       this.loadPublicProfiles()
@@ -306,6 +313,22 @@ const App = {
 
     if (error) throw error;
     this.state.matches = data || [];
+  },
+
+  async loadGroupStandings() {
+    const { data, error } = await window.sb
+      .from("v_group_standings")
+      .select("competition_id,group_name,group_rank,team_id,team_name,points,goal_difference,qualification_status")
+      .order("group_name")
+      .order("group_rank");
+
+    if (error) {
+      console.warn("v_group_standings indisponible pour le rang des équipes", error);
+      this.state.groupStandings = [];
+      return;
+    }
+
+    this.state.groupStandings = data || [];
   },
 
   async loadMyPredictions() {
@@ -476,6 +499,73 @@ const App = {
     return this.upcomingMatches().filter((m) => !this.getMyPrediction(m.id));
   },
 
+  availablePredictionMatches() {
+    return this.state.matches.filter((m) => !["cancelled", "postponed"].includes(m.status));
+  },
+
+  predictionRowsForUser(userId) {
+    const byMatch = new Map();
+    const addRow = (row = {}) => {
+      if (!row.match_id) return;
+      const existing = byMatch.get(row.match_id) || {};
+      byMatch.set(row.match_id, {
+        ...existing,
+        ...row,
+        created_at: row.created_at || existing.created_at,
+        updated_at: row.updated_at || existing.updated_at,
+        locked_at: row.locked_at || existing.locked_at
+      });
+    };
+
+    this.state.visiblePredictions
+      .filter((p) => p.user_id === userId)
+      .forEach(addRow);
+
+    if (userId === this.state.session?.user?.id) {
+      this.state.myPredictions.forEach(addRow);
+    }
+
+    return [...byMatch.values()].sort((a, b) => {
+      const da = this.predictionActivityDate(a)?.getTime() || 0;
+      const db = this.predictionActivityDate(b)?.getTime() || 0;
+      return da - db;
+    });
+  },
+
+  predictionActivityDate(row = {}) {
+    const raw = row.updated_at || row.created_at || row.locked_at;
+    if (!raw) return null;
+    const date = new Date(raw);
+    return Number.isNaN(date.getTime()) ? null : date;
+  },
+
+  localDayKey(date) {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, "0");
+    const d = String(date.getDate()).padStart(2, "0");
+    return `${y}-${m}-${d}`;
+  },
+
+  maxConsecutiveDayStreak(dates = []) {
+    const days = [...new Set(dates.map((date) => {
+      const midnight = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+      return midnight.getTime();
+    }))].sort((a, b) => a - b);
+
+    let current = 0;
+    let best = 0;
+    let previous = null;
+    const oneDay = 24 * 60 * 60 * 1000;
+
+    days.forEach((day) => {
+      current = previous !== null && day - previous === oneDay ? current + 1 : 1;
+      best = Math.max(best, current);
+      previous = day;
+    });
+
+    return best;
+  },
+
   nextMatch() {
     return this.upcomingMatches()[0] || null;
   },
@@ -591,13 +681,14 @@ const App = {
           </div>
           ${missing.length ? `
             <p class="muted">Tu as encore ${missing.length} match${missing.length > 1 ? "s" : ""} à pronostiquer.</p>
-            <button class="primary-btn" data-view="matches">Voir les matchs</button>
+            <button class="primary-btn" type="button" data-action="go-nearest-missing">Aller au plus proche</button>
           ` : `<p class="muted">Nickel, tous tes pronos à venir sont posés.</p>`}
         </article>
       </section>
     `;
 
     this.bindNavigation();
+    this.bindGoToNearestMissingActions();
   },
 
   matchMiniHtml(match) {
@@ -626,7 +717,7 @@ const App = {
   },
 
   async renderMatches() {
-    await Promise.all([this.loadMatches(), this.loadMyPredictions(), this.loadVisiblePredictions()]);
+    await Promise.all([this.loadMatches(), this.loadGroupStandings(), this.loadMyPredictions(), this.loadVisiblePredictions()]);
 
     const root = H.$("#viewRoot");
     const groups = this.groupMatchesByPouleRound(this.state.matches);
@@ -689,6 +780,7 @@ const App = {
     this.bindPhaseNavigation("matchPhaseIndex", () => this.renderMatches());
     this.bindPredictionForms();
     this.bindCombinedPredictionSummaryActions();
+    this.bindGoToNearestMissingActions();
   },
 
   predictionPhaseSummaryHtml(group) {
@@ -701,14 +793,18 @@ const App = {
     return `
       <section class="grid three stats-grid combined-prono-stats">
         <article class="stat-card"><strong>${allDone.length}</strong><span>Pronos posés</span></article>
-        <article class="stat-card"><strong>${allMissing.length}</strong><span>À faire</span></article>
+        ${allMissing.length ? `
+          <button class="stat-card stat-card-action" type="button" data-action="go-nearest-missing" title="Aller au prono manquant le plus proche">
+            <strong>${allMissing.length}</strong><span>À faire · aller au plus proche</span>
+          </button>
+        ` : `<article class="stat-card"><strong>0</strong><span>À faire</span></article>`}
         <article class="stat-card"><strong>${locked.length}</strong><span>Verrouillés</span></article>
       </section>
 
       <section class="card combined-prono-summary">
         <div class="card-title-row">
           <div>
-            <h3>${H.icon("pronos")} Mes pronos — ${H.escapeHtml(group.key)}</h3>
+            <h3>${H.icon("pronos")} Récap rapide — ${H.escapeHtml(group.key)}</h3>
             <p class="muted">${phaseDone}/${group.matches.length} posé${phaseDone > 1 ? "s" : ""} · ${phaseMissing} manquant${phaseMissing > 1 ? "s" : ""} à venir</p>
           </div>
           <span class="pill neutral">${H.matchDateRangeLabel(group.matches)}</span>
@@ -739,13 +835,46 @@ const App = {
   bindCombinedPredictionSummaryActions() {
     H.$$("[data-jump-match]").forEach((button) => {
       button.addEventListener("click", () => {
-        const target = document.getElementById(`match-${button.dataset.jumpMatch}`);
-        if (!target) return;
-        target.scrollIntoView({ behavior: "smooth", block: "center" });
-        target.classList.add("match-card-highlight");
-        setTimeout(() => target.classList.remove("match-card-highlight"), 1200);
+        this.scrollToMatch(button.dataset.jumpMatch);
       });
     });
+  },
+
+  bindGoToNearestMissingActions() {
+    H.$$('[data-action="go-nearest-missing"]').forEach((button) => {
+      button.addEventListener("click", async () => this.goToNearestMissingPrediction());
+    });
+  },
+
+  scrollToMatch(matchId) {
+    const target = document.getElementById(`match-${matchId}`);
+    if (!target) return;
+    target.scrollIntoView({ behavior: "smooth", block: "center" });
+    target.classList.add("match-card-highlight");
+    const firstInput = target.querySelector('input:not([disabled]), select:not([disabled]), button[type="submit"]');
+    if (firstInput) setTimeout(() => firstInput.focus({ preventScroll: true }), 450);
+    setTimeout(() => target.classList.remove("match-card-highlight"), 1200);
+  },
+
+  async goToNearestMissingPrediction() {
+    const missing = this.missingPredictions();
+    if (!missing.length) {
+      H.toast("Tous tes pronos à venir sont posés. La chouette est tranquille.", "success");
+      return;
+    }
+
+    const match = missing[0];
+    const groups = this.groupMatchesByPouleRound(this.state.matches);
+    const groupIndex = groups.findIndex((group) => group.matches.some((item) => item.id === match.id));
+    if (groupIndex >= 0) this.state.matchPhaseIndex = groupIndex;
+
+    if (this.state.currentView !== "matches") {
+      await this.loadView("matches");
+    } else {
+      await this.renderMatches();
+    }
+
+    setTimeout(() => this.scrollToMatch(match.id), 120);
   },
 
   groupMatchesByPouleRound(matches) {
@@ -803,6 +932,71 @@ const App = {
     });
   },
 
+  groupRankLabel(rank) {
+    const value = Number(rank);
+    if (!value) return "—";
+    return value === 1 ? "1er" : `${value}e`;
+  },
+
+  standingForTeam(match, side) {
+    const teamId = match?.[`${side}_team_id`];
+    if (!teamId) return null;
+    return this.state.groupStandings.find((row) =>
+      row.team_id === teamId &&
+      (!match.competition_id || row.competition_id === match.competition_id) &&
+      (!match.group_name || row.group_name === match.group_name)
+    ) || null;
+  },
+
+  teamSideHtml(match, side) {
+    const isRight = side === "away";
+    const teamName = match[`${side}_team_name`];
+    const standing = this.standingForTeam(match, side);
+    const groupName = standing?.group_name || match.group_name;
+    const rank = standing?.group_rank ? this.groupRankLabel(standing.group_rank) : null;
+    const meta = match.stage === "group" && groupName
+      ? `${H.escapeHtml(groupName)}${rank ? ` · ${H.escapeHtml(rank)}` : ""}`
+      : "";
+
+    return `
+      <div class="team-side ${isRight ? "right" : ""}">
+        <span class="flag">${H.matchFlagHtml(match, side)}</span>
+        <span class="team-name-stack ${isRight ? "right" : ""}">
+          <strong>${H.escapeHtml(teamName)}</strong>
+          ${meta ? `<small class="team-group-rank">${meta}</small>` : ""}
+        </span>
+      </div>
+    `;
+  },
+
+  myPointsForMatch(matchId) {
+    return this.state.visiblePredictions.find((row) => row.match_id === matchId && row.user_id === this.state.session.user.id) || null;
+  },
+
+  myPredictionResultHtml(match, prediction) {
+    if (!prediction) return "";
+    const points = this.myPointsForMatch(match.id);
+    const isFinished = match.status === "finished";
+    const pointsText = points
+      ? `${Number(points.points_total ?? 0)} pt${Number(points.points_total ?? 0) > 1 ? "s" : ""} · ${H.escapeHtml(this.predictionReasonLabel(points))}`
+      : "Points en attente";
+
+    return `
+      <div class="my-prono-result ${isFinished ? "finished" : ""}">
+        <div>
+          <small>Ton prono</small>
+          <strong>${prediction.home_score_pred} - ${prediction.away_score_pred}</strong>
+        </div>
+        ${isFinished ? `
+          <div class="my-prono-points">
+            <small>Points gagnés</small>
+            <strong>${pointsText}</strong>
+          </div>
+        ` : ""}
+      </div>
+    `;
+  },
+
   matchCardHtml(match) {
     const myPrediction = this.getMyPrediction(match.id);
     const locked = H.isKickoffPassed(match.kickoff_at);
@@ -815,22 +1009,15 @@ const App = {
         <div class="match-head">
           <div>
             <span class="pill ${match.status}">${H.statusLabel(match.status)}</span>
-            <span class="pill neutral">${H.stageLabel(match.stage)}</span>
-            <span class="pill neutral">${H.shortPoolRoundLabel(match)}</span>
+            ${match.stage !== "group" ? `<span class="pill neutral">${H.stageLabel(match.stage)}</span>` : ""}
           </div>
           <span class="match-time">${H.formatDateTime(match.kickoff_at)}</span>
         </div>
 
         <div class="score-board">
-          <div class="team-side">
-            <span class="flag">${H.matchFlagHtml(match, "home")}</span>
-            <strong>${H.escapeHtml(match.home_team_name)}</strong>
-          </div>
+          ${this.teamSideHtml(match, "home")}
           <div class="official-score">${match.status === "finished" || match.status === "live" ? H.scoreText(match.home_score, match.away_score) : "vs"}</div>
-          <div class="team-side right">
-            <span class="flag">${H.matchFlagHtml(match, "away")}</span>
-            <strong>${H.escapeHtml(match.away_team_name)}</strong>
-          </div>
+          ${this.teamSideHtml(match, "away")}
         </div>
 
         <div class="match-meta">
@@ -867,8 +1054,9 @@ const App = {
               ? `<span class="locked-label">${H.icon("lock")} Prono verrouillé</span>`
               : `<button class="primary-btn" type="submit">${myPrediction ? "Modifier" : "Valider"}</button>`
             }
-            ${myPrediction ? `<span class="my-prediction-label">Ton prono : ${myPrediction.home_score_pred} - ${myPrediction.away_score_pred}</span>` : `<span class="muted">Aucun prono posé</span>`}
+            ${myPrediction ? "" : `<span class="muted">Aucun prono posé</span>`}
           </div>
+          ${this.myPredictionResultHtml(match, myPrediction)}
         </form>
 
         <details class="others-predictions" ${canSeeOthers ? "" : "hidden"}>
@@ -926,8 +1114,13 @@ const App = {
     }
 
     await this.loadMyPredictions();
+    await this.loadVisiblePredictions().catch((refreshError) => {
+      console.warn("Impossible de rafraîchir les pronos visibles avant l’annonce d’exploit", refreshError);
+    });
+    this.syncAchievementNotifications();
     H.toast("Prono enregistré", "success");
     await this.loadView(this.state.currentView);
+    this.syncAchievementNotifications();
   },
 
   async renderMyPredictions() {
@@ -993,7 +1186,7 @@ const App = {
   },
 
   async renderAchievements() {
-    await Promise.all([this.loadMatches(), this.loadVisiblePredictions()]);
+    await Promise.all([this.loadMatches(), this.loadVisiblePredictions(), this.loadWinnerPredictionsForTeams()]);
 
     const root = H.$("#viewRoot");
     root.innerHTML = `
@@ -1001,7 +1194,7 @@ const App = {
         <div>
           <p class="eyebrow">${H.icon("star")} Le mur des exploits</p>
           <h2>Les belles chouetteries… et les casseroles du nid.</h2>
-          <p class="muted">Les exploits se débloquent automatiquement avec les matchs terminés. Plus tard, chaque badge pourra recevoir sa vraie image dans <code>assets/badges/</code>.</p>
+          <p class="muted">Débloque des exploits en pronostiquant, en revenant régulièrement et en marquant des points. Le nid garde l’œil ouvert.</p>
         </div>
       </section>
 
@@ -1052,7 +1245,7 @@ const App = {
             <p class="muted">Neutres : ${neutral}. Les badges négatifs sont là pour chambrer gentiment, pas pour humilier.</p>
           </div>
         </div>
-        ${badges.length ? `<div class="achievement-grid large">${badges.map((badge) => this.badgeCardHtml(badge, true)).join("")}</div>` : `<p class="muted">Aucun exploit pour l’instant. Premier match terminé, premier badge débloqué.</p>`}
+        ${badges.length ? `<div class="achievement-grid large">${badges.map((badge) => this.badgeCardHtml(badge, true)).join("")}</div>` : `<p class="muted">Aucun exploit pour l’instant. Premier prono validé, première coquille qui craque.</p>`}
       </section>
     `;
   },
@@ -1095,9 +1288,11 @@ const App = {
     const root = H.$("#achievementsContent");
     const unlocked = new Set(this.computeBadgesForUser(this.state.session.user.id).map((badge) => badge.id));
     const catalog = this.badgeCatalog();
-    const positives = catalog.filter((b) => b.type === "positive");
+    const progression = catalog.filter((b) => b.category === "progression");
+    const fidelity = catalog.filter((b) => b.category === "fidelity");
+    const positives = catalog.filter((b) => b.type === "positive" && !["progression", "fidelity"].includes(b.category));
     const negatives = catalog.filter((b) => b.type === "negative");
-    const neutral = catalog.filter((b) => b.type === "neutral");
+    const otherNeutral = catalog.filter((b) => b.type === "neutral" && !["progression", "fidelity"].includes(b.category));
 
     const block = (title, rows) => `
       <section class="card achievement-catalog-block">
@@ -1115,10 +1310,11 @@ const App = {
       <section class="toolbar-card compact-toolbar">
         <div>
           <h3>Catalogue des exploits</h3>
-          <p class="muted">Les images pourront être ajoutées plus tard en PNG : <code>assets/badges/nom-du-badge.png</code>.</p>
         </div>
       </section>
-      ${block("Badges de progression", neutral)}
+      ${block("Progression des pronos", progression)}
+      ${block("Fidélité au nid", fidelity)}
+      ${otherNeutral.length ? block("Autres exploits", otherNeutral) : ""}
       ${block("Coups de maître", positives)}
       ${block("Casseroles du nid", negatives)}
     `;
@@ -1358,8 +1554,50 @@ const App = {
     return "draw";
   },
 
+  finalMatch() {
+    return this.state.matches.find((match) => match.stage === "final" && match.status === "finished")
+      || this.state.matches.find((match) => match.stage === "final")
+      || null;
+  },
+
+  winnerPredictionForUser(userId) {
+    const fromPublicView = this.state.winnerPredictions.find((row) =>
+      row.user_id === userId
+      && (!this.state.activeCompetition?.id || row.competition_id === this.state.activeCompetition.id)
+    );
+
+    if (fromPublicView) return fromPublicView;
+
+    if (userId === this.state.session?.user?.id && this.state.winnerPrediction?.predicted_team_id) {
+      const final = this.finalMatch();
+      const predictedTeam = this.state.footballTeams.find((team) => team.id === this.state.winnerPrediction.predicted_team_id);
+      return {
+        ...this.state.winnerPrediction,
+        predicted_team_name: predictedTeam?.name || this.state.winnerPrediction.predicted_team_name,
+        competition_id: this.state.winnerPrediction.competition_id,
+        points_total: final?.status === "finished" && final?.winner_team_id === this.state.winnerPrediction.predicted_team_id ? 100 : 0
+      };
+    }
+
+    return null;
+  },
+
   badgeCatalog() {
     return [
+      { id: "egg-hatched", title: "Éclos de l’œuf", description: "Premier prono validé. La coquille craque, la mini-chouette débarque.", type: "neutral", category: "progression" },
+      { id: "young-feathers", title: "Jeune plumage", description: "10 pronos validés. Ça commence à ressembler à une vraie couvée.", type: "neutral", category: "progression" },
+      { id: "half-nest", title: "Mi-nid rempli", description: "La moitié des pronos sont rentrés. Le nid n’est plus vide, loin de là.", type: "neutral", category: "progression" },
+      { id: "three-quarter-perch", title: "Perchoir presque plein", description: "75 % des pronos sont posés. Les branches commencent à craquer.", type: "neutral", category: "progression" },
+      { id: "all-picks-in", title: "Couvée complète", description: "Tous les pronos disponibles sont validés. Le nid est verrouillé, rideau.", type: "neutral", category: "progression" },
+
+      { id: "night-owl", title: "Chouette de la nuit", description: "Un prono posé entre minuit et 6 h. Même les chauves-souris ont applaudi.", type: "neutral", category: "fidelity" },
+      { id: "three-day-ritual", title: "Rituel du perchoir", description: "Des pronos posés 3 jours d’affilée. Petite routine, gros sérieux.", type: "neutral", category: "fidelity" },
+      { id: "seven-day-streak", title: "Sept jours sur la branche", description: "7 jours d’affilée avec une activité de prono. Là, c’est de la fidélité de compétition.", type: "neutral", category: "fidelity" },
+      { id: "many-active-days", title: "Toujours au nid", description: "14 jours différents avec au moins une activité de prono. Le nid a ton empreinte dans le bois.", type: "neutral", category: "fidelity" },
+      { id: "last-wingbeat", title: "Dernier battement d’aile", description: "Un prono ajusté dans les 2 heures avant le coup d’envoi. Frisson, sueur, validation.", type: "neutral", category: "fidelity" },
+
+      { id: "final-winner-oracle", title: "Oracle de la finale", description: "L’équipe choisie championne avant le départ gagne réellement la Coupe. Là, le nid sort les confettis.", type: "neutral" },
+      { id: "final-perfect-score", title: "Finale millimétrée", description: "Score exact trouvé sur la finale. Une plume, une règle, zéro tremblement.", type: "neutral" },
       { id: "first-flight", title: "Premier envol", description: "Premier match comptabilisé. Le hibou a quitté le nid.", type: "neutral" },
       { id: "first-perfect", title: "Œil de chouette", description: "Premier score exact trouvé.", type: "positive" },
       { id: "surgical-beak", title: "Bec chirurgical", description: "3 scores exacts au total.", type: "positive" },
@@ -1412,7 +1650,10 @@ const App = {
 
   computeBadgesForUser(userId) {
     const rows = this.scoreDetailRowsForUser(userId);
-    if (!rows.length) return [];
+    const predictionRows = this.predictionRowsForUser(userId);
+    const earlyWinnerPick = this.winnerPredictionForUser(userId);
+
+    if (!rows.length && !predictionRows.length && !earlyWinnerPick?.predicted_team_id) return [];
 
     const exact = rows.filter(({ prediction }) => prediction.is_exact_score).length;
     const goodResults = rows.filter(({ prediction }) => prediction.is_good_result).length;
@@ -1529,6 +1770,49 @@ const App = {
       if (badge && !badges.some((b) => b.id === id)) badges.push({ ...badge });
     };
 
+    const predictionCount = predictionRows.length;
+    const availableMatchCount = this.availablePredictionMatches().length;
+    const activityDates = predictionRows
+      .map((prediction) => this.predictionActivityDate(prediction))
+      .filter(Boolean);
+    const activeDayCount = new Set(activityDates.map((date) => this.localDayKey(date))).size;
+    const consecutiveDays = this.maxConsecutiveDayStreak(activityDates);
+    const hasNightPrediction = activityDates.some((date) => date.getHours() >= 0 && date.getHours() < 6);
+    const hasLastWingbeat = predictionRows.some((prediction) => {
+      const activityDate = this.predictionActivityDate(prediction);
+      const match = this.state.matches.find((m) => m.id === prediction.match_id);
+      if (!activityDate || !match?.kickoff_at) return false;
+      const kickoff = new Date(match.kickoff_at);
+      const diff = kickoff.getTime() - activityDate.getTime();
+      return diff >= 0 && diff <= 2 * 60 * 60 * 1000;
+    });
+
+    const final = this.finalMatch();
+    const finalWinnerPick = earlyWinnerPick || this.winnerPredictionForUser(userId);
+    const hasFinalWinnerPick = Boolean(
+      final?.status === "finished"
+      && final?.winner_team_id
+      && finalWinnerPick?.predicted_team_id === final.winner_team_id
+    );
+    const hasPerfectFinalScore = rows.some(({ prediction, match }) =>
+      match.stage === "final" && prediction.is_exact_score
+    );
+
+    if (predictionCount >= 1) unlock("egg-hatched");
+    if (predictionCount >= 10) unlock("young-feathers");
+    if (availableMatchCount > 0 && predictionCount >= Math.ceil(availableMatchCount / 2)) unlock("half-nest");
+    if (availableMatchCount > 0 && predictionCount >= Math.ceil(availableMatchCount * 0.75)) unlock("three-quarter-perch");
+    if (availableMatchCount > 0 && predictionCount >= availableMatchCount) unlock("all-picks-in");
+
+    if (hasNightPrediction) unlock("night-owl");
+    if (consecutiveDays >= 3) unlock("three-day-ritual");
+    if (consecutiveDays >= 7) unlock("seven-day-streak");
+    if (activeDayCount >= 14) unlock("many-active-days");
+    if (hasLastWingbeat) unlock("last-wingbeat");
+
+    if (hasFinalWinnerPick) unlock("final-winner-oracle");
+    if (hasPerfectFinalScore) unlock("final-perfect-score");
+
     if (rows.length >= 1) unlock("first-flight");
     if (exact >= 1) unlock("first-perfect");
     if (exact >= 3) unlock("surgical-beak");
@@ -1615,7 +1899,7 @@ const App = {
         <div>
           <strong>${H.escapeHtml(badge.title)}</strong>
           <p>${H.escapeHtml(badge.description)}</p>
-          ${unlocked ? `<small class="achievement-state">Débloqué</small>` : `<small class="achievement-state locked">À débloquer</small>`}
+          ${unlocked ? "" : `<small class="achievement-state locked">À débloquer</small>`}
         </div>
       </article>
     `;
@@ -1676,8 +1960,29 @@ const App = {
   },
 
   queueAchievementModals(badges = []) {
-    this.state.achievementNotificationQueue.push(...badges);
-    this.showNextAchievementModal();
+    const freshBadges = badges.filter((badge) =>
+      badge?.id
+      && !this.state.achievementNotificationQueue.some((queued) => queued.id === badge.id)
+    );
+    if (!freshBadges.length) return;
+
+    this.state.achievementNotificationQueue.push(...freshBadges);
+    this.scheduleAchievementModal();
+  },
+
+  scheduleAchievementModal() {
+    if (this.state.achievementNotificationTimer) return;
+
+    const run = () => {
+      this.state.achievementNotificationTimer = null;
+      this.showNextAchievementModal();
+    };
+
+    if (typeof window.requestAnimationFrame === "function") {
+      this.state.achievementNotificationTimer = window.requestAnimationFrame(run);
+    } else {
+      this.state.achievementNotificationTimer = window.setTimeout(run, 0);
+    }
   },
 
   achievementModalTone(badge) {
@@ -1703,7 +2008,11 @@ const App = {
   },
 
   showNextAchievementModal() {
+    if (this.state.achievementModalOpen && !H.$("#achievementUnlockModal")) {
+      this.state.achievementModalOpen = false;
+    }
     if (this.state.achievementModalOpen) return;
+
     const badge = this.state.achievementNotificationQueue.shift();
     if (!badge) return;
 
@@ -1736,10 +2045,16 @@ const App = {
     `;
 
     document.body.appendChild(modal);
+    let closed = false;
     const close = () => {
-      modal.remove();
-      this.state.achievementModalOpen = false;
-      this.showNextAchievementModal();
+      if (closed) return;
+      closed = true;
+      modal.classList.add("is-leaving");
+      window.setTimeout(() => {
+        modal.remove();
+        this.state.achievementModalOpen = false;
+        this.scheduleAchievementModal();
+      }, 120);
     };
     H.$("#closeAchievementUnlockBtn", modal)?.focus();
     H.$("#closeAchievementUnlockBtn", modal)?.addEventListener("click", close);
@@ -2550,7 +2865,7 @@ const App = {
             <p class="muted">Déconnexion, crédits et historique des évolutions.</p>
           </div>
           <div class="profile-account-actions">
-            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v0.25.1</button>
+            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v0.25.6</button>
             <button class="danger-btn" id="profileLogoutBtn" type="button">Déconnexion</button>
           </div>
         </div>
@@ -2800,10 +3115,13 @@ const App = {
   async refreshCurrentViewFromRealtime(reason = "realtime") {
     await Promise.all([
       this.loadMatches(),
+      this.loadGroupStandings(),
       this.loadMyPredictions(),
       this.loadVisiblePredictions(),
       this.loadWinnerPrediction()
     ]);
+
+    this.syncAchievementNotifications();
 
     if (["home", "matches", "worldcup", "mypredictions", "leaderboard", "teams", "achievements", "profile"].includes(this.state.currentView)) {
       await this.loadView(this.state.currentView === "mypredictions" ? "matches" : this.state.currentView);
@@ -2826,8 +3144,11 @@ const App = {
         await this.refreshCurrentViewFromRealtime("points");
       })
       .on("postgres_changes", { event: "*", schema: "public", table: "predictions" }, async () => {
+        await this.loadMyPredictions();
         await this.loadVisiblePredictions();
+        this.syncAchievementNotifications();
         if (["matches", "mypredictions"].includes(this.state.currentView)) await this.loadView(this.state.currentView === "mypredictions" ? "matches" : this.state.currentView);
+        this.syncAchievementNotifications();
       })
       .on("postgres_changes", { event: "*", schema: "public", table: "winner_predictions" }, async () => {
         await this.refreshCurrentViewFromRealtime("winner");

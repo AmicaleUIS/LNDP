@@ -4999,3 +4999,179 @@ button:disabled {
     padding: 18px;
   }
 }
+
+/* ---------- V0.25.3 — Prono manquant direct + rangs de groupe + points gagnés ---------- */
+.stat-card-action {
+  appearance: none;
+  width: 100%;
+  text-align: left;
+  color: inherit;
+  cursor: pointer;
+  transition: transform .16s ease, border-color .16s ease, background .16s ease, box-shadow .16s ease;
+}
+
+.stat-card-action:hover,
+.stat-card-action:focus-visible {
+  transform: translateY(-1px);
+  border-color: rgba(250,204,21,.42);
+  background:
+    radial-gradient(circle at 18% 18%, rgba(250,204,21,.12), transparent 34%),
+    var(--card-strong);
+  box-shadow: 0 18px 42px rgba(0,0,0,.24);
+  outline: none;
+}
+
+.team-name-stack {
+  display: inline-flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 2px;
+}
+
+.team-name-stack.right {
+  align-items: flex-end;
+  text-align: right;
+}
+
+.team-name-stack strong {
+  line-height: 1.15;
+}
+
+.team-group-rank {
+  display: inline-flex;
+  align-items: center;
+  width: max-content;
+  max-width: 100%;
+  padding: 3px 8px;
+  border-radius: 999px;
+  color: var(--muted);
+  background: rgba(255,255,255,.055);
+  border: 1px solid rgba(255,255,255,.08);
+  font-size: .72rem;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.my-prono-result {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  padding: 12px 14px;
+  border-radius: 18px;
+  background: rgba(255,255,255,.045);
+  border: 1px solid var(--border);
+}
+
+.my-prono-result.finished {
+  background:
+    linear-gradient(135deg, rgba(250,204,21,.10), transparent 62%),
+    rgba(255,255,255,.045);
+  border-color: rgba(250,204,21,.20);
+}
+
+.my-prono-result small {
+  display: block;
+  color: var(--muted);
+  font-weight: 850;
+  margin-bottom: 3px;
+}
+
+.my-prono-result strong {
+  color: var(--text);
+  font-size: 1.05rem;
+}
+
+.my-prono-points {
+  text-align: right;
+}
+
+.my-prono-points strong {
+  color: var(--gold);
+}
+
+@media (max-width: 760px) {
+  .team-side,
+  .team-side.right {
+    align-items: center;
+  }
+
+  .team-group-rank {
+    font-size: .66rem;
+    padding-inline: 7px;
+  }
+
+  .my-prono-result {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .my-prono-points {
+    text-align: left;
+  }
+}
+
+/* ---------- V0.25.4 — Exploits progression/fidélité + Hall du nid ---------- */
+.badge-player-card > .detail-empty,
+.badge-player-card .detail-empty {
+  margin: 0 18px 18px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  border: 1px solid rgba(148, 163, 184, .18);
+  background: rgba(255, 255, 255, .045);
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.achievement-catalog-block .card-title-row {
+  align-items: center;
+}
+
+.achievement-card.neutral .achievement-state {
+  color: var(--gold);
+}
+
+@media (max-width: 760px) {
+  .badge-player-card > .detail-empty,
+  .badge-player-card .detail-empty {
+    margin: 0 12px 14px;
+  }
+}
+
+
+/* ---------- V0.25.6 — popup exploit plus réactive ---------- */
+.achievement-unlock-modal {
+  animation: achievementBackdropIn .12s ease-out both;
+}
+
+.achievement-unlock-modal.is-leaving {
+  animation: achievementBackdropOut .12s ease-in both;
+}
+
+.achievement-unlock-card {
+  animation: achievementCardPop .26s cubic-bezier(.17, 1.35, .36, 1) both;
+}
+
+.achievement-unlock-modal.is-leaving .achievement-unlock-card {
+  animation: achievementCardOut .12s ease-in both;
+}
+
+@keyframes achievementBackdropIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes achievementBackdropOut {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+@keyframes achievementCardPop {
+  from { opacity: 0; transform: translateY(18px) scale(.94); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes achievementCardOut {
+  from { opacity: 1; transform: translateY(0) scale(1); }
+  to { opacity: 0; transform: translateY(10px) scale(.96); }
+}
