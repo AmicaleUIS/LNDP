@@ -7252,3 +7252,197 @@ button:disabled {
     grid-template-columns: 1fr;
   }
 }
+
+/* ============================================================
+   V0.25.17 — Phase finale anti-chevauchement réel
+   ============================================================ */
+.final-bracket-shell {
+  grid-template-columns: 880px 260px 880px !important;
+  gap: 34px !important;
+  overflow-x: auto !important;
+  overflow-y: hidden !important;
+  align-items: stretch !important;
+  overscroll-behavior-x: contain;
+  scroll-padding-inline: 18px;
+}
+
+.final-bracket-side,
+.final-bracket-side-left,
+.final-bracket-side-right {
+  grid-template-columns: repeat(4, 200px) !important;
+  gap: 24px !important;
+  min-width: 880px !important;
+  width: 880px !important;
+  align-items: start !important;
+}
+
+.final-bracket-column,
+.final-bracket-match-stack,
+.final-bracket-match,
+.final-bracket-match-head,
+.final-bracket-match-body,
+.final-bracket-match-foot,
+.final-bracket-team,
+.final-bracket-team strong {
+  min-width: 0 !important;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.final-bracket-column {
+  width: 200px !important;
+  max-width: 200px !important;
+  overflow: visible;
+}
+
+.final-bracket-stage-title {
+  width: 100%;
+  max-width: 200px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.final-bracket-match {
+  width: 100% !important;
+  max-width: 200px !important;
+  overflow: hidden !important;
+  isolation: isolate;
+}
+
+.final-bracket-match-body {
+  grid-template-columns: minmax(0, 1fr) 24px minmax(0, 1fr) !important;
+  width: 100%;
+}
+
+.final-bracket-team {
+  width: 100%;
+  flex: 1 1 0;
+}
+
+.final-bracket-team .team-flag-img,
+.final-bracket-team .flag-placeholder,
+.final-bracket-team .placeholder-flag,
+.placeholder-flag {
+  width: 20px;
+  height: 15px;
+}
+
+.final-bracket-score {
+  min-width: 24px !important;
+  width: 24px;
+}
+
+.final-bracket-match::after {
+  z-index: -1;
+  right: -24px !important;
+  width: 24px !important;
+}
+
+.final-bracket-side-right .final-bracket-match::after {
+  left: -24px !important;
+  right: auto !important;
+}
+
+.final-bracket-column.round32 .final-bracket-match-stack { gap: 16px !important; padding-top: 0 !important; }
+.final-bracket-column.round16 .final-bracket-match-stack { gap: 42px !important; padding-top: 38px !important; }
+.final-bracket-column.quarter .final-bracket-match-stack { gap: 102px !important; padding-top: 124px !important; }
+.final-bracket-column.semi .final-bracket-match-stack { gap: 0 !important; padding-top: 312px !important; }
+
+.final-bracket-center {
+  min-width: 260px !important;
+  width: 260px !important;
+}
+
+.final-bracket-center .final-bracket-match {
+  max-width: 260px !important;
+}
+
+@media (max-width: 1180px) {
+  .final-bracket-shell {
+    grid-template-columns: 840px 244px 840px !important;
+    gap: 26px !important;
+  }
+
+  .final-bracket-side,
+  .final-bracket-side-left,
+  .final-bracket-side-right {
+    grid-template-columns: repeat(4, 190px) !important;
+    gap: 20px !important;
+    min-width: 840px !important;
+    width: 840px !important;
+  }
+
+  .final-bracket-column,
+  .final-bracket-match,
+  .final-bracket-stage-title {
+    width: 190px !important;
+    max-width: 190px !important;
+  }
+
+  .final-bracket-center {
+    min-width: 244px !important;
+    width: 244px !important;
+  }
+
+  .final-bracket-center .final-bracket-match {
+    max-width: 244px !important;
+  }
+}
+
+@media (max-width: 720px) {
+  .final-bracket-shell {
+    grid-template-columns: 756px 220px 756px !important;
+    gap: 18px !important;
+    padding: 12px !important;
+  }
+
+  .final-bracket-side,
+  .final-bracket-side-left,
+  .final-bracket-side-right {
+    grid-template-columns: repeat(4, 174px) !important;
+    gap: 20px !important;
+    min-width: 756px !important;
+    width: 756px !important;
+  }
+
+  .final-bracket-column,
+  .final-bracket-match,
+  .final-bracket-stage-title {
+    width: 174px !important;
+    max-width: 174px !important;
+  }
+
+  .final-bracket-match {
+    min-height: 104px !important;
+  }
+
+  .final-bracket-team .team-flag-img,
+  .final-bracket-team .flag-placeholder,
+  .final-bracket-team .placeholder-flag,
+  .placeholder-flag {
+    width: 19px;
+    height: 14px;
+  }
+
+  .final-bracket-team strong {
+    font-size: .7rem !important;
+  }
+
+  .final-bracket-match-head span {
+    font-size: .68rem !important;
+  }
+
+  .final-bracket-center {
+    min-width: 220px !important;
+    width: 220px !important;
+  }
+
+  .final-bracket-center .final-bracket-match {
+    max-width: 220px !important;
+  }
+
+  .final-bracket-column.round16 .final-bracket-match-stack { gap: 34px !important; padding-top: 34px !important; }
+  .final-bracket-column.quarter .final-bracket-match-stack { gap: 86px !important; padding-top: 110px !important; }
+  .final-bracket-column.semi .final-bracket-match-stack { padding-top: 286px !important; }
+}

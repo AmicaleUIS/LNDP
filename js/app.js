@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — APP PRINCIPALE V0.25.16
+// LE NID DES PRONOS — APP PRINCIPALE V0.25.17
 // ============================================================
 
 const H = window.Helpers;
@@ -301,19 +301,20 @@ const App = {
           <div>
             <p class="eyebrow">Crédits cachés</p>
             <h2 id="creditsTitle">Le Nid des Pronos</h2>
-            <p class="muted">Version <strong>0.25.16</strong> · pré-déploiement. Le passage en <strong>1.0.0</strong> se fera au déploiement officiel.</p>
+            <p class="muted">Version <strong>0.25.17</strong> · pré-déploiement. Le passage en <strong>1.0.0</strong> se fera au déploiement officiel.</p>
           </div>
           <button class="ghost-btn" id="closeCreditsBtn" type="button">Fermer</button>
         </div>
         <div class="credits-grid">
           <section>
             <h3>Principe de version</h3>
-            <p><strong>0.25.16</strong> = version non déployée · évolution majeure n°25 · correction mineure 16.</p>
+            <p><strong>0.25.17</strong> = version non déployée · évolution majeure n°25 · correction mineure 17.</p>
             <p><strong>1.x.x</strong> = version publique déployée.</p>
           </section>
           <section>
             <h3>Évolutions récentes</h3>
             <ul class="changelog-list">
+              <li><strong>0.25.17</strong> — phase finale réellement anti-chevauchement : colonnes plus larges, cartes contenues et scroll horizontal propre.</li>
               <li><strong>0.25.16</strong> — phase finale aérée sans chevauchement et saisie rapide admin mobile corrigée.</li>
               <li><strong>0.25.15</strong> — tableau visuel de phase finale façon bracket officiel.</li>
               <li><strong>0.25.14</strong> — optimisation mobile de l’accueil, des matchs, des classements et des teams du nid.</li>
@@ -3943,7 +3944,7 @@ const App = {
             <p class="muted">Déconnexion, crédits et historique des évolutions.</p>
           </div>
           <div class="profile-account-actions">
-            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v0.25.16</button>
+            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v0.25.17</button>
             <button class="danger-btn" id="profileLogoutBtn" type="button">Déconnexion</button>
           </div>
         </div>
@@ -4214,7 +4215,7 @@ const App = {
 
   setupRealtime() {
     window.sb
-      .channel("app-realtime-v0-25-16")
+      .channel("app-realtime-v0-25-17")
       .on("postgres_changes", { event: "*", schema: "public", table: "matches" }, async () => {
         await this.refreshCurrentViewFromRealtime("matches");
       })
