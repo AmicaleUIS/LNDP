@@ -5727,3 +5727,315 @@ button:disabled {
     height: 34px;
   }
 }
+
+/* ============================================================
+   V0.25.12 — Classements vivants + mini-records
+   ============================================================ */
+.leaderboard-hero-card {
+  border-color: rgba(250,204,21,.18);
+  background:
+    radial-gradient(circle at 14% 0%, rgba(250,204,21,.12), transparent 32%),
+    linear-gradient(135deg, rgba(15,29,51,.92), rgba(7,17,31,.82));
+}
+
+.leaderboard-tabs {
+  margin-bottom: 12px;
+}
+
+.team-leaderboard-card,
+.evolution-card,
+.records-hero-card {
+  border-color: rgba(250,204,21,.18);
+}
+
+.nest-team-row {
+  position: relative;
+  overflow: hidden;
+}
+
+.nest-team-row::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 5px;
+  background: var(--team-color, var(--gold));
+  opacity: .9;
+}
+
+.team-nest-mark {
+  width: 42px;
+  height: 42px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,.18);
+  background:
+    radial-gradient(circle at 50% 45%, rgba(255,255,255,.28), transparent 26%),
+    radial-gradient(circle, var(--team-color, var(--gold)), rgba(250,204,21,.10) 58%, transparent 60%);
+  box-shadow: 0 0 28px color-mix(in srgb, var(--team-color, var(--gold)), transparent 72%);
+  flex: 0 0 auto;
+}
+
+.team-phase-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  margin: 10px 0;
+  border: 1px solid rgba(255,255,255,.10);
+  border-radius: 18px;
+  background: rgba(255,255,255,.045);
+}
+
+.team-phase-head strong {
+  color: var(--gold);
+}
+
+.team-phase-head small {
+  color: var(--muted);
+  text-align: right;
+}
+
+.evolution-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 280px;
+  gap: 16px;
+  align-items: stretch;
+}
+
+.evolution-chart-wrap {
+  min-width: 0;
+  padding: 12px;
+  border-radius: 24px;
+  border: 1px solid rgba(255,255,255,.10);
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.025)),
+    radial-gradient(circle at 10% 10%, rgba(250,204,21,.08), transparent 32%);
+  overflow-x: auto;
+}
+
+.evolution-svg {
+  display: block;
+  width: 100%;
+  min-width: 620px;
+  height: auto;
+}
+
+.evolution-grid {
+  stroke: rgba(255,255,255,.10);
+  stroke-width: 1;
+}
+
+.evolution-axis-label {
+  fill: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.evolution-line {
+  filter: drop-shadow(0 0 8px rgba(250,204,21,.16));
+}
+
+.evolution-dot {
+  stroke: rgba(7,17,31,.95);
+  stroke-width: 3;
+}
+
+.evolution-legend {
+  display: grid;
+  gap: 8px;
+  align-content: start;
+}
+
+.evolution-player {
+  display: grid;
+  grid-template-columns: 8px auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 9px;
+  border-radius: 18px;
+  border: 1px solid rgba(255,255,255,.10);
+  background: linear-gradient(90deg, color-mix(in srgb, var(--player-color, var(--gold)), transparent 84%), rgba(255,255,255,.035));
+}
+
+.evolution-player::before {
+  content: "";
+  width: 8px;
+  height: 32px;
+  border-radius: 999px;
+  background: var(--player-color, var(--gold));
+  box-shadow: 0 0 18px color-mix(in srgb, var(--player-color, var(--gold)), transparent 55%);
+}
+
+.evolution-player .profile-badge {
+  grid-column: 2;
+  grid-row: 1;
+}
+
+.evolution-player > div {
+  grid-column: 3;
+  grid-row: 1;
+  min-width: 0;
+}
+
+.evolution-player > span {
+  grid-column: 4;
+  grid-row: 1;
+  color: var(--gold);
+  font-weight: 950;
+  white-space: nowrap;
+}
+
+.evolution-player strong,
+.evolution-player small {
+  display: block;
+}
+
+.evolution-player small {
+  color: var(--muted);
+}
+
+.record-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 14px;
+}
+
+.record-card {
+  position: relative;
+  overflow: hidden;
+  padding: 16px;
+  border: 1px solid rgba(255,255,255,.10);
+  border-radius: 26px;
+  background:
+    radial-gradient(circle at 90% -10%, rgba(250,204,21,.12), transparent 36%),
+    linear-gradient(145deg, rgba(15,29,51,.88), rgba(7,17,31,.76));
+  box-shadow: 0 18px 44px rgba(0,0,0,.18);
+}
+
+.record-card::after {
+  content: "";
+  position: absolute;
+  right: -34px;
+  bottom: -42px;
+  width: 120px;
+  height: 120px;
+  border-radius: 999px;
+  border: 1px solid rgba(250,204,21,.16);
+  background: rgba(250,204,21,.045);
+  pointer-events: none;
+}
+
+.record-card-head,
+.record-winner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.record-card-head {
+  margin-bottom: 14px;
+}
+
+.record-icon {
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  border-radius: 16px;
+  background: rgba(250,204,21,.14);
+  border: 1px solid rgba(250,204,21,.18);
+}
+
+.record-icon .owl-icon {
+  width: 25px;
+  height: 25px;
+}
+
+.record-card-head strong,
+.record-card-head small,
+.record-winner span,
+.record-winner strong,
+.record-winner small {
+  display: block;
+}
+
+.record-card-head strong {
+  color: var(--gold);
+  font-size: 1.02rem;
+}
+
+.record-card-head small,
+.record-winner small {
+  color: var(--muted);
+}
+
+.record-winner {
+  padding: 12px;
+  border-radius: 20px;
+  border: 1px solid rgba(250,204,21,.14);
+  background: rgba(250,204,21,.07);
+}
+
+.record-winner span {
+  font-weight: 900;
+}
+
+.record-winner strong {
+  color: var(--gold);
+  font-size: 1.12rem;
+}
+
+.record-podium {
+  display: grid;
+  gap: 6px;
+  margin-top: 12px;
+}
+
+.record-podium span {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 7px 9px;
+  border-radius: 14px;
+  background: rgba(255,255,255,.045);
+  color: var(--muted);
+  font-size: .88rem;
+}
+
+.record-podium b {
+  color: var(--gold);
+}
+
+.record-podium em {
+  color: var(--text);
+  font-style: normal;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+@media (max-width: 980px) {
+  .evolution-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .evolution-legend {
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .team-phase-head,
+  .evolution-card .card-title-row {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .team-phase-head small {
+    text-align: left;
+  }
+
+  .record-grid {
+    grid-template-columns: 1fr;
+  }
+}

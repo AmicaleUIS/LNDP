@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — APP PRINCIPALE V0.25.11
+// LE NID DES PRONOS — APP PRINCIPALE V0.25.12
 // ============================================================
 
 const H = window.Helpers;
@@ -36,6 +36,8 @@ const App = {
     matchPhaseIndex: 0,
     myPredictionsPhaseIndex: 0,
     leaderboardPhaseIndex: 0,
+    teamLeaderboardPhaseIndex: 0,
+    leaderboardEvolutionMode: "day",
     achievementNotificationQueue: [],
     achievementModalOpen: false,
     achievementNotificationTimer: null,
@@ -299,19 +301,20 @@ const App = {
           <div>
             <p class="eyebrow">Crédits cachés</p>
             <h2 id="creditsTitle">Le Nid des Pronos</h2>
-            <p class="muted">Version <strong>0.25.11</strong> · pré-déploiement. Le passage en <strong>1.0.0</strong> se fera au déploiement officiel.</p>
+            <p class="muted">Version <strong>0.25.12</strong> · pré-déploiement. Le passage en <strong>1.0.0</strong> se fera au déploiement officiel.</p>
           </div>
           <button class="ghost-btn" id="closeCreditsBtn" type="button">Fermer</button>
         </div>
         <div class="credits-grid">
           <section>
             <h3>Principe de version</h3>
-            <p><strong>0.25.11</strong> = version non déployée · évolution majeure n°25 · correction mineure 11.</p>
+            <p><strong>0.25.12</strong> = version non déployée · évolution majeure n°25 · correction mineure 12.</p>
             <p><strong>1.x.x</strong> = version publique déployée.</p>
           </section>
           <section>
             <h3>Évolutions récentes</h3>
             <ul class="changelog-list">
+              <li><strong>0.25.12</strong> — classements harmonisés : onglet Exploits retiré, teams bureau par phase, évolution jour/semaine et mini-records dans les exploits.</li>
               <li><strong>0.25.11</strong> — popup exploit ajusté avec date, sauvegardes en menu déroulant seul, header mobile fixe et chouette volante de retour en haut.</li>
               <li><strong>0.25.10</strong> — menu admin burger mobile, reset des messages avec sauvegarde, chat Teams en haut, point rouge de message non lu et exploits rejouables au clic.</li>
               <li><strong>0.25.9</strong> — popup exploits instantané, badge plein rond, suppression du récap rapide, “Les teams du nid” et menu burger mobile.</li>
@@ -1343,7 +1346,7 @@ const App = {
   },
 
   async renderAchievements() {
-    await Promise.all([this.loadMatches(), this.loadVisiblePredictions(), this.loadWinnerPredictionsForTeams()]);
+    await Promise.all([this.loadMatches(), this.loadVisiblePredictions(), this.loadWinnerPredictionsForTeams(), this.loadPlayerScoreRows()]);
 
     const root = H.$("#viewRoot");
     root.innerHTML = `
@@ -1358,6 +1361,7 @@ const App = {
       <div class="segmented achievement-tabs">
         <button class="${this.state.achievementsTab === "mine" ? "active" : ""}" data-achievements-tab="mine">Mes exploits</button>
         <button class="${this.state.achievementsTab === "hall" ? "active" : ""}" data-achievements-tab="hall">Hall du nid</button>
+        <button class="${this.state.achievementsTab === "records" ? "active" : ""}" data-achievements-tab="records">Mini-records</button>
         <button class="${this.state.achievementsTab === "catalog" ? "active" : ""}" data-achievements-tab="catalog">Catalogue</button>
       </div>
 
@@ -1377,6 +1381,7 @@ const App = {
 
   async renderAchievementsContent() {
     if (this.state.achievementsTab === "hall") return this.renderAchievementHall();
+    if (this.state.achievementsTab === "records") return this.renderAchievementRecords();
     if (this.state.achievementsTab === "catalog") return this.renderAchievementCatalog();
     return this.renderMyAchievements();
   },
@@ -1485,6 +1490,152 @@ const App = {
       ${block("Casseroles du nid", negatives)}
     `;
     this.bindAchievementReplay(root);
+  },
+
+  playerRecordStats(userId) {
+    const rows = this.scoreDetailRowsForUser(userId);
+    const predictionRows = this.predictionRowsForUser(userId);
+    const totalPoints = rows.reduce((sum, { prediction }) => sum + Number(prediction.points_total || 0), 0);
+    const exact = rows.filter(({ prediction }) => prediction.is_exact_score).length;
+    const goodResults = rows.filter(({ prediction }) => prediction.is_good_result).length;
+    const goodDiffs = rows.filter(({ prediction }) => prediction.is_good_goal_diff).length;
+    const goodQualified = rows.filter(({ prediction }) => prediction.is_good_qualified).length;
+    const zeros = rows.filter(({ prediction }) => Number(prediction.points_total || 0) === 0).length;
+    const avg = rows.length ? totalPoints / rows.length : 0;
+    const exactStreak = this.maxBooleanStreak(rows, ({ prediction }) => prediction.is_exact_score);
+    const resultStreak = this.maxBooleanStreak(rows, ({ prediction }) => prediction.is_good_result);
+    const zeroStreak = this.maxBooleanStreak(rows, ({ prediction }) => Number(prediction.points_total || 0) === 0);
+
+    const dayMap = new Map();
+    rows.forEach((row) => {
+      const label = row.match?.stage === "group" && (row.match.pool_round || row.match.group_round)
+        ? `Journée de poule ${row.match.pool_round || row.match.group_round}`
+        : H.shortPoolRoundLabel(row.match) || "Phase";
+      const current = dayMap.get(label) || { points: 0, exact: 0, rows: 0 };
+      current.points += Number(row.prediction.points_total || 0);
+      current.exact += row.prediction.is_exact_score ? 1 : 0;
+      current.rows += 1;
+      dayMap.set(label, current);
+    });
+
+    const bestDay = [...dayMap.entries()].reduce((best, [label, item]) => {
+      if (!best || item.points > best.points) return { label, ...item };
+      return best;
+    }, null) || { label: "", points: 0, exact: 0, rows: 0 };
+
+    return {
+      totalPoints,
+      average: avg,
+      exact,
+      goodResults,
+      goodDiffs,
+      goodQualified,
+      zeros,
+      predictionCount: predictionRows.length,
+      scoredMatches: rows.length,
+      exactStreak,
+      resultStreak,
+      zeroStreak,
+      bestDayPoints: bestDay.points,
+      bestDayLabel: bestDay.label,
+      bestDayExact: bestDay.exact
+    };
+  },
+
+  achievementRecordDefinitions() {
+    return [
+      { id: "record-points", title: "Grand-duc du classement", subtitle: "Plus gros total de points", icon: "trophy", value: (s) => s.totalPoints, unit: "pts" },
+      { id: "record-average", title: "Moyenne de velours", subtitle: "Meilleure moyenne sur les matchs comptés", icon: "trend", value: (s) => s.average, unit: "pts/match", decimals: 2, minRows: 3 },
+      { id: "record-exact", title: "Aimant à scores exacts", subtitle: "Plus grand nombre de scores exacts", icon: "target", value: (s) => s.exact, unit: "score(s) exact(s)" },
+      { id: "record-results", title: "Collectionneur de victoires", subtitle: "Plus grand nombre de bons résultats", icon: "check", value: (s) => s.goodResults, unit: "bon(s) résultat(s)" },
+      { id: "record-diffs", title: "Compas du nid", subtitle: "Plus grand nombre de bons écarts", icon: "trend", value: (s) => s.goodDiffs, unit: "bon(s) écart(s)" },
+      { id: "record-qualified", title: "Gardien des qualifiés", subtitle: "Plus grand nombre de qualifiés trouvés", icon: "qualified", value: (s) => s.goodQualified, unit: "qualifié(s)" },
+      { id: "record-day", title: "Journée stratosphérique", subtitle: "Plus gros score sur une journée ou phase", icon: "pool", value: (s) => s.bestDayPoints, unit: "pts", detail: (s) => s.bestDayLabel },
+      { id: "record-exact-streak", title: "Série laser", subtitle: "Plus longue série de scores exacts", icon: "target", value: (s) => s.exactStreak, unit: "d’affilée" },
+      { id: "record-result-streak", title: "Vol sans trou d’air", subtitle: "Plus longue série de bons résultats", icon: "check", value: (s) => s.resultStreak, unit: "d’affilée" },
+      { id: "record-predictions", title: "Greffier du grimoire", subtitle: "Plus grand nombre de pronos validés", icon: "list", value: (s) => s.predictionCount, unit: "prono(s)" },
+      { id: "record-zero", title: "Casserole dorée", subtitle: "Plus grand nombre de matchs à zéro point", icon: "badges", value: (s) => s.zeros, unit: "zéro(s)" },
+      { id: "record-zero-streak", title: "Tunnel de brouillard", subtitle: "Plus longue série à zéro point", icon: "badges", value: (s) => s.zeroStreak, unit: "d’affilée" }
+    ];
+  },
+
+  achievementRecordRows() {
+    const source = this.state.playerScoreRows.length
+      ? this.state.playerScoreRows
+      : this.state.publicProfiles.map((profile) => ({ ...profile, user_id: profile.id }));
+
+    return source
+      .filter((row) => row.user_id || row.id)
+      .map((row) => {
+        const userId = row.user_id || row.id;
+        return { row, userId, stats: this.playerRecordStats(userId) };
+      });
+  },
+
+  formatRecordValue(value, record) {
+    const num = Number(value || 0);
+    const text = record.decimals ? num.toFixed(record.decimals) : String(Math.round(num * 10) / 10);
+    return `${text} ${record.unit}`;
+  },
+
+  recordCardHtml(record, rows = []) {
+    const eligible = rows
+      .filter((item) => (record.minRows ? item.stats.scoredMatches >= record.minRows : true))
+      .map((item) => ({ ...item, value: Number(record.value(item.stats) || 0) }))
+      .filter((item) => item.value > 0)
+      .sort((a, b) => b.value - a.value || String(a.row.pseudo || "").localeCompare(String(b.row.pseudo || ""), "fr"));
+
+    const best = eligible[0];
+    const podium = eligible.slice(0, 3);
+    const bestProfile = best ? this.profileForUser(best.userId, best.row) : null;
+    const detail = best && record.detail ? record.detail(best.stats) : "";
+
+    return `
+      <article class="record-card ${best ? "has-record" : "empty-record"}">
+        <div class="record-card-head">
+          <span class="record-icon">${H.icon(record.icon)}</span>
+          <div>
+            <strong>${H.escapeHtml(record.title)}</strong>
+            <small>${H.escapeHtml(record.subtitle)}</small>
+          </div>
+        </div>
+        ${best ? `
+          <div class="record-winner">
+            ${H.profileBadgeHtml(bestProfile, "profile-badge leaderboard-badge")}
+            <div>
+              <span>${H.escapeHtml(bestProfile.pseudo)}</span>
+              <strong>${H.escapeHtml(this.formatRecordValue(best.value, record))}</strong>
+              ${detail ? `<small>${H.escapeHtml(detail)}</small>` : ""}
+            </div>
+          </div>
+          <div class="record-podium">
+            ${podium.map((item, index) => {
+              const profile = this.profileForUser(item.userId, item.row);
+              return `<span><b>#${index + 1}</b> ${H.escapeHtml(profile.pseudo)} <em>${H.escapeHtml(this.formatRecordValue(item.value, record))}</em></span>`;
+            }).join("")}
+          </div>
+        ` : `<p class="muted">Pas encore assez de données pour ce mini-record.</p>`}
+      </article>
+    `;
+  },
+
+  renderAchievementRecords() {
+    const root = H.$("#achievementsContent");
+    const rows = this.achievementRecordRows();
+    const records = this.achievementRecordDefinitions();
+
+    root.innerHTML = `
+      <section class="toolbar-card compact-toolbar records-hero-card">
+        <div>
+          <p class="eyebrow">${H.icon("badges")} Mini-records du nid</p>
+          <h3>Les petites couronnes et les grosses casseroles</h3>
+          <p class="muted">Une dizaine de records vivants : score sur une journée, séries, exacts, zéros, moyenne… Le nid note tout, avec élégance.</p>
+        </div>
+      </section>
+      <div class="record-grid">
+        ${records.map((record) => this.recordCardHtml(record, rows)).join("")}
+      </div>
+    `;
   },
 
   async renderWorldCup() {
@@ -1622,22 +1773,23 @@ const App = {
   },
 
   async renderLeaderboard() {
-    await Promise.all([this.loadMatches(), this.loadVisiblePredictions()]);
+    await Promise.all([this.loadMatches(), this.loadVisiblePredictions(), this.loadPublicProfiles()]);
 
     const root = H.$("#viewRoot");
     root.innerHTML = `
-      <section class="toolbar-card">
+      <section class="toolbar-card leaderboard-hero-card">
         <div>
+          <p class="eyebrow">${H.icon("trophy")} Le perchoir des scores</p>
           <h2>Classements</h2>
-          <p class="muted">Les joueurs inactifs sont exclus automatiquement.</p>
+          <p class="muted">Général, phases, teams bureau et évolution du nid. Les joueurs inactifs sont exclus automatiquement.</p>
         </div>
       </section>
 
-      <div class="segmented">
-        <button class="active" data-leaderboard-tab="overall">Général</button>
-        <button data-leaderboard-tab="poolround">Par phase</button>
-        <button data-leaderboard-tab="team">Teams bureau</button>
-        <button data-leaderboard-tab="badges">Exploits</button>
+      <div class="segmented leaderboard-tabs">
+        <button class="${this.state.leaderboardTab === "overall" ? "active" : ""}" data-leaderboard-tab="overall">Général</button>
+        <button class="${this.state.leaderboardTab === "poolround" ? "active" : ""}" data-leaderboard-tab="poolround">Par phase</button>
+        <button class="${this.state.leaderboardTab === "team" ? "active" : ""}" data-leaderboard-tab="team">Teams bureau</button>
+        <button class="${this.state.leaderboardTab === "evolution" ? "active" : ""}" data-leaderboard-tab="evolution">Évolution</button>
       </div>
 
       <section id="leaderboardContent"></section>
@@ -1658,7 +1810,8 @@ const App = {
     if (this.state.leaderboardTab === "overall") return this.renderOverallLeaderboard();
     if (this.state.leaderboardTab === "poolround") return this.renderPoolRoundLeaderboard();
     if (this.state.leaderboardTab === "team") return this.renderTeamLeaderboard();
-    if (this.state.leaderboardTab === "badges") return this.renderBadgesLeaderboard();
+    if (this.state.leaderboardTab === "evolution") return this.renderLeaderboardEvolution();
+    return this.renderOverallLeaderboard();
   },
 
   scoreDetailRowsForUser(userId, filters = {}) {
@@ -2820,14 +2973,96 @@ const App = {
     this.bindAchievementReplay(root);
   },
 
+  safeColor(value, fallback = "#facc15") {
+    const raw = String(value || "").trim();
+    return /^#[0-9a-fA-F]{6}$/.test(raw) ? raw : fallback;
+  },
+
+  teamPhaseRows(matchIds = []) {
+    const matchIdSet = new Set(matchIds);
+    const teams = this.state.officeTeams.map((team) => {
+      const players = this.teamPlayers(team.id).filter((player) => player.profile_setup_done !== false);
+      const playerIds = new Set(players.map((player) => player.id));
+      const details = this.state.visiblePredictions
+        .filter((prediction) => playerIds.has(prediction.user_id) && matchIdSet.has(prediction.match_id))
+        .map((prediction) => ({ prediction, match: this.state.matches.find((m) => m.id === prediction.match_id) }))
+        .filter(({ match, prediction }) => match?.status === "finished" && prediction.points_total !== null && prediction.points_total !== undefined);
+
+      const total = details.reduce((sum, { prediction }) => sum + Number(prediction.points_total || 0), 0);
+      const exact = details.filter(({ prediction }) => prediction.is_exact_score).length;
+      const goodResults = details.filter(({ prediction }) => prediction.is_good_result).length;
+      return {
+        office_team_id: team.id,
+        office_team_name: team.name,
+        office_team_color: team.color,
+        active_players: players.length,
+        total_points: total,
+        average_points: players.length ? total / players.length : 0,
+        exact_scores: exact,
+        good_results: goodResults,
+        scored_matches: details.length
+      };
+    }).filter((row) => row.active_players > 0);
+
+    return teams
+      .sort((a, b) =>
+        (b.total_points || 0) - (a.total_points || 0)
+        || (b.average_points || 0) - (a.average_points || 0)
+        || String(a.office_team_name || "").localeCompare(String(b.office_team_name || ""), "fr")
+      )
+      .map((row, index) => ({ ...row, rank: index + 1 }));
+  },
+
+  teamLeaderboardRowsHtml(rows = [], options = {}) {
+    if (!rows.length) return `<p class="muted">Pas encore de team classée.</p>`;
+    const mode = options.mode || this.state.teamTab;
+    return `
+      <div class="leaderboard-list team-leaderboard-list">
+        ${rows.map((r) => {
+          const color = this.safeColor(r.office_team_color || r.color, "#facc15");
+          const mainValue = mode === "average" ? Number(r.average_points || 0).toFixed(1) : Number(r.total_points || 0);
+          const mainLabel = mode === "average" ? "pts/j" : "pts";
+          return `
+            <div class="leader-row team-row nest-team-row" style="--team-color:${color}">
+              <div class="rank">#${r.rank}</div>
+              <div class="team-nest-mark" aria-hidden="true"></div>
+              <div class="leader-main">
+                <strong>${H.escapeHtml(r.office_team_name)}</strong>
+                <small>${r.active_players || 0} joueur${(r.active_players || 0) > 1 ? "s" : ""} actif${(r.active_players || 0) > 1 ? "s" : ""} · total ${Math.round(Number(r.total_points || 0) * 10) / 10} pts</small>
+                <div class="score-breakdown team-breakdown">
+                  <span title="Scores exacts">${H.icon("target")} ${r.exact_scores || 0}</span>
+                  <span title="Bons résultats">${H.icon("check")} ${r.good_results || 0}</span>
+                  ${r.scored_matches !== undefined ? `<span title="Pronos comptabilisés">${H.icon("list")} ${r.scored_matches || 0}</span>` : ""}
+                  ${mode === "phase" ? `<span title="Moyenne par joueur">${H.icon("trend")} ${Number(r.average_points || 0).toFixed(1)} pts/j</span>` : ""}
+                </div>
+              </div>
+              <div class="points">${mainValue}<small>${mainLabel}</small></div>
+            </div>`;
+        }).join("")}
+      </div>
+    `;
+  },
+
   async renderTeamLeaderboard() {
     const root = H.$("#leaderboardContent");
+    const teamTab = ["average", "total", "phase"].includes(this.state.teamTab) ? this.state.teamTab : "average";
+    this.state.teamTab = teamTab;
+
     root.innerHTML = `
-      <div class="segmented small">
-        <button class="${this.state.teamTab === "average" ? "active" : ""}" data-team-tab="average">Moyenne</button>
-        <button class="${this.state.teamTab === "total" ? "active" : ""}" data-team-tab="total">Total</button>
-      </div>
-      <section class="card" id="teamLeaderboardRows"></section>
+      <section class="card team-leaderboard-card">
+        <div class="card-title-row">
+          <div>
+            <h3>Classement teams bureau</h3>
+            <p class="muted">Le nid compare les équipes par moyenne, par total ou par phase.</p>
+          </div>
+        </div>
+        <div class="segmented small">
+          <button class="${teamTab === "average" ? "active" : ""}" data-team-tab="average">Moyenne</button>
+          <button class="${teamTab === "total" ? "active" : ""}" data-team-tab="total">Total</button>
+          <button class="${teamTab === "phase" ? "active" : ""}" data-team-tab="phase">Par phase</button>
+        </div>
+        <div id="teamLeaderboardRows"></div>
+      </section>
     `;
 
     H.$$("[data-team-tab]").forEach((btn) => {
@@ -2837,36 +3072,205 @@ const App = {
       });
     });
 
-    const view = this.state.teamTab === "average" ? "v_team_leaderboard_average" : "v_team_leaderboard_total";
-    const { data, error } = await window.sb.from(view).select("*").order("rank");
     const list = H.$("#teamLeaderboardRows");
+
+    if (teamTab === "phase") {
+      const groups = this.groupMatchesByPouleRound(this.state.matches);
+      const activeIndex = this.clampPhaseIndex("teamLeaderboardPhaseIndex", groups);
+      const group = groups[activeIndex];
+      if (!groups.length || !group) {
+        list.innerHTML = `<p class="muted">Aucune phase à afficher pour le moment.</p>`;
+        return;
+      }
+      const matchIds = group.matches.map((match) => match.id);
+      const finishedCount = group.matches.filter((match) => match.status === "finished").length;
+      const pager = this.phaseNavigatorHtml(groups, activeIndex, "teamLeaderboardPhaseIndex");
+      const rows = this.teamPhaseRows(matchIds);
+      list.innerHTML = `
+        ${pager}
+        <div class="team-phase-head">
+          <strong>${H.escapeHtml(group.key)}</strong>
+          <small>${finishedCount}/${group.matches.length} match${group.matches.length > 1 ? "s" : ""} terminé${finishedCount > 1 ? "s" : ""} · ${H.matchDateRangeLabel(group.matches)}</small>
+        </div>
+        ${this.teamLeaderboardRowsHtml(rows, { mode: "phase" })}
+      `;
+      this.bindPhaseNavigation("teamLeaderboardPhaseIndex", () => this.renderTeamLeaderboard());
+      return;
+    }
+
+    const view = teamTab === "average" ? "v_team_leaderboard_average" : "v_team_leaderboard_total";
+    const { data, error } = await window.sb.from(view).select("*").order("rank");
 
     if (error) {
       list.innerHTML = `<p class="error-text">${H.escapeHtml(error.message)}</p>`;
       return;
     }
 
-    list.innerHTML = `
-      <h3>Classement teams — ${this.state.teamTab === "average" ? "moyenne" : "total"}</h3>
-      ${(data || []).length ? `
-        <div class="leaderboard-list">
-          ${(data || []).map((r) => `
-            <div class="leader-row team-row">
-              <div class="rank">#${r.rank}</div>
-              <div class="leader-main">
-                <strong>${H.escapeHtml(r.office_team_name)}</strong>
-                <small>${r.active_players} joueur${r.active_players > 1 ? "s" : ""} actif${r.active_players > 1 ? "s" : ""} · total ${r.total_points || 0} pts</small>
-                <div class="score-breakdown team-breakdown">
-                  <span title="Scores exacts">${H.icon("target")} ${r.exact_scores || 0}</span>
-                  <span title="Bons résultats">${H.icon("check")} ${r.good_results || 0}</span>
-                </div>
-              </div>
-              <div class="points">${this.state.teamTab === "average" ? (r.average_points || 0) : (r.total_points || 0)}<small>${this.state.teamTab === "average" ? "pts/j" : "pts"}</small></div>
-            </div>
-          `).join("")}
-        </div>
-      ` : `<p class="muted">Pas encore de team classée.</p>`}
+    list.innerHTML = this.teamLeaderboardRowsHtml(data || [], { mode: teamTab });
+  },
+
+  profileForUser(userId, source = null) {
+    const row = source || this.state.playerScoreRows.find((item) => item.user_id === userId || item.id === userId)
+      || this.state.publicProfiles.find((item) => item.id === userId || item.user_id === userId)
+      || {};
+    return this.visualProfile({
+      pseudo: row.pseudo || row.author_pseudo || "Joueur",
+      office_team_id: row.office_team_id,
+      office_team_name: row.office_team_name,
+      office_team_slug: row.office_team_slug,
+      office_team_color: row.office_team_color,
+      avatar_key: row.avatar_key || "owl-01",
+      badge_shape: row.badge_shape || "rounded",
+      badge_color: row.badge_color || row.office_team_color || "#facc15"
+    });
+  },
+
+  playerEvolutionSeries(mode = "day") {
+    const finishedRows = this.state.visiblePredictions
+      .map((prediction) => ({ prediction, match: this.state.matches.find((m) => m.id === prediction.match_id) }))
+      .filter(({ prediction, match }) => match?.status === "finished" && prediction.points_total !== null && prediction.points_total !== undefined)
+      .sort((a, b) => new Date(a.match.kickoff_at || 0) - new Date(b.match.kickoff_at || 0));
+
+    const periodKey = (date) => {
+      const d = new Date(date);
+      if (mode === "week") {
+        const monday = new Date(d);
+        const day = monday.getDay() || 7;
+        monday.setHours(0, 0, 0, 0);
+        monday.setDate(monday.getDate() - day + 1);
+        return monday.toISOString().slice(0, 10);
+      }
+      return d.toISOString().slice(0, 10);
+    };
+    const periodLabel = (key) => mode === "week" ? `Semaine du ${H.formatShortDate(key)}` : H.formatShortDate(key);
+
+    const periods = [...new Set(finishedRows.map(({ match }) => periodKey(match.kickoff_at)))].sort();
+    const totalsByUser = new Map();
+    const pointsByPeriod = new Map(periods.map((key) => [key, new Map()]));
+
+    finishedRows.forEach(({ prediction, match }) => {
+      const key = periodKey(match.kickoff_at);
+      const map = pointsByPeriod.get(key);
+      map.set(prediction.user_id, (map.get(prediction.user_id) || 0) + Number(prediction.points_total || 0));
+    });
+
+    periods.forEach((key) => {
+      const map = pointsByPeriod.get(key);
+      map.forEach((points, userId) => {
+        totalsByUser.set(userId, (totalsByUser.get(userId) || 0) + points);
+      });
+    });
+
+    const playerIds = [...totalsByUser.keys()]
+      .sort((a, b) => (totalsByUser.get(b) || 0) - (totalsByUser.get(a) || 0))
+      .slice(0, 8);
+
+    const cumulative = new Map(playerIds.map((userId) => [userId, 0]));
+    const snapshots = periods.map((key) => {
+      const periodPoints = pointsByPeriod.get(key) || new Map();
+      playerIds.forEach((userId) => cumulative.set(userId, (cumulative.get(userId) || 0) + (periodPoints.get(userId) || 0)));
+      return {
+        key,
+        label: periodLabel(key),
+        totals: new Map(playerIds.map((userId) => [userId, cumulative.get(userId) || 0]))
+      };
+    });
+
+    return { playerIds, snapshots, totalsByUser };
+  },
+
+  evolutionChartSvg(series) {
+    const { playerIds, snapshots } = series;
+    if (!playerIds.length || !snapshots.length) return "";
+    const width = 760;
+    const height = 300;
+    const pad = { left: 46, right: 22, top: 24, bottom: 42 };
+    const graphW = width - pad.left - pad.right;
+    const graphH = height - pad.top - pad.bottom;
+    const maxPoints = Math.max(1, ...snapshots.flatMap((snapshot) => playerIds.map((userId) => snapshot.totals.get(userId) || 0)));
+    const x = (index) => pad.left + (snapshots.length === 1 ? graphW / 2 : (index / (snapshots.length - 1)) * graphW);
+    const y = (value) => pad.top + graphH - (Number(value || 0) / maxPoints) * graphH;
+    const yTicks = [0, Math.ceil(maxPoints / 2), maxPoints];
+
+    const lines = playerIds.map((userId, index) => {
+      const profile = this.profileForUser(userId);
+      const color = this.safeColor(profile.badge_color || profile.office_team_color, ["#facc15", "#38bdf8", "#a78bfa", "#fb7185", "#34d399", "#fb923c", "#f472b6", "#c4b5fd"][index % 8]);
+      const points = snapshots.map((snapshot, i) => `${x(i).toFixed(1)},${y(snapshot.totals.get(userId) || 0).toFixed(1)}`).join(" ");
+      const last = snapshots[snapshots.length - 1];
+      const lastX = x(snapshots.length - 1);
+      const lastY = y(last.totals.get(userId) || 0);
+      return `
+        <polyline class="evolution-line" points="${points}" fill="none" stroke="${color}" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
+        <circle class="evolution-dot" cx="${lastX.toFixed(1)}" cy="${lastY.toFixed(1)}" r="5" fill="${color}" />
+      `;
+    }).join("");
+
+    const xLabels = snapshots.map((snapshot, index) => {
+      const shouldShow = snapshots.length <= 7 || index === 0 || index === snapshots.length - 1 || index % Math.ceil(snapshots.length / 5) === 0;
+      return shouldShow ? `<text class="evolution-axis-label" x="${x(index).toFixed(1)}" y="${height - 14}" text-anchor="middle">${H.escapeHtml(snapshot.label.replace("Semaine du ", "S. "))}</text>` : "";
+    }).join("");
+
+    const yGrid = yTicks.map((tick) => `
+      <line class="evolution-grid" x1="${pad.left}" x2="${width - pad.right}" y1="${y(tick).toFixed(1)}" y2="${y(tick).toFixed(1)}" />
+      <text class="evolution-axis-label" x="${pad.left - 10}" y="${(y(tick) + 4).toFixed(1)}" text-anchor="end">${tick}</text>
+    `).join("");
+
+    return `
+      <svg class="evolution-svg" viewBox="0 0 ${width} ${height}" role="img" aria-label="Évolution des points">
+        ${yGrid}
+        ${lines}
+        ${xLabels}
+      </svg>
     `;
+  },
+
+  async renderLeaderboardEvolution() {
+    await this.loadPlayerScoreRows();
+    const root = H.$("#leaderboardContent");
+    const mode = this.state.leaderboardEvolutionMode === "week" ? "week" : "day";
+    const series = this.playerEvolutionSeries(mode);
+    const latestSnapshot = series.snapshots[series.snapshots.length - 1];
+
+    root.innerHTML = `
+      <section class="card evolution-card">
+        <div class="card-title-row">
+          <div>
+            <h3>Évolution du nid</h3>
+            <p class="muted">Les courbes montrent les points cumulés des 8 meilleurs joueurs au fil des matchs terminés.</p>
+          </div>
+          <div class="segmented small">
+            <button class="${mode === "day" ? "active" : ""}" data-evolution-mode="day">Jour</button>
+            <button class="${mode === "week" ? "active" : ""}" data-evolution-mode="week">Semaine</button>
+          </div>
+        </div>
+        ${series.playerIds.length ? `
+          <div class="evolution-layout">
+            <div class="evolution-chart-wrap">${this.evolutionChartSvg(series)}</div>
+            <div class="evolution-legend">
+              ${series.playerIds.map((userId, index) => {
+                const source = this.state.playerScoreRows.find((row) => row.user_id === userId);
+                const profile = this.profileForUser(userId, source);
+                const color = this.safeColor(profile.badge_color || profile.office_team_color, ["#facc15", "#38bdf8", "#a78bfa", "#fb7185", "#34d399", "#fb923c", "#f472b6", "#c4b5fd"][index % 8]);
+                const total = latestSnapshot?.totals.get(userId) || 0;
+                return `
+                  <div class="evolution-player" style="--player-color:${color}">
+                    ${H.profileBadgeHtml(profile, "profile-badge mini")}
+                    <div><strong>${H.escapeHtml(profile.pseudo)}</strong><small>${H.escapeHtml(profile.office_team_name || "Sans team")}</small></div>
+                    <span>${total} pts</span>
+                  </div>`;
+              }).join("")}
+            </div>
+          </div>
+        ` : `<p class="muted">Pas assez de matchs terminés pour dessiner l’évolution du nid.</p>`}
+      </section>
+    `;
+
+    H.$$('[data-evolution-mode]').forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        this.state.leaderboardEvolutionMode = btn.dataset.evolutionMode;
+        await this.renderLeaderboardEvolution();
+      });
+    });
   },
 
 
@@ -3421,7 +3825,7 @@ const App = {
             <p class="muted">Déconnexion, crédits et historique des évolutions.</p>
           </div>
           <div class="profile-account-actions">
-            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v0.25.11</button>
+            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v0.25.12</button>
             <button class="danger-btn" id="profileLogoutBtn" type="button">Déconnexion</button>
           </div>
         </div>
@@ -3692,7 +4096,7 @@ const App = {
 
   setupRealtime() {
     window.sb
-      .channel("app-realtime-v0-25-11")
+      .channel("app-realtime-v0-25-12")
       .on("postgres_changes", { event: "*", schema: "public", table: "matches" }, async () => {
         await this.refreshCurrentViewFromRealtime("matches");
       })
