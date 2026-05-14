@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — APP PRINCIPALE V0.25.12
+// LE NID DES PRONOS — APP PRINCIPALE V0.25.15
 // ============================================================
 
 const H = window.Helpers;
@@ -1714,7 +1714,26 @@ const App = {
 
   renderWorldCupFinals() {
     const root = H.$("#worldcupContent");
-    const finals = this.state.matches.filter((m) => m.stage !== "group");
+    const finals = this.state.matches
+      .filter((m) => m.stage !== "group")
+      .sort((a, b) => this.finalBracketSortValue(a) - this.finalBracketSortValue(b));
+
+    const byStage = this.finalBracketStages(finals);
+    const totalFinalMatches = Object.values(byStage).reduce((sum, rows) => sum + rows.length, 0);
+
+    root.innerHTML = `
+      <section class="toolbar-card compact-toolbar worldcup-final-toolbar">
+        <div>
+          <h3>Phase finale</h3>
+          <p class="muted">Un vrai tableau visuel : les seizièmes partent des ailes, puis le nid converge vers la grande finale.</p>
+        </div>
+        <span class="pill neutral">${totalFinalMatches} match${totalFinalMatches > 1 ? "s" : ""}</span>
+      </section>
+      ${totalFinalMatches ? this.finalBracketHtml(byStage) : `<section class="card"><p class="muted">Aucune phase finale à afficher pour le moment.</p></section>`}
+    `;
+  },
+
+  finalBracketSortValue(match) {
     const stageOrder = {
       round_of_32: 1,
       round_of_16: 2,
@@ -1723,52 +1742,147 @@ const App = {
       third_place: 5,
       final: 6
     };
+    const kickoff = match?.kickoff_at ? new Date(match.kickoff_at).getTime() : 0;
+    return ((stageOrder[match?.stage] || 99) * 10000000000000) + kickoff;
+  },
 
-    const grouped = finals.reduce((acc, match) => {
-      const key = H.stageLabel(match.stage);
-      acc[key] ||= { key, order: stageOrder[match.stage] || 99, matches: [] };
-      acc[key].matches.push(match);
-      return acc;
-    }, {});
+  finalBracketStages(finals = []) {
+    const stages = {
+      round_of_32: [],
+      round_of_16: [],
+      quarter_final: [],
+      semi_final: [],
+      third_place: [],
+      final: []
+    };
 
-    const sections = Object.values(grouped)
-      .sort((a, b) => a.order - b.order)
-      .map((stage) => ({ ...stage, matches: stage.matches.sort((a, b) => new Date(a.kickoff_at) - new Date(b.kickoff_at)) }));
+    finals.forEach((match) => {
+      if (stages[match.stage]) stages[match.stage].push(match);
+    });
 
-    root.innerHTML = `
-      <section class="toolbar-card compact-toolbar">
-        <div>
-          <h3>Tableau phase finale</h3>
-          <p class="muted">Les équipes seront connues après les groupes. Les matchs restent prêts pour les pronos et les scores admin.</p>
+    Object.keys(stages).forEach((key) => {
+      stages[key] = stages[key].sort((a, b) => new Date(a.kickoff_at || 0) - new Date(b.kickoff_at || 0));
+    });
+
+    return stages;
+  },
+
+  splitBracketSide(matches = []) {
+    const midpoint = Math.ceil(matches.length / 2);
+    return [matches.slice(0, midpoint), matches.slice(midpoint)];
+  },
+
+  finalBracketHtml(byStage) {
+    const [r32Left, r32Right] = this.splitBracketSide(byStage.round_of_32);
+    const [r16Left, r16Right] = this.splitBracketSide(byStage.round_of_16);
+    const [qfLeft, qfRight] = this.splitBracketSide(byStage.quarter_final);
+    const [sfLeft, sfRight] = this.splitBracketSide(byStage.semi_final);
+    const finalMatch = byStage.final[0];
+    const thirdPlaceMatch = byStage.third_place[0];
+
+    return `
+      <section class="final-bracket-shell" aria-label="Tableau de la phase finale">
+        <div class="final-bracket-ribbon ribbon-left-a"></div>
+        <div class="final-bracket-ribbon ribbon-left-b"></div>
+        <div class="final-bracket-ribbon ribbon-right-a"></div>
+        <div class="final-bracket-ribbon ribbon-right-b"></div>
+
+        <div class="final-bracket-side final-bracket-side-left">
+          ${this.finalBracketColumnHtml("Seizièmes", r32Left, "round32")}
+          ${this.finalBracketColumnHtml("Huitièmes", r16Left, "round16")}
+          ${this.finalBracketColumnHtml("Quarts", qfLeft, "quarter")}
+          ${this.finalBracketColumnHtml("Demi-finale", sfLeft, "semi")}
+        </div>
+
+        <div class="final-bracket-center">
+          <div class="final-bracket-cup-card">
+            <span class="final-bracket-cup-emoji" aria-hidden="true">🏆</span>
+            <strong>Finale</strong>
+            <small>Le sommet du nid</small>
+          </div>
+          ${finalMatch ? this.finalBracketMatchHtml(finalMatch, "final-main", "Grande finale") : this.finalBracketPlaceholderHtml("Grande finale")}
+          ${thirdPlaceMatch ? this.finalBracketMatchHtml(thirdPlaceMatch, "third-place", "Petite finale") : this.finalBracketPlaceholderHtml("Petite finale")}
+        </div>
+
+        <div class="final-bracket-side final-bracket-side-right">
+          ${this.finalBracketColumnHtml("Demi-finale", sfRight, "semi")}
+          ${this.finalBracketColumnHtml("Quarts", qfRight, "quarter")}
+          ${this.finalBracketColumnHtml("Huitièmes", r16Right, "round16")}
+          ${this.finalBracketColumnHtml("Seizièmes", r32Right, "round32")}
         </div>
       </section>
-      ${sections.length ? `
-        <div class="worldcup-bracket">
-          ${sections.map((stage) => `
-            <section class="bracket-stage card">
-              <div class="card-title-row">
-                <h3>${H.escapeHtml(stage.key)}</h3>
-                <span class="pill neutral">${stage.matches.length} match${stage.matches.length > 1 ? "s" : ""}</span>
-              </div>
-              <div class="bracket-match-list">
-                ${stage.matches.map((match) => `
-                  <article class="bracket-match ${match.status}">
-                    <div class="bracket-match-teams">
-                      <strong>${H.matchFlagHtml(match, "home")} ${H.escapeHtml(match.home_team_name)}</strong>
-                      <span>${match.status === "finished" || match.status === "live" ? H.scoreText(match.home_score, match.away_score) : "vs"}</span>
-                      <strong>${H.matchFlagHtml(match, "away")} ${H.escapeHtml(match.away_team_name)}</strong>
-                    </div>
-                    <div class="bracket-match-meta muted">
-                      <span>${H.formatDateTime(match.kickoff_at)}</span>
-                      <span>${H.matchLocationHtml(match, true)}</span>
-                    </div>
-                  </article>
-                `).join("")}
-              </div>
-            </section>
-          `).join("")}
+    `;
+  },
+
+  finalBracketColumnHtml(title, matches = [], sizeClass = "") {
+    const emptyCount = Math.max(0, this.expectedFinalStageCount(title, matches.length) - matches.length);
+    return `
+      <div class="final-bracket-column ${sizeClass}">
+        <div class="final-bracket-stage-title">${H.escapeHtml(title)}</div>
+        <div class="final-bracket-match-stack">
+          ${matches.map((match) => this.finalBracketMatchHtml(match)).join("")}
+          ${Array.from({ length: emptyCount }).map(() => this.finalBracketPlaceholderHtml(title)).join("")}
         </div>
-      ` : `<section class="card"><p class="muted">Aucune phase finale à afficher pour le moment.</p></section>`}
+      </div>
+    `;
+  },
+
+  expectedFinalStageCount(title, currentCount = 0) {
+    const labels = {
+      "Seizièmes": 8,
+      "Huitièmes": 4,
+      "Quarts": 2,
+      "Demi-finale": 1
+    };
+    return Math.min(labels[title] || currentCount, Math.max(labels[title] || currentCount, currentCount));
+  },
+
+  finalBracketMatchHtml(match, extraClass = "", customTitle = "") {
+    const isScored = match.status === "finished" || match.status === "live";
+    const score = isScored ? H.scoreText(match.home_score, match.away_score) : "vs";
+    const title = customTitle || H.stageLabel(match.stage);
+    const date = H.formatDateTime(match.kickoff_at);
+    const location = [match.city, match.venue].filter(Boolean).join(" · ");
+    const home = match.home_team_name || "À déterminer";
+    const away = match.away_team_name || "À déterminer";
+
+    return `
+      <article class="final-bracket-match ${match.status || "scheduled"} ${extraClass}">
+        <div class="final-bracket-match-head">
+          <span>${H.escapeHtml(title)}</span>
+          <small>${H.escapeHtml(date)}</small>
+        </div>
+        <div class="final-bracket-match-body">
+          <div class="final-bracket-team">
+            ${H.matchFlagHtml(match, "home")}
+            <strong>${H.escapeHtml(home)}</strong>
+          </div>
+          <span class="final-bracket-score">${H.escapeHtml(score)}</span>
+          <div class="final-bracket-team away">
+            ${H.matchFlagHtml(match, "away")}
+            <strong>${H.escapeHtml(away)}</strong>
+          </div>
+        </div>
+        <div class="final-bracket-match-foot muted">
+          ${location ? `<span>${H.escapeHtml(location)}</span>` : `<span>Lieu à confirmer</span>`}
+        </div>
+      </article>
+    `;
+  },
+
+  finalBracketPlaceholderHtml(title = "Match") {
+    return `
+      <article class="final-bracket-match placeholder">
+        <div class="final-bracket-match-head">
+          <span>${H.escapeHtml(title)}</span>
+          <small>À confirmer</small>
+        </div>
+        <div class="final-bracket-match-body">
+          <div class="final-bracket-team"><span class="flag-mini placeholder-flag"></span><strong>À déterminer</strong></div>
+          <span class="final-bracket-score">vs</span>
+          <div class="final-bracket-team away"><span class="flag-mini placeholder-flag"></span><strong>À déterminer</strong></div>
+        </div>
+      </article>
     `;
   },
 
