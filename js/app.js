@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — APP PRINCIPALE V1.0.9
+// LE NID DES PRONOS — APP PRINCIPALE V1.0.10
 // ============================================================
 
 const H = window.Helpers;
@@ -305,25 +305,25 @@ const App = {
           <div>
             <p class="eyebrow">Crédits cachés</p>
             <h2 id="creditsTitle">Le Nid des Pronos</h2>
-            <p class="muted">Version publique <strong>1.0.9</strong> · dashboard réorganisé, avatars rangés.</p>
+            <p class="muted">Version publique <strong>1.0.10</strong> · dashboard desktop lisible, avatars rangés.</p>
           </div>
           <button class="ghost-btn" id="closeCreditsBtn" type="button">Fermer</button>
         </div>
         <div class="credits-grid">
           <section>
             <h3>Version actuelle</h3>
-            <p><strong>1.0.9</strong> — dashboard réorganisé : match, classements, pronos et mini-records sans chevauchement.</p>
+            <p><strong>1.0.10</strong> — dashboard desktop assoupli : abandon du plein écran forcé, mini-records visibles en entier.</p>
             <p><strong>1.0.5</strong> — dashboard mobile/desktop stabilisé, sans chevauchement des cartes.</p>
           </section>
           <section>
-            <h3>Évolutions V1.0.9</h3>
+            <h3>Évolutions V1.0.10</h3>
             <ul class="changelog-list">
               <li>Tableau de bord réorganisé sans grille forcée qui écrase les cartes.</li>
               <li>Carte “Prochain match” réduite pour laisser respirer les classements et les mini-records.</li>
               <li>Mobile rendu lisible : les cartes gardent une taille confortable et la page peut scroller si nécessaire.</li>
               <li>Desktop conservé en tableau de bord sans scroll, sans chevauchement.</li>
               <li>Annuaire “Teams du nid” : les équipes sans joueur ne sont plus affichées.</li>
-              <li>Cache PWA remis à jour en 1.0.9 pour forcer la récupération du dashboard corrigé.</li>
+              <li>Cache PWA remis à jour en 1.0.10 pour forcer la récupération du dashboard assoupli.</li>
             </ul>
           </section>
           <section>
@@ -4516,7 +4516,7 @@ const App = {
             <p class="muted">Déconnexion, crédits et historique des évolutions.</p>
           </div>
           <div class="profile-account-actions">
-            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.0.9</button>
+            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.0.10</button>
             <button class="danger-btn" id="profileLogoutBtn" type="button">Déconnexion</button>
           </div>
         </div>

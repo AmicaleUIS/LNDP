@@ -11630,7 +11630,7 @@ body[data-current-view="home"] .view-root {
 }
 
 /* ============================================================
-   V1.0.9 — dashboard propre : cartes naturelles, pas de grille forcée
+   V1.0.10 — dashboard propre : cartes naturelles, pas de grille forcée
    Objectif : desktop sans chevauchement ; mobile lisible et scroll naturel.
    ============================================================ */
 body[data-current-view="home"] {
@@ -12355,5 +12355,194 @@ body[data-current-view="home"] .view-root {
     width: 44px !important;
     height: 44px !important;
     flex-basis: 44px !important;
+  }
+}
+
+/* ============================================================
+   V1.0.10 — dashboard desktop lisible et scroll naturel
+   On abandonne le desktop absolument non-scrollable : priorité à une UI propre.
+   Mobile V1.0.9 conservé car validé.
+   ============================================================ */
+@media (min-width: 921px) {
+  body[data-current-view="home"] {
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+  }
+
+  body[data-current-view="home"] .app-shell {
+    height: auto !important;
+    min-height: 100vh !important;
+    overflow: visible !important;
+  }
+
+  body[data-current-view="home"] .main-area {
+    height: auto !important;
+    min-height: 100vh !important;
+    overflow: visible !important;
+    display: block !important;
+    padding: 16px 24px 96px !important;
+  }
+
+  body[data-current-view="home"] .topbar {
+    width: min(var(--max), 100%) !important;
+    margin: 0 auto 10px !important;
+    padding: 0 !important;
+  }
+
+  body[data-current-view="home"] .topbar h1 {
+    font-size: clamp(1.55rem, 2.1vw, 2.15rem) !important;
+    line-height: 1.05 !important;
+  }
+
+  body[data-current-view="home"] .view-root,
+  body[data-current-view="home"] .home-dashboard-screen {
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+  }
+
+  .home-dashboard-screen {
+    display: grid !important;
+    grid-template-rows: none !important;
+    align-content: start !important;
+    gap: 14px !important;
+  }
+
+  .home-dashboard-hero {
+    padding: 18px 26px !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow: visible !important;
+    border-radius: 24px !important;
+  }
+
+  .home-dashboard-hero .eyebrow {
+    margin-bottom: 6px !important;
+  }
+
+  .home-dashboard-hero h2 {
+    font-size: clamp(1.65rem, 2.75vw, 2.55rem) !important;
+    line-height: 1.02 !important;
+  }
+
+  .home-dashboard-hero .muted {
+    display: block !important;
+    max-width: 850px !important;
+  }
+
+  .home-dashboard-hero .rules-home-btn {
+    margin-top: 10px !important;
+    min-height: 38px !important;
+  }
+
+  .home-dashboard-grid {
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) minmax(340px, 430px) !important;
+    gap: 14px !important;
+    align-items: start !important;
+  }
+
+  .home-dashboard-left,
+  .home-dashboard-right {
+    display: grid !important;
+    gap: 14px !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+  }
+
+  .home-dashboard-grid .next-match-card {
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow: visible !important;
+    padding: 16px 18px !important;
+    gap: 12px !important;
+    border-radius: 22px !important;
+  }
+
+  .home-dashboard-grid .next-match-card .mini-match {
+    gap: 8px !important;
+  }
+
+  .home-dashboard-grid .next-match-card .teams-row strong {
+    font-size: clamp(1.12rem, 1.7vw, 1.55rem) !important;
+  }
+
+  .home-standing-stack {
+    height: auto !important;
+    overflow: visible !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 12px !important;
+  }
+
+  .home-rank-card,
+  .home-team-average-card {
+    min-height: 132px !important;
+    height: auto !important;
+    overflow: visible !important;
+    padding: 14px !important;
+  }
+
+  .home-missing-card {
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+    padding: 14px !important;
+  }
+
+  .home-record-carousel-card {
+    height: auto !important;
+    min-height: 174px !important;
+    max-height: none !important;
+    overflow: visible !important;
+    padding: 16px !important;
+    gap: 12px !important;
+    border-radius: 22px !important;
+  }
+
+  .home-record-carousel-card .card-title-row {
+    min-height: 0 !important;
+    align-items: center !important;
+  }
+
+  .home-record-carousel {
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+  }
+
+  .home-record-slide {
+    height: auto !important;
+    min-height: 104px !important;
+    overflow: visible !important;
+    grid-template-columns: 78px minmax(0, 1fr) auto !important;
+    align-items: center !important;
+    gap: 14px !important;
+    padding: 13px 16px !important;
+    border-radius: 18px !important;
+  }
+
+  .home-record-art .record-icon,
+  .home-record-art .record-art {
+    width: 78px !important;
+    height: 78px !important;
+    border-radius: 18px !important;
+  }
+
+  .home-record-main strong {
+    white-space: normal !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
+    font-size: clamp(1rem, 1.15vw, 1.16rem) !important;
+  }
+
+  .home-record-main .home-record-label,
+  .home-record-main span,
+  .home-record-main p,
+  .home-record-date {
+    font-size: clamp(.72rem, .86vw, .82rem) !important;
   }
 }
