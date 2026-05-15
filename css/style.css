@@ -7927,7 +7927,7 @@ button:disabled {
 }
 
 /* ============================================================
-   V1.0.0 — lancement public + mini-records + correctifs mobile
+   V1.0.1 — lancement public + mini-records + correctifs mobile
    ============================================================ */
 .home-record-carousel-card {
   position: relative;
@@ -8345,5 +8345,181 @@ button:disabled {
   .record-detail-winner {
     border-radius: 22px;
     max-width: 100%;
+  }
+}
+
+/* ============================================================
+   V1.0.1 — correctif alignement pronos + groupes visibles mobile
+   ============================================================ */
+@media (min-width: 1180px) {
+  .single-phase-view .match-list {
+    align-items: stretch !important;
+  }
+
+  .single-phase-view .match-card {
+    height: auto !important;
+  }
+}
+
+.match-card .prediction-form {
+  gap: 8px;
+}
+
+.match-card .prediction-actions {
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.my-prono-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 7px 11px;
+  border-radius: 14px;
+  background: rgba(255,255,255,.055);
+  border: 1px solid rgba(255,255,255,.08);
+  color: var(--text);
+  margin-left: auto;
+}
+
+.my-prono-inline small {
+  color: var(--muted);
+  font-weight: 850;
+}
+
+.my-prono-inline strong {
+  font-size: 1.02rem;
+  font-weight: 950;
+  white-space: nowrap;
+}
+
+.match-card .my-prono-result {
+  padding: 8px 10px;
+  border-radius: 14px;
+}
+
+.match-card .my-prono-result small {
+  margin-bottom: 0;
+  font-size: .76rem;
+}
+
+.match-card .my-prono-result strong {
+  font-size: .95rem;
+}
+
+@media (max-width: 760px) {
+  .match-card .score-board {
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) !important;
+    gap: 6px !important;
+    padding: 9px !important;
+  }
+
+  .match-card .team-side,
+  .match-card .team-side.right {
+    align-items: flex-start !important;
+    gap: 5px !important;
+    max-width: none !important;
+  }
+
+  .match-card .team-name-stack,
+  .match-card .team-name-stack.right {
+    display: flex !important;
+    flex-direction: column !important;
+    min-width: 0 !important;
+    gap: 3px !important;
+  }
+
+  .match-card .team-name-stack.right {
+    align-items: flex-end !important;
+    text-align: right !important;
+  }
+
+  .match-card .team-side .team-label,
+  .match-card .team-side strong,
+  .match-card .team-name-stack strong {
+    display: block !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
+    white-space: normal !important;
+    overflow-wrap: anywhere !important;
+    line-height: 1.08 !important;
+    font-size: .82rem !important;
+  }
+
+  .match-card .team-side small.team-group-rank,
+  .match-card .team-group-rank {
+    display: inline-flex !important;
+    width: fit-content !important;
+    max-width: 100% !important;
+    padding: 2px 6px !important;
+    font-size: .58rem !important;
+    line-height: 1.08 !important;
+    white-space: normal !important;
+  }
+
+  .match-card .team-name-stack.right .team-group-rank {
+    margin-left: auto !important;
+  }
+
+  .match-card .official-score {
+    min-width: 36px !important;
+    width: 36px !important;
+    font-size: .95rem !important;
+  }
+
+  .match-card .prediction-form {
+    gap: 8px !important;
+    padding: 9px !important;
+  }
+
+  .match-card .prediction-actions {
+    flex-direction: row !important;
+    align-items: center !important;
+    gap: 8px !important;
+  }
+
+  .my-prono-inline {
+    margin-left: 0;
+    min-height: 36px;
+    padding: 6px 9px;
+    gap: 6px;
+    flex: 1 1 auto;
+    justify-content: space-between;
+  }
+
+  .my-prono-inline small {
+    font-size: .72rem;
+  }
+
+  .my-prono-inline strong {
+    font-size: .95rem;
+  }
+
+  .match-card .my-prono-result {
+    padding: 7px 9px !important;
+  }
+}
+
+@media (max-width: 420px) {
+  .match-card .score-board {
+    gap: 5px !important;
+  }
+
+  .match-card .flag,
+  .match-card .team-flag-img,
+  .match-card .flag-placeholder,
+  .match-card .placeholder-flag {
+    width: 20px !important;
+    height: 15px !important;
+    min-width: 20px !important;
+  }
+
+  .match-card .team-side .team-label,
+  .match-card .team-side strong,
+  .match-card .team-name-stack strong {
+    font-size: .78rem !important;
   }
 }

@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — APP PRINCIPALE V1.0.0
+// LE NID DES PRONOS — APP PRINCIPALE V1.0.1
 // ============================================================
 
 const H = window.Helpers;
@@ -303,17 +303,17 @@ const App = {
           <div>
             <p class="eyebrow">Crédits cachés</p>
             <h2 id="creditsTitle">Le Nid des Pronos</h2>
-            <p class="muted">Version publique <strong>1.0.0</strong> · lancement propre du nid en ligne.</p>
+            <p class="muted">Version publique <strong>1.0.1</strong> · lancement propre du nid en ligne.</p>
           </div>
           <button class="ghost-btn" id="closeCreditsBtn" type="button">Fermer</button>
         </div>
         <div class="credits-grid">
           <section>
             <h3>Version actuelle</h3>
-            <p><strong>1.0.0</strong> — version publique harmonisée : cache PWA remis à neuf, crédits mis à jour et correctifs mobile intégrés.</p>
+            <p><strong>1.0.1</strong> — version publique harmonisée : cache PWA remis à neuf, crédits mis à jour et correctifs mobile intégrés.</p>
           </section>
           <section>
-            <h3>Évolutions V1.0.0</h3>
+            <h3>Évolutions V1.0.1</h3>
             <ul class="changelog-list">
               <li>Accueil enrichi avec le cadre vivant des mini-records du nid.</li>
               <li>Classements par phase capables d’afficher aussi les matchs de préparation, côté joueurs et teams bureau.</li>
@@ -1187,10 +1187,19 @@ const App = {
     return this.state.visiblePredictions.find((row) => row.match_id === matchId && row.user_id === this.state.session.user.id) || null;
   },
 
-  myPredictionResultHtml(match, prediction) {
+  myPredictionInlineHtml(prediction) {
     if (!prediction) return "";
+    return `
+      <span class="my-prono-inline">
+        <small>Ton prono</small>
+        <strong>${prediction.home_score_pred} - ${prediction.away_score_pred}</strong>
+      </span>
+    `;
+  },
+
+  myPredictionResultHtml(match, prediction) {
+    if (!prediction || match.status !== "finished") return "";
     const points = this.myPointsForMatch(match.id);
-    const isFinished = match.status === "finished";
     const pointsText = match.is_test_match
       ? "Match test · hors classement"
       : points
@@ -1198,17 +1207,11 @@ const App = {
         : "Points en attente";
 
     return `
-      <div class="my-prono-result ${isFinished ? "finished" : ""}">
+      <div class="my-prono-result finished">
         <div>
-          <small>Ton prono</small>
-          <strong>${prediction.home_score_pred} - ${prediction.away_score_pred}</strong>
+          <small>${match.is_test_match ? "Résultat test" : "Points gagnés"}</small>
+          <strong>${pointsText}</strong>
         </div>
-        ${isFinished ? `
-          <div class="my-prono-points">
-            <small>${match.is_test_match ? "Résultat test" : "Points gagnés"}</small>
-            <strong>${pointsText}</strong>
-          </div>
-        ` : ""}
       </div>
     `;
   },
@@ -1273,7 +1276,7 @@ const App = {
               ? `<span class="locked-label">${H.icon("lock")} Prono verrouillé</span>`
               : `<button class="primary-btn" type="submit">${myPrediction ? "Modifier" : "Valider"}</button>`
             }
-            ${myPrediction ? "" : `<span class="muted">Aucun prono posé</span>`}
+            ${myPrediction ? this.myPredictionInlineHtml(myPrediction) : `<span class="muted">Aucun prono posé</span>`}
           </div>
           ${this.myPredictionResultHtml(match, myPrediction)}
         </form>
@@ -4351,7 +4354,7 @@ const App = {
             <p class="muted">Déconnexion, crédits et historique des évolutions.</p>
           </div>
           <div class="profile-account-actions">
-            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.0.0</button>
+            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.0.1</button>
             <button class="danger-btn" id="profileLogoutBtn" type="button">Déconnexion</button>
           </div>
         </div>
