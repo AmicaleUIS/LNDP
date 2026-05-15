@@ -8943,7 +8943,7 @@ button:disabled {
 }
 
 /* ============================================================
-   V1.0.7 — accueil plein écran adaptatif
+   V1.0.8 — accueil plein écran adaptatif
    ============================================================ */
 body[data-current-view="home"] {
   overflow: hidden;
@@ -9432,7 +9432,7 @@ body[data-current-view="home"] .view-root {
 
 
 /* ============================================================
-   V1.0.7 — avatars renommés et rangés par type
+   V1.0.8 — avatars renommés et rangés par type
    ============================================================ */
 .avatar-choice-grouped {
   display: grid;
@@ -9477,7 +9477,7 @@ body[data-current-view="home"] .view-root {
 }
 
 /* ============================================================
-   V1.0.7 — tableau de bord sans chevauchement
+   V1.0.8 — tableau de bord sans chevauchement
    ============================================================ */
 body[data-current-view="home"] {
   overflow: hidden !important;
@@ -10004,7 +10004,7 @@ body[data-current-view="home"] .view-root {
 
 
 /* ============================================================
-   V1.0.7 — reset dashboard stable, sans chevauchement
+   V1.0.8 — reset dashboard stable, sans chevauchement
    Objectif : tableau de bord plein écran, mais jamais superposé.
    ============================================================ */
 body[data-current-view="home"] {
@@ -10720,7 +10720,7 @@ body[data-current-view="home"] .view-root {
 }
 
 /* ============================================================
-   V1.0.7 — dashboard équilibré : prochain match compact
+   V1.0.8 — dashboard équilibré : prochain match compact
    Objectif : supprimer l'effet "grosse carte vide" qui écrase le reste.
    ============================================================ */
 body[data-current-view="home"] .view-root,
@@ -10950,5 +10950,681 @@ body[data-current-view="home"] .home-dashboard-grid {
 
   .home-dashboard-hero .rules-home-btn {
     display: none !important;
+  }
+}
+
+/* ============================================================
+   V1.0.8 — dashboard lisible, sans grille qui écrase tout
+   Principe : desktop = une page sans scroll ; mobile = naturel et lisible.
+   ============================================================ */
+body[data-current-view="home"] {
+  overflow: hidden !important;
+}
+
+body[data-current-view="home"] .app-shell {
+  height: 100dvh !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+}
+
+body[data-current-view="home"] .main-area {
+  height: 100dvh !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+  display: grid !important;
+  grid-template-rows: auto minmax(0, 1fr) !important;
+  gap: clamp(8px, 1vh, 12px) !important;
+  padding: clamp(10px, 1.45vh, 18px) !important;
+}
+
+body[data-current-view="home"] .topbar {
+  width: min(var(--max), 100%) !important;
+  margin: 0 auto !important;
+  min-height: 0 !important;
+  padding: 0 !important;
+}
+
+body[data-current-view="home"] .topbar h1 {
+  font-size: clamp(1.45rem, 2.7vh, 2.15rem) !important;
+  line-height: 1.04 !important;
+  letter-spacing: -.04em !important;
+}
+
+body[data-current-view="home"] .topbar .eyebrow {
+  margin: 0 0 2px !important;
+  font-size: clamp(.62rem, 1.25vh, .76rem) !important;
+}
+
+body[data-current-view="home"] .view-root {
+  width: min(var(--max), 100%) !important;
+  height: 100% !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+  display: block !important;
+  margin: 0 auto !important;
+}
+
+.home-dashboard-screen {
+  height: 100% !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+  display: grid !important;
+  grid-template-rows: auto auto auto !important;
+  align-content: start !important;
+  gap: clamp(8px, 1.05vh, 12px) !important;
+}
+
+.home-dashboard-hero {
+  min-height: 0 !important;
+  max-height: none !important;
+  overflow: visible !important;
+  display: block !important;
+  padding: clamp(12px, 1.65vh, 20px) clamp(15px, 2vw, 24px) !important;
+  border-radius: clamp(18px, 2.2vh, 24px) !important;
+}
+
+.home-dashboard-hero .eyebrow {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  margin: 0 0 4px !important;
+  font-size: clamp(.66rem, 1.25vh, .78rem) !important;
+  line-height: 1.08 !important;
+}
+
+.home-dashboard-hero .eyebrow .owl-icon {
+  width: clamp(26px, 3.5vh, 34px) !important;
+  height: clamp(26px, 3.5vh, 34px) !important;
+}
+
+.home-dashboard-hero h2 {
+  margin: 0 !important;
+  font-size: clamp(1.55rem, 3.5vh, 2.65rem) !important;
+  line-height: 1 !important;
+  letter-spacing: -.05em !important;
+}
+
+.home-dashboard-hero .muted {
+  display: block !important;
+  margin: 4px 0 0 !important;
+  max-width: 760px !important;
+  font-size: clamp(.74rem, 1.3vh, .92rem) !important;
+  line-height: 1.2 !important;
+}
+
+.home-dashboard-hero .rules-home-btn {
+  position: static !important;
+  display: inline-flex !important;
+  width: auto !important;
+  min-height: 30px !important;
+  margin: 7px 0 0 !important;
+  padding: 6px 10px !important;
+  border-radius: 12px !important;
+  font-size: clamp(.68rem, 1.2vh, .82rem) !important;
+  line-height: 1 !important;
+}
+
+.home-dashboard-hero .rules-home-btn .owl-icon {
+  width: 20px !important;
+  height: 20px !important;
+}
+
+.home-dashboard-grid {
+  height: auto !important;
+  min-height: 0 !important;
+  overflow: visible !important;
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) minmax(310px, 420px) !important;
+  grid-template-areas:
+    "match standings"
+    "match missing" !important;
+  grid-template-rows: auto auto !important;
+  align-items: start !important;
+  gap: clamp(8px, 1vh, 12px) !important;
+}
+
+.home-dashboard-grid .next-match-card {
+  grid-area: match !important;
+  height: auto !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  overflow: visible !important;
+  display: grid !important;
+  grid-template-rows: auto auto !important;
+  align-content: start !important;
+  gap: 10px !important;
+  padding: clamp(12px, 1.55vh, 17px) !important;
+  border-radius: clamp(18px, 2.2vh, 24px) !important;
+}
+
+.home-dashboard-grid .next-match-card .compact-title-row {
+  min-height: 0 !important;
+  margin: 0 !important;
+  align-items: center !important;
+}
+
+.home-dashboard-grid .next-match-card h3,
+.home-rank-card h3,
+.home-team-average-card h3,
+.home-missing-card h3,
+.home-record-carousel-card h3 {
+  font-size: clamp(1rem, 1.65vh, 1.25rem) !important;
+  line-height: 1.08 !important;
+  margin: 0 !important;
+}
+
+.home-dashboard-grid .next-match-card .pill,
+.home-missing-card .count-badge {
+  min-height: 28px !important;
+  padding: 5px 10px !important;
+  font-size: .72rem !important;
+}
+
+.home-dashboard-grid .next-match-card .mini-match {
+  height: auto !important;
+  min-height: 0 !important;
+  display: grid !important;
+  align-content: start !important;
+  gap: 8px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+.home-dashboard-grid .next-match-card .teams-row {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) !important;
+  align-items: center !important;
+  gap: clamp(8px, 1vw, 14px) !important;
+  min-width: 0 !important;
+}
+
+.home-dashboard-grid .next-match-card .teams-row strong {
+  min-width: 0 !important;
+  max-width: 100% !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  flex-wrap: wrap !important;
+  overflow: visible !important;
+  white-space: normal !important;
+  text-overflow: clip !important;
+  font-size: clamp(1.06rem, 1.8vw, 1.5rem) !important;
+  line-height: 1.08 !important;
+}
+
+.home-dashboard-grid .next-match-card .teams-row strong:last-child {
+  justify-content: flex-end !important;
+  text-align: right !important;
+}
+
+.home-dashboard-grid .next-match-card .teams-row span {
+  font-size: clamp(.9rem, 1.35vw, 1.18rem) !important;
+  line-height: 1 !important;
+}
+
+.home-dashboard-grid .next-match-card .flag-img,
+.home-dashboard-grid .next-match-card .team-flag-img,
+.home-dashboard-grid .next-match-card .flag-placeholder,
+.home-dashboard-grid .next-match-card .placeholder-flag {
+  width: 25px !important;
+  height: 18px !important;
+  flex: 0 0 auto !important;
+}
+
+.home-dashboard-grid .next-match-card .test-match-mini-label {
+  width: fit-content !important;
+  max-width: 100% !important;
+  margin: 0 !important;
+  padding: 4px 10px !important;
+  border-radius: 999px !important;
+  font-size: clamp(.62rem, 1vw, .74rem) !important;
+  line-height: 1.1 !important;
+  white-space: normal !important;
+}
+
+.home-dashboard-grid .next-match-card .mini-location-line,
+.home-dashboard-grid .next-match-card .mini-tv-line {
+  display: block !important;
+  margin: 0 !important;
+  font-size: clamp(.74rem, 1.05vw, .9rem) !important;
+  line-height: 1.18 !important;
+  white-space: normal !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+}
+
+.home-dashboard-grid .next-match-card .mini-tv-line img {
+  max-height: 24px !important;
+  width: auto !important;
+  vertical-align: middle !important;
+}
+
+.home-standing-stack {
+  grid-area: standings !important;
+  height: auto !important;
+  min-height: 0 !important;
+  overflow: visible !important;
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: clamp(8px, 1vw, 12px) !important;
+}
+
+.home-rank-card,
+.home-team-average-card {
+  height: auto !important;
+  min-height: 126px !important;
+  overflow: hidden !important;
+  display: grid !important;
+  grid-template-rows: auto 1fr !important;
+  gap: 10px !important;
+  padding: clamp(12px, 1.5vh, 16px) !important;
+  border-radius: clamp(18px, 2.2vh, 23px) !important;
+}
+
+.home-rank-card .card-title-row,
+.home-team-average-card .card-title-row,
+.home-missing-card .card-title-row,
+.home-record-carousel-card .card-title-row {
+  min-height: 0 !important;
+  align-items: flex-start !important;
+}
+
+.home-rank-card .tiny-btn,
+.home-team-average-card .tiny-btn {
+  display: inline-flex !important;
+  min-height: 28px !important;
+  padding: 5px 9px !important;
+  font-size: .7rem !important;
+}
+
+.home-rank-main,
+.home-team-average-main {
+  align-self: center !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+}
+
+.home-rank-number,
+.home-team-rank {
+  width: 54px !important;
+  height: 54px !important;
+  flex: 0 0 54px !important;
+  border-radius: 16px !important;
+  font-size: 1.12rem !important;
+}
+
+.home-rank-main strong,
+.home-team-average-main strong {
+  display: block !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+  font-size: clamp(.9rem, 1.12vw, 1.05rem) !important;
+  line-height: 1.08 !important;
+}
+
+.home-rank-main small,
+.home-team-average-main small {
+  display: block !important;
+  font-size: clamp(.66rem, .9vw, .78rem) !important;
+  line-height: 1.15 !important;
+}
+
+.home-team-average-leader {
+  display: none !important;
+}
+
+.home-missing-card {
+  grid-area: missing !important;
+  height: auto !important;
+  min-height: 92px !important;
+  overflow: hidden !important;
+  display: grid !important;
+  grid-template-columns: 1fr !important;
+  grid-template-rows: auto auto auto !important;
+  align-content: start !important;
+  gap: 8px !important;
+  padding: clamp(12px, 1.45vh, 16px) !important;
+  border-radius: clamp(18px, 2.2vh, 23px) !important;
+}
+
+.home-missing-card .muted {
+  display: block !important;
+  margin: 0 !important;
+  line-height: 1.15 !important;
+  font-size: clamp(.72rem, .95vw, .86rem) !important;
+}
+
+.home-missing-card .primary-btn {
+  width: 100% !important;
+  min-height: 32px !important;
+  padding: 7px 10px !important;
+  border-radius: 12px !important;
+  font-size: clamp(.74rem, .9vw, .86rem) !important;
+  line-height: 1.05 !important;
+}
+
+.home-record-carousel-card {
+  height: auto !important;
+  min-height: 128px !important;
+  max-height: 156px !important;
+  overflow: hidden !important;
+  display: grid !important;
+  grid-template-rows: auto minmax(0, 1fr) !important;
+  gap: 8px !important;
+  padding: clamp(12px, 1.45vh, 16px) !important;
+  border-radius: clamp(18px, 2.2vh, 24px) !important;
+}
+
+.home-record-carousel-card .card-title-row p {
+  display: none !important;
+}
+
+.home-record-carousel {
+  min-height: 0 !important;
+  height: 100% !important;
+  overflow: hidden !important;
+  margin: 0 !important;
+}
+
+.home-record-slide {
+  min-height: 0 !important;
+  height: 100% !important;
+  overflow: hidden !important;
+  display: grid !important;
+  grid-template-columns: clamp(58px, 7vh, 74px) minmax(0, 1fr) auto !important;
+  align-items: center !important;
+  gap: 10px !important;
+  padding: 10px 12px !important;
+  border-radius: 17px !important;
+}
+
+.home-record-art .record-icon,
+.home-record-art .record-art {
+  width: clamp(58px, 7vh, 74px) !important;
+  height: clamp(58px, 7vh, 74px) !important;
+  border-radius: 16px !important;
+}
+
+.home-record-main strong {
+  font-size: clamp(.95rem, 1.25vw, 1.12rem) !important;
+  line-height: 1.05 !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+.home-record-main .home-record-label,
+.home-record-main span,
+.home-record-main p,
+.home-record-date {
+  font-size: clamp(.62rem, .9vw, .76rem) !important;
+  line-height: 1.12 !important;
+}
+
+/* Mobile : on arrête le faux plein écran compressé. C’est lisible, puis ça scrolle si besoin. */
+@media (max-width: 920px) {
+  body[data-current-view="home"] {
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+  }
+
+  body[data-current-view="home"] .app-shell,
+  body[data-current-view="home"] .main-area,
+  body[data-current-view="home"] .view-root,
+  body[data-current-view="home"] .home-dashboard-screen {
+    height: auto !important;
+    min-height: 100dvh !important;
+    overflow: visible !important;
+  }
+
+  body[data-current-view="home"] .main-area {
+    display: block !important;
+    padding: max(12px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) calc(88px + env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left)) !important;
+  }
+
+  body[data-current-view="home"] .topbar {
+    position: relative !important;
+    top: auto !important;
+    z-index: 1 !important;
+    margin: 0 0 10px !important;
+    padding: 0 !important;
+    background: transparent !important;
+    border: 0 !important;
+    box-shadow: none !important;
+  }
+
+  body[data-current-view="home"] .topbar h1 {
+    font-size: clamp(1.55rem, 7.2vw, 2.2rem) !important;
+    line-height: 1 !important;
+  }
+
+  body[data-current-view="home"] .topbar .eyebrow {
+    display: none !important;
+  }
+
+  .home-dashboard-screen {
+    display: grid !important;
+    grid-template-rows: auto auto auto !important;
+    gap: 10px !important;
+    align-content: start !important;
+  }
+
+  .home-dashboard-hero {
+    padding: 13px 14px !important;
+    border-radius: 21px !important;
+  }
+
+  .home-dashboard-hero .eyebrow {
+    font-size: .68rem !important;
+    margin-bottom: 4px !important;
+  }
+
+  .home-dashboard-hero .eyebrow .owl-icon {
+    width: 30px !important;
+    height: 30px !important;
+  }
+
+  .home-dashboard-hero h2 {
+    font-size: clamp(1.22rem, 5.6vw, 1.7rem) !important;
+    line-height: 1.03 !important;
+  }
+
+  .home-dashboard-hero .muted {
+    display: block !important;
+    margin-top: 5px !important;
+    font-size: .78rem !important;
+    line-height: 1.2 !important;
+  }
+
+  .home-dashboard-hero .rules-home-btn {
+    min-height: 32px !important;
+    margin-top: 8px !important;
+    padding: 6px 10px !important;
+    font-size: .72rem !important;
+  }
+
+  .home-dashboard-grid {
+    display: grid !important;
+    grid-template-columns: 1fr !important;
+    grid-template-areas:
+      "match"
+      "standings"
+      "missing" !important;
+    gap: 10px !important;
+    overflow: visible !important;
+  }
+
+  .home-dashboard-grid .next-match-card {
+    padding: 13px !important;
+    border-radius: 21px !important;
+    gap: 10px !important;
+  }
+
+  .home-dashboard-grid .next-match-card h3,
+  .home-rank-card h3,
+  .home-team-average-card h3,
+  .home-missing-card h3,
+  .home-record-carousel-card h3 {
+    font-size: clamp(.96rem, 4vw, 1.08rem) !important;
+  }
+
+  .home-dashboard-grid .next-match-card .teams-row strong {
+    flex-wrap: nowrap !important;
+    overflow: hidden !important;
+    white-space: nowrap !important;
+    text-overflow: ellipsis !important;
+    font-size: clamp(.92rem, 4.4vw, 1.18rem) !important;
+  }
+
+  .home-dashboard-grid .next-match-card .teams-row strong:last-child {
+    justify-content: flex-end !important;
+  }
+
+  .home-dashboard-grid .next-match-card .flag-img,
+  .home-dashboard-grid .next-match-card .team-flag-img,
+  .home-dashboard-grid .next-match-card .flag-placeholder,
+  .home-dashboard-grid .next-match-card .placeholder-flag {
+    width: 24px !important;
+    height: 18px !important;
+  }
+
+  .home-dashboard-grid .next-match-card .test-match-mini-label {
+    font-size: .66rem !important;
+    padding: 4px 9px !important;
+  }
+
+  .home-dashboard-grid .next-match-card .mini-location-line,
+  .home-dashboard-grid .next-match-card .mini-tv-line {
+    font-size: .78rem !important;
+    line-height: 1.18 !important;
+  }
+
+  .home-standing-stack {
+    grid-area: standings !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 10px !important;
+  }
+
+  .home-rank-card,
+  .home-team-average-card {
+    min-height: 118px !important;
+    padding: 12px !important;
+    border-radius: 20px !important;
+    gap: 8px !important;
+  }
+
+  .home-rank-card .tiny-btn,
+  .home-team-average-card .tiny-btn {
+    display: none !important;
+  }
+
+  .home-rank-main,
+  .home-team-average-main {
+    gap: 8px !important;
+  }
+
+  .home-rank-number,
+  .home-team-rank {
+    width: 48px !important;
+    height: 48px !important;
+    flex-basis: 48px !important;
+    border-radius: 15px !important;
+    font-size: 1rem !important;
+  }
+
+  .home-rank-main strong,
+  .home-team-average-main strong {
+    font-size: .9rem !important;
+  }
+
+  .home-rank-main small,
+  .home-team-average-main small {
+    font-size: .66rem !important;
+    line-height: 1.12 !important;
+  }
+
+  .home-missing-card {
+    grid-area: missing !important;
+    min-height: 0 !important;
+    padding: 12px !important;
+    border-radius: 20px !important;
+  }
+
+  .home-missing-card .muted {
+    font-size: .78rem !important;
+  }
+
+  .home-missing-card .primary-btn {
+    min-height: 36px !important;
+    border-radius: 999px !important;
+    font-size: .78rem !important;
+  }
+
+  .home-record-carousel-card {
+    min-height: 156px !important;
+    max-height: none !important;
+    padding: 12px !important;
+    border-radius: 20px !important;
+  }
+
+  .home-record-carousel-card .card-title-row {
+    justify-content: space-between !important;
+    text-align: left !important;
+  }
+
+  .home-record-slide {
+    grid-template-columns: 64px minmax(0, 1fr) !important;
+    grid-template-rows: auto auto !important;
+    gap: 6px 10px !important;
+    padding: 10px !important;
+    min-height: 96px !important;
+  }
+
+  .home-record-art {
+    grid-row: 1 / 3 !important;
+  }
+
+  .home-record-art .record-icon,
+  .home-record-art .record-art {
+    width: 64px !important;
+    height: 64px !important;
+  }
+
+  .home-record-date {
+    grid-column: 2 !important;
+    justify-content: flex-start !important;
+    text-align: left !important;
+  }
+}
+
+@media (max-width: 420px) {
+  .home-dashboard-grid .next-match-card .teams-row {
+    gap: 6px !important;
+  }
+
+  .home-dashboard-grid .next-match-card .teams-row strong {
+    font-size: .98rem !important;
+  }
+
+  .home-standing-stack {
+    gap: 8px !important;
+  }
+
+  .home-rank-card,
+  .home-team-average-card {
+    padding: 10px !important;
+  }
+
+  .home-rank-number,
+  .home-team-rank {
+    width: 44px !important;
+    height: 44px !important;
+    flex-basis: 44px !important;
   }
 }
