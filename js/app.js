@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — APP PRINCIPALE V1.0.15
+// LE NID DES PRONOS — APP PRINCIPALE V1.0.16
 // ============================================================
 
 const H = window.Helpers;
@@ -305,19 +305,19 @@ const App = {
           <div>
             <p class="eyebrow">Crédits cachés</p>
             <h2 id="creditsTitle">Le Nid des Pronos</h2>
-            <p class="muted">Version publique <strong>1.0.15</strong> · mini-records exclusifs pour leur détenteur actuel.</p>
+            <p class="muted">Version publique <strong>1.0.16</strong> · mini-records exclusifs pour leur détenteur actuel.</p>
           </div>
           <button class="ghost-btn" id="closeCreditsBtn" type="button">Fermer</button>
         </div>
         <div class="credits-grid">
           <section>
             <h3>Version actuelle</h3>
-            <p><strong>1.0.15</strong> — les mini-records deviennent des trophées dynamiques : un seul détenteur actuel par record, calculé sur tous les joueurs.</p>
-            <p><strong>1.0.15</strong> — ajout du badge “Descente du bus impossible” quand le champion pronostiqué reste bloqué en phase de groupes.</p>
+            <p><strong>1.0.16</strong> — les mini-records deviennent des trophées dynamiques : un seul détenteur actuel par record, calculé sur tous les joueurs.</p>
+            <p><strong>1.0.16</strong> — ajout du badge “Descente du bus impossible” quand le champion pronostiqué reste bloqué en phase de groupes.</p>
             <p><strong>1.0.5</strong> — dashboard mobile/desktop stabilisé, sans chevauchement des cartes.</p>
           </section>
           <section>
-            <h3>Évolutions V1.0.15</h3>
+            <h3>Évolutions V1.0.16</h3>
             <ul class="changelog-list">
               <li>Tableau de bord réorganisé sans grille forcée qui écrase les cartes.</li>
               <li>Carte “Prochain match” réduite pour laisser respirer les classements et les mini-records.</li>
@@ -4598,7 +4598,7 @@ const App = {
             <p class="muted">Déconnexion, crédits et historique des évolutions.</p>
           </div>
           <div class="profile-account-actions">
-            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.0.15</button>
+            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.0.16</button>
             <button class="danger-btn" id="profileLogoutBtn" type="button">Déconnexion</button>
           </div>
         </div>
