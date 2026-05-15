@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — APP PRINCIPALE V1.0.12
+// LE NID DES PRONOS — APP PRINCIPALE V1.0.13
 // ============================================================
 
 const H = window.Helpers;
@@ -305,25 +305,25 @@ const App = {
           <div>
             <p class="eyebrow">Crédits cachés</p>
             <h2 id="creditsTitle">Le Nid des Pronos</h2>
-            <p class="muted">Version publique <strong>1.0.12</strong> · pages compactées et tableaux groupes corrigés.</p>
+            <p class="muted">Version publique <strong>1.0.13</strong> · nouveau badge champion éliminé en poules.</p>
           </div>
           <button class="ghost-btn" id="closeCreditsBtn" type="button">Fermer</button>
         </div>
         <div class="credits-grid">
           <section>
             <h3>Version actuelle</h3>
-            <p><strong>1.0.12</strong> — interface affinée : tuiles matchs compactes, classements allégés et groupes stabilisés.</p>
+            <p><strong>1.0.13</strong> — ajout du badge “Descente du bus impossible” quand le champion pronostiqué reste bloqué en phase de groupes.</p>
             <p><strong>1.0.5</strong> — dashboard mobile/desktop stabilisé, sans chevauchement des cartes.</p>
           </section>
           <section>
-            <h3>Évolutions V1.0.12</h3>
+            <h3>Évolutions V1.0.13</h3>
             <ul class="changelog-list">
               <li>Tableau de bord réorganisé sans grille forcée qui écrase les cartes.</li>
               <li>Carte “Prochain match” réduite pour laisser respirer les classements et les mini-records.</li>
               <li>Mobile rendu lisible : les cartes gardent une taille confortable et la page peut scroller si nécessaire.</li>
               <li>Desktop conservé en tableau de bord sans scroll, sans chevauchement.</li>
               <li>Annuaire “Teams du nid” : les équipes sans joueur ne sont plus affichées.</li>
-              <li>Cache PWA remis à jour en 1.0.12 pour forcer la récupération du dashboard assoupli.</li>
+              <li>Nouveau badge négatif : champion annoncé éliminé en phase de groupes.</li>
             </ul>
           </section>
           <section>
@@ -522,7 +522,7 @@ const App = {
   async loadGroupStandings() {
     const { data, error } = await window.sb
       .from("v_group_standings")
-      .select("competition_id,group_name,group_rank,team_id,team_name,points,goal_difference,qualification_status")
+      .select("competition_id,group_name,group_rank,team_id,team_name,points,goal_difference,qualification_status,total_group_matches,finished_group_matches,group_finished,all_groups_finished")
       .order("group_name")
       .order("group_rank");
 
@@ -2631,6 +2631,42 @@ const App = {
     return null;
   },
 
+  championGroupExitDate(winnerPick) {
+    const predictedTeamId = winnerPick?.predicted_team_id;
+    if (!predictedTeamId) return null;
+
+    const competitionId = winnerPick.competition_id || this.state.activeCompetition?.id || null;
+    const standing = this.state.groupStandings.find((row) =>
+      row.team_id === predictedTeamId
+      && (!competitionId || row.competition_id === competitionId)
+    );
+
+    if (!standing || standing.qualification_status !== "eliminated") return null;
+
+    const groupMatches = this.state.matches.filter((match) =>
+      match.stage === "group"
+      && (!competitionId || match.competition_id === competitionId)
+      && (!standing.group_name || match.group_name === standing.group_name)
+    );
+
+    const allGroupMatches = this.state.matches.filter((match) =>
+      match.stage === "group"
+      && (!competitionId || match.competition_id === competitionId)
+    );
+
+    const allGroupsFinished = allGroupMatches.length > 0
+      && allGroupMatches.every((match) => match.status === "finished");
+
+    if (!allGroupsFinished) return null;
+
+    const dates = (groupMatches.length ? groupMatches : allGroupMatches)
+      .map((match) => this.matchResultDate(match))
+      .filter(Boolean)
+      .sort((a, b) => b.getTime() - a.getTime());
+
+    return dates[0] || null;
+  },
+
   badgeCatalog() {
     return [
       { id: "egg-hatched", title: "Éclos de l’œuf", description: "Premier prono validé. La coquille craque, la mini-chouette débarque.", type: "neutral", category: "progression" },
@@ -2649,6 +2685,7 @@ const App = {
       { id: "last-wingbeat", title: "Dernier battement d’aile", description: "Un prono ajusté dans les 2 heures avant le coup d’envoi. Frisson, sueur, validation.", type: "neutral", category: "fidelity" },
 
       { id: "final-winner-oracle", title: "Oracle de la finale", description: "L’équipe choisie championne avant le départ gagne réellement la Coupe. Là, le nid sort les confettis.", type: "neutral" },
+      { id: "bus-stuck", title: "Descente du bus impossible", description: "L’équipe désignée championne reste bloquée en phase de groupes. Le bus a calé avant la sortie des poules.", type: "negative" },
       { id: "final-perfect-score", title: "Finale millimétrée", description: "Score exact trouvé sur la finale. Une plume, une règle, zéro tremblement.", type: "neutral" },
       { id: "first-flight", title: "Premier envol", description: "Premier match comptabilisé. Le hibou a quitté le nid.", type: "neutral" },
       { id: "first-perfect", title: "Œil de chouette", description: "Premier score exact trouvé.", type: "positive" },
@@ -2925,6 +2962,8 @@ const App = {
     if (hasLastWingbeat) unlock("last-wingbeat", this.predictionActivityDate(lastWingbeatPrediction));
 
     if (hasFinalWinnerPick) unlock("final-winner-oracle", finalDate);
+    const championGroupExitDate = this.championGroupExitDate(finalWinnerPick);
+    if (championGroupExitDate) unlock("bus-stuck", championGroupExitDate);
     if (hasPerfectFinalScore) unlock("final-perfect-score", this.scoreRowResultDate(finalPerfectRow));
 
     if (prepMatchCount > 0 && prepPredictionIds.size >= prepMatchCount) unlock("preparation-two-picks", this.predictionDateAt(prepPredictionRows, prepMatchCount));
@@ -4514,7 +4553,7 @@ const App = {
             <p class="muted">Déconnexion, crédits et historique des évolutions.</p>
           </div>
           <div class="profile-account-actions">
-            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.0.12</button>
+            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.0.13</button>
             <button class="danger-btn" id="profileLogoutBtn" type="button">Déconnexion</button>
           </div>
         </div>

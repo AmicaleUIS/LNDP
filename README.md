@@ -1,22 +1,24 @@
-# Le Nid des Pronos — V1.0.12
+# Le Nid des Pronos — V1.0.13
 
-## Correctif V1.0.12
+## Correctif V1.0.13
 
-- **Matchs & pronos** : les 3 tuiles de synthèse sont compactées sur desktop et mobile.
-- **Coupe du monde** : les tableaux de groupes sont stabilisés, avec des lignes droites et des cellules d’équipe plus propres.
-- **Classements** : phrase secondaire retirée dans le classement joueurs et haut de page réduit.
-- Cache PWA forcé en **1.0.12**.
+- Ajout du badge **Descente du bus impossible**.
+- Le badge se débloque quand l’équipe choisie comme championne du monde est marquée comme éliminée dans `v_group_standings` après la fin complète de la phase de groupes.
+- Le badge utilise l’image `assets/badges/bus-stuck.png`.
+- Cache PWA forcé en **1.0.13**.
 
-Assets :
+## Cache
 
-```txt
-?v=1.0.12
-```
-
-Cache :
+Les assets sont appelés avec :
 
 ```txt
-le-nid-des-pronos-v1-0-12
+?v=1.0.13
 ```
 
-Aucun nouveau patch SQL n’est nécessaire pour cette V1.0.12.
+Le service worker utilise :
+
+```txt
+le-nid-des-pronos-v1-0-13
+```
+
+Aucun nouveau patch SQL n’est nécessaire pour cette V1.0.13 si `v_group_standings` existe déjà.

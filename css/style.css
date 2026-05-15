@@ -11630,7 +11630,7 @@ body[data-current-view="home"] .view-root {
 }
 
 /* ============================================================
-   V1.0.12 — dashboard propre : cartes naturelles, pas de grille forcée
+   V1.0.13 — dashboard propre : cartes naturelles, pas de grille forcée
    Objectif : desktop sans chevauchement ; mobile lisible et scroll naturel.
    ============================================================ */
 body[data-current-view="home"] {
@@ -12359,7 +12359,7 @@ body[data-current-view="home"] .view-root {
 }
 
 /* ============================================================
-   V1.0.12 — dashboard desktop lisible et scroll naturel
+   V1.0.13 — dashboard desktop lisible et scroll naturel
    On abandonne le desktop absolument non-scrollable : priorité à une UI propre.
    Mobile V1.0.9 conservé car validé.
    ============================================================ */
@@ -12548,7 +12548,7 @@ body[data-current-view="home"] .view-root {
 }
 
 /* ============================================================
-   V1.0.12 — compacité utile + tableaux de groupes stabilisés
+   V1.0.13 — compacité utile + tableaux de groupes stabilisés
    ============================================================ */
 
 /* Matchs & pronos : les 3 tuiles de résumé ne doivent plus manger l'écran. */
@@ -12776,7 +12776,7 @@ body[data-current-view="leaderboard"] .leaderboard-compact-title {
 }
 
 /* ============================================================
-   V1.0.12 — ajustements UI ciblés desktop/mobile
+   V1.0.13 — ajustements UI ciblés desktop/mobile
    ============================================================ */
 
 /* Accueil desktop : on garde le dashboard naturel mais on évite les textes minuscules. */
