@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — APP PRINCIPALE V1.0.1
+// LE NID DES PRONOS — APP PRINCIPALE V1.0.2
 // ============================================================
 
 const H = window.Helpers;
@@ -303,24 +303,23 @@ const App = {
           <div>
             <p class="eyebrow">Crédits cachés</p>
             <h2 id="creditsTitle">Le Nid des Pronos</h2>
-            <p class="muted">Version publique <strong>1.0.1</strong> · lancement propre du nid en ligne.</p>
+            <p class="muted">Version publique <strong>1.0.2</strong> · tableau de bord mobile compact et moyenne team.</p>
           </div>
           <button class="ghost-btn" id="closeCreditsBtn" type="button">Fermer</button>
         </div>
         <div class="credits-grid">
           <section>
             <h3>Version actuelle</h3>
-            <p><strong>1.0.1</strong> — version publique harmonisée : cache PWA remis à neuf, crédits mis à jour et correctifs mobile intégrés.</p>
+            <p><strong>1.0.2</strong> — correctif mobile : accueil plus compact, moyenne de la team visible sur le tableau de bord et annuaire des teams complété.</p>
           </section>
           <section>
-            <h3>Évolutions V1.0.1</h3>
+            <h3>Évolutions V1.0.2</h3>
             <ul class="changelog-list">
-              <li>Accueil enrichi avec le cadre vivant des mini-records du nid.</li>
-              <li>Classements par phase capables d’afficher aussi les matchs de préparation, côté joueurs et teams bureau.</li>
-              <li>Popups recentrés et plus simples à fermer sur mobile.</li>
-              <li>Badges et mini-records consultables au clic avec grande icône, infos et confettis.</li>
-              <li>Groupes Coupe du monde améliorés sur mobile : noms longs lisibles et tableau plus souple.</li>
-              <li>Phase finale mobile renforcée avec scroll horizontal et boutons de déplacement gauche/droite.</li>
+              <li>Tableau de bord mobile fortement compacté pour garder l’essentiel sur une seule vue.</li>
+              <li>Ajout du classement de la team à la moyenne directement sur l’accueil.</li>
+              <li>Le bouton “Voir” mène au classement des teams en mode moyenne.</li>
+              <li>Annuaire des teams : les équipes sans joueur restent visibles avec un message dédié.</li>
+              <li>Cache PWA remis à jour en 1.0.2 pour forcer les mobiles à récupérer les nouveaux fichiers.</li>
             </ul>
           </section>
           <section>
@@ -662,6 +661,7 @@ const App = {
     }
     this.clearHomeRecordCarousel();
     this.state.currentView = viewName;
+    document.body.dataset.currentView = viewName;
     this.setActiveNav(viewName);
 
     const titleMap = {
@@ -875,12 +875,14 @@ const App = {
 
   async renderHome() {
     const root = H.$("#viewRoot");
+    await this.loadPlayerScoreRows();
     const next = this.nextMatch();
     const missing = this.missingPredictions();
     const myRank = await this.fetchMyRank();
+    const teamAverageRows = this.overallTeamAverageRows();
 
     root.innerHTML = `
-      <section class="hero-card">
+      <section class="hero-card home-dashboard-hero">
         <div>
           <p class="eyebrow">${H.icon("nest")} Bienvenue dans le nid</p>
           <h2>Fais tes scores avant le coup d’envoi.</h2>
@@ -893,7 +895,7 @@ const App = {
         </div>
       </section>
 
-      <section class="grid two">
+      <section class="grid home-dashboard-grid">
         <article class="card next-match-card">
           <div class="card-title-row compact-title-row">
             <h3>Prochain match</h3>
@@ -902,16 +904,18 @@ const App = {
           ${next ? this.matchMiniHtml(next) : `<p class="muted">Aucun match à venir pour le moment.</p>`}
         </article>
 
-        <article class="card warning-soft">
+        <article class="card warning-soft home-missing-card">
           <div class="card-title-row">
             <h3>Pronos manquants</h3>
             <span class="count-badge">${missing.length}</span>
           </div>
           ${missing.length ? `
-            <p class="muted">Tu as encore ${missing.length} match${missing.length > 1 ? "s" : ""} à pronostiquer.</p>
+            <p class="muted">Encore ${missing.length} match${missing.length > 1 ? "s" : ""} à poser.</p>
             <button class="primary-btn" type="button" data-action="go-nearest-missing">Aller au plus proche</button>
           ` : `<p class="muted">Nickel, tous tes pronos à venir sont posés.</p>`}
         </article>
+
+        ${this.homeTeamAverageCardHtml(teamAverageRows)}
       </section>
 
       ${this.homeRecordCarouselHtml()}
@@ -922,9 +926,99 @@ const App = {
       this.state.achievementsTab = "records";
       this.loadView("achievements");
     });
+    H.$('[data-action="go-team-average-leaderboard"]', root)?.addEventListener("click", () => {
+      this.state.leaderboardTab = "team";
+      this.state.teamTab = "average";
+      this.loadView("leaderboard");
+    });
     this.bindNavigation();
     this.bindGoToNearestMissingActions();
     this.bindHomeRecordCarousel(root);
+  },
+
+  overallTeamAverageRows() {
+    const scoreByUser = new Map(
+      this.state.playerScoreRows.map((row) => [row.user_id || row.id, row])
+    );
+
+    return this.state.officeTeams
+      .map((team) => {
+        const players = this.teamPlayers(team.id).filter((player) => player.profile_setup_done !== false);
+        const total = players.reduce((sum, player) => {
+          const score = scoreByUser.get(player.id) || scoreByUser.get(player.user_id);
+          return sum + Number(score?.total_points || 0);
+        }, 0);
+
+        return {
+          office_team_id: team.id,
+          office_team_name: team.name,
+          office_team_color: team.color,
+          active_players: players.length,
+          total_points: total,
+          average_points: players.length ? total / players.length : 0
+        };
+      })
+      .filter((row) => row.active_players > 0)
+      .sort((a, b) =>
+        (b.average_points || 0) - (a.average_points || 0)
+        || (b.total_points || 0) - (a.total_points || 0)
+        || String(a.office_team_name || "").localeCompare(String(b.office_team_name || ""), "fr")
+      )
+      .map((row, index) => ({ ...row, rank: index + 1 }));
+  },
+
+  homeTeamAverageCardHtml(rows = []) {
+    const myTeam = this.officeTeamById(this.state.profile?.office_team_id);
+    const myRow = rows.find((row) => row.office_team_id === myTeam?.id);
+    const leader = rows[0];
+
+    if (!myTeam) {
+      return `
+        <article class="card home-team-average-card">
+          <div class="card-title-row">
+            <h3>Moyenne team</h3>
+          </div>
+          <p class="muted">Choisis une team pour voir son classement moyen.</p>
+        </article>
+      `;
+    }
+
+    if (!myRow) {
+      return `
+        <article class="card home-team-average-card">
+          <div class="card-title-row">
+            <h3>Moyenne team</h3>
+            <button class="ghost-btn tiny-btn" type="button" data-action="go-team-average-leaderboard">Voir</button>
+          </div>
+          <div class="home-team-average-main empty">
+            <span class="home-team-rank">—</span>
+            <div>
+              <strong>${H.escapeHtml(myTeam.name)}</strong>
+              <small>Aucun joueur actif classé pour l’instant.</small>
+            </div>
+          </div>
+        </article>
+      `;
+    }
+
+    return `
+      <article class="card home-team-average-card" style="--team-color:${this.safeColor(myRow.office_team_color, "#facc15")}">
+        <div class="card-title-row">
+          <h3>Moyenne team</h3>
+          <button class="ghost-btn tiny-btn" type="button" data-action="go-team-average-leaderboard">Voir</button>
+        </div>
+        <div class="home-team-average-main">
+          <span class="home-team-rank">#${myRow.rank}</span>
+          <div>
+            <strong>${H.escapeHtml(myRow.office_team_name)}</strong>
+            <small>${Number(myRow.average_points || 0).toFixed(1)} pts/joueur · ${myRow.active_players} joueur${myRow.active_players > 1 ? "s" : ""}</small>
+          </div>
+        </div>
+        ${leader && leader.office_team_id !== myRow.office_team_id ? `
+          <p class="home-team-average-leader">Leader : <strong>${H.escapeHtml(leader.office_team_name)}</strong> · ${Number(leader.average_points || 0).toFixed(1)} pts/j</p>
+        ` : `<p class="home-team-average-leader is-first">Ta team mène le nid à la moyenne 🦉</p>`}
+      </article>
+    `;
   },
 
   clearHomeRecordCarousel() {
@@ -3963,10 +4057,10 @@ const App = {
     H.$("#teamPlayerModal")?.remove();
   },
 
-  teamCardHtml(team, players) {
+  teamCardHtml(team, players = []) {
     const color = team?.color || "#facc15";
     return `
-      <article class="team-directory-card" style="--team-color:${H.escapeHtml(color)}">
+      <article class="team-directory-card ${players.length ? "" : "is-empty"}" style="--team-color:${H.escapeHtml(color)}">
         <div class="team-directory-head">
           <span class="team-color-dot" aria-hidden="true"></span>
           <div>
@@ -3987,7 +4081,7 @@ const App = {
                 </div>
               </button>
             `;
-          }).join("") : `<p class="muted">Aucun joueur actif dans cette team.</p>`}
+          }).join("") : `<p class="muted team-empty-message">Aucun joueur dans cette team pour l’instant.</p>`}
         </div>
       </article>
     `;
@@ -4036,7 +4130,7 @@ const App = {
     const root = H.$("#viewRoot");
     const myTeam = this.officeTeamById(this.state.profile?.office_team_id);
     const activePlayers = this.state.publicProfiles.filter((player) => player.profile_setup_done !== false);
-    const teamsWithPlayers = this.state.officeTeams.map((team) => ({
+    const teamDirectoryRows = this.state.officeTeams.map((team) => ({
       team,
       players: this.teamPlayers(team.id)
     }));
@@ -4100,7 +4194,7 @@ const App = {
             <button class="ghost-btn" id="refreshTeamsBtn" type="button">Rafraîchir</button>
           </div>
           <div class="teams-directory-grid">
-            ${teamsWithPlayers.map(({ team, players }) => this.teamCardHtml(team, players)).join("")}
+            ${teamDirectoryRows.map(({ team, players }) => this.teamCardHtml(team, players)).join("")}
             ${playersWithoutTeam.length ? this.teamCardHtml({ name: "Sans team", color: "#94a3b8" }, playersWithoutTeam) : ""}
           </div>
         </section>
@@ -4354,7 +4448,7 @@ const App = {
             <p class="muted">Déconnexion, crédits et historique des évolutions.</p>
           </div>
           <div class="profile-account-actions">
-            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.0.1</button>
+            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.0.2</button>
             <button class="danger-btn" id="profileLogoutBtn" type="button">Déconnexion</button>
           </div>
         </div>
