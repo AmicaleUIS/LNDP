@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — APP PRINCIPALE V1.0.4
+// LE NID DES PRONOS — APP PRINCIPALE V1.0.5
 // ============================================================
 
 const H = window.Helpers;
@@ -305,23 +305,23 @@ const App = {
           <div>
             <p class="eyebrow">Crédits cachés</p>
             <h2 id="creditsTitle">Le Nid des Pronos</h2>
-            <p class="muted">Version publique <strong>1.0.4</strong> · avatars renommés et rangés par type.</p>
+            <p class="muted">Version publique <strong>1.0.5</strong> · tableau de bord corrigé, avatars rangés.</p>
           </div>
           <button class="ghost-btn" id="closeCreditsBtn" type="button">Fermer</button>
         </div>
         <div class="credits-grid">
           <section>
             <h3>Version actuelle</h3>
-            <p><strong>1.0.4</strong> — avatars analysés, noms corrigés et galerie rangée par type.</p>
+            <p><strong>1.0.5</strong> — dashboard mobile/desktop stabilisé, sans chevauchement des cartes.</p>
           </section>
           <section>
-            <h3>Évolutions V1.0.4</h3>
+            <h3>Évolutions V1.0.5</h3>
             <ul class="changelog-list">
-              <li>Galerie avatars rangée par familles : terrain, kop, ambiance, nations et clubs.</li>
-              <li>Libellés avatars synchronisés avec assets/avatars/avatars.json.</li>
-              <li>Fichiers avatars renommés avec des noms lisibles et classés dans des sous-dossiers.</li>
-              <li>Sélecteur d’avatar plus lisible, avec titres de catégories.</li>
-              <li>Cache PWA remis à jour en 1.0.4 pour forcer les mobiles à récupérer les nouveaux chemins avatars.</li>
+              <li>Tableau de bord réorganisé pour éviter les chevauchements sur mobile et desktop.</li>
+              <li>Bloc “Pronos manquants” rendu compact pour tenir sous les cartes de classement.</li>
+              <li>Prochain match corrigé sur mobile : les noms longs d’équipes reviennent à la ligne proprement.</li>
+              <li>Accueil plein écran conservé, avec zones qui se redimensionnent sans déborder les unes sur les autres.</li>
+              <li>Cache PWA remis à jour en 1.0.5 pour forcer la récupération du nouveau CSS.</li>
             </ul>
           </section>
           <section>
@@ -4507,7 +4507,7 @@ const App = {
             <p class="muted">Déconnexion, crédits et historique des évolutions.</p>
           </div>
           <div class="profile-account-actions">
-            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.0.4</button>
+            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.0.5</button>
             <button class="danger-btn" id="profileLogoutBtn" type="button">Déconnexion</button>
           </div>
         </div>
