@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — APP PRINCIPALE V1.0.8
+// LE NID DES PRONOS — APP PRINCIPALE V1.0.9
 // ============================================================
 
 const H = window.Helpers;
@@ -305,25 +305,25 @@ const App = {
           <div>
             <p class="eyebrow">Crédits cachés</p>
             <h2 id="creditsTitle">Le Nid des Pronos</h2>
-            <p class="muted">Version publique <strong>1.0.8</strong> · tableau de bord lisible, avatars rangés.</p>
+            <p class="muted">Version publique <strong>1.0.9</strong> · dashboard réorganisé, avatars rangés.</p>
           </div>
           <button class="ghost-btn" id="closeCreditsBtn" type="button">Fermer</button>
         </div>
         <div class="credits-grid">
           <section>
             <h3>Version actuelle</h3>
-            <p><strong>1.0.8</strong> — tableau de bord remis à plat : carte match réduite, mini-records visibles, mobile lisible.</p>
+            <p><strong>1.0.9</strong> — dashboard réorganisé : match, classements, pronos et mini-records sans chevauchement.</p>
             <p><strong>1.0.5</strong> — dashboard mobile/desktop stabilisé, sans chevauchement des cartes.</p>
           </section>
           <section>
-            <h3>Évolutions V1.0.8</h3>
+            <h3>Évolutions V1.0.9</h3>
             <ul class="changelog-list">
               <li>Tableau de bord réorganisé sans grille forcée qui écrase les cartes.</li>
               <li>Carte “Prochain match” réduite pour laisser respirer les classements et les mini-records.</li>
               <li>Mobile rendu lisible : les cartes gardent une taille confortable et la page peut scroller si nécessaire.</li>
               <li>Desktop conservé en tableau de bord sans scroll, sans chevauchement.</li>
               <li>Annuaire “Teams du nid” : les équipes sans joueur ne sont plus affichées.</li>
-              <li>Cache PWA remis à jour en 1.0.8 pour forcer la récupération du nouveau CSS.</li>
+              <li>Cache PWA remis à jour en 1.0.9 pour forcer la récupération du dashboard corrigé.</li>
             </ul>
           </section>
           <section>
@@ -897,32 +897,36 @@ const App = {
         </section>
 
         <section class="home-dashboard-grid">
-          <article class="card next-match-card">
-            <div class="card-title-row compact-title-row">
-              <h3>Prochain match</h3>
-              <span class="pill">${next ? H.statusLabel(next.status) : "Aucun"}</span>
-            </div>
-            ${next ? this.matchMiniHtml(next) : `<p class="muted">Aucun match à venir pour le moment.</p>`}
-          </article>
+          <section class="home-dashboard-left" aria-label="Match et mini-records">
+            <article class="card next-match-card">
+              <div class="card-title-row compact-title-row">
+                <h3>Prochain match</h3>
+                <span class="pill">${next ? H.statusLabel(next.status) : "Aucun"}</span>
+              </div>
+              ${next ? this.matchMiniHtml(next) : `<p class="muted">Aucun match à venir pour le moment.</p>`}
+            </article>
 
-          <section class="home-standing-stack" aria-label="Classements rapides">
-            ${this.homeRankCardHtml(myRank)}
-            ${this.homeTeamAverageCardHtml(teamAverageRows)}
+            ${this.homeRecordCarouselHtml()}
           </section>
 
-          <article class="card warning-soft home-missing-card">
-            <div class="card-title-row">
-              <h3>Pronos manquants</h3>
-              <span class="count-badge">${missing.length}</span>
-            </div>
-            ${missing.length ? `
-              <p class="muted">Encore ${missing.length} match${missing.length > 1 ? "s" : ""} à poser.</p>
-              <button class="primary-btn" type="button" data-action="go-nearest-missing">Aller au plus proche</button>
-            ` : `<p class="muted">Nickel, tous tes pronos à venir sont posés.</p>`}
-          </article>
-        </section>
+          <aside class="home-dashboard-right" aria-label="Classements rapides et pronos">
+            <section class="home-standing-stack" aria-label="Classements rapides">
+              ${this.homeRankCardHtml(myRank)}
+              ${this.homeTeamAverageCardHtml(teamAverageRows)}
+            </section>
 
-        ${this.homeRecordCarouselHtml()}
+            <article class="card warning-soft home-missing-card">
+              <div class="card-title-row">
+                <h3>Pronos manquants</h3>
+                <span class="count-badge">${missing.length}</span>
+              </div>
+              ${missing.length ? `
+                <p class="muted">Encore ${missing.length} match${missing.length > 1 ? "s" : ""} à poser.</p>
+                <button class="primary-btn" type="button" data-action="go-nearest-missing">Aller au plus proche</button>
+              ` : `<p class="muted">Nickel, tous tes pronos à venir sont posés.</p>`}
+            </article>
+          </aside>
+        </section>
       </section>
     `;
 
@@ -4512,7 +4516,7 @@ const App = {
             <p class="muted">Déconnexion, crédits et historique des évolutions.</p>
           </div>
           <div class="profile-account-actions">
-            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.0.8</button>
+            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.0.9</button>
             <button class="danger-btn" id="profileLogoutBtn" type="button">Déconnexion</button>
           </div>
         </div>
