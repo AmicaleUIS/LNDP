@@ -8092,6 +8092,14 @@ button:disabled {
   text-align: left;
 }
 
+.record-detail-podium-title {
+  display: block;
+  color: #fff;
+  font-size: .92rem;
+  text-align: center;
+  margin-bottom: 2px;
+}
+
 .record-detail-podium span {
   display: flex;
   justify-content: space-between;

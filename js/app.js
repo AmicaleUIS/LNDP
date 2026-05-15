@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — APP PRINCIPALE V1.0.14
+// LE NID DES PRONOS — APP PRINCIPALE V1.0.15
 // ============================================================
 
 const H = window.Helpers;
@@ -305,24 +305,26 @@ const App = {
           <div>
             <p class="eyebrow">Crédits cachés</p>
             <h2 id="creditsTitle">Le Nid des Pronos</h2>
-            <p class="muted">Version publique <strong>1.0.14</strong> · nouveau badge champion éliminé en poules.</p>
+            <p class="muted">Version publique <strong>1.0.15</strong> · mini-records exclusifs pour leur détenteur actuel.</p>
           </div>
           <button class="ghost-btn" id="closeCreditsBtn" type="button">Fermer</button>
         </div>
         <div class="credits-grid">
           <section>
             <h3>Version actuelle</h3>
-            <p><strong>1.0.14</strong> — ajout du badge “Descente du bus impossible” quand le champion pronostiqué reste bloqué en phase de groupes.</p>
+            <p><strong>1.0.15</strong> — les mini-records deviennent des trophées dynamiques : un seul détenteur actuel par record, calculé sur tous les joueurs.</p>
+            <p><strong>1.0.15</strong> — ajout du badge “Descente du bus impossible” quand le champion pronostiqué reste bloqué en phase de groupes.</p>
             <p><strong>1.0.5</strong> — dashboard mobile/desktop stabilisé, sans chevauchement des cartes.</p>
           </section>
           <section>
-            <h3>Évolutions V1.0.14</h3>
+            <h3>Évolutions V1.0.15</h3>
             <ul class="changelog-list">
               <li>Tableau de bord réorganisé sans grille forcée qui écrase les cartes.</li>
               <li>Carte “Prochain match” réduite pour laisser respirer les classements et les mini-records.</li>
               <li>Mobile rendu lisible : les cartes gardent une taille confortable et la page peut scroller si nécessaire.</li>
               <li>Desktop conservé en tableau de bord sans scroll, sans chevauchement.</li>
               <li>Annuaire “Teams du nid” : les équipes sans joueur ne sont plus affichées.</li>
+              <li>Mini-records exclusifs : un seul joueur détient chaque trophée à la fois.</li>
               <li>Nouveau badge négatif : champion annoncé éliminé en phase de groupes.</li>
             </ul>
           </section>
@@ -1796,15 +1798,44 @@ const App = {
       .filter((item) => (record.minRows ? item.stats.scoredMatches >= record.minRows : true))
       .map((item) => ({ ...item, value: Number(record.value(item.stats) || 0) }))
       .filter((item) => item.value > 0)
-      .sort((a, b) => b.value - a.value || String(a.row.pseudo || "").localeCompare(String(b.row.pseudo || ""), "fr"));
+      .map((item) => {
+        const date = this.recordDateForUser(item.userId, record, item.stats, item.value);
+        return {
+          ...item,
+          recordDate: date,
+          recordTime: date ? date.getTime() : Number.POSITIVE_INFINITY
+        };
+      })
+      .sort((a, b) =>
+        b.value - a.value
+        || a.recordTime - b.recordTime
+        || String(a.row.pseudo || "").localeCompare(String(b.row.pseudo || ""), "fr")
+      );
 
     const best = eligible[0] || null;
     const podium = eligible.slice(0, 3);
     const bestProfile = best ? this.profileForUser(best.userId, best.row) : null;
     const detail = best && record.detail ? record.detail(best.stats) : "";
-    const date = best ? this.recordDateForUser(best.userId, record, best.stats, best.value) : null;
+    const date = best ? best.recordDate : null;
 
     return { record, eligible, best, podium, bestProfile, detail, date };
+  },
+
+  miniRecordBadgesForUser(userId) {
+    const rows = this.achievementRecordRows();
+    return this.achievementRecordDefinitions()
+      .map((record) => this.recordWinner(record, rows))
+      .filter((item) => item.best && String(item.best.userId) === String(userId))
+      .map(({ record, best, detail, date }) => ({
+        id: record.id,
+        title: record.title,
+        description: `${record.subtitle} · Détenteur actuel : ${this.formatRecordValue(best.value, record)}${detail ? ` · ${detail}` : ""}. Un seul joueur peut tenir ce mini-record à la fois.`,
+        type: "neutral",
+        category: "mini-record",
+        icon: record.icon,
+        isMiniRecord: true,
+        unlockedAt: this.safeDate(date)
+      }));
   },
 
   recordDateForUser(userId, record, stats = {}, value = 0) {
@@ -1917,7 +1948,7 @@ const App = {
           <div>
             <p class="eyebrow">${H.icon("badges")} Mini-records du nid</p>
             <h3>Les chouettes qui tiennent un record</h3>
-            <p class="muted">Un détenteur de mini-record défile toutes les 10 secondes : nom, team, haut fait et date.</p>
+            <p class="muted">Un seul détenteur par mini-record : si quelqu’un passe devant, le trophée change de perchoir.</p>
           </div>
           <button class="ghost-btn" id="homeRecordsBtn" type="button">Voir tous</button>
         </div>
@@ -2020,6 +2051,7 @@ const App = {
         <p class="record-detail-score"><strong>${H.escapeHtml(this.formatRecordValue(best.value, record))}</strong>${detail ? ` <span>· ${H.escapeHtml(detail)}</span>` : ""}</p>
         <p class="achievement-unlock-date">${H.icon("time")} Date : ${H.escapeHtml(this.formatRecordDateLabel(date))}</p>
         <div class="record-detail-podium">
+          <strong class="record-detail-podium-title">Classement de ce mini-record · Top 3</strong>
           ${podium.map((row, index) => {
             const profile = this.profileForUser(row.userId, row.row);
             return `<span><b>#${index + 1}</b> ${H.escapeHtml(profile.pseudo)} <em>${H.escapeHtml(this.formatRecordValue(row.value, record))}</em></span>`;
@@ -2050,7 +2082,7 @@ const App = {
         <div>
           <p class="eyebrow">${H.icon("badges")} Mini-records du nid</p>
           <h3>Les petites couronnes et les grosses casseroles</h3>
-          <p class="muted">Une dizaine de records vivants : score sur une journée, séries, exacts, zéros, moyenne… Le nid note tout, avec élégance.</p>
+          <p class="muted">Des records vivants calculés sur tous les joueurs. Un seul détenteur par mini-record : si le record tombe, le trophée change de main.</p>
         </div>
       </section>
       <div class="record-grid">
@@ -3013,10 +3045,12 @@ const App = {
     if (bigWrongWay >= 1) unlock("big-owch", firstDateFromRows(bigWrongWayRows));
     if (rows.length >= 5 && zeros >= 3) unlock("wet-feathers", dateWhenCountReached(zeroRows, 3));
 
-    return badges;
+    return [...badges, ...this.miniRecordBadgesForUser(userId)];
   },
 
   badgeIconName(badge) {
+    if (badge.icon) return badge.icon;
+    if (String(badge.id || "").startsWith("record-")) return "trophy";
     if (badge.type === "negative") return "lock";
     if (badge.type === "neutral") return "nest";
     return "star";
@@ -3025,9 +3059,12 @@ const App = {
   badgeArtHtml(badge, unlocked = true) {
     const id = H.escapeHtml(badge.id);
     const title = H.escapeHtml(badge.title);
+    const isMiniRecord = badge.isMiniRecord || String(badge.id || "").startsWith("record-");
+    const assetFolder = isMiniRecord ? "assets/records" : "assets/badges";
+    const altPrefix = isMiniRecord ? "Mini-record" : "Badge";
     return `
-      <span class="achievement-art ${unlocked ? "unlocked" : "locked"}">
-        <img src="assets/badges/${id}.png" alt="Badge ${title}" loading="lazy" onerror="this.remove()">
+      <span class="achievement-art ${unlocked ? "unlocked" : "locked"} ${isMiniRecord ? "mini-record-art" : ""}">
+        <img src="${assetFolder}/${id}.png" alt="${altPrefix} ${title}" loading="lazy" onerror="this.remove()">
         <span class="achievement-fallback">${H.icon(this.badgeIconName(badge))}</span>
       </span>
     `;
@@ -3247,6 +3284,14 @@ const App = {
     const unlockedBadge = this.computeBadgesForUser(this.state.session?.user?.id).find((badge) => badge.id === badgeId);
     const badge = unlockedBadge || this.badgeById(badgeId);
     if (!badge) return;
+
+    // Les mini-records sont des trophées dynamiques : un seul détenteur actuel.
+    // Au clic, on affiche donc le classement du mini-record plutôt qu’un popup de badge classique.
+    if (badge.isMiniRecord || String(badge.id || "").startsWith("record-")) {
+      this.showRecordPopup(badge.id);
+      return;
+    }
+
     this.queueAchievementModals([{ ...badge, replayed: true }]);
   },
 
@@ -4553,7 +4598,7 @@ const App = {
             <p class="muted">Déconnexion, crédits et historique des évolutions.</p>
           </div>
           <div class="profile-account-actions">
-            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.0.14</button>
+            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.0.15</button>
             <button class="danger-btn" id="profileLogoutBtn" type="button">Déconnexion</button>
           </div>
         </div>
