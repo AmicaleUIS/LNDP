@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — APP PRINCIPALE V1.0.16
+// LE NID DES PRONOS — APP PRINCIPALE V1.0.17
 // ============================================================
 
 const H = window.Helpers;
@@ -16,6 +16,7 @@ const App = {
     groupStandings: [],
     myPredictions: [],
     visiblePredictions: [],
+    miniRecordPredictionCounts: [],
     publicProfiles: [],
     playerScoreRows: [],
     winnerPredictions: [],
@@ -305,19 +306,19 @@ const App = {
           <div>
             <p class="eyebrow">Crédits cachés</p>
             <h2 id="creditsTitle">Le Nid des Pronos</h2>
-            <p class="muted">Version publique <strong>1.0.16</strong> · mini-records exclusifs pour leur détenteur actuel.</p>
+            <p class="muted">Version publique <strong>1.0.17</strong> · mini-records exclusifs pour leur détenteur actuel.</p>
           </div>
           <button class="ghost-btn" id="closeCreditsBtn" type="button">Fermer</button>
         </div>
         <div class="credits-grid">
           <section>
             <h3>Version actuelle</h3>
-            <p><strong>1.0.16</strong> — les mini-records deviennent des trophées dynamiques : un seul détenteur actuel par record, calculé sur tous les joueurs.</p>
-            <p><strong>1.0.16</strong> — ajout du badge “Descente du bus impossible” quand le champion pronostiqué reste bloqué en phase de groupes.</p>
+            <p><strong>1.0.17</strong> — les mini-records deviennent des trophées dynamiques : un seul détenteur actuel par record, calculé sur tous les joueurs.</p>
+            <p><strong>1.0.17</strong> — ajout du badge “Descente du bus impossible” quand le champion pronostiqué reste bloqué en phase de groupes.</p>
             <p><strong>1.0.5</strong> — dashboard mobile/desktop stabilisé, sans chevauchement des cartes.</p>
           </section>
           <section>
-            <h3>Évolutions V1.0.16</h3>
+            <h3>Évolutions V1.0.17</h3>
             <ul class="changelog-list">
               <li>Tableau de bord réorganisé sans grille forcée qui écrase les cartes.</li>
               <li>Carte “Prochain match” réduite pour laisser respirer les classements et les mini-records.</li>
@@ -391,7 +392,10 @@ const App = {
       this.loadPublicProfiles()
     ]);
 
-    await this.loadWinnerPrediction();
+    await Promise.all([
+      this.loadWinnerPrediction(),
+      this.loadMiniRecordPredictionCounts()
+    ]);
     this.renderShell();
   },
 
@@ -474,6 +478,24 @@ const App = {
     }
 
     this.state.playerScoreRows = data || [];
+  },
+
+  async loadMiniRecordPredictionCounts() {
+    const { data, error } = await window.sb
+      .from("v_mini_record_prediction_counts")
+      .select("*");
+
+    if (error) {
+      console.warn("Compteurs mini-records indisponibles", error);
+      this.state.miniRecordPredictionCounts = [];
+      return;
+    }
+
+    this.state.miniRecordPredictionCounts = data || [];
+  },
+
+  miniRecordPredictionCountRow(userId) {
+    return this.state.miniRecordPredictionCounts.find((row) => String(row.user_id || row.id) === String(userId)) || null;
   },
 
   async loadWinnerPredictionsForTeams() {
@@ -1484,6 +1506,9 @@ const App = {
     }
 
     await this.loadMyPredictions();
+    await this.loadMiniRecordPredictionCounts().catch((refreshError) => {
+      console.warn("Impossible de rafraîchir les compteurs mini-records", refreshError);
+    });
     await this.loadVisiblePredictions().catch((refreshError) => {
       console.warn("Impossible de rafraîchir les pronos visibles avant l’annonce d’exploit", refreshError);
     });
@@ -1559,7 +1584,7 @@ const App = {
   },
 
   async renderAchievements() {
-    await Promise.all([this.loadMatches(), this.loadVisiblePredictions(), this.loadWinnerPredictionsForTeams(), this.loadPlayerScoreRows()]);
+    await Promise.all([this.loadMatches(), this.loadVisiblePredictions(), this.loadMiniRecordPredictionCounts(), this.loadWinnerPredictionsForTeams(), this.loadPlayerScoreRows()]);
 
     const root = H.$("#viewRoot");
     root.innerHTML = `
@@ -1710,6 +1735,11 @@ const App = {
   playerRecordStats(userId) {
     const rows = this.scoreDetailRowsForUser(userId);
     const predictionRows = this.predictionRowsForUser(userId);
+    const countRow = this.miniRecordPredictionCountRow(userId);
+    const publicPredictionCount = Number(countRow?.prediction_count ?? NaN);
+    const predictionCount = Number.isFinite(publicPredictionCount)
+      ? Math.max(publicPredictionCount, predictionRows.length)
+      : predictionRows.length;
     const totalPoints = rows.reduce((sum, { prediction }) => sum + Number(prediction.points_total || 0), 0);
     const exact = rows.filter(({ prediction }) => prediction.is_exact_score).length;
     const goodResults = rows.filter(({ prediction }) => prediction.is_good_result).length;
@@ -1746,7 +1776,7 @@ const App = {
       goodDiffs,
       goodQualified,
       zeros,
-      predictionCount: predictionRows.length,
+      predictionCount,
       scoredMatches: rows.length,
       exactStreak,
       resultStreak,
@@ -1868,7 +1898,9 @@ const App = {
     if (record.id === "record-predictions") {
       const predictions = this.predictionRowsForUser(userId);
       const prediction = predictions[Math.max(0, Math.ceil(value) - 1)];
-      return prediction ? this.predictionActivityDate(prediction) : latestScoreDate();
+      if (prediction) return this.predictionActivityDate(prediction);
+      const countRow = this.miniRecordPredictionCountRow(userId);
+      return this.safeDate(countRow?.latest_prediction_at || countRow?.first_prediction_at) || latestScoreDate();
     }
     if (record.id === "record-day" && stats.bestDayLabel) {
       const matchingRows = rows.filter((row) => {
@@ -4598,7 +4630,7 @@ const App = {
             <p class="muted">Déconnexion, crédits et historique des évolutions.</p>
           </div>
           <div class="profile-account-actions">
-            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.0.16</button>
+            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.0.17</button>
             <button class="danger-btn" id="profileLogoutBtn" type="button">Déconnexion</button>
           </div>
         </div>

@@ -1,6 +1,6 @@
-# Le Nid des Pronos — V1.0.16
+# Le Nid des Pronos — V1.0.17
 
-## Correctif V1.0.16
+## Correctif V1.0.17
 
 Cette version finalise le fonctionnement des mini-records et conserve le parcours d’inscription avec identifiant interne UIS.
 
@@ -32,5 +32,5 @@ Aucun patch SQL nécessaire pour cette version.
 Publier tous les fichiers sur GitHub Pages. Les assets sont appelés avec :
 
 ```txt
-?v=1.0.16
+?v=1.0.17
 ```
