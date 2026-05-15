@@ -1,31 +1,29 @@
-# Le Nid des Pronos — V1.0.6
+# Le Nid des Pronos — V1.0.7
 
-## Correctif V1.0.6
+## Correctif V1.0.7
 
-Version de stabilisation du tableau de bord après le rangement des avatars.
+Cette version corrige le tableau de bord après la V1.0.6 :
 
-### Modifications
+- Carte **Prochain match** rendue compacte sur desktop et mobile.
+- Suppression de l'effet de grosse carte vide qui écrasait les autres blocs.
+- Cartes **Classement général** et **Moyenne team** conservées côte à côte.
+- Bloc **Pronos manquants** stabilisé.
+- Carrousel mini-records conservé en bas sans chevauchement.
+- Annuaire des teams : les équipes sans joueur restent masquées.
+- Cache PWA forcé en **1.0.7**.
 
-- Accueil/tableau de bord corrigé sur desktop et mobile : suppression des chevauchements de cartes.
-- Bloc **Pronos manquants** rendu plus compact et contenu dans sa carte.
-- Bloc **Prochain match** corrigé sur mobile : les noms longs d’équipes reviennent à la ligne au lieu de sortir de l’écran.
-- Les cartes **Classement général** et **Moyenne team** restent côte à côte et au même niveau.
-- Annuaire **Les teams du nid** : les équipes sans joueur ne sont plus affichées.
-- Correction du bouton “Voir” de la moyenne team : il ouvre bien le classement des teams en mode moyenne.
-- Cache PWA passé en **1.0.6**.
+## Cache
 
-### Cache
-
-Les fichiers statiques utilisent maintenant :
+Les assets sont appelés avec :
 
 ```txt
-?v=1.0.6
+?v=1.0.7
 ```
 
-Nom du cache :
+Le cache PWA utilise :
 
 ```txt
-le-nid-des-pronos-v1-0-6
+le-nid-des-pronos-v1-0-7
 ```
 
-Aucun nouveau patch SQL n’est nécessaire pour cette V1.0.6.
+Aucun nouveau patch SQL n’est nécessaire pour cette V1.0.7.
