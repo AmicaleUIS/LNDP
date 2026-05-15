@@ -8943,7 +8943,7 @@ button:disabled {
 }
 
 /* ============================================================
-   V1.0.3 — accueil plein écran adaptatif
+   V1.0.4 — accueil plein écran adaptatif
    ============================================================ */
 body[data-current-view="home"] {
   overflow: hidden;
@@ -9427,5 +9427,51 @@ body[data-current-view="home"] .view-root {
 
   .home-dashboard-hero .muted {
     display: none !important;
+  }
+}
+
+
+/* ============================================================
+   V1.0.4 — avatars renommés et rangés par type
+   ============================================================ */
+.avatar-choice-grouped {
+  display: grid;
+  gap: 18px;
+  max-height: 430px;
+  overflow: auto;
+  padding: 4px 6px 6px 4px;
+}
+
+.avatar-choice-section {
+  display: grid;
+  gap: 10px;
+}
+
+.avatar-type-title {
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 14px;
+  background: rgba(250,204,21,.10);
+  border: 1px solid rgba(250,204,21,.18);
+  color: var(--gold);
+  font-size: .82rem;
+  font-weight: 950;
+  letter-spacing: .01em;
+}
+
+.avatar-choice-grouped .avatar-choice-grid {
+  max-height: none;
+  overflow: visible;
+  padding: 0;
+}
+
+@media (max-width: 760px) {
+  .avatar-choice-grouped {
+    max-height: 360px;
+  }
+
+  .avatar-type-title {
+    font-size: .78rem;
+    padding: 7px 9px;
   }
 }

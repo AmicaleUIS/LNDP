@@ -1,32 +1,28 @@
-# Le Nid des Pronos — V1.0.3
+# Le Nid des Pronos — V1.0.4
 
-Version corrective orientée **tableau de bord plein écran**.
+## Nouveautés V1.0.4
 
-## Nouveautés V1.0.3
+- Avatars analysés et rangés par type dans `assets/avatars/`.
+- Fichiers avatars renommés avec un nom lisible, tout en gardant les clés `owl-01` à `owl-90` pour ne pas casser les profils déjà enregistrés.
+- `assets/avatars/avatars.json` enrichi avec `type`, `type_label` et le nouveau chemin de chaque image.
+- `js/common.js` synchronisé avec `avatars.json` : les noms affichés dans le site sont maintenant les bons.
+- Sélecteur d’avatar du profil groupé par familles : terrain, kop, ambiance, nations et clubs.
+- Cache PWA passé en **1.0.4**.
 
-- Accueil réglé pour occuper la hauteur visible de l’écran.
-- Tableau de bord desktop sans scroll de page.
-- Mobile rééquilibré : l’écran est moins tassé que la V1.0.2, tout en restant contenu dans la vue.
-- Carte **Classement général** ajoutée sur l’accueil.
-- Carte **Moyenne team** placée au même endroit que le classement général.
-- Cache PWA passé en **1.0.3** pour forcer la récupération des nouveaux fichiers.
-
-## Déploiement
-
-Remplacer les fichiers du site par ceux de cette archive.
+## Cache
 
 Les assets sont appelés avec :
 
 ```txt
-?v=1.0.3
+?v=1.0.4
 ```
 
 Le cache PWA utilise :
 
 ```txt
-le-nid-des-pronos-v1-0-3
+le-nid-des-pronos-v1-0-4
 ```
 
 ## SQL
 
-Aucun nouveau patch SQL n’est nécessaire pour cette V1.0.3.
+Aucun nouveau patch SQL n’est nécessaire pour cette V1.0.4.

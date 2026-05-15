@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — APP PRINCIPALE V1.0.3
+// LE NID DES PRONOS — APP PRINCIPALE V1.0.4
 // ============================================================
 
 const H = window.Helpers;
@@ -274,7 +274,9 @@ const App = {
   },
 
   avatarChoices() {
-    return Object.entries(H.AVATAR_LABELS).map(([key, label]) => ({ key, label }));
+    return typeof H.avatarChoices === "function"
+      ? H.avatarChoices()
+      : Object.entries(H.AVATAR_LABELS).map(([key, label]) => ({ key, label, typeLabel: "Avatars" }));
   },
 
   badgeShapes() {
@@ -303,23 +305,23 @@ const App = {
           <div>
             <p class="eyebrow">Crédits cachés</p>
             <h2 id="creditsTitle">Le Nid des Pronos</h2>
-            <p class="muted">Version publique <strong>1.0.3</strong> · tableau de bord plein écran adaptatif.</p>
+            <p class="muted">Version publique <strong>1.0.4</strong> · avatars renommés et rangés par type.</p>
           </div>
           <button class="ghost-btn" id="closeCreditsBtn" type="button">Fermer</button>
         </div>
         <div class="credits-grid">
           <section>
             <h3>Version actuelle</h3>
-            <p><strong>1.0.3</strong> — accueil redessiné en dashboard plein écran, sans scroll sur desktop et mieux réparti sur mobile.</p>
+            <p><strong>1.0.4</strong> — avatars analysés, noms corrigés et galerie rangée par type.</p>
           </section>
           <section>
-            <h3>Évolutions V1.0.3</h3>
+            <h3>Évolutions V1.0.4</h3>
             <ul class="changelog-list">
-              <li>Accueil réglé pour occuper exactement la hauteur de l’écran en mode tableau de bord.</li>
-              <li>Suppression du scroll sur le tableau de bord desktop.</li>
-              <li>Classement général et moyenne team placés dans le même bloc de lecture.</li>
-              <li>Mobile rééquilibré : moins tassé, mais toujours contenu dans la hauteur visible.</li>
-              <li>Cache PWA remis à jour en 1.0.3 pour forcer les mobiles à récupérer les nouveaux fichiers.</li>
+              <li>Galerie avatars rangée par familles : terrain, kop, ambiance, nations et clubs.</li>
+              <li>Libellés avatars synchronisés avec assets/avatars/avatars.json.</li>
+              <li>Fichiers avatars renommés avec des noms lisibles et classés dans des sous-dossiers.</li>
+              <li>Sélecteur d’avatar plus lisible, avec titres de catégories.</li>
+              <li>Cache PWA remis à jour en 1.0.4 pour forcer les mobiles à récupérer les nouveaux chemins avatars.</li>
             </ul>
           </section>
           <section>
@@ -4423,12 +4425,26 @@ const App = {
     const currentColor = profile.badge_color || "#facc15";
     const teamColor = team?.color || currentColor || "#facc15";
 
-    const avatarOptions = this.avatarChoices().map((avatar) => `
-      <label class="avatar-choice ${currentAvatar === avatar.key ? "selected" : ""}">
-        <input type="radio" name="avatar_key" value="${H.escapeHtml(avatar.key)}" ${currentAvatar === avatar.key ? "checked" : ""}>
-        <img src="${H.escapeHtml(H.avatarUrl(avatar.key))}" alt="${H.escapeHtml(avatar.label)}" loading="lazy" onerror="this.onerror=null;this.src='assets/avatars/owl-01.png';">
-        <span>${H.escapeHtml(avatar.label)}</span>
-      </label>
+    const avatarChoices = this.avatarChoices();
+    const avatarGroups = avatarChoices.reduce((groups, avatar) => {
+      const label = avatar.typeLabel || "Avatars";
+      if (!groups.has(label)) groups.set(label, []);
+      groups.get(label).push(avatar);
+      return groups;
+    }, new Map());
+    const avatarOptions = Array.from(avatarGroups.entries()).map(([typeLabel, avatars]) => `
+      <section class="avatar-choice-section">
+        <h4 class="avatar-type-title">${H.escapeHtml(typeLabel)}</h4>
+        <div class="avatar-choice-grid">
+          ${avatars.map((avatar) => `
+            <label class="avatar-choice ${currentAvatar === avatar.key ? "selected" : ""}">
+              <input type="radio" name="avatar_key" value="${H.escapeHtml(avatar.key)}" ${currentAvatar === avatar.key ? "checked" : ""}>
+              <img src="${H.escapeHtml(H.avatarUrl(avatar.key))}" alt="${H.escapeHtml(avatar.label)}" loading="lazy" onerror="this.onerror=null;this.src='assets/avatars/nations-couleurs/owl-01-le-bleu-blanc-bougon.png';">
+              <span>${H.escapeHtml(avatar.label)}</span>
+            </label>
+          `).join("")}
+        </div>
+      </section>
     `).join("");
 
     const shapeOptions = this.badgeShapes().map((shape) => `
@@ -4491,7 +4507,7 @@ const App = {
             <p class="muted">Déconnexion, crédits et historique des évolutions.</p>
           </div>
           <div class="profile-account-actions">
-            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.0.3</button>
+            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.0.4</button>
             <button class="danger-btn" id="profileLogoutBtn" type="button">Déconnexion</button>
           </div>
         </div>
@@ -4525,12 +4541,12 @@ const App = {
             <div class="field-title-row">
               <div>
                 <span class="field-title">Avatar chouette</span>
-                <p class="muted small-note">90 chouettes disponibles. La galerie reste rangée tant que tu n’en as pas besoin.</p>
+                <p class="muted small-note">90 chouettes disponibles, renommées et rangées par type pour s’y retrouver sans fouiller le nid.</p>
               </div>
               <button class="ghost-btn avatar-toggle-btn" id="toggleAvatarPanel" type="button" aria-expanded="false" aria-controls="avatarChoicePanel">Personnaliser l’avatar</button>
             </div>
             <div class="avatar-choice-panel" id="avatarChoicePanel" hidden>
-              <div class="avatar-choice-grid">${avatarOptions}</div>
+              <div class="avatar-choice-grouped">${avatarOptions}</div>
             </div>
           </div>
 
