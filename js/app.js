@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — APP PRINCIPALE V0.26.1
+// LE NID DES PRONOS — APP PRINCIPALE V1.0.0
 // ============================================================
 
 const H = window.Helpers;
@@ -43,6 +43,7 @@ const App = {
     achievementModalOpen: false,
     achievementNotificationTimer: null,
     achievementResyncTimers: [],
+    homeRecordCarouselTimer: null,
     lastAchievementIds: null
   },
 
@@ -302,59 +303,30 @@ const App = {
           <div>
             <p class="eyebrow">Crédits cachés</p>
             <h2 id="creditsTitle">Le Nid des Pronos</h2>
-            <p class="muted">Version <strong>0.26.1</strong> · pré-déploiement. Le passage en <strong>1.0.0</strong> se fera au déploiement officiel.</p>
+            <p class="muted">Version publique <strong>1.0.0</strong> · lancement propre du nid en ligne.</p>
           </div>
           <button class="ghost-btn" id="closeCreditsBtn" type="button">Fermer</button>
         </div>
         <div class="credits-grid">
           <section>
-            <h3>Principe de version</h3>
-            <p><strong>0.26.1</strong> = version non déployée · règles du nid clarifiées, avec bonus qualifié expliqué.</p>
-            <p><strong>1.x.x</strong> = version publique déployée.</p>
+            <h3>Version actuelle</h3>
+            <p><strong>1.0.0</strong> — version publique harmonisée : cache PWA remis à neuf, crédits mis à jour et correctifs mobile intégrés.</p>
           </section>
           <section>
-            <h3>Évolutions récentes</h3>
+            <h3>Évolutions V1.0.0</h3>
             <ul class="changelog-list">
-              <li><strong>0.26.1</strong> — règles du nid clarifiées : score exact, bon résultat, bon écart, bonus qualifié +2 pts, champion et matchs test.</li>
-              <li><strong>0.26.0</strong> — matchs de préparation test, bouton règles, classements clarifiés, phase finale draggable et reset scores de préparation.</li>
-              <li><strong>0.25.17</strong> — phase finale réellement anti-chevauchement : colonnes plus larges, cartes contenues et scroll horizontal propre.</li>
-              <li><strong>0.25.16</strong> — phase finale aérée sans chevauchement et saisie rapide admin mobile corrigée.</li>
-              <li><strong>0.25.15</strong> — tableau visuel de phase finale façon bracket officiel.</li>
-              <li><strong>0.25.14</strong> — optimisation mobile de l’accueil, des matchs, des classements et des teams du nid.</li>
-              <li><strong>0.25.13</strong> — header mobile pleine largeur écran.</li>
-              <li><strong>0.25.12</strong> — classements harmonisés : onglet Exploits retiré, teams bureau par phase, évolution jour/semaine et mini-records dans les exploits.</li>
-              <li><strong>0.25.11</strong> — popup exploit ajusté avec date, sauvegardes en menu déroulant seul, header mobile fixe et chouette volante de retour en haut.</li>
-              <li><strong>0.25.10</strong> — menu admin burger mobile, reset des messages avec sauvegarde, chat Teams en haut, point rouge de message non lu et exploits rejouables au clic.</li>
-              <li><strong>0.25.9</strong> — popup exploits instantané, badge plein rond, suppression du récap rapide, “Les teams du nid” et menu burger mobile.</li>
-              <li><strong>0.25.8</strong> — choix joueur des 3 badges d’exploit affichés dans les classements.</li>
-              <li><strong>0.25.7</strong> — exploits affinés : 3 badges max affichés dans les classements, dates d’obtention visibles et Hall du nid plus détaillé.</li>
-              <li><strong>0.25.6</strong> — popup d’exploit déclenchée plus vite après un prono ou une mise à jour des points, avec arrivée visuelle plus nette.</li>
-              <li><strong>0.25.5</strong> — catalogue d’exploits sans pastille “Débloqué” et deux exploits de finale : champion choisi et score parfait.</li>
-              <li><strong>0.25.4</strong> — nouveaux exploits de progression/fidélité, catalogue nettoyé et affichage du Hall du nid corrigé.</li>
-              <li><strong>0.25.3</strong> — accès direct au prono manquant le plus proche, points gagnés sous le prono et rang de groupe affiché à côté des équipes.</li>
-              <li><strong>0.25.2</strong> — fusion Matchs/Mes pronos et modals magiques pour les exploits débloqués un par un.</li>
-              <li><strong>0.25.1</strong> — fiches joueurs dans Les teams, chargement progressif du chat et modération admin des messages.</li>
-              <li><strong>0.24.3</strong> — correction des avatars : vraies chouettes sans bande colorée parasite et fond basé sur la couleur de team.</li>
-              <li><strong>0.24.2</strong> — avatar joueur affiché dans les classements, à gauche des scores.</li>
-              <li><strong>0.24.3</strong> — choix d’avatar sans fond parasite, galerie teintée par la couleur de la team et suppression du carré jaune derrière l’avatar du menu.</li>
-              <li><strong>0.24.0</strong> — 90 avatars chouette pris en charge, galerie d’avatars masquée par défaut et ouverture via “Personnaliser l’avatar”.</li>
-              <li><strong>0.23.0</strong> — menu Coupe du monde, déplacement des crédits/déconnexion dans Profil et suppression des raccourcis d’accueil.</li>
-              <li><strong>0.22.5</strong> — affichage des lieux au format <code>drapeau pays hôte - ville - stade</code>, avec drapeaux locaux Canada / États-Unis / Mexique.</li>
-              <li><strong>0.22.4</strong> — correctif sauvegardes/restauration : suppression sécurisée avec <code>WHERE true</code> pour éviter l’erreur <code>DELETE requires a WHERE clause</code>.</li>
-              <li><strong>0.22.3</strong> — correctif sauvegardes/restauration : suppression de l’erreur <code>points_total</code> sur le choix champion.</li>
-              <li><strong>0.22.2</strong> — pays hôte sur les matchs, écran d’accueil enrichi, patch sauvegardes corrigé sans erreur SQL.</li>
-              <li><strong>0.22.0</strong> — menu desktop simplifié, accès profil via badge, admin par sections, sauvegardes/restauration et remise à zéro sécurisée.</li>
-              <li><strong>0.21.0</strong> — onboarding première connexion, avatars chouette, badge joueur forme/couleur, teams bureau administrables.</li>
-              <li><strong>0.20.0</strong> — icônes PNG chouette agrandies et recadrées.</li>
-              <li><strong>0.17.0</strong> — choix du champion du monde +100 points.</li>
-              <li><strong>0.15.x</strong> — logos TV beIN / M6 / W9.</li>
-              <li><strong>0.14.0</strong> — admin mobile avec priorité prochains matchs.</li>
+              <li>Accueil enrichi avec le cadre vivant des mini-records du nid.</li>
+              <li>Classements par phase capables d’afficher aussi les matchs de préparation, côté joueurs et teams bureau.</li>
+              <li>Popups recentrés et plus simples à fermer sur mobile.</li>
+              <li>Badges et mini-records consultables au clic avec grande icône, infos et confettis.</li>
+              <li>Groupes Coupe du monde améliorés sur mobile : noms longs lisibles et tableau plus souple.</li>
+              <li>Phase finale mobile renforcée avec scroll horizontal et boutons de déplacement gauche/droite.</li>
             </ul>
           </section>
           <section>
             <h3>Crédits</h3>
-            <p>Application : Le Nid des Pronos · concept pronos + chouette.</p>
-            <p>Version de travail par Parkaf.</p>
+            <p>Application : Le Nid des Pronos · pronostics, chouettes, teams et mauvaise foi sportive assumée.</p>
+            <p>Version publique préparée par Parkaf.</p>
           </section>
         </div>
       </div>
@@ -688,6 +660,7 @@ const App = {
       viewName = "profile";
       H.toast("Complète d’abord ton profil pour accéder au nid.", "info");
     }
+    this.clearHomeRecordCarousel();
     this.state.currentView = viewName;
     this.setActiveNav(viewName);
 
@@ -746,6 +719,10 @@ const App = {
 
   competitionMatches() {
     return this.state.matches.filter((m) => !m.is_test_match);
+  },
+
+  phaseLeaderboardMatches() {
+    return this.state.matches.filter((m) => !["cancelled", "postponed"].includes(m.status));
   },
 
   predictionRowsForUser(userId, options = {}) {
@@ -936,11 +913,25 @@ const App = {
           ` : `<p class="muted">Nickel, tous tes pronos à venir sont posés.</p>`}
         </article>
       </section>
+
+      ${this.homeRecordCarouselHtml()}
     `;
 
     H.$("#rulesHomeBtn")?.addEventListener("click", () => this.openRulesModal());
+    H.$("#homeRecordsBtn", root)?.addEventListener("click", () => {
+      this.state.achievementsTab = "records";
+      this.loadView("achievements");
+    });
     this.bindNavigation();
     this.bindGoToNearestMissingActions();
+    this.bindHomeRecordCarousel(root);
+  },
+
+  clearHomeRecordCarousel() {
+    if (this.state.homeRecordCarouselTimer) {
+      window.clearInterval(this.state.homeRecordCarouselTimer);
+      this.state.homeRecordCarouselTimer = null;
+    }
   },
 
   matchMiniHtml(match) {
@@ -1652,20 +1643,77 @@ const App = {
     return `${text} ${record.unit}`;
   },
 
-  recordCardHtml(record, rows = []) {
+  recordWinner(record, rows = this.achievementRecordRows()) {
     const eligible = rows
       .filter((item) => (record.minRows ? item.stats.scoredMatches >= record.minRows : true))
       .map((item) => ({ ...item, value: Number(record.value(item.stats) || 0) }))
       .filter((item) => item.value > 0)
       .sort((a, b) => b.value - a.value || String(a.row.pseudo || "").localeCompare(String(b.row.pseudo || ""), "fr"));
 
-    const best = eligible[0];
+    const best = eligible[0] || null;
     const podium = eligible.slice(0, 3);
     const bestProfile = best ? this.profileForUser(best.userId, best.row) : null;
     const detail = best && record.detail ? record.detail(best.stats) : "";
+    const date = best ? this.recordDateForUser(best.userId, record, best.stats, best.value) : null;
+
+    return { record, eligible, best, podium, bestProfile, detail, date };
+  },
+
+  recordDateForUser(userId, record, stats = {}, value = 0) {
+    const rows = this.scoreDetailRowsForUser(userId);
+    const latestScoreDate = () => rows
+      .map((row) => this.scoreRowResultDate(row))
+      .filter(Boolean)
+      .sort((a, b) => b - a)[0] || null;
+
+    const dateWhenCountReached = (filteredRows = [], target = 1) => {
+      const row = filteredRows[Math.max(0, Math.ceil(target) - 1)];
+      return row ? this.scoreRowResultDate(row) : null;
+    };
+
+    if (!rows.length) {
+      const predictions = this.predictionRowsForUser(userId);
+      return predictions.map((row) => this.predictionActivityDate(row)).filter(Boolean).sort((a, b) => b - a)[0] || null;
+    }
+
+    if (record.id === "record-exact") return dateWhenCountReached(rows.filter(({ prediction }) => prediction.is_exact_score), value);
+    if (record.id === "record-results") return dateWhenCountReached(rows.filter(({ prediction }) => prediction.is_good_result), value);
+    if (record.id === "record-diffs") return dateWhenCountReached(rows.filter(({ prediction }) => prediction.is_good_goal_diff), value);
+    if (record.id === "record-qualified") return dateWhenCountReached(rows.filter(({ prediction }) => prediction.is_good_qualified), value);
+    if (record.id === "record-zero") return dateWhenCountReached(rows.filter(({ prediction }) => Number(prediction.points_total || 0) === 0), value);
+    if (record.id === "record-exact-streak") return this.dateWhenBooleanStreakReached(rows, ({ prediction }) => prediction.is_exact_score, value);
+    if (record.id === "record-result-streak") return this.dateWhenBooleanStreakReached(rows, ({ prediction }) => prediction.is_good_result, value);
+    if (record.id === "record-zero-streak") return this.dateWhenBooleanStreakReached(rows, ({ prediction }) => Number(prediction.points_total || 0) === 0, value);
+    if (record.id === "record-points") return this.dateWhenTotalPointsReached(rows, value) || latestScoreDate();
+    if (record.id === "record-average") return this.dateWhenAverageReached(rows, record.minRows || 1, value) || latestScoreDate();
+    if (record.id === "record-predictions") {
+      const predictions = this.predictionRowsForUser(userId);
+      const prediction = predictions[Math.max(0, Math.ceil(value) - 1)];
+      return prediction ? this.predictionActivityDate(prediction) : latestScoreDate();
+    }
+    if (record.id === "record-day" && stats.bestDayLabel) {
+      const matchingRows = rows.filter((row) => {
+        const label = row.match?.stage === "group" && (row.match.pool_round || row.match.group_round)
+          ? `Journée de poule ${row.match.pool_round || row.match.group_round}`
+          : H.shortPoolRoundLabel(row.match) || "Phase";
+        return label === stats.bestDayLabel;
+      });
+      return matchingRows.map((row) => this.scoreRowResultDate(row)).filter(Boolean).sort((a, b) => b - a)[0] || latestScoreDate();
+    }
+
+    return latestScoreDate();
+  },
+
+  formatRecordDateLabel(date) {
+    return date ? H.formatDateTime(date) : "Date à confirmer";
+  },
+
+  recordCardHtml(record, rows = []) {
+    const { best, podium, bestProfile, detail, date } = this.recordWinner(record, rows);
+    const popupAttrs = best ? `data-record-popup-id="${H.escapeHtml(record.id)}" role="button" tabindex="0" title="Voir le détail du mini-record"` : "";
 
     return `
-      <article class="record-card ${best ? "has-record" : "empty-record"}">
+      <article class="record-card ${best ? "has-record record-card-clickable" : "empty-record"}" ${popupAttrs}>
         <div class="record-card-head">
           ${this.recordArtHtml(record)}
           <div>
@@ -1679,7 +1727,9 @@ const App = {
             <div>
               <span>${H.escapeHtml(bestProfile.pseudo)}</span>
               <strong>${H.escapeHtml(this.formatRecordValue(best.value, record))}</strong>
+              <small>${H.escapeHtml(bestProfile.office_team_name || "Sans team")}</small>
               ${detail ? `<small>${H.escapeHtml(detail)}</small>` : ""}
+              <small>${H.icon("time")} ${H.escapeHtml(this.formatRecordDateLabel(date))}</small>
             </div>
           </div>
           <div class="record-podium">
@@ -1691,6 +1741,155 @@ const App = {
         ` : `<p class="muted">Pas encore assez de données pour ce mini-record.</p>`}
       </article>
     `;
+  },
+
+  homeRecordCarouselHtml() {
+    const rows = this.achievementRecordRows();
+    const highlights = this.achievementRecordDefinitions()
+      .map((record) => this.recordWinner(record, rows))
+      .filter((item) => item.best && item.bestProfile);
+
+    if (!highlights.length) {
+      return `
+        <section class="card home-record-carousel-card empty-record-carousel">
+          <div class="card-title-row">
+            <div>
+              <p class="eyebrow">${H.icon("badges")} Mini-records du nid</p>
+              <h3>Le tableau des petits exploits arrive</h3>
+              <p class="muted">Dès que les premiers matchs seront comptabilisés, les détenteurs de mini-records défileront ici.</p>
+            </div>
+          </div>
+        </section>
+      `;
+    }
+
+    return `
+      <section class="card home-record-carousel-card">
+        <div class="card-title-row compact-title-row">
+          <div>
+            <p class="eyebrow">${H.icon("badges")} Mini-records du nid</p>
+            <h3>Les chouettes qui tiennent un record</h3>
+            <p class="muted">Un détenteur de mini-record défile toutes les 10 secondes : nom, team, haut fait et date.</p>
+          </div>
+          <button class="ghost-btn" id="homeRecordsBtn" type="button">Voir tous</button>
+        </div>
+        <div class="home-record-carousel" data-home-record-carousel aria-live="polite">
+          ${highlights.map((item, index) => {
+            const { record, best, bestProfile, detail, date } = item;
+            return `
+              <article class="home-record-slide ${index === 0 ? "active" : ""}" data-home-record-slide data-record-popup-id="${H.escapeHtml(record.id)}" role="button" tabindex="0" title="Voir le détail du mini-record">
+                <div class="home-record-art">${this.recordArtHtml(record)}</div>
+                <div class="home-record-main">
+                  <small class="home-record-label">${H.escapeHtml(record.title)}</small>
+                  <strong>${H.escapeHtml(bestProfile.pseudo)}</strong>
+                  <span>${H.escapeHtml(bestProfile.office_team_name || "Sans team")}</span>
+                  <p>${H.escapeHtml(this.formatRecordValue(best.value, record))}${detail ? ` · ${H.escapeHtml(detail)}` : ""}</p>
+                </div>
+                <div class="home-record-date">
+                  ${H.icon("time")}
+                  <span>${H.escapeHtml(this.formatRecordDateLabel(date))}</span>
+                </div>
+              </article>
+            `;
+          }).join("")}
+        </div>
+      </section>
+    `;
+  },
+
+  bindHomeRecordCarousel(root = document) {
+    this.clearHomeRecordCarousel();
+    const slides = H.$$('[data-home-record-slide]', root);
+    if (!slides.length) return;
+
+    let index = Math.max(0, slides.findIndex((slide) => slide.classList.contains("active")));
+    const show = (nextIndex) => {
+      index = (nextIndex + slides.length) % slides.length;
+      slides.forEach((slide, slideIndex) => slide.classList.toggle("active", slideIndex === index));
+    };
+
+    slides.forEach((slide) => {
+      const open = () => this.showRecordPopup(slide.dataset.recordPopupId);
+      slide.addEventListener("click", open);
+      slide.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          open();
+        }
+      });
+    });
+
+    if (slides.length > 1) {
+      this.state.homeRecordCarouselTimer = window.setInterval(() => show(index + 1), 10000);
+    }
+  },
+
+  bindRecordPopups(root = document) {
+    H.$$('[data-record-popup-id]', root).forEach((card) => {
+      if (card.dataset.recordPopupBound === "true") return;
+      card.dataset.recordPopupBound = "true";
+      const open = () => this.showRecordPopup(card.dataset.recordPopupId);
+      card.addEventListener("click", (event) => {
+        if (event.target.closest("button, a, input, select, textarea")) return;
+        open();
+      });
+      card.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          open();
+        }
+      });
+    });
+  },
+
+  showRecordPopup(recordId) {
+    const record = this.achievementRecordDefinitions().find((item) => item.id === recordId);
+    if (!record) return;
+    const item = this.recordWinner(record);
+    if (!item.best || !item.bestProfile) return;
+
+    H.$("#recordDetailModal")?.remove();
+    const { best, bestProfile, detail, date, podium } = item;
+    const modal = document.createElement("div");
+    modal.id = "recordDetailModal";
+    modal.className = "modal-backdrop achievement-unlock-modal record-detail-modal";
+    modal.innerHTML = `
+      <div class="modal-card achievement-unlock-card record-detail-card" role="dialog" aria-modal="true" aria-labelledby="recordDetailTitle">
+        <button class="modal-x-btn" id="closeRecordDetailXBtn" type="button" aria-label="Fermer">×</button>
+        <div class="magic-confetti" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span><span></span></div>
+        <div class="achievement-unlock-glow" aria-hidden="true"></div>
+        <p class="eyebrow achievement-unlock-kicker">Mini-record du nid</p>
+        <div class="achievement-unlock-art record-unlock-art">${this.recordArtHtml(record)}</div>
+        <h2 id="recordDetailTitle">${H.escapeHtml(record.title)}</h2>
+        <p class="achievement-unlock-headline">${H.escapeHtml(record.subtitle)} 🦉✨</p>
+        <div class="record-detail-winner">
+          ${H.profileBadgeHtml(bestProfile, "profile-badge leader")}
+          <div>
+            <strong>${H.escapeHtml(bestProfile.pseudo)}</strong>
+            <span>${H.escapeHtml(bestProfile.office_team_name || "Sans team")}</span>
+          </div>
+        </div>
+        <p class="record-detail-score"><strong>${H.escapeHtml(this.formatRecordValue(best.value, record))}</strong>${detail ? ` <span>· ${H.escapeHtml(detail)}</span>` : ""}</p>
+        <p class="achievement-unlock-date">${H.icon("time")} Date : ${H.escapeHtml(this.formatRecordDateLabel(date))}</p>
+        <div class="record-detail-podium">
+          ${podium.map((row, index) => {
+            const profile = this.profileForUser(row.userId, row.row);
+            return `<span><b>#${index + 1}</b> ${H.escapeHtml(profile.pseudo)} <em>${H.escapeHtml(this.formatRecordValue(row.value, record))}</em></span>`;
+          }).join("")}
+        </div>
+        <div class="achievement-unlock-actions">
+          <small>Le grimoire des mini-records est à jour.</small>
+          <button class="primary-btn" id="closeRecordDetailBtn" type="button">Fermer</button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(modal);
+    const close = () => modal.remove();
+    H.$("#closeRecordDetailBtn", modal)?.addEventListener("click", close);
+    H.$("#closeRecordDetailXBtn", modal)?.addEventListener("click", close);
+    modal.addEventListener("click", (event) => { if (event.target === modal) close(); });
+    H.$("#closeRecordDetailBtn", modal)?.focus();
   },
 
   renderAchievementRecords() {
@@ -1710,6 +1909,7 @@ const App = {
         ${records.map((record) => this.recordCardHtml(record, rows)).join("")}
       </div>
     `;
+    this.bindRecordPopups(root);
   },
 
   async renderWorldCup() {
@@ -1803,11 +2003,16 @@ const App = {
           <h3>Phase finale</h3>
           <p class="muted">Un vrai tableau visuel : les seizièmes partent des ailes, puis le nid converge vers la grande finale.</p>
         </div>
-        <span class="pill neutral">${totalFinalMatches} match${totalFinalMatches > 1 ? "s" : ""}</span>
+        <div class="final-bracket-toolbar-actions">
+          <button class="ghost-btn final-scroll-btn" type="button" data-final-scroll="left" aria-label="Voir la partie gauche">←</button>
+          <span class="pill neutral">${totalFinalMatches} match${totalFinalMatches > 1 ? "s" : ""}</span>
+          <button class="ghost-btn final-scroll-btn" type="button" data-final-scroll="right" aria-label="Voir la partie droite">→</button>
+        </div>
       </section>
       ${totalFinalMatches ? this.finalBracketHtml(byStage) : `<section class="card"><p class="muted">Aucune phase finale à afficher pour le moment.</p></section>`}
     `;
     this.bindFinalBracketDrag();
+    this.bindFinalBracketControls();
   },
 
   bindFinalBracketDrag() {
@@ -1842,6 +2047,20 @@ const App = {
     scroller.addEventListener("pointerup", stop);
     scroller.addEventListener("pointercancel", stop);
     scroller.addEventListener("mouseleave", stop);
+  },
+
+  bindFinalBracketControls() {
+    const scroller = H.$("#finalBracketScroll");
+    if (!scroller) return;
+    H.$$('[data-final-scroll]').forEach((button) => {
+      if (button.dataset.finalScrollBound === "true") return;
+      button.dataset.finalScrollBound = "true";
+      button.addEventListener("click", () => {
+        const direction = button.dataset.finalScroll === "left" ? -1 : 1;
+        const amount = Math.max(260, Math.round(scroller.clientWidth * 0.82));
+        scroller.scrollBy({ left: direction * amount, behavior: "smooth" });
+      });
+    });
   },
 
   finalBracketSortValue(match) {
@@ -2076,7 +2295,7 @@ const App = {
   },
 
   scoreDetailRowsForUser(userId, filters = {}) {
-    const includeTest = Boolean(filters.includeTest);
+    const includeTest = Boolean(filters.includeTest || (filters.matchIds && filters.matchIds.length));
     return this.state.visiblePredictions
       .filter((p) => p.user_id === userId && p.points_total !== null && p.points_total !== undefined)
       .map((p) => {
@@ -3026,6 +3245,7 @@ const App = {
     modal.className = `modal-backdrop achievement-unlock-modal achievement-unlock-${H.escapeHtml(badge.type)}`;
     modal.innerHTML = `
       <div class="modal-card achievement-unlock-card" role="dialog" aria-modal="true" aria-labelledby="achievementUnlockTitle">
+        <button class="modal-x-btn" id="closeAchievementUnlockXBtn" type="button" aria-label="Fermer">×</button>
         <div class="magic-confetti" aria-hidden="true">
           <span></span><span></span><span></span><span></span><span></span><span></span>
         </div>
@@ -3059,6 +3279,7 @@ const App = {
     };
     H.$("#closeAchievementUnlockBtn", modal)?.focus();
     H.$("#closeAchievementUnlockBtn", modal)?.addEventListener("click", close);
+    H.$("#closeAchievementUnlockXBtn", modal)?.addEventListener("click", close);
     modal.addEventListener("click", (event) => {
       if (event.target === modal) close();
     });
@@ -3157,7 +3378,7 @@ const App = {
 
   async renderPoolRoundLeaderboard(targetSelector = "#leaderboardContent") {
     const root = H.$(targetSelector);
-    const groups = this.groupMatchesByPouleRound(this.competitionMatches());
+    const groups = this.groupMatchesByPouleRound(this.phaseLeaderboardMatches());
     const activeIndex = this.clampPhaseIndex("leaderboardPhaseIndex", groups);
     const group = groups[activeIndex];
 
@@ -3176,9 +3397,31 @@ const App = {
       return;
     }
 
+    const byUser = new Map();
+    this.state.publicProfiles.forEach((profile) => {
+      const userId = profile.id || profile.user_id;
+      if (!userId) return;
+      byUser.set(userId, {
+        user_id: userId,
+        pseudo: profile.pseudo || "Joueur",
+        office_team_id: profile.office_team_id,
+        office_team_name: profile.office_team_name,
+        office_team_slug: profile.office_team_slug,
+        office_team_color: profile.office_team_color,
+        avatar_key: profile.avatar_key || "owl-01",
+        badge_shape: profile.badge_shape || "rounded",
+        badge_color: profile.badge_color || profile.office_team_color || "#facc15",
+        featured_badge_ids: profile.featured_badge_ids
+      });
+    });
+    (data || []).forEach((row) => {
+      if (!row.user_id) return;
+      byUser.set(row.user_id, { ...(byUser.get(row.user_id) || {}), ...row });
+    });
+
     const matchIds = group.matches.map((m) => m.id);
     const finishedCount = group.matches.filter((m) => m.status === "finished").length;
-    const rows = (data || []).map((player) => {
+    const rows = [...byUser.values()].map((player) => {
       const details = this.scoreDetailRowsForUser(player.user_id, { matchIds });
       const total = details.reduce((sum, { prediction }) => sum + Number(prediction.points_total || 0), 0);
       const exact = details.filter(({ prediction }) => prediction.is_exact_score).length;
@@ -3217,6 +3460,7 @@ const App = {
     `;
 
     this.bindPhaseNavigation("leaderboardPhaseIndex", () => this.renderPoolRoundLeaderboard(targetSelector));
+    this.bindAchievementReplay(root);
   },
 
 
@@ -3345,7 +3589,7 @@ const App = {
     const root = H.$("#leaderboardContent");
     const teamTab = ["average", "points"].includes(this.state.teamTab) ? this.state.teamTab : "average";
     this.state.teamTab = teamTab;
-    const groups = this.groupMatchesByPouleRound(this.competitionMatches());
+    const groups = this.groupMatchesByPouleRound(this.phaseLeaderboardMatches());
     const activeIndex = this.clampPhaseIndex("teamLeaderboardPhaseIndex", groups);
     const group = groups[activeIndex];
 
@@ -4107,7 +4351,7 @@ const App = {
             <p class="muted">Déconnexion, crédits et historique des évolutions.</p>
           </div>
           <div class="profile-account-actions">
-            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v0.26.1</button>
+            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.0.0</button>
             <button class="danger-btn" id="profileLogoutBtn" type="button">Déconnexion</button>
           </div>
         </div>

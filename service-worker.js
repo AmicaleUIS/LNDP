@@ -1,9 +1,9 @@
 // ============================================================
-// LE NID DES PRONOS — SERVICE WORKER V0.26.3
-// Cache mis à jour : icônes PWA normales + maskable.
+// LE NID DES PRONOS — SERVICE WORKER V1.0.0
+// Cache public V1.0.0 : assets statiques + correctifs mobile.
 // ============================================================
 
-const CACHE_NAME = "le-nid-des-pronos-v0-26-3";
+const CACHE_NAME = "le-nid-des-pronos-v1-0-0";
 
 // Les avatars ne sont pas précachés : ils peuvent aller de owl-01.png à owl-90.png et être ajoutés/remplacés librement.
 const ASSETS = [
@@ -13,13 +13,13 @@ const ASSETS = [
   "./register.html",
   "./app.html",
   "./admin.html",
-  "./css/style.css?v=0.26.3",
-  "./js/supabaseClient.js?v=0.24.3",
-  "./js/auth.js?v=0.24.3",
-  "./js/common.js?v=0.26.3",
-  "./js/app.js?v=0.26.3",
-  "./js/admin.js?v=0.26.3",
-  "./manifest.json?v=0.26.3",
+  "./css/style.css?v=1.0.0",
+  "./js/supabaseClient.js?v=1.0.0",
+  "./js/auth.js?v=1.0.0",
+  "./js/common.js?v=1.0.0",
+  "./js/app.js?v=1.0.0",
+  "./js/admin.js?v=1.0.0",
+  "./manifest.json?v=1.0.0",
   "./assets/icons/icon-192.png",
   "./assets/icons/icon-512.png",
   "./assets/icons/icon-maskable-192.png",

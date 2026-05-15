@@ -7925,3 +7925,425 @@ button:disabled {
   padding: 4px;
   background: transparent;
 }
+
+/* ============================================================
+   V1.0.0 — lancement public + mini-records + correctifs mobile
+   ============================================================ */
+.home-record-carousel-card {
+  position: relative;
+  overflow: hidden;
+}
+
+.home-record-carousel {
+  position: relative;
+  min-height: 164px;
+  margin-top: 14px;
+}
+
+.home-record-slide {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 16px;
+  min-height: 150px;
+  padding: 18px;
+  border-radius: 26px;
+  border: 1px solid rgba(250, 204, 21, .18);
+  background:
+    radial-gradient(circle at 10% 20%, rgba(250,204,21,.16), transparent 34%),
+    radial-gradient(circle at 88% 72%, rgba(56,189,248,.12), transparent 30%),
+    rgba(255,255,255,.045);
+  opacity: 0;
+  transform: translateY(12px) scale(.985);
+  pointer-events: none;
+  transition: opacity .42s ease, transform .42s ease, border-color .2s ease;
+}
+
+.home-record-slide.active {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  pointer-events: auto;
+}
+
+.home-record-slide:hover,
+.home-record-slide:focus-visible,
+.record-card-clickable:hover,
+.record-card-clickable:focus-visible {
+  border-color: rgba(250,204,21,.42);
+  transform: translateY(-2px);
+  cursor: pointer;
+}
+
+.home-record-art .record-icon,
+.home-record-art .record-art {
+  width: 94px;
+  height: 94px;
+  border-radius: 24px;
+}
+
+.home-record-main {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.home-record-main .home-record-label {
+  color: var(--gold);
+  font-weight: 950;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+}
+
+.home-record-main strong {
+  font-size: clamp(1.35rem, 4vw, 2.15rem);
+  line-height: 1;
+}
+
+.home-record-main span,
+.home-record-main p,
+.home-record-date {
+  color: var(--muted);
+  font-weight: 800;
+}
+
+.home-record-main p {
+  margin: 4px 0 0;
+  color: #fff;
+}
+
+.home-record-date {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 7px;
+  text-align: right;
+  max-width: 210px;
+  font-size: .88rem;
+}
+
+.home-record-date .owl-icon {
+  width: 19px;
+  height: 19px;
+}
+
+.record-card-clickable {
+  transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease;
+}
+
+.record-card-clickable:hover,
+.record-card-clickable:focus-visible {
+  box-shadow: 0 20px 54px rgba(0,0,0,.22), 0 0 0 1px rgba(250,204,21,.08);
+  outline: none;
+}
+
+.record-detail-card .record-unlock-art .record-icon,
+.record-detail-card .record-unlock-art .record-art {
+  width: 122px;
+  height: 122px;
+  border-radius: 30px;
+}
+
+.record-detail-winner {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin: 10px auto;
+  padding: 10px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,.12);
+  background: rgba(255,255,255,.055);
+}
+
+.record-detail-winner > div {
+  display: grid;
+  gap: 2px;
+  text-align: left;
+}
+
+.record-detail-winner strong {
+  color: #fff;
+  font-weight: 950;
+}
+
+.record-detail-winner span,
+.record-detail-score span {
+  color: var(--muted);
+  font-weight: 800;
+}
+
+.record-detail-score {
+  margin: 8px 0;
+  font-size: 1.1rem;
+}
+
+.record-detail-score strong {
+  color: var(--gold);
+  font-size: clamp(1.45rem, 5vw, 2.1rem);
+}
+
+.record-detail-podium {
+  display: grid;
+  gap: 6px;
+  max-width: 420px;
+  margin: 12px auto 0;
+  text-align: left;
+}
+
+.record-detail-podium span {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 10px;
+  border-radius: 14px;
+  background: rgba(255,255,255,.055);
+  color: var(--muted);
+  font-weight: 800;
+}
+
+.record-detail-podium b {
+  color: var(--gold);
+}
+
+.record-detail-podium em {
+  color: #fff;
+  font-style: normal;
+}
+
+.final-bracket-toolbar-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.final-scroll-btn {
+  min-width: 42px;
+  padding-inline: 12px;
+  font-weight: 950;
+}
+
+.final-bracket-shell {
+  max-width: 100%;
+  overflow-x: auto !important;
+  overflow-y: hidden !important;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-x;
+  scroll-behavior: smooth;
+}
+
+.final-bracket-shell.is-dragging {
+  cursor: grabbing;
+  user-select: none;
+}
+
+.modal-backdrop {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: max(14px, env(safe-area-inset-top)) 14px max(14px, env(safe-area-inset-bottom));
+}
+
+.modal-card {
+  max-height: calc(100dvh - 28px) !important;
+  overscroll-behavior: contain;
+}
+
+.modal-card > .card-title-row:first-child {
+  position: sticky;
+  top: -22px;
+  z-index: 8;
+  margin: -22px -22px 18px;
+  padding: 18px 22px;
+  border-bottom: 1px solid rgba(255,255,255,.09);
+  border-radius: 28px 28px 0 0;
+  background: linear-gradient(180deg, rgba(15,29,51,.99), rgba(11,24,43,.97));
+  backdrop-filter: blur(14px);
+}
+
+.modal-x-btn {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 12;
+  width: 42px;
+  height: 42px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,.16);
+  background: rgba(2,6,23,.68);
+  color: #fff;
+  font-size: 1.55rem;
+  line-height: 1;
+  font-weight: 900;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  box-shadow: 0 10px 26px rgba(0,0,0,.22);
+}
+
+.modal-x-btn:hover,
+.modal-x-btn:focus-visible {
+  border-color: rgba(250,204,21,.45);
+  color: var(--gold);
+  outline: none;
+}
+
+.team-player-modal {
+  align-items: center !important;
+}
+
+@media (max-width: 720px) {
+  .home-record-carousel {
+    min-height: 244px;
+  }
+
+  .home-record-slide {
+    grid-template-columns: 1fr;
+    justify-items: center;
+    text-align: center;
+    gap: 10px;
+    padding: 16px;
+  }
+
+  .home-record-date {
+    justify-content: center;
+    text-align: center;
+    max-width: none;
+  }
+
+  .home-record-art .record-icon,
+  .home-record-art .record-art {
+    width: 82px;
+    height: 82px;
+  }
+
+  .final-bracket-toolbar-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .final-bracket-shell {
+    width: 100% !important;
+    max-width: calc(100vw - 28px) !important;
+    margin-inline: auto;
+    display: grid !important;
+    grid-template-columns: 816px 236px 816px !important;
+    cursor: grab;
+  }
+
+  .groups-grid,
+  .worldcup-groups-grid {
+    grid-template-columns: 1fr !important;
+    gap: 12px;
+  }
+
+  .group-card {
+    overflow: visible;
+  }
+
+  .group-table-wrap {
+    overflow-x: visible;
+  }
+
+  .group-table {
+    min-width: 0 !important;
+    width: 100%;
+    table-layout: fixed;
+    font-size: .72rem;
+  }
+
+  .group-table th,
+  .group-table td {
+    padding: 8px 4px;
+    white-space: normal;
+  }
+
+  .group-table th:nth-child(1),
+  .group-table td:nth-child(1) { width: 28px; }
+  .group-table th:nth-child(3),
+  .group-table td:nth-child(3) { width: 28px; }
+  .group-table th:nth-child(4),
+  .group-table td:nth-child(4) { width: 36px; }
+  .group-table th:nth-child(5),
+  .group-table td:nth-child(5) { width: 40px; }
+  .group-table th:nth-child(6),
+  .group-table td:nth-child(6) { width: 62px; }
+
+  .group-table .team-cell {
+    min-width: 0 !important;
+    gap: 6px;
+    white-space: normal;
+  }
+
+  .group-table .team-cell span {
+    display: block;
+    min-width: 0;
+    overflow: visible;
+    text-overflow: clip;
+    white-space: normal;
+    line-height: 1.12;
+    font-size: .72rem;
+    word-break: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .group-table .pill {
+    padding: 4px 5px;
+    font-size: .58rem;
+    line-height: 1.05;
+  }
+
+  .modal-backdrop {
+    align-items: center !important;
+    padding: 10px;
+  }
+
+  .modal-card {
+    width: min(100%, 620px) !important;
+    max-height: calc(100dvh - 20px) !important;
+    border-radius: 22px;
+    padding: 18px;
+  }
+
+  .modal-card > .card-title-row:first-child {
+    top: -18px;
+    margin: -18px -18px 14px;
+    padding: 14px 18px;
+    border-radius: 22px 22px 0 0;
+    gap: 10px;
+  }
+
+  .modal-card > .card-title-row:first-child .ghost-btn,
+  .modal-card > .card-title-row:first-child .primary-btn,
+  .modal-card > .card-title-row:first-child .danger-btn {
+    min-height: 40px;
+    padding: 9px 12px;
+  }
+
+  .achievement-unlock-card {
+    width: min(100%, 520px) !important;
+    padding: 18px !important;
+  }
+
+  .achievement-unlock-art {
+    width: 118px !important;
+    height: 118px !important;
+  }
+
+  .achievement-unlock-art .achievement-art,
+  .record-detail-card .record-unlock-art .record-icon,
+  .record-detail-card .record-unlock-art .record-art {
+    width: 92px !important;
+    height: 92px !important;
+  }
+
+  .record-detail-winner {
+    border-radius: 22px;
+    max-width: 100%;
+  }
+}

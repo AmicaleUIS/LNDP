@@ -1,39 +1,48 @@
-# Le Nid des Pronos — V0.26.3
+# Le Nid des Pronos — V1.0.0
 
-## Nouveautés V0.26.3
+## Version publique
 
-Préparation du site pour ajouter facilement les nouvelles images :
+Cette version marque le passage du site en **1.0.0** avec harmonisation des numéros de version, mise à jour du cache PWA et corrections visibles côté utilisateur.
 
-- badges **Préparation du nid** et **Test concluant** ;
-- image de la chouette volante pour le bouton retour rapide vers le haut ;
-- images des **mini-records du nid**.
+## Nouveautés V1.0.0
 
-Aucun patch SQL nécessaire pour cette version.
+- Ajout sur l’écran d’accueil d’un cadre **Mini-records du nid** : un détenteur de record défile toutes les 10 secondes avec son nom, sa team, son haut fait, sa valeur et la date.
+- Les classements **par phase** affichent maintenant aussi la phase **Matchs de préparation · TEST** pour les joueurs et les teams bureau, sans réintégrer ces matchs dans le classement général Coupe du Monde.
+- Les popups sont mieux centrés sur mobile et plus simples à fermer.
+- Les badges / exploits débloqués et les mini-records peuvent s’ouvrir au clic avec grande icône, infos et confettis.
+- Les groupes Coupe du monde sont plus lisibles sur mobile : les noms longs d’équipes reviennent à la ligne au lieu d’être coupés.
+- La phase finale mobile a un scroll horizontal renforcé, avec boutons gauche/droite pour naviguer dans le tableau.
+- Les crédits affichés dans le profil sont mis à jour en **v1.0.0**.
 
-## Où mettre les images
+## Cache PWA
 
-### Badges préparation
-
-À déposer dans :
-
-```txt
-assets/badges/preparation-two-picks.png
-assets/badges/prep-good-pick.png
-```
-
-### Chouette retour haut
-
-À déposer dans :
+Le service worker utilise maintenant :
 
 ```txt
-assets/icons/owl-png/retour-haut-chouette.png
+le-nid-des-pronos-v1-0-0
 ```
 
-Si l’image n’existe pas encore, l’application utilise automatiquement `accueil.png` en secours.
+Les fichiers HTML appellent les assets avec :
 
-### Mini-records
+```txt
+?v=1.0.0
+```
 
-À déposer dans :
+Cela force les navigateurs et mobiles déjà installés en PWA à récupérer la nouvelle version au lieu de conserver les anciens fichiers.
+
+## Patch SQL
+
+Aucun nouveau patch SQL n’est nécessaire pour cette V1.0.0.
+
+Le dernier patch SQL nécessaire pour les fonctions de préparation reste :
+
+```txt
+patch_v0_26_0_preparation_classements.sql
+```
+
+## Images mini-records
+
+Les images des mini-records sont attendues dans :
 
 ```txt
 assets/records/<record-id>.png
@@ -44,29 +53,3 @@ Liste complète dans :
 ```txt
 assets/records/README.md
 ```
-
-## Conseils image
-
-- Format conseillé : PNG carré `512x512` ou `1024x1024`.
-- Fond transparent si possible.
-- Garder une petite marge autour du dessin.
-- Nom de fichier exact, tout en minuscules, avec les tirets.
-
-## Patch SQL
-
-Le dernier patch SQL nécessaire reste celui de la V0.26.0 :
-
-```txt
-patch_v0_26_0_preparation_classements.sql
-```
-
-Pour la V0.26.2, il n’y a rien à lancer côté Supabase.
-
-
-### Icônes PWA maskable
-
-- Ajout des fichiers `assets/icons/icon-maskable-192.png` et `assets/icons/icon-maskable-512.png`.
-- Mise à jour du `manifest.json` avec des entrées séparées `any` et `maskable`.
-- Ajout de `assets/icons/apple-touch-icon.png` pour iOS.
-
-Pour la V0.26.3, il n’y a rien à lancer côté Supabase.
