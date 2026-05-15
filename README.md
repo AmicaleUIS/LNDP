@@ -1,6 +1,6 @@
-# Le Nid des Pronos — V1.0.17
+# Le Nid des Pronos — V1.0.18
 
-## Correctif V1.0.17
+## Correctif V1.0.18
 
 Cette version finalise le fonctionnement des mini-records et conserve le parcours d’inscription avec identifiant interne UIS.
 
@@ -25,12 +25,12 @@ Pour que les nouveaux comptes soient utilisables immédiatement, désactiver la 
 
 Authentication → Providers → Email → désactiver la confirmation email.
 
-Aucun patch SQL nécessaire pour cette version.
+Patch SQL à lancer dans Supabase : `patch_v1_0_18_mini_records_prediction_date.sql`. Il met à jour la vue `v_mini_record_prediction_counts` avec `record_unlocked_at` pour afficher la date du trophée et départager les égalités au premier détenteur.
 
 ## Déploiement
 
 Publier tous les fichiers sur GitHub Pages. Les assets sont appelés avec :
 
 ```txt
-?v=1.0.17
+?v=1.0.18
 ```
