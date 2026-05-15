@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — APP PRINCIPALE V1.0.18
+// LE NID DES PRONOS — APP PRINCIPALE V1.0.19
 // ============================================================
 
 const H = window.Helpers;
@@ -33,6 +33,7 @@ const App = {
     leaderboardTab: "players",
     playerLeaderboardMode: "overall",
     teamTab: "average",
+    teamLeaderboardScope: "overall",
     achievementsTab: "mine",
     worldcupTab: "groups",
     matchPhaseIndex: 0,
@@ -306,27 +307,26 @@ const App = {
           <div>
             <p class="eyebrow">Crédits cachés</p>
             <h2 id="creditsTitle">Le Nid des Pronos</h2>
-            <p class="muted">Version publique <strong>1.0.18</strong> · mini-records exclusifs pour leur détenteur actuel.</p>
+            <p class="muted">Version publique <strong>1.0.19</strong> · classements Teams bureau général et par phase.</p>
           </div>
           <button class="ghost-btn" id="closeCreditsBtn" type="button">Fermer</button>
         </div>
         <div class="credits-grid">
           <section>
             <h3>Version actuelle</h3>
+            <p><strong>1.0.19</strong> — classement Teams bureau enrichi : général et par phase, chacun disponible en moyenne ou par points.</p>
             <p><strong>1.0.18</strong> — mini-record “Greffier du grimoire” : date fournie par Supabase et égalités conservées par le premier détenteur.</p>
-            <p><strong>1.0.18</strong> — les mini-records deviennent des trophées dynamiques : un seul détenteur actuel par record, calculé sur tous les joueurs.</p>
+            <p><strong>1.0.15</strong> — les mini-records deviennent des trophées dynamiques : un seul détenteur actuel par record, calculé sur tous les joueurs.</p>
             <p><strong>1.0.13</strong> — ajout du badge “Descente du bus impossible” quand le champion pronostiqué reste bloqué en phase de groupes.</p>
             <p><strong>1.0.5</strong> — dashboard mobile/desktop stabilisé, sans chevauchement des cartes.</p>
           </section>
           <section>
-            <h3>Évolutions V1.0.18</h3>
+            <h3>Évolutions V1.0.19</h3>
             <ul class="changelog-list">
-              <li>Tableau de bord réorganisé sans grille forcée qui écrase les cartes.</li>
-              <li>Carte “Prochain match” réduite pour laisser respirer les classements et les mini-records.</li>
-              <li>Mobile rendu lisible : les cartes gardent une taille confortable et la page peut scroller si nécessaire.</li>
-              <li>Desktop conservé en tableau de bord sans scroll, sans chevauchement.</li>
-              <li>Annuaire “Teams du nid” : les équipes sans joueur ne sont plus affichées.</li>
-              <li>Mini-records exclusifs : un seul joueur détient chaque trophée à la fois.</li>
+              <li>Classement Teams bureau général ajouté.</li>
+              <li>Classement Teams bureau par phase conservé.</li>
+              <li>Les deux classements Teams bureau peuvent être affichés en moyenne ou par points.</li>
+              <li>Le bouton “Moyenne team” de l’accueil mène directement au classement Teams bureau général en moyenne.</li>
               <li>Nouveau badge négatif : champion annoncé éliminé en phase de groupes.</li>
             </ul>
           </section>
@@ -967,6 +967,7 @@ const App = {
     });
     H.$('[data-action="go-team-average-leaderboard"]', root)?.addEventListener("click", () => {
       this.state.leaderboardTab = "team";
+      this.state.teamLeaderboardScope = "overall";
       this.state.teamTab = "average";
       this.loadView("leaderboard");
     });
@@ -3825,6 +3826,55 @@ const App = {
       .map((row, index) => ({ ...row, rank: index + 1 }));
   },
 
+  teamOverallRows(mode = "average") {
+    const scoreByUser = new Map(
+      this.state.playerScoreRows.map((row) => [String(row.user_id || row.id), row])
+    );
+
+    const rows = this.state.officeTeams.map((team) => {
+      const players = this.teamPlayers(team.id).filter((player) => player.profile_setup_done !== false);
+      const totals = players.reduce((acc, player) => {
+        const score = scoreByUser.get(String(player.id || player.user_id)) || {};
+        acc.total_points += Number(score.total_points || 0);
+        acc.exact_scores += Number(score.exact_scores || 0);
+        acc.good_results += Number(score.good_results || 0);
+        acc.good_goal_diffs += Number(score.good_goal_diffs || 0);
+        acc.good_qualified += Number(score.good_qualified || 0);
+        acc.scored_matches += Number(score.scored_matches || 0);
+        return acc;
+      }, {
+        total_points: 0,
+        exact_scores: 0,
+        good_results: 0,
+        good_goal_diffs: 0,
+        good_qualified: 0,
+        scored_matches: 0
+      });
+
+      return {
+        office_team_id: team.id,
+        office_team_name: team.name,
+        office_team_color: team.color,
+        active_players: players.length,
+        average_points: players.length ? totals.total_points / players.length : 0,
+        ...totals
+      };
+    }).filter((row) => row.active_players > 0);
+
+    const byAverage = mode === "average";
+    return rows
+      .sort((a, b) =>
+        byAverage
+          ? (b.average_points || 0) - (a.average_points || 0)
+            || (b.total_points || 0) - (a.total_points || 0)
+            || String(a.office_team_name || "").localeCompare(String(b.office_team_name || ""), "fr")
+          : (b.total_points || 0) - (a.total_points || 0)
+            || (b.average_points || 0) - (a.average_points || 0)
+            || String(a.office_team_name || "").localeCompare(String(b.office_team_name || ""), "fr")
+      )
+      .map((row, index) => ({ ...row, rank: index + 1 }));
+  },
+
   teamLeaderboardRowsHtml(rows = [], options = {}) {
     if (!rows.length) return `<p class="muted">Pas encore de team classée.</p>`;
     const mode = options.mode || this.state.teamTab;
@@ -3855,16 +3905,83 @@ const App = {
     `;
   },
 
+  bindTeamLeaderboardControls(root) {
+    H.$$('[data-team-scope]', root).forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        this.state.teamLeaderboardScope = btn.dataset.teamScope;
+        await this.renderTeamLeaderboard();
+      });
+    });
+
+    H.$$('[data-team-tab]', root).forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        this.state.teamTab = btn.dataset.teamTab;
+        await this.renderTeamLeaderboard();
+      });
+    });
+  },
+
   async renderTeamLeaderboard() {
     const root = H.$("#leaderboardContent");
     const teamTab = ["average", "points"].includes(this.state.teamTab) ? this.state.teamTab : "average";
+    const scope = this.state.teamLeaderboardScope === "phase" ? "phase" : "overall";
     this.state.teamTab = teamTab;
+    this.state.teamLeaderboardScope = scope;
+
+    const scopeControls = `
+      <div class="segmented small team-leaderboard-scope">
+        <button class="${scope === "overall" ? "active" : ""}" data-team-scope="overall">Général</button>
+        <button class="${scope === "phase" ? "active" : ""}" data-team-scope="phase">Par phase</button>
+      </div>
+    `;
+    const modeControls = `
+      <div class="segmented small team-leaderboard-mode">
+        <button class="${teamTab === "average" ? "active" : ""}" data-team-tab="average">Moyenne</button>
+        <button class="${teamTab === "points" ? "active" : ""}" data-team-tab="points">Par points</button>
+      </div>
+    `;
+
+    if (scope === "overall") {
+      await this.loadPlayerScoreRows();
+      const rows = this.teamOverallRows(teamTab);
+      root.innerHTML = `
+        <section class="card team-leaderboard-card">
+          <div class="card-title-row">
+            <div>
+              <h3>Teams bureau général</h3>
+            </div>
+          </div>
+          <div class="team-leaderboard-control-stack">
+            ${scopeControls}
+            ${modeControls}
+          </div>
+          <div class="team-phase-head">
+            <strong>Général</strong>
+            <small>Classement Coupe du monde, hors matchs test</small>
+          </div>
+          ${this.teamLeaderboardRowsHtml(rows, { mode: teamTab })}
+        </section>
+      `;
+      this.bindTeamLeaderboardControls(root);
+      return;
+    }
+
     const groups = this.groupMatchesByPouleRound(this.phaseLeaderboardMatches());
     const activeIndex = this.clampPhaseIndex("teamLeaderboardPhaseIndex", groups);
     const group = groups[activeIndex];
 
     if (!groups.length || !group) {
-      root.innerHTML = `<section class="card"><p class="muted">Aucune phase à afficher pour le moment.</p></section>`;
+      root.innerHTML = `
+        <section class="card team-leaderboard-card">
+          <div class="card-title-row"><h3>Teams bureau par phase</h3></div>
+          <div class="team-leaderboard-control-stack">
+            ${scopeControls}
+            ${modeControls}
+          </div>
+          <p class="muted">Aucune phase à afficher pour le moment.</p>
+        </section>
+      `;
+      this.bindTeamLeaderboardControls(root);
       return;
     }
 
@@ -3880,9 +3997,9 @@ const App = {
             <h3>Teams bureau par phase</h3>
           </div>
         </div>
-        <div class="segmented small team-leaderboard-mode">
-          <button class="${teamTab === "average" ? "active" : ""}" data-team-tab="average">Moyenne</button>
-          <button class="${teamTab === "points" ? "active" : ""}" data-team-tab="points">Par points</button>
+        <div class="team-leaderboard-control-stack">
+          ${scopeControls}
+          ${modeControls}
         </div>
         ${pager}
         <div class="team-phase-head">
@@ -3894,13 +4011,7 @@ const App = {
       </section>
     `;
 
-    H.$$('[data-team-tab]', root).forEach((btn) => {
-      btn.addEventListener("click", async () => {
-        this.state.teamTab = btn.dataset.teamTab;
-        await this.renderTeamLeaderboard();
-      });
-    });
-
+    this.bindTeamLeaderboardControls(root);
     this.bindPhaseNavigation("teamLeaderboardPhaseIndex", () => this.renderTeamLeaderboard());
   },
 
@@ -4637,7 +4748,7 @@ const App = {
             <p class="muted">Déconnexion, crédits et historique des évolutions.</p>
           </div>
           <div class="profile-account-actions">
-            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.0.18</button>
+            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.0.19</button>
             <button class="danger-btn" id="profileLogoutBtn" type="button">Déconnexion</button>
           </div>
         </div>

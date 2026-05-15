@@ -13108,7 +13108,7 @@ body[data-current-view="leaderboard"] .team-leaderboard-card .muted {
 }
 
 /* ============================================================
-   V1.0.18 — accueil desktop plus respirant
+   V1.0.19 — accueil desktop plus respirant
    Le dashboard desktop utilise enfin toute la largeur disponible,
    sans compresser les cartes au centre de l'écran.
    ============================================================ */
@@ -13250,5 +13250,44 @@ body[data-current-view="leaderboard"] .team-leaderboard-card .muted {
   body[data-current-view="home"] .home-record-art .record-art {
     width: 78px !important;
     height: 78px !important;
+  }
+}
+
+/* ============================================================
+   V1.0.19 — classements Teams bureau général / par phase
+   ============================================================ */
+.team-leaderboard-control-stack {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 0 0 12px;
+}
+
+.team-leaderboard-scope,
+.team-leaderboard-mode {
+  margin-bottom: 0 !important;
+}
+
+.team-leaderboard-scope button,
+.team-leaderboard-mode button {
+  white-space: nowrap;
+}
+
+@media (max-width: 760px) {
+  .team-leaderboard-control-stack {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .team-leaderboard-scope,
+  .team-leaderboard-mode {
+    width: 100%;
+  }
+
+  .team-leaderboard-scope button,
+  .team-leaderboard-mode button {
+    flex: 1 1 0;
   }
 }
