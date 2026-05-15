@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — APP PRINCIPALE V1.0.5
+// LE NID DES PRONOS — APP PRINCIPALE V1.0.6
 // ============================================================
 
 const H = window.Helpers;
@@ -305,23 +305,25 @@ const App = {
           <div>
             <p class="eyebrow">Crédits cachés</p>
             <h2 id="creditsTitle">Le Nid des Pronos</h2>
-            <p class="muted">Version publique <strong>1.0.5</strong> · tableau de bord corrigé, avatars rangés.</p>
+            <p class="muted">Version publique <strong>1.0.6</strong> · tableau de bord corrigé, avatars rangés.</p>
           </div>
           <button class="ghost-btn" id="closeCreditsBtn" type="button">Fermer</button>
         </div>
         <div class="credits-grid">
           <section>
             <h3>Version actuelle</h3>
+            <p><strong>1.0.6</strong> — tableau de bord remis à plat : plus de chevauchement mobile/desktop, équipes vides masquées dans l’annuaire.</p>
             <p><strong>1.0.5</strong> — dashboard mobile/desktop stabilisé, sans chevauchement des cartes.</p>
           </section>
           <section>
-            <h3>Évolutions V1.0.5</h3>
+            <h3>Évolutions V1.0.6</h3>
             <ul class="changelog-list">
               <li>Tableau de bord réorganisé pour éviter les chevauchements sur mobile et desktop.</li>
               <li>Bloc “Pronos manquants” rendu compact pour tenir sous les cartes de classement.</li>
               <li>Prochain match corrigé sur mobile : les noms longs d’équipes reviennent à la ligne proprement.</li>
               <li>Accueil plein écran conservé, avec zones qui se redimensionnent sans déborder les unes sur les autres.</li>
-              <li>Cache PWA remis à jour en 1.0.5 pour forcer la récupération du nouveau CSS.</li>
+              <li>Annuaire “Teams du nid” : les équipes sans joueur ne sont plus affichées.</li>
+              <li>Cache PWA remis à jour en 1.0.6 pour forcer la récupération du nouveau CSS.</li>
             </ul>
           </section>
           <section>
@@ -4175,11 +4177,14 @@ const App = {
     const root = H.$("#viewRoot");
     const myTeam = this.officeTeamById(this.state.profile?.office_team_id);
     const activePlayers = this.state.publicProfiles.filter((player) => player.profile_setup_done !== false);
-    const teamDirectoryRows = this.state.officeTeams.map((team) => ({
-      team,
-      players: this.teamPlayers(team.id)
-    }));
-    const playersWithoutTeam = this.teamPlayers(null);
+    const teamDirectoryRows = this.state.officeTeams
+      .map((team) => ({
+        team,
+        players: this.teamPlayers(team.id).filter((player) => player.profile_setup_done !== false)
+      }))
+      .filter(({ players }) => players.length > 0);
+    const playersWithoutTeam = this.teamPlayers(null).filter((player) => player.profile_setup_done !== false);
+    const visibleDirectoryTeamCount = teamDirectoryRows.length + (playersWithoutTeam.length ? 1 : 0);
     const chatScope = this.state.teamChatScope || "global";
     const chatUnavailable = Boolean(this.state.teamChatError);
 
@@ -4192,7 +4197,7 @@ const App = {
         </div>
         <div class="teams-hero-stats">
           <div><strong>${activePlayers.length}</strong><small>joueurs</small></div>
-          <div><strong>${this.state.officeTeams.length}</strong><small>teams</small></div>
+          <div><strong>${visibleDirectoryTeamCount}</strong><small>teams actives</small></div>
           <div><strong>${H.escapeHtml(myTeam?.name || "—")}</strong><small>ma team</small></div>
         </div>
       </section>
@@ -4507,7 +4512,7 @@ const App = {
             <p class="muted">Déconnexion, crédits et historique des évolutions.</p>
           </div>
           <div class="profile-account-actions">
-            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.0.5</button>
+            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.0.6</button>
             <button class="danger-btn" id="profileLogoutBtn" type="button">Déconnexion</button>
           </div>
         </div>
