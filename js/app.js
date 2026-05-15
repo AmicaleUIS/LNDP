@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — APP PRINCIPALE V1.0.2
+// LE NID DES PRONOS — APP PRINCIPALE V1.0.3
 // ============================================================
 
 const H = window.Helpers;
@@ -303,23 +303,23 @@ const App = {
           <div>
             <p class="eyebrow">Crédits cachés</p>
             <h2 id="creditsTitle">Le Nid des Pronos</h2>
-            <p class="muted">Version publique <strong>1.0.2</strong> · tableau de bord mobile compact et moyenne team.</p>
+            <p class="muted">Version publique <strong>1.0.3</strong> · tableau de bord plein écran adaptatif.</p>
           </div>
           <button class="ghost-btn" id="closeCreditsBtn" type="button">Fermer</button>
         </div>
         <div class="credits-grid">
           <section>
             <h3>Version actuelle</h3>
-            <p><strong>1.0.2</strong> — correctif mobile : accueil plus compact, moyenne de la team visible sur le tableau de bord et annuaire des teams complété.</p>
+            <p><strong>1.0.3</strong> — accueil redessiné en dashboard plein écran, sans scroll sur desktop et mieux réparti sur mobile.</p>
           </section>
           <section>
-            <h3>Évolutions V1.0.2</h3>
+            <h3>Évolutions V1.0.3</h3>
             <ul class="changelog-list">
-              <li>Tableau de bord mobile fortement compacté pour garder l’essentiel sur une seule vue.</li>
-              <li>Ajout du classement de la team à la moyenne directement sur l’accueil.</li>
-              <li>Le bouton “Voir” mène au classement des teams en mode moyenne.</li>
-              <li>Annuaire des teams : les équipes sans joueur restent visibles avec un message dédié.</li>
-              <li>Cache PWA remis à jour en 1.0.2 pour forcer les mobiles à récupérer les nouveaux fichiers.</li>
+              <li>Accueil réglé pour occuper exactement la hauteur de l’écran en mode tableau de bord.</li>
+              <li>Suppression du scroll sur le tableau de bord desktop.</li>
+              <li>Classement général et moyenne team placés dans le même bloc de lecture.</li>
+              <li>Mobile rééquilibré : moins tassé, mais toujours contenu dans la hauteur visible.</li>
+              <li>Cache PWA remis à jour en 1.0.3 pour forcer les mobiles à récupérer les nouveaux fichiers.</li>
             </ul>
           </section>
           <section>
@@ -882,49 +882,55 @@ const App = {
     const teamAverageRows = this.overallTeamAverageRows();
 
     root.innerHTML = `
-      <section class="hero-card home-dashboard-hero">
-        <div>
-          <p class="eyebrow">${H.icon("nest")} Bienvenue dans le nid</p>
-          <h2>Fais tes scores avant le coup d’envoi.</h2>
-          <p class="muted">Les pronos des autres restent cachés jusqu’au début du match. Pas de copie, que du flair.</p>
-          <button class="ghost-btn rules-home-btn" id="rulesHomeBtn" type="button">${H.icon("list")} Règles & points</button>
-        </div>
-        <div class="hero-score">
-          <span>${myRank ? `#${myRank.rank}` : "—"}</span>
-          <small>ton rang</small>
-        </div>
-      </section>
-
-      <section class="grid home-dashboard-grid">
-        <article class="card next-match-card">
-          <div class="card-title-row compact-title-row">
-            <h3>Prochain match</h3>
-            <span class="pill">${next ? H.statusLabel(next.status) : "Aucun"}</span>
+      <section class="home-dashboard-screen" aria-label="Tableau de bord accueil">
+        <section class="hero-card home-dashboard-hero">
+          <div>
+            <p class="eyebrow">${H.icon("nest")} Bienvenue dans le nid</p>
+            <h2>Fais tes scores avant le coup d’envoi.</h2>
+            <p class="muted">Les pronos des autres restent cachés jusqu’au début du match. Pas de copie, que du flair.</p>
+            <button class="ghost-btn rules-home-btn" id="rulesHomeBtn" type="button">${H.icon("list")} Règles & points</button>
           </div>
-          ${next ? this.matchMiniHtml(next) : `<p class="muted">Aucun match à venir pour le moment.</p>`}
-        </article>
+        </section>
 
-        <article class="card warning-soft home-missing-card">
-          <div class="card-title-row">
-            <h3>Pronos manquants</h3>
-            <span class="count-badge">${missing.length}</span>
-          </div>
-          ${missing.length ? `
-            <p class="muted">Encore ${missing.length} match${missing.length > 1 ? "s" : ""} à poser.</p>
-            <button class="primary-btn" type="button" data-action="go-nearest-missing">Aller au plus proche</button>
-          ` : `<p class="muted">Nickel, tous tes pronos à venir sont posés.</p>`}
-        </article>
+        <section class="home-dashboard-grid">
+          <article class="card next-match-card">
+            <div class="card-title-row compact-title-row">
+              <h3>Prochain match</h3>
+              <span class="pill">${next ? H.statusLabel(next.status) : "Aucun"}</span>
+            </div>
+            ${next ? this.matchMiniHtml(next) : `<p class="muted">Aucun match à venir pour le moment.</p>`}
+          </article>
 
-        ${this.homeTeamAverageCardHtml(teamAverageRows)}
+          <section class="home-standing-stack" aria-label="Classements rapides">
+            ${this.homeRankCardHtml(myRank)}
+            ${this.homeTeamAverageCardHtml(teamAverageRows)}
+          </section>
+
+          <article class="card warning-soft home-missing-card">
+            <div class="card-title-row">
+              <h3>Pronos manquants</h3>
+              <span class="count-badge">${missing.length}</span>
+            </div>
+            ${missing.length ? `
+              <p class="muted">Encore ${missing.length} match${missing.length > 1 ? "s" : ""} à poser.</p>
+              <button class="primary-btn" type="button" data-action="go-nearest-missing">Aller au plus proche</button>
+            ` : `<p class="muted">Nickel, tous tes pronos à venir sont posés.</p>`}
+          </article>
+        </section>
+
+        ${this.homeRecordCarouselHtml()}
       </section>
-
-      ${this.homeRecordCarouselHtml()}
     `;
 
     H.$("#rulesHomeBtn")?.addEventListener("click", () => this.openRulesModal());
     H.$("#homeRecordsBtn", root)?.addEventListener("click", () => {
       this.state.achievementsTab = "records";
       this.loadView("achievements");
+    });
+    H.$('[data-action="go-overall-leaderboard"]', root)?.addEventListener("click", () => {
+      this.state.leaderboardTab = "players";
+      this.state.playerLeaderboardMode = "overall";
+      this.loadView("leaderboard");
     });
     H.$('[data-action="go-team-average-leaderboard"]', root)?.addEventListener("click", () => {
       this.state.leaderboardTab = "team";
@@ -934,6 +940,43 @@ const App = {
     this.bindNavigation();
     this.bindGoToNearestMissingActions();
     this.bindHomeRecordCarousel(root);
+  },
+
+
+  homeRankCardHtml(myRank) {
+    if (!myRank) {
+      return `
+        <article class="card home-rank-card">
+          <div class="card-title-row">
+            <h3>Classement général</h3>
+            <button class="ghost-btn tiny-btn" type="button" data-action="go-overall-leaderboard">Voir</button>
+          </div>
+          <div class="home-rank-main empty">
+            <span class="home-rank-number">—</span>
+            <div>
+              <strong>Pas encore classé</strong>
+              <small>Pose tes premiers pronos pour entrer dans le nid.</small>
+            </div>
+          </div>
+        </article>
+      `;
+    }
+
+    return `
+      <article class="card home-rank-card">
+        <div class="card-title-row">
+          <h3>Classement général</h3>
+          <button class="ghost-btn tiny-btn" type="button" data-action="go-overall-leaderboard">Voir</button>
+        </div>
+        <div class="home-rank-main">
+          <span class="home-rank-number">#${myRank.rank}</span>
+          <div>
+            <strong>${Number(myRank.total_points || 0)} pts</strong>
+            <small>Ton rang joueur</small>
+          </div>
+        </div>
+      </article>
+    `;
   },
 
   overallTeamAverageRows() {
@@ -4448,7 +4491,7 @@ const App = {
             <p class="muted">Déconnexion, crédits et historique des évolutions.</p>
           </div>
           <div class="profile-account-actions">
-            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.0.2</button>
+            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.0.3</button>
             <button class="danger-btn" id="profileLogoutBtn" type="button">Déconnexion</button>
           </div>
         </div>

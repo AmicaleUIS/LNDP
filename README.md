@@ -1,52 +1,32 @@
-# Le Nid des Pronos — V1.0.2
+# Le Nid des Pronos — V1.0.3
 
-## Version publique
+Version corrective orientée **tableau de bord plein écran**.
 
-Cette version marque le passage du site en **1.0.2** avec harmonisation des numéros de version, mise à jour du cache PWA et corrections visibles côté utilisateur.
+## Nouveautés V1.0.3
 
-## Nouveautés V1.0.2
+- Accueil réglé pour occuper la hauteur visible de l’écran.
+- Tableau de bord desktop sans scroll de page.
+- Mobile rééquilibré : l’écran est moins tassé que la V1.0.2, tout en restant contenu dans la vue.
+- Carte **Classement général** ajoutée sur l’accueil.
+- Carte **Moyenne team** placée au même endroit que le classement général.
+- Cache PWA passé en **1.0.3** pour forcer la récupération des nouveaux fichiers.
 
-- Tableau de bord mobile compacté : titre, hero, prochain match, pronos manquants, moyenne team et mini-records prennent beaucoup moins de hauteur.
-- Ajout d’une carte **Moyenne team** sur l’accueil : rang de la team, moyenne par joueur et accès rapide au classement des teams en mode moyenne.
-- Les équipes sans joueur restent visibles dans l’annuaire des teams, avec un état vide explicite.
-- Cache PWA passé en **1.0.2** pour forcer la récupération des nouveaux fichiers sur mobile/PWA.
+## Déploiement
 
-## Cache PWA
+Remplacer les fichiers du site par ceux de cette archive.
 
-Le service worker utilise maintenant :
-
-```txt
-le-nid-des-pronos-v1-0-2
-```
-
-Les fichiers HTML appellent les assets avec :
+Les assets sont appelés avec :
 
 ```txt
-?v=1.0.2
+?v=1.0.3
 ```
 
-Cela force les navigateurs et mobiles déjà installés en PWA à récupérer la nouvelle version au lieu de conserver les anciens fichiers.
-
-## Patch SQL
-
-Aucun nouveau patch SQL n’est nécessaire pour cette V1.0.2.
-
-Le dernier patch SQL nécessaire pour les fonctions de préparation reste :
+Le cache PWA utilise :
 
 ```txt
-patch_v0_26_0_preparation_classements.sql
+le-nid-des-pronos-v1-0-3
 ```
 
-## Images mini-records
+## SQL
 
-Les images des mini-records sont attendues dans :
-
-```txt
-assets/records/<record-id>.png
-```
-
-Liste complète dans :
-
-```txt
-assets/records/README.md
-```
+Aucun nouveau patch SQL n’est nécessaire pour cette V1.0.3.
