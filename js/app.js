@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — APP PRINCIPALE V1.0.10
+// LE NID DES PRONOS — APP PRINCIPALE V1.0.11
 // ============================================================
 
 const H = window.Helpers;
@@ -305,25 +305,25 @@ const App = {
           <div>
             <p class="eyebrow">Crédits cachés</p>
             <h2 id="creditsTitle">Le Nid des Pronos</h2>
-            <p class="muted">Version publique <strong>1.0.10</strong> · dashboard desktop lisible, avatars rangés.</p>
+            <p class="muted">Version publique <strong>1.0.11</strong> · pages compactées et tableaux groupes corrigés.</p>
           </div>
           <button class="ghost-btn" id="closeCreditsBtn" type="button">Fermer</button>
         </div>
         <div class="credits-grid">
           <section>
             <h3>Version actuelle</h3>
-            <p><strong>1.0.10</strong> — dashboard desktop assoupli : abandon du plein écran forcé, mini-records visibles en entier.</p>
+            <p><strong>1.0.11</strong> — interface affinée : tuiles matchs compactes, classements allégés et groupes stabilisés.</p>
             <p><strong>1.0.5</strong> — dashboard mobile/desktop stabilisé, sans chevauchement des cartes.</p>
           </section>
           <section>
-            <h3>Évolutions V1.0.10</h3>
+            <h3>Évolutions V1.0.11</h3>
             <ul class="changelog-list">
               <li>Tableau de bord réorganisé sans grille forcée qui écrase les cartes.</li>
               <li>Carte “Prochain match” réduite pour laisser respirer les classements et les mini-records.</li>
               <li>Mobile rendu lisible : les cartes gardent une taille confortable et la page peut scroller si nécessaire.</li>
               <li>Desktop conservé en tableau de bord sans scroll, sans chevauchement.</li>
               <li>Annuaire “Teams du nid” : les équipes sans joueur ne sont plus affichées.</li>
-              <li>Cache PWA remis à jour en 1.0.10 pour forcer la récupération du dashboard assoupli.</li>
+              <li>Cache PWA remis à jour en 1.0.11 pour forcer la récupération du dashboard assoupli.</li>
             </ul>
           </section>
           <section>
@@ -1181,7 +1181,7 @@ const App = {
         <article class="stat-card"><strong>${allDone.length}</strong><span>Pronos posés</span></article>
         ${allMissing.length ? `
           <button class="stat-card stat-card-action" type="button" data-action="go-nearest-missing" title="Aller au prono manquant le plus proche">
-            <strong>${allMissing.length}</strong><span>À faire · aller au plus proche</span>
+            <strong>${allMissing.length}</strong><span>À faire</span>
           </button>
         ` : `<article class="stat-card"><strong>0</strong><span>À faire</span></article>`}
         <article class="stat-card"><strong>${locked.length}</strong><span>Verrouillés</span></article>
@@ -2414,10 +2414,9 @@ const App = {
 
     root.innerHTML = `
       <section class="card player-leaderboard-card">
-        <div class="card-title-row">
+        <div class="card-title-row leaderboard-compact-title">
           <div>
             <h3>Classement joueurs</h3>
-            <p class="muted">Général ou par phase. Les badges restent visibles dans le détail, mais ne polluent plus la lecture principale.</p>
           </div>
         </div>
         <div class="segmented small player-leaderboard-mode">
@@ -4400,7 +4399,7 @@ const App = {
                 return `
                   <tr class="${r.group_rank <= 2 ? "qual-zone" : r.group_rank === 3 ? "third-zone" : ""}">
                     <td class="group-rank">${r.group_rank}</td>
-                    <td class="team-cell">${flag}<span>${H.escapeHtml(r.team_name)}</span></td>
+                    <td class="team-cell"><span class="group-team-inline">${flag}<span class="group-team-name">${H.escapeHtml(r.team_name)}</span></span></td>
                     <td>${r.played || 0}</td>
                     <td><strong>${r.points || 0}</strong></td>
                     <td>${(r.goal_difference || 0) > 0 ? "+" : ""}${r.goal_difference || 0}</td>
@@ -4516,7 +4515,7 @@ const App = {
             <p class="muted">Déconnexion, crédits et historique des évolutions.</p>
           </div>
           <div class="profile-account-actions">
-            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.0.10</button>
+            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.0.11</button>
             <button class="danger-btn" id="profileLogoutBtn" type="button">Déconnexion</button>
           </div>
         </div>

@@ -1,23 +1,22 @@
-# Le Nid des Pronos — V1.0.10
+# Le Nid des Pronos — V1.0.11
 
-## Correctif V1.0.10
+## Correctif V1.0.11
 
-- Refonte du tableau de bord d’accueil : arrêt de la grille forcée qui créait des espaces vides et des cartes coupées.
-- Nouvelle structure dashboard : bloc match + mini-records à gauche, classements + pronos manquants à droite sur desktop.
-- Mobile remis en lecture naturelle : empilement propre, sans chevauchement, avec scroll si la hauteur écran est trop courte.
-- Les équipes sans joueur restent masquées dans l’annuaire des teams du nid.
-- Cache PWA forcé en **1.0.10**.
+- **Matchs & pronos** : les 3 tuiles de synthèse sont compactées sur desktop et mobile.
+- **Coupe du monde** : les tableaux de groupes sont stabilisés, avec des lignes droites et des cellules d’équipe plus propres.
+- **Classements** : phrase secondaire retirée dans le classement joueurs et haut de page réduit.
+- Cache PWA forcé en **1.0.11**.
 
 Assets :
 
 ```txt
-?v=1.0.10
+?v=1.0.11
 ```
 
 Cache :
 
 ```txt
-le-nid-des-pronos-v1-0-10
+le-nid-des-pronos-v1-0-11
 ```
 
-Aucun nouveau patch SQL n’est nécessaire pour cette V1.0.10.
+Aucun nouveau patch SQL n’est nécessaire pour cette V1.0.11.

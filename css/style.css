@@ -11630,7 +11630,7 @@ body[data-current-view="home"] .view-root {
 }
 
 /* ============================================================
-   V1.0.10 — dashboard propre : cartes naturelles, pas de grille forcée
+   V1.0.11 — dashboard propre : cartes naturelles, pas de grille forcée
    Objectif : desktop sans chevauchement ; mobile lisible et scroll naturel.
    ============================================================ */
 body[data-current-view="home"] {
@@ -12359,7 +12359,7 @@ body[data-current-view="home"] .view-root {
 }
 
 /* ============================================================
-   V1.0.10 — dashboard desktop lisible et scroll naturel
+   V1.0.11 — dashboard desktop lisible et scroll naturel
    On abandonne le desktop absolument non-scrollable : priorité à une UI propre.
    Mobile V1.0.9 conservé car validé.
    ============================================================ */
@@ -12544,5 +12544,233 @@ body[data-current-view="home"] .view-root {
   .home-record-main p,
   .home-record-date {
     font-size: clamp(.72rem, .86vw, .82rem) !important;
+  }
+}
+
+/* ============================================================
+   V1.0.11 — compacité utile + tableaux de groupes stabilisés
+   ============================================================ */
+
+/* Matchs & pronos : les 3 tuiles de résumé ne doivent plus manger l'écran. */
+body[data-current-view="matches"] .toolbar-card {
+  padding: 16px 18px !important;
+  gap: 12px !important;
+}
+
+body[data-current-view="matches"] .toolbar-card h2 {
+  font-size: clamp(1.15rem, 1.6vw, 1.55rem) !important;
+  line-height: 1.05 !important;
+}
+
+body[data-current-view="matches"] .toolbar-card .muted {
+  margin: 6px 0 0 !important;
+  font-size: clamp(.82rem, 1vw, .96rem) !important;
+  line-height: 1.25 !important;
+}
+
+body[data-current-view="matches"] .combined-prono-stats {
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  gap: 10px !important;
+  margin: -2px 0 4px !important;
+}
+
+body[data-current-view="matches"] .combined-prono-stats .stat-card {
+  min-height: 68px !important;
+  padding: 10px 14px !important;
+  border-radius: 18px !important;
+  align-content: center !important;
+  justify-content: start !important;
+}
+
+body[data-current-view="matches"] .combined-prono-stats .stat-card strong {
+  font-size: clamp(1.45rem, 2vw, 1.9rem) !important;
+  line-height: .95 !important;
+}
+
+body[data-current-view="matches"] .combined-prono-stats .stat-card span {
+  font-size: clamp(.72rem, .9vw, .84rem) !important;
+  line-height: 1.1 !important;
+}
+
+body[data-current-view="matches"] .phase-nav,
+body[data-current-view="matches"] .phase-pager,
+body[data-current-view="matches"] .phase-navigation {
+  margin-block: 6px !important;
+}
+
+/* Coupe du monde : remettre les cellules en vrai tableau pour que les traits restent droits. */
+.group-table {
+  border-collapse: collapse !important;
+  border-spacing: 0 !important;
+  table-layout: fixed !important;
+}
+
+.group-table th,
+.group-table td {
+  border-bottom: 0 !important;
+  vertical-align: middle !important;
+}
+
+.group-table thead tr,
+.group-table tbody tr {
+  border-bottom: 1px solid rgba(255,255,255,.08) !important;
+}
+
+.group-table tbody tr:last-child {
+  border-bottom: 0 !important;
+}
+
+.group-table .team-cell {
+  display: table-cell !important;
+  text-align: left !important;
+  min-width: 0 !important;
+}
+
+.group-team-inline {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  vertical-align: middle !important;
+}
+
+.group-team-name {
+  min-width: 0 !important;
+  overflow-wrap: anywhere !important;
+  word-break: normal !important;
+  line-height: 1.15 !important;
+}
+
+/* Classements : en-tête moins haut, texte inutile retiré côté JS. */
+body[data-current-view="leaderboard"] .topbar {
+  margin-bottom: 10px !important;
+}
+
+body[data-current-view="leaderboard"] .topbar h1 {
+  font-size: clamp(2rem, 3.1vw, 3rem) !important;
+  line-height: 1 !important;
+}
+
+body[data-current-view="leaderboard"] .leaderboard-hero-card {
+  padding: 15px 18px !important;
+  min-height: 0 !important;
+  border-radius: 22px !important;
+}
+
+body[data-current-view="leaderboard"] .leaderboard-hero-card .eyebrow {
+  margin-bottom: 6px !important;
+  font-size: .72rem !important;
+}
+
+body[data-current-view="leaderboard"] .leaderboard-hero-card h2 {
+  font-size: clamp(1.25rem, 1.7vw, 1.65rem) !important;
+  line-height: 1.05 !important;
+}
+
+body[data-current-view="leaderboard"] .leaderboard-hero-card .muted {
+  margin: 6px 0 0 !important;
+  font-size: .88rem !important;
+  line-height: 1.25 !important;
+}
+
+body[data-current-view="leaderboard"] .leaderboard-main-tabs {
+  margin: 10px 0 12px !important;
+}
+
+body[data-current-view="leaderboard"] .player-leaderboard-card,
+body[data-current-view="leaderboard"] .team-leaderboard-card,
+body[data-current-view="leaderboard"] .evolution-card {
+  padding: 16px 18px !important;
+}
+
+body[data-current-view="leaderboard"] .leaderboard-compact-title {
+  margin-bottom: 8px !important;
+}
+
+@media (max-width: 760px) {
+  body[data-current-view="matches"] .toolbar-card {
+    padding: 12px !important;
+    border-radius: 18px !important;
+  }
+
+  body[data-current-view="matches"] .toolbar-card h2 {
+    font-size: 1.05rem !important;
+  }
+
+  body[data-current-view="matches"] .toolbar-card .muted {
+    font-size: .74rem !important;
+  }
+
+  body[data-current-view="matches"] .combined-prono-stats {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    gap: 7px !important;
+  }
+
+  body[data-current-view="matches"] .combined-prono-stats .stat-card {
+    min-height: 54px !important;
+    padding: 7px 8px !important;
+    border-radius: 14px !important;
+  }
+
+  body[data-current-view="matches"] .combined-prono-stats .stat-card strong {
+    font-size: 1.22rem !important;
+  }
+
+  body[data-current-view="matches"] .combined-prono-stats .stat-card span {
+    font-size: .58rem !important;
+    line-height: 1.05 !important;
+    letter-spacing: 0 !important;
+  }
+
+  .group-card {
+    overflow: hidden !important;
+  }
+
+  .group-table-wrap {
+    overflow-x: hidden !important;
+  }
+
+  .group-table {
+    min-width: 0 !important;
+    width: 100% !important;
+    font-size: .7rem !important;
+  }
+
+  .group-table th,
+  .group-table td {
+    padding: 7px 3px !important;
+  }
+
+  .group-team-inline {
+    gap: 5px !important;
+  }
+
+  .group-team-name {
+    font-size: .7rem !important;
+    line-height: 1.08 !important;
+  }
+
+  body[data-current-view="leaderboard"] .leaderboard-hero-card {
+    padding: 12px !important;
+    border-radius: 18px !important;
+  }
+
+  body[data-current-view="leaderboard"] .leaderboard-hero-card h2 {
+    font-size: 1.15rem !important;
+  }
+
+  body[data-current-view="leaderboard"] .leaderboard-hero-card .muted {
+    display: none !important;
+  }
+
+  body[data-current-view="leaderboard"] .leaderboard-main-tabs {
+    margin: 8px 0 10px !important;
+  }
+
+  body[data-current-view="leaderboard"] .player-leaderboard-card,
+  body[data-current-view="leaderboard"] .team-leaderboard-card,
+  body[data-current-view="leaderboard"] .evolution-card {
+    padding: 12px !important;
   }
 }
