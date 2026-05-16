@@ -1,6 +1,6 @@
-# Le Nid des Pronos — V1.1.2
+# Le Nid des Pronos — V1.1.3
 
-## Version V1.1.2
+## Version V1.1.3
 
 Correctif SQL : lancer `patch_v1_1_2_admin_role_enum_cast.sql` si le changement de rôle admin affiche une erreur `app_role` / `text`.
 
@@ -45,11 +45,11 @@ Ce patch ajoute les colonnes, tables, fonctions RPC et vues nécessaires.
 Publier tous les fichiers sur GitHub Pages. Les assets sont appelés avec :
 
 ```txt
-?v=1.1.2
+?v=1.1.3
 ```
 
 Le cache PWA est passé en :
 
 ```txt
-le-nid-des-pronos-v1-1-2
+le-nid-des-pronos-v1-1-3
 ```

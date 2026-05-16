@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — APP PRINCIPALE V1.1.2
+// LE NID DES PRONOS — APP PRINCIPALE V1.1.3
 // ============================================================
 
 const H = window.Helpers;
@@ -37,6 +37,13 @@ const App = {
     playerLeaderboardMode: "overall",
     teamTab: "average",
     teamLeaderboardScope: "overall",
+    familyLeaderboardTab: "players",
+    familyPlayerLeaderboardMode: "overall",
+    familyTeamTab: "average",
+    familyTeamLeaderboardScope: "overall",
+    familyLeaderboardPhaseIndex: 0,
+    familyTeamLeaderboardPhaseIndex: 0,
+    familyLeaderboardEvolutionMode: "day",
     achievementsTab: "mine",
     worldcupTab: "groups",
     matchPhaseIndex: 0,
@@ -306,6 +313,21 @@ const App = {
     return this.canSeeFamily() ? profiles : this.officialProfiles(profiles);
   },
 
+  familyProfiles(profiles = this.state.publicProfiles) {
+    // Univers Famille = comptes Famille + joueurs UIS qui ont explicitement activé le mode Famille.
+    // Les joueurs UIS qui gardent l’option désactivée restent invisibles ici et ne comptent pas dans ce classement.
+    return (profiles || []).filter((player) => {
+      const scope = player.player_scope || player.role || "uis";
+      const role = player.role || "user";
+      if (scope === "family" || role === "family") return true;
+      return Boolean(player.show_family_players);
+    });
+  },
+
+  familyProfileIds(profiles = this.state.publicProfiles) {
+    return new Set(this.familyProfiles(profiles).map((player) => String(player.id || player.user_id)));
+  },
+
   filterBlockedMessages(messages = []) {
     const blocked = this.state.blockedUserIds || new Set();
     return messages.filter((message) => {
@@ -364,21 +386,22 @@ const App = {
           <div>
             <p class="eyebrow">Crédits cachés</p>
             <h2 id="creditsTitle">Le Nid des Pronos</h2>
-            <p class="muted">Version publique <strong>1.1.2</strong> · correctif rôles admin et visibilité du mode Famille.</p>
+            <p class="muted">Version publique <strong>1.1.3</strong> · correctif rôles admin + amélioration UI du mode Famille dans le profil.</p>
           </div>
           <button class="ghost-btn" id="closeCreditsBtn" type="button">Fermer</button>
         </div>
         <div class="credits-grid">
           <section>
             <h3>Version actuelle</h3>
-            <p><strong>1.1.2</strong> — correction du changement de rôle depuis l’admin quand le rôle est stocké en enum Supabase.</p>
+            <p><strong>1.1.3</strong> — correction du changement de rôle depuis l’admin quand le rôle est stocké en enum Supabase.</p>
+            <p><strong>1.1.3</strong> — refonte visuelle du bloc Mode Famille dans le profil : interrupteur plus clair, état visible/masqué plus lisible, carte d’invitation plus propre.</p>
             <p><strong>1.0.18</strong> — mini-record “Greffier du grimoire” : date fournie par Supabase et égalités conservées par le premier détenteur.</p>
             <p><strong>1.0.15</strong> — les mini-records deviennent des trophées dynamiques : un seul détenteur actuel par record, calculé sur tous les joueurs.</p>
             <p><strong>1.0.13</strong> — ajout du badge “Descente du bus impossible” quand le champion pronostiqué reste bloqué en phase de groupes.</p>
             <p><strong>1.0.5</strong> — dashboard mobile/desktop stabilisé, sans chevauchement des cartes.</p>
           </section>
           <section>
-            <h3>Évolutions V1.1.2</h3>
+            <h3>Évolutions V1.1.3</h3>
             <ul class="changelog-list">
               <li>Classement Teams bureau général ajouté.</li>
               <li>Classement Teams bureau par phase conservé.</li>
@@ -719,7 +742,7 @@ const App = {
     console.warn("v_public_profiles indisponible, fallback profiles", error);
     const { data: fallback, error: fallbackError } = await window.sb
       .from("profiles")
-      .select("id,pseudo,role,player_scope,office_team_id,is_active,avatar_key,badge_shape,badge_color,profile_setup_done,featured_badge_ids")
+      .select("id,pseudo,role,player_scope,show_family_players,office_team_id,is_active,avatar_key,badge_shape,badge_color,profile_setup_done,featured_badge_ids")
       .eq("is_active", true)
       .order("pseudo", { ascending: true });
 
@@ -1036,6 +1059,9 @@ const App = {
     const missing = this.missingPredictions();
     const myRank = await this.fetchMyRank();
     const teamAverageRows = this.overallTeamAverageRows();
+    const familyRows = this.canSeeFamily() ? this.familyPlayerRows() : [];
+    const myFamilyRank = familyRows.find((row) => String(row.user_id || row.id) === String(this.state.session.user.id));
+    const familyTeamRows = this.canSeeFamily() ? this.familyTeamRows(null, "average") : [];
 
     root.innerHTML = `
       <section class="home-dashboard-screen" aria-label="Tableau de bord accueil">
@@ -1066,6 +1092,12 @@ const App = {
               ${this.homeRankCardHtml(myRank)}
               ${this.homeTeamAverageCardHtml(teamAverageRows)}
             </section>
+            ${this.canSeeFamily() ? `
+              <section class="home-standing-stack home-family-stack" aria-label="Classements Famille rapides">
+                ${this.homeFamilyRankCardHtml(myFamilyRank)}
+                ${this.homeFamilyTeamAverageCardHtml(familyTeamRows)}
+              </section>
+            ` : ""}
 
             <article class="card warning-soft home-missing-card">
               <div class="card-title-row">
@@ -1096,6 +1128,19 @@ const App = {
       this.state.leaderboardTab = "team";
       this.state.teamLeaderboardScope = "overall";
       this.state.teamTab = "average";
+      this.loadView("leaderboard");
+    });
+    H.$('[data-action="go-family-player-leaderboard"]', root)?.addEventListener("click", () => {
+      this.state.leaderboardTab = "family";
+      this.state.familyLeaderboardTab = "players";
+      this.state.familyPlayerLeaderboardMode = "overall";
+      this.loadView("leaderboard");
+    });
+    H.$('[data-action="go-family-team-average-leaderboard"]', root)?.addEventListener("click", () => {
+      this.state.leaderboardTab = "family";
+      this.state.familyLeaderboardTab = "team";
+      this.state.familyTeamLeaderboardScope = "overall";
+      this.state.familyTeamTab = "average";
       this.loadView("leaderboard");
     });
     this.bindNavigation();
@@ -1221,6 +1266,44 @@ const App = {
         ${leader && leader.office_team_id !== myRow.office_team_id ? `
           <p class="home-team-average-leader">Leader : <strong>${H.escapeHtml(leader.office_team_name)}</strong> · ${Number(leader.average_points || 0).toFixed(1)} pts/j</p>
         ` : `<p class="home-team-average-leader is-first">Ta team mène le nid à la moyenne 🦉</p>`}
+      </article>
+    `;
+  },
+
+  homeFamilyRankCardHtml(myRank) {
+    return `
+      <article class="card home-rank-card home-family-rank-card">
+        <div class="card-title-row">
+          <h3>Classement Famille</h3>
+          <button class="ghost-btn tiny-btn" type="button" data-action="go-family-player-leaderboard">Voir</button>
+        </div>
+        <div class="home-rank-main ${myRank ? "" : "empty"}">
+          <span class="home-rank-number">${myRank ? `#${myRank.rank}` : "—"}</span>
+          <div>
+            <strong>${myRank ? `${Math.round(Number(myRank.total_points || 0) * 10) / 10} pts` : "Pas encore classé"}</strong>
+            <small>Famille · hors classement officiel</small>
+          </div>
+        </div>
+      </article>
+    `;
+  },
+
+  homeFamilyTeamAverageCardHtml(rows = []) {
+    const myTeamId = this.state.profile?.office_team_id;
+    const myRow = rows.find((row) => row.office_team_id === myTeamId);
+    return `
+      <article class="card home-team-average-card home-family-team-card" style="--team-color:${this.safeColor(myRow?.office_team_color, "#facc15")}">
+        <div class="card-title-row">
+          <h3>Team Famille</h3>
+          <button class="ghost-btn tiny-btn" type="button" data-action="go-family-team-average-leaderboard">Voir</button>
+        </div>
+        <div class="home-team-average-main ${myRow ? "" : "empty"}">
+          <span class="home-team-rank">${myRow ? `#${myRow.rank}` : "—"}</span>
+          <div>
+            <strong>${myRow ? H.escapeHtml(myRow.office_team_name || "Team") : "Pas classée"}</strong>
+            <small>${myRow ? `${Number(myRow.average_points || 0).toFixed(1)} pts/joueur · ${myRow.active_players || 0} joueur${(myRow.active_players || 0) > 1 ? "s" : ""}` : "Aucun joueur Famille actif"}</small>
+          </div>
+        </div>
       </article>
     `;
   },
@@ -4271,12 +4354,11 @@ const App = {
     `;
   },
 
-  async renderFamilyLeaderboard() {
-    const root = H.$("#leaderboardContent");
-    const familyPlayers = this.state.publicProfiles.filter((player) => (player.player_scope || player.role) === "family" || player.role === "family");
-    const rows = familyPlayers.map((player) => {
+  familyPlayerRows(matchIds = null) {
+    const participants = this.familyProfiles(this.state.publicProfiles).filter((player) => player.profile_setup_done !== false);
+    const rows = participants.map((player) => {
       const userId = player.id || player.user_id;
-      const details = this.scoreDetailRowsForUser(userId);
+      const details = this.scoreDetailRowsForUser(userId, matchIds ? { matchIds } : {});
       const total = details.reduce((sum, { prediction }) => sum + Number(prediction.points_total || 0), 0);
       const exact = details.filter(({ prediction }) => prediction.is_exact_score).length;
       const goodResults = details.filter(({ prediction }) => prediction.is_good_result).length;
@@ -4290,23 +4372,273 @@ const App = {
         good_goal_diffs: goodDiffs,
         scored_matches: details.length
       };
-    }).sort((a, b) =>
-      Number(b.total_points || 0) - Number(a.total_points || 0)
-      || Number(b.exact_scores || 0) - Number(a.exact_scores || 0)
-      || String(a.pseudo || "").localeCompare(String(b.pseudo || ""), "fr")
-    ).map((row, index) => ({ ...row, rank: index + 1 }));
+    });
+    return rows
+      .sort((a, b) =>
+        Number(b.total_points || 0) - Number(a.total_points || 0)
+        || Number(b.exact_scores || 0) - Number(a.exact_scores || 0)
+        || Number(b.good_results || 0) - Number(a.good_results || 0)
+        || String(a.pseudo || "").localeCompare(String(b.pseudo || ""), "fr")
+      )
+      .map((row, index) => ({ ...row, rank: index + 1 }));
+  },
 
+  familyTeamRows(matchIds = null, mode = "average") {
+    const participants = this.familyProfiles(this.state.publicProfiles).filter((player) => player.profile_setup_done !== false);
+    const byTeam = new Map();
+
+    participants.forEach((player) => {
+      if (!player.office_team_id) return;
+      const team = this.state.officeTeams.find((item) => item.id === player.office_team_id) || {};
+      const userId = player.id || player.user_id;
+      const details = this.scoreDetailRowsForUser(userId, matchIds ? { matchIds } : {});
+      const row = byTeam.get(player.office_team_id) || {
+        office_team_id: player.office_team_id,
+        office_team_name: player.office_team_name || team.name || "Team",
+        office_team_color: player.office_team_color || team.color || "#facc15",
+        active_players: 0,
+        total_points: 0,
+        exact_scores: 0,
+        good_results: 0,
+        good_goal_diffs: 0,
+        scored_matches: 0
+      };
+      row.active_players += 1;
+      details.forEach(({ prediction }) => {
+        row.total_points += Number(prediction.points_total || 0);
+        row.exact_scores += prediction.is_exact_score ? 1 : 0;
+        row.good_results += prediction.is_good_result ? 1 : 0;
+        row.good_goal_diffs += prediction.is_good_goal_diff ? 1 : 0;
+        row.scored_matches += 1;
+      });
+      byTeam.set(player.office_team_id, row);
+    });
+
+    const byAverage = mode === "average";
+    return [...byTeam.values()]
+      .map((row) => ({ ...row, average_points: row.active_players ? row.total_points / row.active_players : 0 }))
+      .sort((a, b) =>
+        byAverage
+          ? (b.average_points || 0) - (a.average_points || 0)
+            || (b.total_points || 0) - (a.total_points || 0)
+            || String(a.office_team_name || "").localeCompare(String(b.office_team_name || ""), "fr")
+          : (b.total_points || 0) - (a.total_points || 0)
+            || (b.average_points || 0) - (a.average_points || 0)
+            || String(a.office_team_name || "").localeCompare(String(b.office_team_name || ""), "fr")
+      )
+      .map((row, index) => ({ ...row, rank: index + 1 }));
+  },
+
+  familyEvolutionSeries(mode = "day") {
+    const allowedIds = this.familyProfileIds();
+    const finishedRows = this.state.visiblePredictions
+      .map((prediction) => ({ prediction, match: this.state.matches.find((m) => m.id === prediction.match_id) }))
+      .filter(({ prediction, match }) => allowedIds.has(String(prediction.user_id)) && match?.status === "finished" && !match.is_test_match && prediction.points_total !== null && prediction.points_total !== undefined)
+      .sort((a, b) => new Date(a.match.kickoff_at || 0) - new Date(b.match.kickoff_at || 0));
+
+    const periodKey = (date) => {
+      const d = new Date(date);
+      if (mode === "week") {
+        const monday = new Date(d);
+        const day = monday.getDay() || 7;
+        monday.setHours(0, 0, 0, 0);
+        monday.setDate(monday.getDate() - day + 1);
+        return monday.toISOString().slice(0, 10);
+      }
+      return d.toISOString().slice(0, 10);
+    };
+    const periodLabel = (key) => mode === "week" ? `Semaine du ${H.formatShortDate(key)}` : H.formatShortDate(key);
+    const periods = [...new Set(finishedRows.map(({ match }) => periodKey(match.kickoff_at)))].sort();
+    const totalsByUser = new Map();
+    const pointsByPeriod = new Map(periods.map((key) => [key, new Map()]));
+    finishedRows.forEach(({ prediction, match }) => {
+      const key = periodKey(match.kickoff_at);
+      const map = pointsByPeriod.get(key);
+      map.set(prediction.user_id, (map.get(prediction.user_id) || 0) + Number(prediction.points_total || 0));
+    });
+    periods.forEach((key) => {
+      const map = pointsByPeriod.get(key);
+      map.forEach((points, userId) => totalsByUser.set(userId, (totalsByUser.get(userId) || 0) + points));
+    });
+    const playerIds = [...totalsByUser.keys()]
+      .sort((a, b) => (totalsByUser.get(b) || 0) - (totalsByUser.get(a) || 0))
+      .slice(0, 8);
+    const cumulative = new Map(playerIds.map((userId) => [userId, 0]));
+    const snapshots = periods.map((key) => {
+      const periodPoints = pointsByPeriod.get(key) || new Map();
+      playerIds.forEach((userId) => cumulative.set(userId, (cumulative.get(userId) || 0) + (periodPoints.get(userId) || 0)));
+      return { key, label: periodLabel(key), totals: new Map(playerIds.map((userId) => [userId, cumulative.get(userId) || 0])) };
+    });
+    return { playerIds, snapshots, totalsByUser };
+  },
+
+  bindFamilyLeaderboardControls(root) {
+    H.$$('[data-family-pane]', root).forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        this.state.familyLeaderboardTab = btn.dataset.familyPane;
+        await this.renderFamilyLeaderboard();
+      });
+    });
+    H.$$('[data-family-player-mode]', root).forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        this.state.familyPlayerLeaderboardMode = btn.dataset.familyPlayerMode;
+        await this.renderFamilyLeaderboard();
+      });
+    });
+    H.$$('[data-family-team-scope]', root).forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        this.state.familyTeamLeaderboardScope = btn.dataset.familyTeamScope;
+        await this.renderFamilyLeaderboard();
+      });
+    });
+    H.$$('[data-family-team-tab]', root).forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        this.state.familyTeamTab = btn.dataset.familyTeamTab;
+        await this.renderFamilyLeaderboard();
+      });
+    });
+    H.$$('[data-family-evolution-mode]', root).forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        this.state.familyLeaderboardEvolutionMode = btn.dataset.familyEvolutionMode;
+        await this.renderFamilyLeaderboard();
+      });
+    });
+  },
+
+  async renderFamilyLeaderboard() {
+    const root = H.$("#leaderboardContent");
+    const pane = ["players", "team", "evolution"].includes(this.state.familyLeaderboardTab) ? this.state.familyLeaderboardTab : "players";
+    this.state.familyLeaderboardTab = pane;
+
+    const paneControls = `
+      <div class="segmented small family-leaderboard-panes">
+        <button class="${pane === "players" ? "active" : ""}" data-family-pane="players">Joueurs</button>
+        <button class="${pane === "team" ? "active" : ""}" data-family-pane="team">Par équipe</button>
+        <button class="${pane === "evolution" ? "active" : ""}" data-family-pane="evolution">Évolution</button>
+      </div>
+    `;
+
+    if (pane === "team") {
+      const teamTab = ["average", "points"].includes(this.state.familyTeamTab) ? this.state.familyTeamTab : "average";
+      const scope = this.state.familyTeamLeaderboardScope === "phase" ? "phase" : "overall";
+      this.state.familyTeamTab = teamTab;
+      this.state.familyTeamLeaderboardScope = scope;
+      const scopeControls = `
+        <div class="segmented small team-leaderboard-scope">
+          <button class="${scope === "overall" ? "active" : ""}" data-family-team-scope="overall">Général</button>
+          <button class="${scope === "phase" ? "active" : ""}" data-family-team-scope="phase">Par phase</button>
+        </div>`;
+      const modeControls = `
+        <div class="segmented small team-leaderboard-mode">
+          <button class="${teamTab === "average" ? "active" : ""}" data-family-team-tab="average">Moyenne</button>
+          <button class="${teamTab === "points" ? "active" : ""}" data-family-team-tab="points">Par points</button>
+        </div>`;
+
+      if (scope === "overall") {
+        const rows = this.familyTeamRows(null, teamTab);
+        root.innerHTML = `
+          <section class="card team-leaderboard-card family-leaderboard-card">
+            <div class="card-title-row leaderboard-compact-title"><h3>Famille · par équipe</h3></div>
+            <div class="team-leaderboard-control-stack">${paneControls}${scopeControls}${modeControls}</div>
+            <div class="team-phase-head"><strong>Général</strong><small>Joueurs Famille + joueurs UIS ayant activé le mode Famille</small></div>
+            ${this.teamLeaderboardRowsHtml(rows, { mode: teamTab })}
+          </section>`;
+        this.bindFamilyLeaderboardControls(root);
+        return;
+      }
+
+      const groups = this.groupMatchesByPouleRound(this.phaseLeaderboardMatches());
+      const activeIndex = this.clampPhaseIndex("familyTeamLeaderboardPhaseIndex", groups);
+      const group = groups[activeIndex];
+      const rows = group ? this.familyTeamRows(group.matches.map((match) => match.id), teamTab) : [];
+      const finishedCount = group ? group.matches.filter((match) => match.status === "finished").length : 0;
+      const pager = group ? this.phaseNavigatorHtml(groups, activeIndex, "familyTeamLeaderboardPhaseIndex") : "";
+      root.innerHTML = `
+        <section class="card team-leaderboard-card family-leaderboard-card">
+          <div class="card-title-row leaderboard-compact-title"><h3>Famille · par équipe · phase</h3></div>
+          <div class="team-leaderboard-control-stack">${paneControls}${scopeControls}${modeControls}</div>
+          ${pager}
+          ${group ? `<div class="team-phase-head"><strong>${H.escapeHtml(group.key)}</strong><small>${finishedCount}/${group.matches.length} match${group.matches.length > 1 ? "s" : ""} terminé${finishedCount > 1 ? "s" : ""} · ${H.matchDateRangeLabel(group.matches)}</small></div>` : `<p class="muted">Aucune phase à afficher pour le moment.</p>`}
+          ${this.teamLeaderboardRowsHtml(rows, { mode: teamTab })}
+          ${pager}
+        </section>`;
+      this.bindFamilyLeaderboardControls(root);
+      this.bindPhaseNavigation("familyTeamLeaderboardPhaseIndex", () => this.renderFamilyLeaderboard());
+      return;
+    }
+
+    if (pane === "evolution") {
+      const mode = this.state.familyLeaderboardEvolutionMode === "week" ? "week" : "day";
+      const series = this.familyEvolutionSeries(mode);
+      const latestSnapshot = series.snapshots[series.snapshots.length - 1];
+      root.innerHTML = `
+        <section class="card evolution-card family-leaderboard-card">
+          <div class="card-title-row">
+            <div><h3>Famille · évolution</h3><p class="muted">Courbe des 8 meilleurs joueurs du mode Famille.</p></div>
+            <div class="segmented small">
+              <button class="${mode === "day" ? "active" : ""}" data-family-evolution-mode="day">Jour</button>
+              <button class="${mode === "week" ? "active" : ""}" data-family-evolution-mode="week">Semaine</button>
+            </div>
+          </div>
+          ${paneControls}
+          ${series.playerIds.length ? `
+            <div class="evolution-layout">
+              <div class="evolution-chart-wrap">${this.evolutionChartSvg(series)}</div>
+              <div class="evolution-legend">
+                ${series.playerIds.map((userId, index) => {
+                  const profile = this.profileForUser(userId);
+                  const color = this.safeColor(profile.badge_color || profile.office_team_color, ["#facc15", "#38bdf8", "#a78bfa", "#fb7185", "#34d399", "#fb923c", "#f472b6", "#c4b5fd"][index % 8]);
+                  const total = latestSnapshot?.totals.get(userId) || 0;
+                  return `<div class="evolution-player" style="--player-color:${color}">${H.profileBadgeHtml(profile, "profile-badge mini")}<div><strong>${H.escapeHtml(profile.pseudo)}</strong><small>${H.escapeHtml(profile.office_team_name || "Sans team")} · ${total} pts</small></div></div>`;
+                }).join("")}
+              </div>
+            </div>` : `<p class="muted">Pas encore assez de matchs terminés pour afficher une courbe Famille.</p>`}
+        </section>`;
+      this.bindFamilyLeaderboardControls(root);
+      return;
+    }
+
+    const mode = this.state.familyPlayerLeaderboardMode === "phase" ? "phase" : "overall";
+    this.state.familyPlayerLeaderboardMode = mode;
+    const modeControls = `
+      <div class="segmented small player-leaderboard-mode">
+        <button class="${mode === "overall" ? "active" : ""}" data-family-player-mode="overall">Général</button>
+        <button class="${mode === "phase" ? "active" : ""}" data-family-player-mode="phase">Par phase</button>
+      </div>`;
+
+    if (mode === "phase") {
+      const groups = this.groupMatchesByPouleRound(this.phaseLeaderboardMatches());
+      const activeIndex = this.clampPhaseIndex("familyLeaderboardPhaseIndex", groups);
+      const group = groups[activeIndex];
+      const rows = group ? this.familyPlayerRows(group.matches.map((match) => match.id)) : [];
+      const finishedCount = group ? group.matches.filter((match) => match.status === "finished").length : 0;
+      const pager = group ? this.phaseNavigatorHtml(groups, activeIndex, "familyLeaderboardPhaseIndex") : "";
+      root.innerHTML = `
+        <section class="card player-leaderboard-card family-leaderboard-card">
+          <div class="card-title-row leaderboard-compact-title"><h3>Famille · joueurs · phase</h3></div>
+          <div class="team-leaderboard-control-stack">${paneControls}${modeControls}</div>
+          ${pager}
+          ${group ? `<div class="team-phase-head"><strong>${H.escapeHtml(group.key)}</strong><small>${finishedCount}/${group.matches.length} match${group.matches.length > 1 ? "s" : ""} terminé${finishedCount > 1 ? "s" : ""} · ${H.matchDateRangeLabel(group.matches)}</small></div>` : `<p class="muted">Aucune phase à afficher pour le moment.</p>`}
+          ${this.leaderboardRowsHtml(rows)}
+          ${pager}
+        </section>`;
+      this.bindFamilyLeaderboardControls(root);
+      this.bindAchievementReplay(root);
+      this.bindPhaseNavigation("familyLeaderboardPhaseIndex", () => this.renderFamilyLeaderboard());
+      return;
+    }
+
+    const rows = this.familyPlayerRows();
     root.innerHTML = `
       <section class="card player-leaderboard-card family-leaderboard-card">
         <div class="card-title-row leaderboard-compact-title">
-          <div>
-            <h3>Classement Famille</h3>
-            <p class="muted">Hors classement officiel du bureau. Les mini-records restent réservés aux joueurs UIS.</p>
-          </div>
+          <div><h3>Famille · joueurs</h3><p class="muted">Joueurs Famille + joueurs UIS ayant activé le mode Famille. Hors classement officiel et hors mini-records.</p></div>
         </div>
+        <div class="team-leaderboard-control-stack">${paneControls}${modeControls}</div>
         ${this.leaderboardRowsHtml(rows)}
       </section>
     `;
+    this.bindFamilyLeaderboardControls(root);
     this.bindAchievementReplay(root);
   },
 
@@ -4899,22 +5231,34 @@ const App = {
 
     return `
       <section class="card family-profile-card">
-        <div class="card-title-row">
+        <div class="card-title-row family-header-row">
           <div>
             <h3>Mode Famille</h3>
             <p class="muted">Tu peux choisir d’afficher ou non les joueurs Famille. Par défaut, ils sont masqués pour ne pas polluer ton nid.</p>
           </div>
           <span class="pill ${familyEnabled ? "success" : "neutral"}">${familyEnabled ? "Inscriptions ouvertes" : "Inscriptions fermées"}</span>
         </div>
-        <label class="family-toggle-line">
-          <input id="showFamilyPlayersToggle" type="checkbox" ${profile.show_family_players ? "checked" : ""}>
-          <span>Afficher les joueurs Famille dans mon nid</span>
-        </label>
+
+        <div class="family-toggle-card">
+          <div class="family-toggle-copy">
+            <strong>Afficher le mode Famille</strong>
+            <p class="muted small-note">Classements Famille, joueurs Famille et messages associés deviennent visibles dans ton nid.</p>
+          </div>
+          <label class="family-switch" for="showFamilyPlayersToggle">
+            <input id="showFamilyPlayersToggle" type="checkbox" ${profile.show_family_players ? "checked" : ""}>
+            <span class="family-switch-track" aria-hidden="true"><span class="family-switch-thumb"></span></span>
+            <span class="family-switch-state">${profile.show_family_players ? "Visible" : "Masqué"}</span>
+          </label>
+        </div>
+
         <div class="family-invite-box">
           <div>
             <strong>Invitations Famille</strong>
             <p class="muted small-note">Maximum 3 invitations par joueur UIS. Une invitation = une personne, valable 7 jours, rattachée à ta team actuelle.</p>
-            <p class="muted small-note">Créées : ${createdCount}/3 · utilisées : ${usedCount}</p>
+            <div class="family-invite-stats">
+              <span class="stat-chip">Créées <strong>${createdCount}/3</strong></span>
+              <span class="stat-chip">Utilisées <strong>${usedCount}</strong></span>
+            </div>
           </div>
           <button class="primary-btn" id="createFamilyInviteBtn" type="button" ${(!familyEnabled || createdCount >= 3 || !profile.office_team_id) ? "disabled" : ""}>Créer une invitation</button>
         </div>
@@ -5031,7 +5375,7 @@ const App = {
             <p class="muted">Déconnexion, crédits et historique des évolutions.</p>
           </div>
           <div class="profile-account-actions">
-            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.1.2</button>
+            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.1.3</button>
             <button class="danger-btn" id="profileLogoutBtn" type="button">Déconnexion</button>
           </div>
         </div>
