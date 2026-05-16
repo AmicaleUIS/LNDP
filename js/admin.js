@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — ADMIN V1.2.3
+// LE NID DES PRONOS — ADMIN V1.2.4
 // ============================================================
 
 const H = window.Helpers;
@@ -21,7 +21,8 @@ const Admin = {
     backups: [],
     familyInvites: [],
     appSettings: {},
-    familyModeEnabled: false
+    familyModeEnabled: false,
+    preparationModuleEnabled: true
   },
 
   isSuperAdmin() {
@@ -67,6 +68,7 @@ const Admin = {
     H.$("#restoreBackupBtn")?.addEventListener("click", () => this.restoreSelectedBackup());
     H.$("#resetPredictionsBtn")?.addEventListener("click", () => this.resetAllPredictions());
     H.$("#resetPreparationScoresBtn")?.addEventListener("click", () => this.resetPreparationScores());
+    H.$("#togglePreparationModuleBtn")?.addEventListener("click", () => this.togglePreparationModule());
 
     const scrollTopBtn = H.$("#adminScrollTopOwl");
     if (scrollTopBtn && scrollTopBtn.dataset.bound !== "true") {
@@ -316,7 +318,8 @@ const Admin = {
       await Promise.all([
         this.loadTeams(),
         this.loadFootballTeams(),
-        this.loadMatches()
+        this.loadMatches(),
+        this.loadFamilyModeSetting()
       ]);
       this.renderQuickScores();
       this.renderMatches();
@@ -423,21 +426,37 @@ const Admin = {
     this.state.familyInvites = data || [];
   },
 
+  settingBoolean(value, fallback = false) {
+    if (value === undefined || value === null) return fallback;
+    if (typeof value === "boolean") return value;
+    if (typeof value === "string") return value === "true";
+    if (value && typeof value === "object" && "enabled" in value) return Boolean(value.enabled);
+    return Boolean(value);
+  },
+
   async loadFamilyModeSetting() {
     const { data, error } = await window.sb
       .from("app_settings")
       .select("key,value")
-      .eq("key", "family_mode_enabled")
-      .maybeSingle();
+      .in("key", ["family_mode_enabled", "preparation_module_enabled"]);
 
     if (error) {
-      console.warn("Paramètre Famille indisponible", error);
+      console.warn("Paramètres app indisponibles", error);
       this.state.familyModeEnabled = false;
+      this.state.preparationModuleEnabled = true;
       return;
     }
 
-    const value = data?.value;
-    this.state.familyModeEnabled = typeof value === "boolean" ? value : value === "true" || Boolean(value?.enabled);
+    const settings = Object.fromEntries((data || []).map((row) => [row.key, row.value]));
+    this.state.appSettings = settings;
+    this.state.familyModeEnabled = this.settingBoolean(settings.family_mode_enabled, false);
+    this.state.preparationModuleEnabled = this.settingBoolean(settings.preparation_module_enabled, true);
+  },
+
+  adminVisibleMatches(matches = this.state.matches) {
+    return this.state.preparationModuleEnabled === false
+      ? matches.filter((match) => !match.is_test_match)
+      : matches;
   },
 
   applyRolePermissions() {
@@ -1038,7 +1057,7 @@ const Admin = {
   },
 
   groupMatchesForAdmin(matches = []) {
-    return Object.values(H.groupMatchesByPouleRound(matches))
+    return Object.values(H.groupMatchesByPouleRound(this.adminVisibleMatches(matches)))
       .map((group) => {
         const sortedMatches = this.sortMatchesForAdmin(group.matches);
         const openMatches = sortedMatches.filter((m) => !["finished", "cancelled"].includes(m.status));
@@ -1071,7 +1090,7 @@ const Admin = {
     const filter = this.state.quickScoreFilter || "work";
     const todayKey = this.localDateKey(new Date());
 
-    const matches = this.state.matches
+    const matches = this.adminVisibleMatches(this.state.matches)
       .filter((match) => {
         const matchDateKey = this.localDateKey(match.kickoff_at);
         if (filter === "all") return true;
@@ -1449,6 +1468,22 @@ const Admin = {
   renderBackups() {
     const select = H.$("#backupSelect");
     const list = H.$("#backupListAdmin");
+    const prepEnabled = this.state.preparationModuleEnabled !== false;
+    const prepStatus = H.$("#prepModuleStatusText");
+    const prepToggle = H.$("#togglePreparationModuleBtn");
+
+    if (prepStatus) {
+      prepStatus.innerHTML = prepEnabled
+        ? `<strong>Actif</strong> · les matchs test restent visibles dans les écrans joueurs/admin.`
+        : `<strong>Désactivé</strong> · les matchs test, règles et classements de préparation sont masqués.`;
+    }
+
+    if (prepToggle) {
+      prepToggle.textContent = prepEnabled ? "Désactiver le module préparation" : "Réactiver le module préparation";
+      prepToggle.classList.toggle("danger-btn", prepEnabled);
+      prepToggle.classList.toggle("ghost-btn", !prepEnabled);
+    }
+
     if (!select) return;
 
     if (!this.state.backups.length) {
@@ -1516,6 +1551,28 @@ const Admin = {
     H.$("#resetConfirmInput").value = "";
     H.toast("Pronos et messages remis à zéro", "success");
     await this.reloadAll();
+  },
+
+  async togglePreparationModule() {
+    const enabledNow = this.state.preparationModuleEnabled !== false;
+    const nextEnabled = !enabledNow;
+    const message = enabledNow
+      ? "Désactiver le module préparation ? Les matchs test, leurs règles et leurs classements par phase seront masqués. Les 2 badges de préparation restent visibles dans les exploits."
+      : "Réactiver le module préparation ? Les matchs test redeviendront visibles dans les écrans joueurs et admin.";
+
+    if (!confirm(message)) return;
+
+    const { error } = await window.sb.rpc("admin_set_preparation_module", { p_enabled: nextEnabled });
+    if (error) {
+      H.toast(error.message || "Impossible de modifier le module préparation. As-tu lancé le patch SQL V1.2.4 ?", "error");
+      return;
+    }
+
+    await this.loadFamilyModeSetting();
+    this.renderBackups();
+    this.renderQuickScores();
+    this.renderMatches();
+    H.toast(nextEnabled ? "Module préparation réactivé" : "Module préparation désactivé", "success");
   },
 
   async resetPreparationScores() {

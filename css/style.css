@@ -14128,3 +14128,103 @@ body[data-current-view="leaderboard"] .team-leaderboard-card .muted {
 .family-bonus-form button {
   min-width: 0;
 }
+
+
+/* ============================================================
+   V1.2.4 — module préparation masquable + sidebar admin desktop
+   ============================================================ */
+.admin-sidebar {
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+.admin-sidebar-action {
+  display: flex !important;
+  align-items: center;
+  justify-content: flex-start !important;
+  gap: 10px;
+  min-height: 48px;
+  padding-inline: 12px;
+}
+
+.admin-sidebar-action .owl-icon {
+  width: 34px;
+  height: 34px;
+  flex: 0 0 34px;
+  object-fit: contain;
+}
+
+.prep-module-box {
+  border-color: rgba(250, 204, 21, .24);
+  background:
+    radial-gradient(circle at 0% 0%, rgba(250, 204, 21, .10), transparent 34%),
+    rgba(255,255,255,.045);
+}
+
+.prep-module-status {
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: rgba(0,0,0,.16);
+  border: 1px solid rgba(255,255,255,.08);
+}
+
+.prep-module-status strong {
+  color: var(--text);
+}
+
+.prep-module-actions {
+  display: grid;
+  gap: 10px;
+}
+
+.prep-module-actions .ghost-btn,
+.prep-module-actions .danger-btn {
+  width: 100%;
+  justify-content: center;
+}
+
+.tiny-note {
+  font-size: .82rem;
+  line-height: 1.35;
+}
+
+@media (max-width: 1100px) and (min-width: 761px) {
+  .admin-sidebar {
+    padding: 14px 10px;
+    gap: 10px;
+  }
+
+  .admin-nav {
+    gap: 8px;
+  }
+
+  .admin-nav-btn {
+    min-height: 56px;
+  }
+
+  .admin-nav-btn .owl-icon {
+    width: 44px;
+    height: 44px;
+    flex-basis: 44px;
+  }
+
+  .admin-sidebar-footer {
+    gap: 8px;
+  }
+
+  .admin-sidebar-footer .admin-sidebar-action {
+    justify-content: center !important;
+    min-height: 52px;
+    padding: 8px;
+  }
+
+  .admin-sidebar-footer .admin-sidebar-action span {
+    display: none;
+  }
+
+  .admin-sidebar-footer .admin-sidebar-action .owl-icon {
+    width: 42px;
+    height: 42px;
+    flex-basis: 42px;
+  }
+}

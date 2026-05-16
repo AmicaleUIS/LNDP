@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Admin — Le Nid des Pronos</title>
   <meta name="theme-color" content="#07111f">
-  <link rel="manifest" href="manifest.json?v=1.2.3">
+  <link rel="manifest" href="manifest.json?v=1.2.4">
   <link rel="icon" href="assets/icons/icon-192.png">
   <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png">
-  <link rel="stylesheet" href="css/style.css?v=1.2.3">
+  <link rel="stylesheet" href="css/style.css?v=1.2.4">
 </head>
 <body>
   <div class="admin-shell">
@@ -46,16 +46,16 @@
       </nav>
 
       <div class="admin-sidebar-footer">
-        <a class="ghost-btn" href="app.html">Retour app</a>
-        <button class="ghost-btn" id="refreshAdmin">Rafraîchir</button>
-        <button class="danger-btn" id="logoutBtn">Déconnexion</button>
+        <a class="ghost-btn admin-sidebar-action" href="app.html"><img class="owl-icon" src="assets/icons/owl-png/accueil.png" alt="" aria-hidden="true" loading="lazy"><span>Retour app</span></a>
+        <button class="ghost-btn admin-sidebar-action" id="refreshAdmin" type="button"><img class="owl-icon" src="assets/icons/owl-png/en-direct.png" alt="" aria-hidden="true" loading="lazy"><span>Rafraîchir</span></button>
+        <button class="danger-btn admin-sidebar-action" id="logoutBtn" type="button"><img class="owl-icon" src="assets/icons/owl-png/verrouille.png" alt="" aria-hidden="true" loading="lazy"><span>Déconnexion</span></button>
       </div>
     </aside>
 
     <main class="admin-main-area">
       <header class="admin-header admin-page-header">
         <div>
-          <p class="eyebrow">Administration · v1.2.3</p>
+          <p class="eyebrow">Administration · v1.2.4</p>
           <h1 id="adminPageTitle"><img class="owl-icon title-icon" src="assets/icons/owl-png/admin.png" alt="" aria-hidden="true" loading="lazy"> Saisie rapide des scores</h1>
           <p class="muted" id="adminPageSubtitle">Prochains matchs en haut, scores manuels, classement recalculé automatiquement.</p>
         </div>
@@ -137,10 +137,15 @@
               <button class="ghost-btn" id="restoreBackupBtn" type="button">Charger la sauvegarde</button>
             </section>
 
-            <section class="backup-box prep-reset-box">
+            <section class="backup-box prep-reset-box prep-module-box">
               <h3>Scores de préparation</h3>
               <p class="muted">Remet uniquement à zéro les scores des 2 matchs test. Les pronos joueurs restent conservés pour retester le calcul.</p>
-              <button class="ghost-btn" id="resetPreparationScoresBtn" type="button">Reset scores préparation</button>
+              <p class="prep-module-status muted" id="prepModuleStatusText">Chargement du statut préparation...</p>
+              <div class="prep-module-actions">
+                <button class="ghost-btn" id="resetPreparationScoresBtn" type="button">Reset scores préparation</button>
+                <button class="danger-btn" id="togglePreparationModuleBtn" type="button">Désactiver le module préparation</button>
+              </div>
+              <p class="muted tiny-note">Désactiver masque les matchs test, les règles et les classements liés. Les 2 badges préparation restent dans les exploits.</p>
             </section>
 
             <section class="backup-box danger-zone">
@@ -199,10 +204,10 @@
   </button>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="js/config.js?v=1.2.3"></script>
-  <script src="js/supabaseClient.js?v=1.2.3"></script>
-  <script src="js/auth.js?v=1.2.3"></script>
-  <script src="js/common.js?v=1.2.3"></script>
-  <script src="js/admin.js?v=1.2.3"></script>
+  <script src="js/config.js?v=1.2.4"></script>
+  <script src="js/supabaseClient.js?v=1.2.4"></script>
+  <script src="js/auth.js?v=1.2.4"></script>
+  <script src="js/common.js?v=1.2.4"></script>
+  <script src="js/admin.js?v=1.2.4"></script>
 </body>
 </html>

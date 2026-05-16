@@ -1,8 +1,8 @@
-# Le Nid des Pronos — V1.2.3
+# Le Nid des Pronos — V1.2.4
 
-## Version V1.2.3 — Coupons Famille super admin
+## Version V1.2.4 — Module préparation masquable
 
-Cette version ajoute une gestion plus complète des coupons d’invitation Famille côté super admin : ajout de coupons bonus, réinitialisation de coupons utilisés/expirés, vue par joueur et détail des personnes invitées.
+Cette version ajoute un réglage super admin pour désactiver l’affichage du module “préparation” quand tu veux alléger l’application après les tests ou après la Coupe du monde.
 
 ### Patch SQL obligatoire
 
@@ -14,50 +14,33 @@ patch_v1_1_2_admin_role_enum_cast.sql
 patch_v1_2_0_chat_du_nid.sql
 patch_v1_2_1_reactions_whatsapp.sql
 patch_v1_2_3_coupons_famille_super_admin.sql
+patch_v1_2_4_module_preparation.sql
 ```
 
-### Chat
+### Admin
+
+- Dans **Sauvegardes & remise à zéro > Scores de préparation**, le super admin peut désactiver ou réactiver le module préparation.
+- Quand le module est désactivé, les matchs test disparaissent des écrans joueurs et admin.
+- Les règles et classements par phase liés aux matchs de préparation sont masqués.
+- Les 2 badges de préparation restent visibles dans les exploits.
+- En desktop/tablette, la barre admin de gauche affiche aussi les icônes Retour app, Rafraîchir et Déconnexion.
+
+### Chat et Famille
 
 - Salons : `Général`, `Ma team`, `Famille`, `Famille team`.
-- Les comptes Famille ne peuvent pas écrire dans le Général officiel.
-- Les joueurs UIS doivent activer le mode Famille pour voir/écrire dans les salons Famille.
-- 10 derniers messages au chargement.
-- Bouton pour charger 20 messages précédents.
-- Auto-refresh toutes les 8 secondes.
 - Réactions PNG : LOL, Chaud, Oups..., Coeur, Approuvé, Casserole.
-- Les réactions ne s'affichent sous un message que s'il y a au moins une réaction.
-- Clic sur une bulle de message : ouverture d'une fenêtre avec les 6 réactions PNG.
-- Clic sur un compteur de réaction : détail avec avatar, pseudo, team et date.
-- Une seule réaction par joueur et par message.
-- Le blocage individuel masque les messages et réactions du joueur bloqué.
-- L'auteur peut masquer son message ; le super admin peut masquer tous les messages.
-
-### Mode Famille
-
-- Ajout d'un bouton d'explication dans le profil.
-- Le bloc Famille du profil est clarifié.
-- Le panneau admin Famille est visuellement amélioré.
-- Le mode Famille reste masqué par défaut pour les joueurs UIS.
+- Panneau admin Famille : coupons bonus, réinitialisation de coupons et vue des invités.
 
 ## Déploiement
 
 Publier tous les fichiers sur GitHub Pages. Les assets sont appelés avec :
 
 ```txt
-?v=1.2.3
+?v=1.2.4
 ```
 
 Le cache PWA est passé en :
 
 ```txt
-le-nid-des-pronos-v1-2-3
+le-nid-des-pronos-v1-2-4
 ```
-
-
-### V1.2.3
-
-- Ajout d’un panneau “Coupon bonus joueur” dans l’admin Famille.
-- Le super admin peut créer un coupon bonus pour un joueur UIS, même au-delà des 3 invitations normales.
-- Le super admin peut réinitialiser un coupon utilisé, expiré ou annulé : il redevient disponible 7 jours.
-- Ajout d’une vue “Coupons par joueur” avec total, utilisés, disponibles et bonus.
-- Ajout d’une vue “Personnes invitées” indiquant qui a été invité, par qui, avec quelle team et quel code quand l’information existe.

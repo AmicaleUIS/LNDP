@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — APP PRINCIPALE V1.2.3
+// LE NID DES PRONOS — APP PRINCIPALE V1.2.4
 // ============================================================
 
 const H = window.Helpers;
@@ -427,13 +427,14 @@ const App = {
           <div>
             <p class="eyebrow">Crédits cachés</p>
             <h2 id="creditsTitle">Le Nid des Pronos</h2>
-            <p class="muted">Version publique <strong>1.2.3</strong> · coupons Famille bonus et réinitialisation admin.</p>
+            <p class="muted">Version publique <strong>1.2.4</strong> · préparation masquable et admin desktop plus lisible.</p>
           </div>
           <button class="ghost-btn" id="closeCreditsBtn" type="button">Fermer</button>
         </div>
         <div class="credits-grid">
           <section>
             <h3>Version actuelle</h3>
+            <p><strong>1.2.4</strong> — super admin : bouton pour masquer/réactiver le module préparation, règles et classements nettoyés, barre admin desktop améliorée.</p>
             <p><strong>1.2.3</strong> — super admin : coupons Famille bonus, réinitialisation des invitations et vue détaillée des invités.</p>
             <p><strong>1.2.0</strong> — nouveau tchat : salons Général / Team / Famille / Team Famille, chargement des anciens messages, réactions PNG, blocage individuel renforcé.</p>
             <p><strong>1.2.0</strong> — refonte des classements Famille et amélioration du bloc Mode Famille dans le profil.</p>
@@ -443,12 +444,12 @@ const App = {
             <p><strong>1.0.5</strong> — dashboard mobile/desktop stabilisé, sans chevauchement des cartes.</p>
           </section>
           <section>
-            <h3>Évolutions V1.2.3</h3>
+            <h3>Évolutions V1.2.4</h3>
             <ul class="changelog-list">
-              <li>Le super admin peut ajouter des coupons bonus au-delà des 3 invitations normales.</li>
-              <li>Les coupons utilisés, expirés ou annulés peuvent être réinitialisés.</li>
-              <li>Le panneau Famille affiche les coupons par joueur et les personnes invitées avec leur origine.</li>
-              <li>La fenêtre “Comprendre le mode Famille” reçoit une vraie croix de fermeture.</li>
+              <li>Le super admin peut désactiver ou réactiver l’affichage du module préparation.</li>
+              <li>Quand la préparation est désactivée, les matchs test disparaissent des matchs/pronos, classements par phase et règles.</li>
+              <li>Les 2 badges de préparation restent visibles dans les exploits.</li>
+              <li>La barre admin desktop affiche aussi les icônes Retour, Rafraîchir et Déconnexion.</li>
             </ul>
           </section>
           <section>
@@ -470,13 +471,14 @@ const App = {
     const modal = document.createElement("div");
     modal.id = "rulesModal";
     modal.className = "modal-backdrop rules-modal";
+    const preparationEnabled = this.preparationModuleEnabled();
     modal.innerHTML = `
       <div class="modal-card rules-card" role="dialog" aria-modal="true" aria-labelledby="rulesTitle">
         <div class="card-title-row">
           <div>
             <p class="eyebrow">${H.icon("list")} Règles du nid</p>
             <h2 id="rulesTitle">Comment les points tombent</h2>
-            <p class="muted">Les matchs de préparation sont des tests : ils ne comptent pas dans le classement Coupe du monde.</p>
+            <p class="muted">Les matchs officiels comptent pour le classement Coupe du monde. Les pronos restent cachés jusqu’au coup d’envoi.</p>
           </div>
           <button class="ghost-btn" id="closeRulesBtn" type="button">Fermer</button>
         </div>
@@ -486,13 +488,15 @@ const App = {
           <article><strong>Bon écart</strong><span>Tu ne trouves pas forcément le score, mais tu trouves le bon écart de buts. Exemple : tu pronostiques 2-0 et le match finit 3-1.</span><b>+1 pt</b></article>
           <article><strong>Phase finale</strong><span>Dans un match couperet, l’important est aussi de deviner quel oiseau reste perché. Si tu choisis la bonne équipe qualifiée, même après prolongation ou tirs au but, tu gagnes le bonus.</span><b>+2 pts</b></article>
           <article><strong>Champion du monde</strong><span>Ton grand favori, choisi avant le début de la Coupe du monde, soulève le trophée à la fin.</span><b>+100 pts</b></article>
-          <article><strong>Matchs test</strong><span>France–Côte d’Ivoire et France–Irlande du Nord servent uniquement à tester le nid avant le vrai envol.</span><b>0 pt classement</b></article>
+          ${preparationEnabled ? `<article><strong>Matchs test</strong><span>France–Côte d’Ivoire et France–Irlande du Nord servent uniquement à tester le nid avant le vrai envol.</span><b>0 pt classement</b></article>` : ""}
         </div>
-        <div class="rules-note">
-          <strong>Préparation du nid</strong>
-          <p>Les 2 matchs de préparation sont bien des matchs test : ils ne comptent pas dans le classement Coupe du monde, ne comptent pas dans les graphiques et ne débloquent pas les exploits normaux. Ils servent à vérifier que les pronos, les scores et les popups fonctionnent avant le début officiel.</p>
-          <p>Ils peuvent seulement débloquer les badges spéciaux de préparation : <strong>Préparation du nid</strong> si tu pronostiques les 2 matchs, et <strong>Test concluant</strong> si tu pronostiques bien au moins 1 match sur les 2.</p>
-        </div>
+        ${preparationEnabled ? `
+          <div class="rules-note">
+            <strong>Préparation du nid</strong>
+            <p>Les 2 matchs de préparation sont bien des matchs test : ils ne comptent pas dans le classement Coupe du monde, ne comptent pas dans les graphiques et ne débloquent pas les exploits normaux. Ils servent à vérifier que les pronos, les scores et les popups fonctionnent avant le début officiel.</p>
+            <p>Ils peuvent seulement débloquer les badges spéciaux de préparation : <strong>Préparation du nid</strong> si tu pronostiques les 2 matchs, et <strong>Test concluant</strong> si tu pronostiques bien au moins 1 match sur les 2.</p>
+          </div>
+        ` : ""}
       </div>
     `;
     document.body.appendChild(modal);
@@ -624,7 +628,7 @@ const App = {
     const { data, error } = await window.sb
       .from("app_settings")
       .select("key,value")
-      .in("key", ["family_mode_enabled"]);
+      .in("key", ["family_mode_enabled", "preparation_module_enabled"]);
 
     if (error) {
       console.warn("Paramètres app indisponibles", error);
@@ -641,6 +645,21 @@ const App = {
     if (typeof value === "string") return value === "true";
     if (value && typeof value === "object" && "enabled" in value) return Boolean(value.enabled);
     return false;
+  },
+
+  preparationModuleEnabled() {
+    const value = this.state.appSettings?.preparation_module_enabled;
+    if (value === undefined || value === null) return true;
+    if (typeof value === "boolean") return value;
+    if (typeof value === "string") return value === "true";
+    if (value && typeof value === "object" && "enabled" in value) return Boolean(value.enabled);
+    return Boolean(value);
+  },
+
+  displayMatches() {
+    return this.preparationModuleEnabled()
+      ? this.state.matches
+      : this.state.matches.filter((match) => !match.is_test_match);
   },
 
   async loadMyFamilyInvites() {
@@ -913,7 +932,7 @@ const App = {
   },
 
   upcomingMatches() {
-    return this.state.matches.filter((m) => new Date(m.kickoff_at).getTime() > Date.now());
+    return this.displayMatches().filter((m) => new Date(m.kickoff_at).getTime() > Date.now());
   },
 
   missingPredictions() {
@@ -940,7 +959,7 @@ const App = {
   },
 
   phaseLeaderboardMatches() {
-    return this.state.matches.filter((m) => !["cancelled", "postponed"].includes(m.status));
+    return this.displayMatches().filter((m) => !["cancelled", "postponed"].includes(m.status));
   },
 
   predictionRowsForUser(userId, options = {}) {
@@ -1039,7 +1058,7 @@ const App = {
 
   championCandidateTeams() {
     const groupTeamIds = new Set();
-    this.state.matches
+    this.competitionMatches()
       .filter((match) => match.stage === "group")
       .forEach((match) => {
         if (match.home_team_id) groupTeamIds.add(match.home_team_id);
@@ -1388,7 +1407,7 @@ const App = {
     await Promise.all([this.loadMatches(), this.loadGroupStandings(), this.loadMyPredictions(), this.loadVisiblePredictions()]);
 
     const root = H.$("#viewRoot");
-    const groups = this.groupMatchesByPouleRound(this.state.matches);
+    const groups = this.groupMatchesByPouleRound(this.displayMatches());
     const activeIndex = this.clampPhaseIndex("matchPhaseIndex", groups);
     const group = groups[activeIndex];
 
@@ -1452,8 +1471,9 @@ const App = {
 
   predictionPhaseSummaryHtml(group) {
     const allMissing = this.missingPredictions();
-    const allDone = this.state.matches.filter((match) => this.getMyPrediction(match.id));
-    const locked = this.state.matches.filter((match) => H.isKickoffPassed(match.kickoff_at));
+    const visibleMatches = this.displayMatches();
+    const allDone = visibleMatches.filter((match) => this.getMyPrediction(match.id));
+    const locked = visibleMatches.filter((match) => H.isKickoffPassed(match.kickoff_at));
 
     return `
       <section class="grid three stats-grid combined-prono-stats">
@@ -1500,7 +1520,7 @@ const App = {
     }
 
     const match = missing[0];
-    const groups = this.groupMatchesByPouleRound(this.state.matches);
+    const groups = this.groupMatchesByPouleRound(this.displayMatches());
     const groupIndex = groups.findIndex((group) => group.matches.some((item) => item.id === match.id));
     if (groupIndex >= 0) this.state.matchPhaseIndex = groupIndex;
 
@@ -1784,9 +1804,10 @@ const App = {
     await Promise.all([this.loadMatches(), this.loadMyPredictions(), this.loadVisiblePredictions()]);
 
     const root = H.$("#viewRoot");
+    const visibleMatches = this.displayMatches();
     const missing = this.missingPredictions();
-    const done = this.state.matches.filter((m) => this.getMyPrediction(m.id));
-    const groups = this.groupMatchesByPouleRound(this.state.matches);
+    const done = visibleMatches.filter((m) => this.getMyPrediction(m.id));
+    const groups = this.groupMatchesByPouleRound(visibleMatches);
     const activeIndex = this.clampPhaseIndex("myPredictionsPhaseIndex", groups);
     const group = groups[activeIndex];
 
@@ -1803,7 +1824,7 @@ const App = {
       <section class="grid three stats-grid">
         <article class="stat-card"><strong>${done.length}</strong><span>Pronos posés</span></article>
         <article class="stat-card"><strong>${missing.length}</strong><span>Manquants</span></article>
-        <article class="stat-card"><strong>${this.state.matches.filter((m) => H.isKickoffPassed(m.kickoff_at)).length}</strong><span>Verrouillés</span></article>
+        <article class="stat-card"><strong>${visibleMatches.filter((m) => H.isKickoffPassed(m.kickoff_at)).length}</strong><span>Verrouillés</span></article>
       </section>
 
       ${pager}
@@ -2980,13 +3001,13 @@ const App = {
 
     if (!standing || standing.qualification_status !== "eliminated") return null;
 
-    const groupMatches = this.state.matches.filter((match) =>
+    const groupMatches = this.competitionMatches().filter((match) =>
       match.stage === "group"
       && (!competitionId || match.competition_id === competitionId)
       && (!standing.group_name || match.group_name === standing.group_name)
     );
 
-    const allGroupMatches = this.state.matches.filter((match) =>
+    const allGroupMatches = this.competitionMatches().filter((match) =>
       match.stage === "group"
       && (!competitionId || match.competition_id === competitionId)
     );
@@ -5799,7 +5820,7 @@ const App = {
             <p class="muted">Déconnexion, crédits et historique des évolutions.</p>
           </div>
           <div class="profile-account-actions">
-            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.2.3</button>
+            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.2.4</button>
             <button class="danger-btn" id="profileLogoutBtn" type="button">Déconnexion</button>
           </div>
         </div>
