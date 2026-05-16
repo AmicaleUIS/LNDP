@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — ADMIN V1.2.5
+// LE NID DES PRONOS — ADMIN V1.2.6
 // ============================================================
 
 const H = window.Helpers;
@@ -25,7 +25,8 @@ const Admin = {
     preparationModuleEnabled: true,
     auditLogs: [],
     healthSnapshot: null,
-    healthError: null
+    healthError: null,
+    finalReportSelectedUserId: null
   },
 
   isSuperAdmin() {
@@ -170,6 +171,7 @@ const Admin = {
       backups: ["Sauvegardes", "Sauvegarder, restaurer ou remettre à zéro les pronostics."],
       health: ["Santé du Nid", "Contrôler rapidement les voyants essentiels de l’application."],
       audit: ["Journal du Nid", "Consulter les actions sensibles effectuées dans l’administration."],
+      "final-report": ["Bilan PDF final", "Prévisualiser les carnets de vol et diplômes de fin de compétition."],
       users: ["Joueurs", "Gérer les joueurs, rôles, teams et statuts actif/inactif."],
       family: ["Mode Famille", "Invitations, inscriptions Famille et droits associés."]
     };
@@ -187,6 +189,7 @@ const Admin = {
       backups: "verrouille",
       health: "sante",
       audit: "journal",
+      "final-report": "bilan",
       users: "profil",
       family: "famille"
     }[section] || "admin";
@@ -354,6 +357,7 @@ const Admin = {
       this.renderFamilyAdmin();
       this.renderHealth();
       this.renderAudit();
+      this.renderFinalReportAdmin();
     } else {
       await Promise.all([
         this.loadTeams(),
@@ -745,6 +749,65 @@ const Admin = {
         </article>
       `;
     }).join("");
+  },
+
+
+  renderFinalReportAdmin() {
+    const root = H.$("#finalReportAdmin");
+    if (!root) return;
+
+    const players = this.state.users
+      .filter((user) => user.is_active !== false && !user.is_banned)
+      .sort((a, b) => String(a.pseudo || a.email || "").localeCompare(String(b.pseudo || b.email || ""), "fr"));
+
+    if (!this.state.finalReportSelectedUserId && players.length) {
+      this.state.finalReportSelectedUserId = players[0].id;
+    }
+
+    const selectedId = this.state.finalReportSelectedUserId || "";
+    const selected = players.find((player) => player.id === selectedId) || players[0];
+    const previewUrl = selected ? `bilan.html?player=${encodeURIComponent(selected.id)}&preview=admin` : "";
+
+    root.innerHTML = `
+      <div class="final-report-admin-shell">
+        <section class="admin-mini-panel final-report-controls">
+          <h3>Prévisualisation temps réel</h3>
+          <p class="muted">Choisis un joueur : le carnet PDF se recharge avec ses points, badges, records, courbes, pronos et diplôme.</p>
+          <div class="inline-form final-report-picker">
+            <select id="finalReportPlayerSelect">
+              ${players.map((player) => `<option value="${H.escapeHtml(player.id)}" ${player.id === selectedId ? "selected" : ""}>${H.escapeHtml(player.pseudo || player.email || "Joueur")} · ${H.escapeHtml(this.teamName(player.office_team_id))}</option>`).join("")}
+            </select>
+            <button class="ghost-btn" id="openFinalReportBtn" type="button" ${selected ? "" : "disabled"}>Ouvrir</button>
+            <button class="primary-btn" id="printFinalReportBtn" type="button" ${selected ? "" : "disabled"}>Imprimer / PDF</button>
+          </div>
+          <p class="muted tiny-note">Les fonds de pages pourront être ajoutés plus tard dans <code>assets/reports/</code>. Les emplacements sont déjà prévus.</p>
+        </section>
+        <section class="final-report-preview-wrap">
+          ${selected ? `<iframe id="finalReportPreview" class="final-report-preview" src="${H.escapeHtml(previewUrl)}" title="Aperçu bilan PDF"></iframe>` : `<p class="muted">Aucun joueur disponible.</p>`}
+        </section>
+      </div>
+    `;
+
+    const select = H.$("#finalReportPlayerSelect", root);
+    select?.addEventListener("change", () => {
+      this.state.finalReportSelectedUserId = select.value;
+      this.renderFinalReportAdmin();
+    });
+
+    H.$("#openFinalReportBtn", root)?.addEventListener("click", () => {
+      if (!selected) return;
+      window.open(`bilan.html?player=${encodeURIComponent(selected.id)}&preview=admin`, "_blank", "noopener");
+    });
+
+    H.$("#printFinalReportBtn", root)?.addEventListener("click", () => {
+      const iframe = H.$("#finalReportPreview", root);
+      if (iframe?.contentWindow) {
+        iframe.contentWindow.focus();
+        iframe.contentWindow.print();
+      } else if (selected) {
+        window.open(`bilan.html?player=${encodeURIComponent(selected.id)}&print=1`, "_blank", "noopener");
+      }
+    });
   },
 
   renderUsers() {

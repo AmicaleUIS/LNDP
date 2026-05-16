@@ -14407,3 +14407,44 @@ body[data-current-view="leaderboard"] .team-leaderboard-card .muted {
     justify-self: start;
   }
 }
+
+
+/* ============================================================
+   V1.2.6 — Admin aperçu Bilan PDF final
+   ============================================================ */
+.final-report-admin-shell {
+  display: grid;
+  gap: 18px;
+}
+.final-report-controls code {
+  color: #facc15;
+  background: rgba(250,204,21,.10);
+  border: 1px solid rgba(250,204,21,.16);
+  padding: 2px 6px;
+  border-radius: 8px;
+}
+.final-report-picker {
+  align-items: center;
+}
+.final-report-picker select {
+  min-width: min(420px, 100%);
+}
+.final-report-preview-wrap {
+  border: 1px solid rgba(250,204,21,.22);
+  background: rgba(2,6,23,.42);
+  border-radius: 28px;
+  padding: 10px;
+  min-height: 720px;
+  overflow: hidden;
+}
+.final-report-preview {
+  width: 100%;
+  min-height: 760px;
+  border: 0;
+  border-radius: 20px;
+  background: #07111f;
+}
+@media (max-width: 900px) {
+  .final-report-preview-wrap { min-height: 520px; }
+  .final-report-preview { min-height: 560px; }
+}

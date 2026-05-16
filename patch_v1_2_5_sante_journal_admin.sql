@@ -294,7 +294,7 @@ grant execute on function public.admin_get_health_snapshot() to authenticated;
 -- Ces fonctions remplacent les versions précédentes en gardant les mêmes signatures.
 
 create or replace function public.admin_set_preparation_module(p_enabled boolean)
-returns jsonb
+returns void
 language plpgsql
 security definer
 set search_path = public
@@ -316,14 +316,14 @@ begin
     jsonb_build_object('enabled', coalesce(p_enabled, true))
   );
 
-  return jsonb_build_object('preparation_module_enabled', coalesce(p_enabled, true));
+  return;
 end;
 $$;
 
 grant execute on function public.admin_set_preparation_module(boolean) to authenticated;
 
 create or replace function public.admin_set_family_mode(p_enabled boolean)
-returns jsonb
+returns void
 language plpgsql
 security definer
 set search_path = public
@@ -345,7 +345,7 @@ begin
     jsonb_build_object('enabled', coalesce(p_enabled, false))
   );
 
-  return jsonb_build_object('family_mode_enabled', coalesce(p_enabled, false));
+  return;
 end;
 $$;
 
@@ -353,8 +353,7 @@ grant execute on function public.admin_set_family_mode(boolean) to authenticated
 
 -- Journalisation de création de coupon direct.
 create or replace function public.admin_create_family_invite(
-  p_office_team_id uuid,
-  p_valid_days int default 7
+  p_office_team_id uuid
 )
 returns table(code text, expires_at timestamptz, office_team_id uuid)
 language plpgsql
@@ -362,7 +361,7 @@ security definer
 set search_path = public
 as $$
 declare
-  valid_days int := greatest(1, least(coalesce(p_valid_days, 7), 30));
+  valid_days int := 7;
   new_code text;
   new_expires_at timestamptz;
 begin
@@ -390,7 +389,7 @@ begin
 end;
 $$;
 
-grant execute on function public.admin_create_family_invite(uuid, int) to authenticated;
+grant execute on function public.admin_create_family_invite(uuid) to authenticated;
 
 -- Journalisation de coupon bonus.
 create or replace function public.admin_create_bonus_family_invite(

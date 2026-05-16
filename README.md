@@ -54,3 +54,11 @@ le-nid-des-pronos-v1-2-4
   - `assets/icons/owl-png/sante.png`
   - `assets/icons/owl-png/journal.png`
 - Patch SQL à lancer : `patch_v1_2_5_sante_journal_admin.sql`.
+
+
+## V1.2.6 — Bilan PDF final
+
+- Ajout d’un onglet admin **Bilan PDF** avec aperçu temps réel par joueur.
+- Ajout de `bilan.html` imprimable en PDF : couverture, résumé, badges, records, graphiques, historique des pronos et diplôme.
+- Ajout des emplacements : `assets/icons/owl-png/bilan.png`, `assets/icons/owl-png/diplome.png` et dossier `assets/reports/` pour les futurs fonds.
+- Patch SQL à lancer : `patch_v1_2_6_bilan_pdf_final.sql`.
