@@ -1,8 +1,8 @@
-# Le Nid des Pronos — V1.2.2
+# Le Nid des Pronos — V1.2.3
 
-## Version V1.2.2 — Icône Famille et réactions du Nid
+## Version V1.2.3 — Coupons Famille super admin
 
-Cette version améliore les réactions PNG du tchat du Nid : elles ne s'affichent plus à zéro sous chaque message, le choix se fait dans une fenêtre au clic sur un message, et les compteurs ouvrent le détail des personnes qui ont réagi.
+Cette version ajoute une gestion plus complète des coupons d’invitation Famille côté super admin : ajout de coupons bonus, réinitialisation de coupons utilisés/expirés, vue par joueur et détail des personnes invitées.
 
 ### Patch SQL obligatoire
 
@@ -13,6 +13,7 @@ patch_v1_1_0_mode_famille_super_admin.sql
 patch_v1_1_2_admin_role_enum_cast.sql
 patch_v1_2_0_chat_du_nid.sql
 patch_v1_2_1_reactions_whatsapp.sql
+patch_v1_2_3_coupons_famille_super_admin.sql
 ```
 
 ### Chat
@@ -43,20 +44,20 @@ patch_v1_2_1_reactions_whatsapp.sql
 Publier tous les fichiers sur GitHub Pages. Les assets sont appelés avec :
 
 ```txt
-?v=1.2.2
+?v=1.2.3
 ```
 
 Le cache PWA est passé en :
 
 ```txt
-le-nid-des-pronos-v1-2-2
+le-nid-des-pronos-v1-2-3
 ```
 
 
-### V1.2.2
+### V1.2.3
 
-- Icône `famille.png` utilisée dans l’onglet Famille de l’admin, desktop et mobile.
-- Réactions du chat renommées : LOL, Chaud, Oups..., Coeur, Approuvé, Casserole.
-- Nouveaux fichiers de réactions descriptifs ajoutés dans `assets/reactions/`.
-- Icônes de réactions agrandies dans la popup et les compteurs.
-- Croix de fermeture du popup “Comprendre le mode Famille” stylisée.
+- Ajout d’un panneau “Coupon bonus joueur” dans l’admin Famille.
+- Le super admin peut créer un coupon bonus pour un joueur UIS, même au-delà des 3 invitations normales.
+- Le super admin peut réinitialiser un coupon utilisé, expiré ou annulé : il redevient disponible 7 jours.
+- Ajout d’une vue “Coupons par joueur” avec total, utilisés, disponibles et bonus.
+- Ajout d’une vue “Personnes invitées” indiquant qui a été invité, par qui, avec quelle team et quel code quand l’information existe.

@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — ADMIN V1.2.2
+// LE NID DES PRONOS — ADMIN V1.2.3
 // ============================================================
 
 const H = window.Helpers;
@@ -413,7 +413,7 @@ const Admin = {
       .from("family_invites")
       .select("id,code,inviter_id,office_team_id,used_by,used_at,expires_at,created_at,revoked_at")
       .order("created_at", { ascending: false })
-      .limit(50);
+      .limit(250);
 
     if (error) {
       console.warn("Invitations Famille indisponibles", error);
@@ -560,13 +560,68 @@ const Admin = {
     await this.reloadAll();
   },
 
+  familyInviteStatus(invite) {
+    if (invite.revoked_at) return { key: "revoked", label: "Annulé", pill: "danger" };
+    if (invite.used_at || invite.used_by) return { key: "used", label: "Utilisé", pill: "success" };
+    const expiresAt = invite.expires_at ? new Date(invite.expires_at).getTime() : null;
+    if (expiresAt && expiresAt < Date.now()) return { key: "expired", label: "Expiré", pill: "warning" };
+    return { key: "available", label: "Disponible", pill: "neutral" };
+  },
+
+  userDisplayName(user, fallback = "—") {
+    return user?.pseudo || user?.email || fallback;
+  },
+
+  teamName(teamId) {
+    return this.state.teams.find((team) => team.id === teamId)?.name || "—";
+  },
+
   renderFamilyAdmin() {
     const root = H.$("#familyAdmin");
     if (!root) return;
+
     const familyUsers = this.state.users.filter((user) => user.role === "family" || user.player_scope === "family");
-    const teamOptions = this.state.teams.map((team) => `<option value="${team.id}">${H.escapeHtml(team.name)}</option>`).join("");
+    const inviterCandidates = this.state.users.filter((user) => user.player_scope !== "family" && user.role !== "family" && user.is_active !== false);
+    const teamOptions = this.state.teams.map((team) => `<option value="${H.escapeHtml(team.id)}">${H.escapeHtml(team.name)}</option>`).join("");
+    const inviterOptions = inviterCandidates.map((user) => {
+      const teamName = this.teamName(user.office_team_id);
+      return `<option value="${H.escapeHtml(user.id)}" data-team-id="${H.escapeHtml(user.office_team_id || "")}">${H.escapeHtml(this.userDisplayName(user, "Joueur"))}${user.office_team_id ? ` · ${H.escapeHtml(teamName)}` : " · sans team"}</option>`;
+    }).join("");
+
+    const invitesByInviter = new Map();
+    this.state.familyInvites.forEach((invite) => {
+      const key = invite.inviter_id || "__direct";
+      if (!invitesByInviter.has(key)) invitesByInviter.set(key, []);
+      invitesByInviter.get(key).push(invite);
+    });
+
+    const inviterSummaryRows = Array.from(invitesByInviter.entries()).map(([inviterId, invites]) => {
+      const inviter = this.state.users.find((user) => user.id === inviterId);
+      const total = invites.filter((invite) => !invite.revoked_at).length;
+      const used = invites.filter((invite) => invite.used_at || invite.used_by).length;
+      const available = invites.filter((invite) => this.familyInviteStatus(invite).key === "available").length;
+      const bonus = Math.max(0, total - 3);
+      return `
+        <article class="admin-row family-coupon-summary-row">
+          <div class="admin-main user-admin-main">
+            ${inviter ? H.profileBadgeHtml(inviter, "profile-badge mini") : `<span class="profile-badge mini">${H.icon("famille", "")}</span>`}
+            <div>
+              <strong>${H.escapeHtml(inviter ? this.userDisplayName(inviter, "Joueur") : "Invitations directes")}</strong>
+              <small>${inviter ? `Team ${H.escapeHtml(this.teamName(inviter.office_team_id))}` : "Créées directement par le super admin"}</small>
+            </div>
+          </div>
+          <div class="family-coupon-summary-pills">
+            <span class="pill neutral">${total}/3 base</span>
+            ${bonus ? `<span class="pill warning">+${bonus} bonus</span>` : ""}
+            <span class="pill success">${used} utilisé${used > 1 ? "s" : ""}</span>
+            <span class="pill neutral">${available} dispo</span>
+          </div>
+        </article>
+      `;
+    }).join("");
+
     root.innerHTML = `
-      <div class="family-admin-grid">
+      <div class="family-admin-grid family-admin-grid-v123">
         <section class="admin-mini-panel">
           <h3>Inscriptions Famille</h3>
           <p class="muted">Quand le mode est fermé, les nouveaux codes ne peuvent pas être utilisés.</p>
@@ -577,32 +632,57 @@ const Admin = {
         </section>
 
         <section class="admin-mini-panel">
-          <h3>Dépannage super admin</h3>
+          <h3>Invitation directe</h3>
           <p class="muted">Créer une invitation Famille directement sur une team, sans passer par un joueur.</p>
           <div class="inline-form">
             <select id="adminFamilyInviteTeam"><option value="">Choisir une team</option>${teamOptions}</select>
-            <button class="primary-btn" id="adminCreateFamilyInviteBtn" type="button">Créer une invitation</button>
+            <button class="primary-btn" id="adminCreateFamilyInviteBtn" type="button">Créer</button>
           </div>
+        </section>
+
+        <section class="admin-mini-panel family-bonus-panel">
+          <h3>Coupon bonus joueur</h3>
+          <p class="muted">Ajoute un code bonus à un joueur UIS, même s’il a déjà ses 3 invitations.</p>
+          <div class="inline-form family-bonus-form">
+            <select id="adminBonusInviteUser"><option value="">Choisir un joueur</option>${inviterOptions}</select>
+            <select id="adminBonusInviteTeam"><option value="">Team du joueur</option>${teamOptions}</select>
+            <button class="primary-btn" id="adminCreateBonusFamilyInviteBtn" type="button">Ajouter un coupon bonus</button>
+          </div>
+          <p class="muted small-note">Le coupon bonus apparaîtra dans la liste du joueur. La limite normale reste 3, mais le super admin peut dépasser cette limite.</p>
         </section>
       </div>
 
+      <section class="admin-mini-panel family-coupon-summary-panel">
+        <h3>Coupons par joueur</h3>
+        <p class="muted">Vue rapide pour voir qui a combien de coupons, ceux déjà utilisés, disponibles ou bonus.</p>
+        <div class="admin-list compact">
+          ${inviterSummaryRows || `<p class="muted">Aucun coupon créé pour le moment.</p>`}
+        </div>
+      </section>
+
       <section class="admin-mini-panel family-invites-admin-panel">
-        <h3>Dernières invitations</h3>
+        <h3>Tous les coupons d’invitation</h3>
+        <p class="muted">Tu peux réinitialiser un coupon utilisé ou expiré : il redevient disponible 7 jours. Le compte déjà invité n’est pas modifié automatiquement.</p>
         <div class="admin-list compact">
           ${this.state.familyInvites.length ? this.state.familyInvites.map((invite) => {
             const inviter = this.state.users.find((user) => user.id === invite.inviter_id);
             const usedBy = this.state.users.find((user) => user.id === invite.used_by);
             const team = this.state.teams.find((item) => item.id === invite.office_team_id);
+            const status = this.familyInviteStatus(invite);
+            const canReset = ["used", "expired", "revoked"].includes(status.key);
             return `
-              <article class="admin-row family-invite-admin-row">
-                <div class="admin-main">
+              <article class="admin-row family-invite-admin-row family-invite-admin-row-v123" data-invite-id="${H.escapeHtml(invite.id)}">
+                <div class="admin-main family-invite-admin-main">
                   <div>
                     <strong>${H.escapeHtml(invite.code)}</strong>
-                    <small>Team ${H.escapeHtml(team?.name || "—")} · invité par ${H.escapeHtml(inviter?.pseudo || "Super admin")}</small>
-                    <small>${invite.used_at ? `Utilisé par ${H.escapeHtml(usedBy?.pseudo || "un joueur")} le ${H.formatDateTime(invite.used_at)}` : `Expire le ${H.formatDateTime(invite.expires_at)}`}</small>
+                    <small>Team ${H.escapeHtml(team?.name || "—")} · coupon de ${H.escapeHtml(inviter ? this.userDisplayName(inviter, "Joueur") : "Super admin")}</small>
+                    <small>${usedBy ? `Invité : ${H.escapeHtml(this.userDisplayName(usedBy, "membre Famille"))} · utilisé le ${H.formatDateTime(invite.used_at)}` : `Créé le ${H.formatDateTime(invite.created_at)} · expire le ${H.formatDateTime(invite.expires_at)}`}</small>
                   </div>
                 </div>
-                <span class="pill ${invite.used_at ? "success" : "neutral"}">${invite.used_at ? "Utilisé" : "Disponible"}</span>
+                <div class="family-invite-admin-actions">
+                  <span class="pill ${status.pill}">${status.label}</span>
+                  ${canReset ? `<button class="ghost-btn tiny-btn reset-family-invite-btn" type="button" data-family-invite-reset="${H.escapeHtml(invite.id)}">Réinitialiser</button>` : ""}
+                </div>
               </article>
             `;
           }).join("") : `<p class="muted">Aucune invitation Famille.</p>`}
@@ -610,18 +690,27 @@ const Admin = {
       </section>
 
       <section class="admin-mini-panel">
-        <h3>Membres Famille</h3>
-        <p class="muted">Ils peuvent jouer et débloquer les badges classiques, mais restent hors concours officiel et hors mini-records.</p>
+        <h3>Personnes invitées</h3>
+        <p class="muted">Liste des comptes Famille, avec leur coupon d’origine et la personne qui les a invités.</p>
         <div class="admin-list compact">
-          ${familyUsers.length ? familyUsers.map((user) => `
-            <article class="admin-row">
-              <div class="admin-main user-admin-main">
-                ${H.profileBadgeHtml(user, "profile-badge mini")}
-                <div><strong>${H.escapeHtml(user.pseudo || "Famille")}</strong><small>${H.escapeHtml(user.email || "")}</small></div>
-              </div>
-              <span class="pill neutral">Famille</span>
-            </article>
-          `).join("") : `<p class="muted">Aucun membre Famille pour le moment.</p>`}
+          ${familyUsers.length ? familyUsers.map((user) => {
+            const sourceInvite = this.state.familyInvites.find((invite) => invite.used_by === user.id);
+            const inviter = this.state.users.find((item) => item.id === (user.invited_by || sourceInvite?.inviter_id));
+            const team = this.state.teams.find((item) => item.id === user.office_team_id);
+            return `
+              <article class="admin-row family-member-admin-row">
+                <div class="admin-main user-admin-main">
+                  ${H.profileBadgeHtml(user, "profile-badge mini")}
+                  <div>
+                    <strong>${H.escapeHtml(user.pseudo || "Famille")}</strong>
+                    <small>${H.escapeHtml(user.email || "")}</small>
+                    <small>Invité par ${H.escapeHtml(inviter ? this.userDisplayName(inviter, "Joueur") : "origine inconnue")} · Team ${H.escapeHtml(team?.name || "—")}${sourceInvite?.code ? ` · code ${H.escapeHtml(sourceInvite.code)}` : ""}</small>
+                  </div>
+                </div>
+                <span class="pill neutral">Famille</span>
+              </article>
+            `;
+          }).join("") : `<p class="muted">Aucun membre Famille pour le moment.</p>`}
         </div>
       </section>
     `;
@@ -643,6 +732,48 @@ const Admin = {
       const code = Array.isArray(data) ? data[0]?.code : data?.code;
       H.toast(code ? `Code créé : ${code}` : "Code créé", "success");
       this.renderFamilyAdmin();
+    });
+
+    const bonusUserSelect = H.$("#adminBonusInviteUser", root);
+    const bonusTeamSelect = H.$("#adminBonusInviteTeam", root);
+    bonusUserSelect?.addEventListener("change", () => {
+      const selected = bonusUserSelect.selectedOptions?.[0];
+      const userTeamId = selected?.dataset?.teamId || "";
+      if (bonusTeamSelect && userTeamId) bonusTeamSelect.value = userTeamId;
+    });
+
+    H.$("#adminCreateBonusFamilyInviteBtn", root)?.addEventListener("click", async () => {
+      const inviterId = H.$("#adminBonusInviteUser", root)?.value;
+      const teamId = H.$("#adminBonusInviteTeam", root)?.value || null;
+      if (!inviterId) return H.toast("Choisis le joueur qui recevra le coupon bonus.", "error");
+      const { data, error } = await window.sb.rpc("admin_create_bonus_family_invite", {
+        p_inviter_id: inviterId,
+        p_office_team_id: teamId,
+        p_valid_days: 7
+      });
+      if (error) return H.toast(error.message, "error");
+      await this.loadFamilyInvites();
+      const code = Array.isArray(data) ? data[0]?.code : data?.code;
+      H.toast(code ? `Coupon bonus créé : ${code}` : "Coupon bonus créé", "success");
+      this.renderFamilyAdmin();
+    });
+
+    H.$$('[data-family-invite-reset]', root).forEach((button) => {
+      button.addEventListener("click", async () => {
+        const inviteId = button.dataset.familyInviteReset;
+        if (!inviteId) return;
+        if (!confirm("Réinitialiser ce coupon ? Il redeviendra disponible 7 jours. Le compte déjà invité ne sera pas modifié.")) return;
+        const { data, error } = await window.sb.rpc("admin_reset_family_invite", {
+          p_invite_id: inviteId,
+          p_valid_days: 7
+        });
+        if (error) return H.toast(error.message, "error");
+        await this.loadFamilyInvites();
+        await this.loadUsers();
+        const code = Array.isArray(data) ? data[0]?.code : data?.code;
+        H.toast(code ? `Coupon réinitialisé : ${code}` : "Coupon réinitialisé", "success");
+        this.renderFamilyAdmin();
+      });
     });
   },
 
@@ -1414,6 +1545,16 @@ const Admin = {
       .on("postgres_changes", { event: "*", schema: "public", table: "team_chat_messages" }, async () => {
         await this.loadChatMessages();
         this.renderChatModeration();
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "family_invites" }, async () => {
+        if (!this.isSuperAdmin()) return;
+        await this.loadFamilyInvites();
+        this.renderFamilyAdmin();
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "profiles" }, async () => {
+        if (!this.isSuperAdmin()) return;
+        await this.loadUsers();
+        this.renderFamilyAdmin();
       })
       .subscribe((status) => {
         console.info("[Le Nid des Pronos] Realtime admin:", status);

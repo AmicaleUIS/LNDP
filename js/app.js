@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — APP PRINCIPALE V1.2.2
+// LE NID DES PRONOS — APP PRINCIPALE V1.2.3
 // ============================================================
 
 const H = window.Helpers;
@@ -427,14 +427,14 @@ const App = {
           <div>
             <p class="eyebrow">Crédits cachés</p>
             <h2 id="creditsTitle">Le Nid des Pronos</h2>
-            <p class="muted">Version publique <strong>1.2.2</strong> · icônes Famille et réactions du Nid ajustées.</p>
+            <p class="muted">Version publique <strong>1.2.3</strong> · coupons Famille bonus et réinitialisation admin.</p>
           </div>
           <button class="ghost-btn" id="closeCreditsBtn" type="button">Fermer</button>
         </div>
         <div class="credits-grid">
           <section>
             <h3>Version actuelle</h3>
-            <p><strong>1.2.2</strong> — icône Famille dans l’admin, stickers de réactions renommés/agrandis, fermeture du mode Famille améliorée.</p>
+            <p><strong>1.2.3</strong> — super admin : coupons Famille bonus, réinitialisation des invitations et vue détaillée des invités.</p>
             <p><strong>1.2.0</strong> — nouveau tchat : salons Général / Team / Famille / Team Famille, chargement des anciens messages, réactions PNG, blocage individuel renforcé.</p>
             <p><strong>1.2.0</strong> — refonte des classements Famille et amélioration du bloc Mode Famille dans le profil.</p>
             <p><strong>1.0.18</strong> — mini-record “Greffier du grimoire” : date fournie par Supabase et égalités conservées par le premier détenteur.</p>
@@ -443,11 +443,11 @@ const App = {
             <p><strong>1.0.5</strong> — dashboard mobile/desktop stabilisé, sans chevauchement des cartes.</p>
           </section>
           <section>
-            <h3>Évolutions V1.2.2</h3>
+            <h3>Évolutions V1.2.3</h3>
             <ul class="changelog-list">
-              <li>L’onglet Famille de l’admin utilise maintenant l’icône dédiée.</li>
-              <li>Les réactions du chat sont renommées : LOL, Chaud, Oups..., Coeur, Approuvé, Casserole.</li>
-              <li>Les stickers sont plus grands dans la fenêtre de réaction et dans les compteurs.</li>
+              <li>Le super admin peut ajouter des coupons bonus au-delà des 3 invitations normales.</li>
+              <li>Les coupons utilisés, expirés ou annulés peuvent être réinitialisés.</li>
+              <li>Le panneau Famille affiche les coupons par joueur et les personnes invitées avec leur origine.</li>
               <li>La fenêtre “Comprendre le mode Famille” reçoit une vraie croix de fermeture.</li>
             </ul>
           </section>
@@ -5799,7 +5799,7 @@ const App = {
             <p class="muted">Déconnexion, crédits et historique des évolutions.</p>
           </div>
           <div class="profile-account-actions">
-            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.2.2</button>
+            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.2.3</button>
             <button class="danger-btn" id="profileLogoutBtn" type="button">Déconnexion</button>
           </div>
         </div>
