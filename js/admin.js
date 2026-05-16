@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — ADMIN V1.1.3
+// LE NID DES PRONOS — ADMIN V1.2.0
 // ============================================================
 
 const H = window.Helpers;
@@ -572,7 +572,7 @@ const Admin = {
           <p class="muted">Quand le mode est fermé, les nouveaux codes ne peuvent pas être utilisés.</p>
           <label class="family-toggle-line">
             <input id="adminFamilyModeToggle" type="checkbox" ${this.state.familyModeEnabled ? "checked" : ""}>
-            <span>Activer le mode Famille</span>
+            <span>Mode Famille ouvert</span>
           </label>
         </section>
 
@@ -581,7 +581,7 @@ const Admin = {
           <p class="muted">Créer une invitation Famille directement sur une team, sans passer par un joueur.</p>
           <div class="inline-form">
             <select id="adminFamilyInviteTeam"><option value="">Choisir une team</option>${teamOptions}</select>
-            <button class="primary-btn" id="adminCreateFamilyInviteBtn" type="button">Créer un code</button>
+            <button class="primary-btn" id="adminCreateFamilyInviteBtn" type="button">Créer une invitation</button>
           </div>
         </section>
       </div>

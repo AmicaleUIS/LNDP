@@ -1,55 +1,49 @@
-# Le Nid des Pronos — V1.1.3
+# Le Nid des Pronos — V1.2.0
 
-## Version V1.1.3
+## Version V1.2.0 — Chat du Nid
 
-Correctif SQL : lancer `patch_v1_1_2_admin_role_enum_cast.sql` si le changement de rôle admin affiche une erreur `app_role` / `text`.
-
-Cette version ajoute le **mode Famille** et sépare les droits d'administration.
-
-### Rôles
-
-- `super_admin` : tous les droits de l'ancien admin.
-- `admin` : gestion des matchs / scores uniquement.
-- `user` : joueur UIS classique.
-- `family` : joueur Famille, hors concours officiel.
-
-### Mode Famille
-
-- Les joueurs UIS peuvent générer jusqu'à **3 invitations Famille** depuis leur profil.
-- Une invitation = une personne.
-- Le code expire après **7 jours**.
-- Le membre Famille est rattaché à la team du joueur qui invite.
-- La team Famille est figée après inscription.
-- Les membres Famille peuvent jouer et obtenir les badges classiques.
-- Les membres Famille ne comptent pas dans le classement officiel, les classements Teams bureau, les moyennes officielles ou les mini-records.
-- Chaque joueur UIS peut activer ou désactiver l'affichage Famille depuis son profil. Par défaut, c'est masqué.
-- Blocage individuel possible dans le chat : un joueur peut masquer les messages d'une personne précise.
-
-### Connexion / inscription
-
-- Compte UIS : `prenom.nom@uis.fr`
-- Compte Famille : `prenom.nom.famille@uis.fr`
+Cette version ajoute le vrai tchat du Nid : salons officiels / Famille, réactions PNG, historique progressif et auto-refresh.
 
 ### Patch SQL obligatoire
 
-Avant de publier cette version, lancer dans Supabase SQL Editor :
+Avant de publier cette version, lancer dans Supabase SQL Editor, dans cet ordre si ce n'est pas déjà fait :
 
 ```txt
 patch_v1_1_0_mode_famille_super_admin.sql
+patch_v1_1_2_admin_role_enum_cast.sql
+patch_v1_2_0_chat_du_nid.sql
 ```
 
-Ce patch ajoute les colonnes, tables, fonctions RPC et vues nécessaires.
+### Chat
+
+- Salons : `Général`, `Ma team`, `Famille`, `Famille team`.
+- Les comptes Famille ne peuvent pas écrire dans le Général officiel.
+- Les joueurs UIS doivent activer le mode Famille pour voir/écrire dans les salons Famille.
+- 10 derniers messages au chargement.
+- Bouton pour charger 20 messages précédents.
+- Auto-refresh toutes les 8 secondes.
+- Réactions PNG : Chouette, Bien joué, Chambrage, Chaud, Casserole, Je surveille.
+- Une seule réaction par joueur et par message.
+- Le blocage individuel masque les messages et réactions du joueur bloqué.
+- L'auteur peut masquer son message ; le super admin peut masquer tous les messages.
+
+### Mode Famille
+
+- Ajout d'un bouton d'explication dans le profil.
+- Le bloc Famille du profil est clarifié.
+- Le panneau admin Famille est visuellement amélioré.
+- Le mode Famille reste masqué par défaut pour les joueurs UIS.
 
 ## Déploiement
 
 Publier tous les fichiers sur GitHub Pages. Les assets sont appelés avec :
 
 ```txt
-?v=1.1.3
+?v=1.2.0
 ```
 
 Le cache PWA est passé en :
 
 ```txt
-le-nid-des-pronos-v1-1-3
+le-nid-des-pronos-v1-2-0
 ```

@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — APP PRINCIPALE V1.1.3
+// LE NID DES PRONOS — APP PRINCIPALE V1.2.0
 // ============================================================
 
 const H = window.Helpers;
@@ -27,10 +27,19 @@ const App = {
     teamSelectedPlayerId: null,
     teamChatMessages: [],
     teamChatScope: "global",
-    teamChatLimit: 30,
-    teamChatPageSize: 30,
+    teamChatLimit: 10,
+    teamChatPageSize: 20,
     teamChatHasMore: false,
     teamChatError: null,
+    teamChatRefreshTimer: null,
+    chatReactions: [
+      { key: "owl", label: "Chouette", file: "assets/reactions/reaction-owl.png" },
+      { key: "ball", label: "Bien joué", file: "assets/reactions/reaction-ball.png" },
+      { key: "laugh", label: "Chambrage", file: "assets/reactions/reaction-laugh.png" },
+      { key: "fire", label: "Chaud", file: "assets/reactions/reaction-fire.png" },
+      { key: "cry", label: "Casserole", file: "assets/reactions/reaction-cry.png" },
+      { key: "eyes", label: "Je surveille", file: "assets/reactions/reaction-eyes.png" }
+    ],
     hasUnreadTeamMessages: false,
     currentView: "home",
     leaderboardTab: "players",
@@ -196,8 +205,10 @@ const App = {
       return Boolean(rows.length);
     };
 
-    const checks = [
-      hasUnreadInQuery(
+    const checks = [];
+
+    if (!this.isFamily(this.state.profile)) {
+      checks.push(hasUnreadInQuery(
         window.sb
           .from("v_team_chat_messages")
           .select("id,created_at,user_id")
@@ -206,10 +217,10 @@ const App = {
           .gt("created_at", after)
           .order("created_at", { ascending: false })
           .limit(1)
-      )
-    ];
+      ));
+    }
 
-    if (this.state.profile?.office_team_id) {
+    if (!this.isFamily(this.state.profile) && this.state.profile?.office_team_id) {
       checks.push(hasUnreadInQuery(
         window.sb
           .from("v_team_chat_messages")
@@ -223,6 +234,32 @@ const App = {
       ));
     }
 
+    if (this.canSeeFamily()) {
+      checks.push(hasUnreadInQuery(
+        window.sb
+          .from("v_team_chat_messages")
+          .select("id,created_at,user_id")
+          .eq("scope", "family_global")
+          .neq("user_id", ownUserId)
+          .gt("created_at", after)
+          .order("created_at", { ascending: false })
+          .limit(1)
+      ));
+      if (this.state.profile?.office_team_id) {
+        checks.push(hasUnreadInQuery(
+          window.sb
+            .from("v_team_chat_messages")
+            .select("id,created_at,user_id")
+            .eq("scope", "family_team")
+            .eq("office_team_id", this.state.profile.office_team_id)
+            .neq("user_id", ownUserId)
+            .gt("created_at", after)
+            .order("created_at", { ascending: false })
+            .limit(1)
+        ));
+      }
+    }
+
     const results = await Promise.all(checks);
     this.state.hasUnreadTeamMessages = results.some(Boolean);
     this.updateTeamUnreadIndicators();
@@ -232,9 +269,10 @@ const App = {
     if (!message || message.user_id === this.state.session?.user?.id) return false;
     if (message.deleted_at) return false;
     const isFamilyAuthor = message.author_player_scope === "family" || message.author_role === "family";
-    if (isFamilyAuthor && !this.canSeeFamily()) return false;
-    if (message.scope === "global") return true;
-    return message.scope === "team" && message.office_team_id === this.state.profile?.office_team_id;
+    if ((isFamilyAuthor || this.isFamilyChatScope(message.scope)) && !this.canSeeFamily()) return false;
+    if (this.isFamily(this.state.profile) && !this.isFamilyChatScope(message.scope)) return false;
+    if (message.scope === "global" || message.scope === "family_global") return true;
+    return (message.scope === "team" || message.scope === "family_team") && message.office_team_id === this.state.profile?.office_team_id;
   },
 
   async handleTeamChatRealtime(payload = {}) {
@@ -333,7 +371,8 @@ const App = {
     return messages.filter((message) => {
       if (blocked.has(String(message.user_id))) return false;
       const isFamilyAuthor = message.author_player_scope === "family" || message.author_role === "family";
-      if (isFamilyAuthor && !this.canSeeFamily()) return false;
+      if ((isFamilyAuthor || this.isFamilyChatScope(message.scope)) && !this.canSeeFamily()) return false;
+      if (this.isFamily(this.state.profile) && !this.isFamilyChatScope(message.scope)) return false;
       return true;
     });
   },
@@ -386,22 +425,22 @@ const App = {
           <div>
             <p class="eyebrow">Crédits cachés</p>
             <h2 id="creditsTitle">Le Nid des Pronos</h2>
-            <p class="muted">Version publique <strong>1.1.3</strong> · correctif rôles admin + amélioration UI du mode Famille dans le profil.</p>
+            <p class="muted">Version publique <strong>1.2.0</strong> · vrai tchat du nid avec salons officiels/famille, historique et réactions.</p>
           </div>
           <button class="ghost-btn" id="closeCreditsBtn" type="button">Fermer</button>
         </div>
         <div class="credits-grid">
           <section>
             <h3>Version actuelle</h3>
-            <p><strong>1.1.3</strong> — correction du changement de rôle depuis l’admin quand le rôle est stocké en enum Supabase.</p>
-            <p><strong>1.1.3</strong> — refonte visuelle du bloc Mode Famille dans le profil : interrupteur plus clair, état visible/masqué plus lisible, carte d’invitation plus propre.</p>
+            <p><strong>1.2.0</strong> — nouveau tchat : salons Général / Team / Famille / Team Famille, chargement des anciens messages, réactions PNG, blocage individuel renforcé.</p>
+            <p><strong>1.2.0</strong> — refonte des classements Famille et amélioration du bloc Mode Famille dans le profil.</p>
             <p><strong>1.0.18</strong> — mini-record “Greffier du grimoire” : date fournie par Supabase et égalités conservées par le premier détenteur.</p>
             <p><strong>1.0.15</strong> — les mini-records deviennent des trophées dynamiques : un seul détenteur actuel par record, calculé sur tous les joueurs.</p>
             <p><strong>1.0.13</strong> — ajout du badge “Descente du bus impossible” quand le champion pronostiqué reste bloqué en phase de groupes.</p>
             <p><strong>1.0.5</strong> — dashboard mobile/desktop stabilisé, sans chevauchement des cartes.</p>
           </section>
           <section>
-            <h3>Évolutions V1.1.3</h3>
+            <h3>Évolutions V1.2.0</h3>
             <ul class="changelog-list">
               <li>Classement Teams bureau général ajouté.</li>
               <li>Classement Teams bureau par phase conservé.</li>
@@ -768,8 +807,9 @@ const App = {
 
   async loadTeamChatMessages() {
     this.state.teamChatError = null;
-    const scope = this.state.teamChatScope || "global";
-    const limit = Math.max(10, Number(this.state.teamChatLimit || this.state.teamChatPageSize || 30));
+    const scope = this.normalizeChatScope(this.state.teamChatScope || "global");
+    this.state.teamChatScope = scope;
+    const limit = Math.max(10, Number(this.state.teamChatLimit || this.state.teamChatPageSize || 20));
     let query = window.sb
       .from("v_team_chat_messages")
       .select("*")
@@ -777,7 +817,7 @@ const App = {
       .order("created_at", { ascending: false })
       .limit(limit + 1);
 
-    if (scope === "team" && this.state.profile?.office_team_id) {
+    if (this.chatScopeNeedsTeam(scope) && this.state.profile?.office_team_id) {
       query = query.eq("office_team_id", this.state.profile.office_team_id);
     }
 
@@ -835,6 +875,7 @@ const App = {
       H.toast("Complète d’abord ton profil pour accéder au nid.", "info");
     }
     this.clearHomeRecordCarousel();
+    this.stopTeamChatAutoRefresh();
     this.state.currentView = viewName;
     document.body.dataset.currentView = viewName;
     this.setActiveNav(viewName);
@@ -4883,6 +4924,155 @@ const App = {
     `;
   },
 
+  normalizeChatScope(scope = "global") {
+    const allowed = this.availableChatScopes().map((item) => item.key);
+    return allowed.includes(scope) ? scope : allowed[0] || "global";
+  },
+
+  chatScopeNeedsTeam(scope = "global") {
+    return scope === "team" || scope === "family_team";
+  },
+
+  isFamilyChatScope(scope = "global") {
+    return scope === "family_global" || scope === "family_team";
+  },
+
+  availableChatScopes() {
+    const profile = this.state.profile || {};
+    const hasTeam = Boolean(profile.office_team_id);
+    const scopes = [];
+    if (!this.isFamily(profile)) {
+      scopes.push({ key: "global", label: "Général", short: "Général", hint: "Tous les joueurs UIS" });
+      if (hasTeam) scopes.push({ key: "team", label: "Ma team", short: "Team", hint: "Ta team bureau" });
+    }
+    if (this.canSeeFamily()) {
+      scopes.push({ key: "family_global", label: "Famille", short: "Famille", hint: "Famille + UIS ayant activé le mode" });
+      if (hasTeam) scopes.push({ key: "family_team", label: "Famille team", short: "Team famille", hint: "Ta team dans le mode Famille" });
+    }
+    return scopes.length ? scopes : [{ key: "global", label: "Général", short: "Général", hint: "Tous les joueurs UIS" }];
+  },
+
+  chatScopeLabel(scope = "global") {
+    return this.availableChatScopes().find((item) => item.key === scope)?.label || {
+      global: "Général",
+      team: "Ma team",
+      family_global: "Famille",
+      family_team: "Famille team"
+    }[scope] || "Messages";
+  },
+
+  reactionByKey(key) {
+    return (this.state.chatReactions || []).find((reaction) => reaction.key === key);
+  },
+
+  parseReactionCounts(raw) {
+    if (!raw) return [];
+    if (Array.isArray(raw)) return raw;
+    if (typeof raw === "string") {
+      try { return JSON.parse(raw) || []; } catch (error) { return []; }
+    }
+    return [];
+  },
+
+  reactionButtonsHtml(message) {
+    const counts = this.parseReactionCounts(message.reaction_counts);
+    const countsByKey = new Map(counts.map((row) => [row.reaction_key, Number(row.count || 0)]));
+    const myReaction = message.my_reaction || null;
+    return `
+      <div class="chat-reaction-row" data-message-id="${H.escapeHtml(message.id)}">
+        ${(this.state.chatReactions || []).map((reaction) => {
+          const count = countsByKey.get(reaction.key) || 0;
+          const active = myReaction === reaction.key;
+          return `
+            <button class="chat-reaction-btn ${active ? "active" : ""}" type="button" data-react-message-id="${H.escapeHtml(message.id)}" data-reaction-key="${H.escapeHtml(reaction.key)}" title="${H.escapeHtml(reaction.label)}">
+              <img src="${H.escapeHtml(reaction.file)}" alt="${H.escapeHtml(reaction.label)}" loading="lazy">
+              ${count ? `<span>${count}</span>` : ""}
+            </button>
+          `;
+        }).join("")}
+      </div>
+    `;
+  },
+
+  stopTeamChatAutoRefresh() {
+    if (this.state.teamChatRefreshTimer) {
+      window.clearInterval(this.state.teamChatRefreshTimer);
+      this.state.teamChatRefreshTimer = null;
+    }
+  },
+
+  startTeamChatAutoRefresh() {
+    this.stopTeamChatAutoRefresh();
+    if (this.state.currentView !== "teams") return;
+    this.state.teamChatRefreshTimer = window.setInterval(async () => {
+      if (this.state.currentView !== "teams") return this.stopTeamChatAutoRefresh();
+      const active = document.activeElement;
+      const isTyping = active && active.closest && active.closest("#teamChatForm");
+      if (isTyping) return;
+      await this.loadTeamChatMessages();
+      const list = H.$("#teamChatList");
+      if (!list) return;
+      const nearBottom = list.scrollHeight - list.scrollTop - list.clientHeight < 80;
+      list.innerHTML = this.state.teamChatMessages.length
+        ? this.state.teamChatMessages.map((message) => this.chatMessageHtml(message)).join("")
+        : `<p class="muted empty-chat">Aucun message ici pour l’instant. Ouvre le bal 🦉</p>`;
+      this.bindChatMessageActions();
+      if (nearBottom) list.scrollTop = list.scrollHeight;
+      this.markTeamChatAsSeen();
+    }, 8000);
+  },
+
+  bindChatMessageActions() {
+    const root = H.$("#viewRoot");
+    if (!root) return;
+    H.$$('[data-react-message-id]', root).forEach((button) => {
+      if (button.dataset.bound === "true") return;
+      button.dataset.bound = "true";
+      button.addEventListener("click", async () => {
+        await this.toggleChatReaction(button.dataset.reactMessageId, button.dataset.reactionKey);
+      });
+    });
+    H.$$('[data-delete-message-id]', root).forEach((button) => {
+      if (button.dataset.bound === "true") return;
+      button.dataset.bound = "true";
+      button.addEventListener("click", async () => {
+        if (!confirm("Masquer ce message ?")) return;
+        const { error } = await window.sb.rpc("delete_own_or_moderate_chat_message", { p_message_id: button.dataset.deleteMessageId });
+        if (error) return H.toast(error.message, "error");
+        await this.renderTeamsPage();
+      });
+    });
+    H.$$('[data-block-user-id]', root).forEach((button) => {
+      if (button.dataset.bound === "true") return;
+      button.dataset.bound = "true";
+      button.addEventListener("click", async () => {
+        const name = button.closest(".team-chat-message")?.querySelector("strong")?.textContent || "ce joueur";
+        if (!confirm(`Ne plus voir les messages et réactions de ${name} ? Tu pourras le débloquer depuis ton profil.`)) return;
+        const { error } = await window.sb.rpc("block_user", { p_blocked_id: button.dataset.blockUserId });
+        if (error) return H.toast(error.message, "error");
+        await this.loadBlockedUsers();
+        await this.renderTeamsPage();
+      });
+    });
+  },
+
+  async toggleChatReaction(messageId, reactionKey) {
+    if (!messageId || !reactionKey) return;
+    const { error } = await window.sb.rpc("toggle_team_chat_reaction", {
+      p_message_id: messageId,
+      p_reaction_key: reactionKey
+    });
+    if (error) return H.toast(error.message, "error");
+    await this.loadTeamChatMessages();
+    const list = H.$("#teamChatList");
+    if (list) {
+      const nearBottom = list.scrollHeight - list.scrollTop - list.clientHeight < 80;
+      list.innerHTML = this.state.teamChatMessages.map((message) => this.chatMessageHtml(message)).join("") || `<p class="muted empty-chat">Aucun message ici pour l’instant. Ouvre le bal 🦉</p>`;
+      this.bindChatMessageActions();
+      if (nearBottom) list.scrollTop = list.scrollHeight;
+    }
+  },
+
   chatMessageHtml(message) {
     const profile = this.playerPublicProfile({
       id: message.user_id,
@@ -4896,17 +5086,25 @@ const App = {
       badge_color: message.badge_color || message.author_office_team_color || message.office_team_color || "#facc15"
     });
     const isMe = message.user_id === this.state.session.user.id;
+    const canDelete = isMe || this.isSuperAdmin();
+    const scopeLabel = this.chatScopeLabel(message.scope);
     return `
-      <article class="team-chat-message ${isMe ? "me" : ""}">
+      <article class="team-chat-message ${isMe ? "me" : ""} ${this.isFamilyChatScope(message.scope) ? "family-message" : ""}">
         ${H.profileBadgeHtml(profile, "profile-badge mini")}
         <div class="team-chat-bubble">
           <div class="team-chat-meta">
             <strong>${H.escapeHtml(message.author_pseudo || "Joueur")}</strong>
-            <span>${H.escapeHtml(message.scope === "team" ? (message.office_team_name || "Ma team") : "Tout le nid")}</span>
+            <span>${H.escapeHtml(scopeLabel)}</span>
             <time>${H.formatDateTime(message.created_at)}</time>
-            ${!isMe ? `<button class="ghost-btn tiny-btn block-user-btn" type="button" data-block-user-id="${H.escapeHtml(message.user_id)}">Bloquer</button>` : ""}
           </div>
           <p>${H.escapeHtml(message.body)}</p>
+          <div class="chat-message-actions">
+            ${this.reactionButtonsHtml(message)}
+            <div class="chat-message-tools">
+              ${!isMe ? `<button class="ghost-btn tiny-btn block-user-btn" type="button" data-block-user-id="${H.escapeHtml(message.user_id)}">Bloquer</button>` : ""}
+              ${canDelete ? `<button class="ghost-btn tiny-btn delete-message-btn" type="button" data-delete-message-id="${H.escapeHtml(message.id)}">Masquer</button>` : ""}
+            </div>
+          </div>
         </div>
       </article>
     `;
@@ -4919,9 +5117,11 @@ const App = {
       this.loadWinnerPredictionsForTeams()
     ]);
 
-    if (this.state.teamChatScope === "team" && !this.state.profile?.office_team_id) {
-      this.state.teamChatScope = "global";
+    const scopes = this.availableChatScopes();
+    if (!scopes.some((item) => item.key === this.state.teamChatScope)) {
+      this.state.teamChatScope = scopes[0]?.key || "global";
     }
+    this.state.teamChatScope = this.normalizeChatScope(this.state.teamChatScope);
     await this.loadTeamChatMessages();
 
     const root = H.$("#viewRoot");
@@ -4937,13 +5137,14 @@ const App = {
     const visibleDirectoryTeamCount = teamDirectoryRows.length + (playersWithoutTeam.length ? 1 : 0);
     const chatScope = this.state.teamChatScope || "global";
     const chatUnavailable = Boolean(this.state.teamChatError);
+    const chatTitle = this.chatScopeLabel(chatScope);
 
     root.innerHTML = `
-      <section class="hero-card teams-hero">
+      <section class="hero-card teams-hero compact-teams-hero">
         <div>
           <p class="eyebrow">${H.icon("profile")} Les teams du nid</p>
-          <h2>Les joueurs du nid, par équipe.</h2>
-          <p class="muted">Retrouve tous les joueurs actifs, leur team bureau et le chat du tournoi.</p>
+          <h2>Joueurs, teams et chambrage.</h2>
+          <p class="muted">Le nid général reste officiel. Le nid Famille apparaît seulement pour ceux qui l’activent.</p>
         </div>
         <div class="teams-hero-stats">
           <div><strong>${activePlayers.length}</strong><small>joueurs</small></div>
@@ -4953,34 +5154,38 @@ const App = {
       </section>
 
       <section class="grid teams-page-grid teams-chat-first">
-        <section class="card team-chat-card is-top">
+        <section class="card team-chat-card is-top chat-v120-card">
           <div class="card-title-row">
             <div>
-              <h3>Messages</h3>
-              <p class="muted">Le chat est placé en haut du nid. Écris à tout le monde ou seulement à ta team, par paquets de ${this.state.teamChatPageSize} messages.</p>
+              <h3>Messages · ${H.escapeHtml(chatTitle)}</h3>
+              <p class="muted">10 derniers messages affichés. Recharge les anciens par paquets de 20. Actualisation automatique toutes les 8 secondes.</p>
             </div>
+            <button class="ghost-btn" id="refreshTeamChatBtn" type="button">Rafraîchir</button>
           </div>
 
-          <div class="segmented small team-chat-scope">
-            <button class="${chatScope === "global" ? "active" : ""}" data-chat-scope="global" type="button">Tout le monde</button>
-            <button class="${chatScope === "team" ? "active" : ""}" data-chat-scope="team" type="button" ${!myTeam ? "disabled" : ""}>Ma team</button>
+          <div class="segmented small team-chat-scope chat-scope-v120">
+            ${scopes.map((scope) => `
+              <button class="${chatScope === scope.key ? "active" : ""} ${this.isFamilyChatScope(scope.key) ? "family-tab" : ""}" data-chat-scope="${H.escapeHtml(scope.key)}" type="button" title="${H.escapeHtml(scope.hint)}">
+                ${H.escapeHtml(scope.short)}
+              </button>
+            `).join("")}
           </div>
 
           ${chatUnavailable ? `
             <div class="chat-warning">
               <strong>Chat pas encore branché en base.</strong>
-              <p>Lance les patchs SQL <code>patch_v0_25_0_les_teams_chat.sql</code> puis <code>patch_v0_25_1_teams_details_moderation.sql</code> dans Supabase, puis recharge l’app.</p>
+              <p>Lance le patch SQL <code>patch_v1_2_0_chat_du_nid.sql</code> dans Supabase, puis recharge l’app.</p>
               <small>${H.escapeHtml(this.state.teamChatError?.message || "Table ou vue manquante")}</small>
             </div>
           ` : `
-            ${this.state.teamChatHasMore ? `<button class="ghost-btn load-more-chat-btn" id="loadMoreTeamChatBtn" type="button">Afficher plus de messages</button>` : ""}
+            ${this.state.teamChatHasMore ? `<button class="ghost-btn load-more-chat-btn" id="loadMoreTeamChatBtn" type="button">Charger 20 messages précédents</button>` : ""}
             <div class="team-chat-list" id="teamChatList">
               ${this.state.teamChatMessages.length ? this.state.teamChatMessages.map((message) => this.chatMessageHtml(message)).join("") : `<p class="muted empty-chat">Aucun message ici pour l’instant. Ouvre le bal 🦉</p>`}
             </div>
 
-            <form id="teamChatForm" class="team-chat-form">
-              <input type="text" name="body" maxlength="600" placeholder="Ton message..." autocomplete="off" required>
-              <button class="primary-btn" type="submit">Envoyer</button>
+            <form id="teamChatForm" class="team-chat-form chat-form-v120">
+              <input type="text" name="body" maxlength="600" placeholder="Écris dans ${H.escapeHtml(chatTitle)}..." autocomplete="off" required ${this.state.profile?.can_chat === false ? "disabled" : ""}>
+              <button class="primary-btn" type="submit" ${this.state.profile?.can_chat === false ? "disabled" : ""}>Envoyer</button>
             </form>
           `}
         </section>
@@ -5006,10 +5211,15 @@ const App = {
       H.toast("Teams rafraîchies", "success");
     });
 
+    H.$("#refreshTeamChatBtn")?.addEventListener("click", async () => {
+      await this.renderTeamsPage();
+      H.toast("Messages rafraîchis", "success");
+    });
+
     H.$$('[data-chat-scope]').forEach((button) => {
       button.addEventListener("click", async () => {
         this.state.teamChatScope = button.dataset.chatScope || "global";
-        this.state.teamChatLimit = this.state.teamChatPageSize;
+        this.state.teamChatLimit = 10;
         await this.renderTeamsPage();
       });
     });
@@ -5024,21 +5234,12 @@ const App = {
     });
 
     H.$("#teamChatForm")?.addEventListener("submit", (event) => this.sendTeamChatMessage(event));
-
-    H.$$("[data-block-user-id]", root).forEach((button) => {
-      button.addEventListener("click", async () => {
-        const name = button.closest(".team-chat-message")?.querySelector("strong")?.textContent || "ce joueur";
-        if (!confirm(`Ne plus voir les messages de ${name} ? Tu pourras le débloquer depuis ton profil.`)) return;
-        const { error } = await window.sb.rpc("block_user", { p_blocked_id: button.dataset.blockUserId });
-        if (error) return H.toast(error.message, "error");
-        await this.loadBlockedUsers();
-        await this.renderTeamsPage();
-      });
-    });
+    this.bindChatMessageActions();
 
     const chatList = H.$("#teamChatList");
     if (chatList) chatList.scrollTop = chatList.scrollHeight;
     this.markTeamChatAsSeen();
+    this.startTeamChatAutoRefresh();
   },
 
   async sendTeamChatMessage(event) {
@@ -5052,10 +5253,18 @@ const App = {
     const body = String(formData.get("body") || "").trim();
     if (!body) return;
 
-    const scope = this.state.teamChatScope === "team" ? "team" : "global";
-    const officeTeamId = scope === "team" ? this.state.profile?.office_team_id : null;
-    if (scope === "team" && !officeTeamId) {
-      H.toast("Tu dois avoir une team pour écrire dans le chat team.", "error");
+    const scope = this.normalizeChatScope(this.state.teamChatScope || "global");
+    if (this.isFamily(this.state.profile) && !this.isFamilyChatScope(scope)) {
+      H.toast("Les comptes Famille écrivent dans les salons Famille uniquement.", "error");
+      return;
+    }
+    if (this.isFamilyChatScope(scope) && !this.canSeeFamily()) {
+      H.toast("Active le mode Famille pour écrire ici.", "error");
+      return;
+    }
+    const officeTeamId = this.chatScopeNeedsTeam(scope) ? this.state.profile?.office_team_id : null;
+    if (this.chatScopeNeedsTeam(scope) && !officeTeamId) {
+      H.toast("Tu dois avoir une team pour écrire dans ce salon.", "error");
       return;
     }
 
@@ -5074,7 +5283,7 @@ const App = {
     }
 
     form.reset();
-    this.state.teamChatLimit = Math.max(this.state.teamChatLimit, this.state.teamChatPageSize);
+    this.state.teamChatLimit = Math.max(this.state.teamChatLimit, 10);
     await this.loadTeamChatMessages();
     await this.renderTeamsPage();
   },
@@ -5179,6 +5388,28 @@ const App = {
     `;
   },
 
+  openFamilyHelpModal() {
+    const modal = document.createElement("div");
+    modal.className = "modal-backdrop family-help-modal";
+    modal.innerHTML = `
+      <div class="modal-card">
+        <button class="modal-close" type="button" aria-label="Fermer">×</button>
+        <p class="eyebrow">Mode Famille</p>
+        <h2>Un nid parallèle, sans toucher au classement officiel.</h2>
+        <div class="family-help-grid">
+          <article><strong>Officiel préservé</strong><p>Les joueurs Famille ne comptent pas dans le classement UIS, les teams bureau ni les mini-records.</p></article>
+          <article><strong>Classement Famille</strong><p>Les comptes Famille et les joueurs UIS qui activent ce mode jouent ensemble dans un classement séparé.</p></article>
+          <article><strong>Chat séparé</strong><p>Le salon Général reste UIS. Les salons Famille permettent de chambrer avec les invités sans polluer ceux qui ne veulent rien voir.</p></article>
+          <article><strong>Invitations</strong><p>Chaque joueur UIS peut générer jusqu’à 3 invitations, valables 7 jours, rattachées à sa team.</p></article>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+    const close = () => modal.remove();
+    modal.querySelector(".modal-close")?.addEventListener("click", close);
+    modal.addEventListener("click", (event) => { if (event.target === modal) close(); });
+  },
+
   blockedUsersSectionHtml() {
     const blocked = [...(this.state.blockedUserIds || new Set())];
     if (!blocked.length) return "";
@@ -5234,8 +5465,9 @@ const App = {
         <div class="card-title-row family-header-row">
           <div>
             <h3>Mode Famille</h3>
-            <p class="muted">Tu peux choisir d’afficher ou non les joueurs Famille. Par défaut, ils sont masqués pour ne pas polluer ton nid.</p>
+            <p class="muted">Active le mode Famille pour voir les classements, messages et joueurs Famille. Ton classement officiel reste inchangé.</p>
           </div>
+          <button class="ghost-btn family-help-btn" id="familyHelpBtn" type="button">Comprendre</button>
           <span class="pill ${familyEnabled ? "success" : "neutral"}">${familyEnabled ? "Inscriptions ouvertes" : "Inscriptions fermées"}</span>
         </div>
 
@@ -5375,7 +5607,7 @@ const App = {
             <p class="muted">Déconnexion, crédits et historique des évolutions.</p>
           </div>
           <div class="profile-account-actions">
-            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.1.3</button>
+            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.2.0</button>
             <button class="danger-btn" id="profileLogoutBtn" type="button">Déconnexion</button>
           </div>
         </div>
@@ -5602,6 +5834,8 @@ const App = {
     H.$("#profileCreditsBtn")?.addEventListener("click", () => this.openCreditsModal());
     H.$("#profileLogoutBtn")?.addEventListener("click", () => Auth.logout());
 
+    H.$("#familyHelpBtn")?.addEventListener("click", () => this.openFamilyHelpModal());
+
     H.$("#showFamilyPlayersToggle")?.addEventListener("change", async (event) => {
       const { error } = await window.sb.rpc("set_show_family_players", { p_enabled: event.currentTarget.checked });
       if (error) return H.toast(error.message, "error");
@@ -5704,6 +5938,20 @@ const App = {
       })
       .on("postgres_changes", { event: "*", schema: "public", table: "team_chat_messages" }, async (payload) => {
         await this.handleTeamChatRealtime(payload);
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "team_chat_reactions" }, async () => {
+        if (this.state.currentView === "teams") {
+          await this.loadTeamChatMessages();
+          const list = H.$("#teamChatList");
+          if (list) {
+            const nearBottom = list.scrollHeight - list.scrollTop - list.clientHeight < 80;
+            list.innerHTML = this.state.teamChatMessages.map((message) => this.chatMessageHtml(message)).join("") || `<p class="muted empty-chat">Aucun message ici pour l’instant. Ouvre le bal 🦉</p>`;
+            this.bindChatMessageActions();
+            if (nearBottom) list.scrollTop = list.scrollHeight;
+          }
+        } else {
+          await this.refreshTeamChatUnreadIndicator();
+        }
       })
       .subscribe((status) => {
         console.info("[Le Nid des Pronos] Realtime app:", status);
