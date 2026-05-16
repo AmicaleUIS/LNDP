@@ -420,7 +420,7 @@ security definer
 set search_path = public
 as $$
 declare
-  next_role text := coalesce(p_role, 'user');
+  next_role text := coalesce(nullif(trim(p_role), ''), 'user');
 begin
   if not public.is_super_admin() then
     raise exception 'Réservé au super admin';
@@ -431,7 +431,7 @@ begin
   end if;
 
   update public.profiles
-  set role = next_role,
+  set role = next_role::public.app_role,
       player_scope = case when next_role = 'family' then 'family' else 'uis' end,
       office_team_id = case
         when next_role = 'family' then coalesce(office_team_id, p_office_team_id)
