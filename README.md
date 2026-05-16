@@ -1,6 +1,6 @@
-# Le Nid des Pronos — V1.1.0
+# Le Nid des Pronos — V1.1.1
 
-## Version majeure V1.1.0
+## Version V1.1.1
 
 Cette version ajoute le **mode Famille** et sépare les droits d'administration.
 
@@ -43,11 +43,11 @@ Ce patch ajoute les colonnes, tables, fonctions RPC et vues nécessaires.
 Publier tous les fichiers sur GitHub Pages. Les assets sont appelés avec :
 
 ```txt
-?v=1.1.0
+?v=1.1.1
 ```
 
 Le cache PWA est passé en :
 
 ```txt
-le-nid-des-pronos-v1-1-0
+le-nid-des-pronos-v1-1-1
 ```

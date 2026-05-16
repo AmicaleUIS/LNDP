@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — APP PRINCIPALE V1.1.0
+// LE NID DES PRONOS — APP PRINCIPALE V1.1.1
 // ============================================================
 
 const H = window.Helpers;
@@ -283,7 +283,12 @@ const App = {
   },
 
   canSeeFamily() {
-    return this.isFamily() || this.isSuperAdmin() || Boolean(this.state.profile?.show_family_players);
+    // Le mode Famille doit rester transparent pour chaque joueur, y compris super_admin.
+    // Si le joueur décoche l’option dans son profil, aucune zone Famille ne remonte
+    // dans les écrans publics : classements, teams, chat, fiches joueurs, etc.
+    if (this.isFamily()) return true;
+    if (!this.familyModeEnabled()) return false;
+    return Boolean(this.state.profile?.show_family_players);
   },
 
   roleLabel(role, scope) {
@@ -359,21 +364,21 @@ const App = {
           <div>
             <p class="eyebrow">Crédits cachés</p>
             <h2 id="creditsTitle">Le Nid des Pronos</h2>
-            <p class="muted">Version publique <strong>1.1.0</strong> · classements Teams bureau général et par phase.</p>
+            <p class="muted">Version publique <strong>1.1.1</strong> · correctif visibilité du mode Famille.</p>
           </div>
           <button class="ghost-btn" id="closeCreditsBtn" type="button">Fermer</button>
         </div>
         <div class="credits-grid">
           <section>
             <h3>Version actuelle</h3>
-            <p><strong>1.1.0</strong> — classement Teams bureau enrichi : général et par phase, chacun disponible en moyenne ou par points.</p>
+            <p><strong>1.1.1</strong> — le mode Famille respecte l’option de visibilité personnelle, y compris pour le super admin.</p>
             <p><strong>1.0.18</strong> — mini-record “Greffier du grimoire” : date fournie par Supabase et égalités conservées par le premier détenteur.</p>
             <p><strong>1.0.15</strong> — les mini-records deviennent des trophées dynamiques : un seul détenteur actuel par record, calculé sur tous les joueurs.</p>
             <p><strong>1.0.13</strong> — ajout du badge “Descente du bus impossible” quand le champion pronostiqué reste bloqué en phase de groupes.</p>
             <p><strong>1.0.5</strong> — dashboard mobile/desktop stabilisé, sans chevauchement des cartes.</p>
           </section>
           <section>
-            <h3>Évolutions V1.1.0</h3>
+            <h3>Évolutions V1.1.1</h3>
             <ul class="changelog-list">
               <li>Classement Teams bureau général ajouté.</li>
               <li>Classement Teams bureau par phase conservé.</li>
@@ -2602,6 +2607,10 @@ const App = {
   },
 
   async renderLeaderboardContent() {
+    if (this.state.leaderboardTab === "family" && !this.canSeeFamily()) {
+      this.state.leaderboardTab = "players";
+      return this.renderPlayerLeaderboard();
+    }
     if (this.state.leaderboardTab === "players") return this.renderPlayerLeaderboard();
     if (this.state.leaderboardTab === "team") return this.renderTeamLeaderboard();
     if (this.state.leaderboardTab === "family") return this.renderFamilyLeaderboard();
@@ -4884,6 +4893,10 @@ const App = {
       `;
     }
 
+    if (!familyEnabled) {
+      return "";
+    }
+
     return `
       <section class="card family-profile-card">
         <div class="card-title-row">
@@ -5018,7 +5031,7 @@ const App = {
             <p class="muted">Déconnexion, crédits et historique des évolutions.</p>
           </div>
           <div class="profile-account-actions">
-            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.1.0</button>
+            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.1.1</button>
             <button class="danger-btn" id="profileLogoutBtn" type="button">Déconnexion</button>
           </div>
         </div>
