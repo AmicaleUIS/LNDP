@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — APP PRINCIPALE V1.2.0
+// LE NID DES PRONOS — APP PRINCIPALE V1.2.1
 // ============================================================
 
 const H = window.Helpers;
@@ -425,13 +425,14 @@ const App = {
           <div>
             <p class="eyebrow">Crédits cachés</p>
             <h2 id="creditsTitle">Le Nid des Pronos</h2>
-            <p class="muted">Version publique <strong>1.2.0</strong> · vrai tchat du nid avec salons officiels/famille, historique et réactions.</p>
+            <p class="muted">Version publique <strong>1.2.1</strong> · réactions PNG façon WhatsApp dans le tchat du nid.</p>
           </div>
           <button class="ghost-btn" id="closeCreditsBtn" type="button">Fermer</button>
         </div>
         <div class="credits-grid">
           <section>
             <h3>Version actuelle</h3>
+            <p><strong>1.2.1</strong> — réactions PNG façon WhatsApp : choix au clic sur un message, compteurs uniquement s’il y a des réactions, détail des joueurs au clic.</p>
             <p><strong>1.2.0</strong> — nouveau tchat : salons Général / Team / Famille / Team Famille, chargement des anciens messages, réactions PNG, blocage individuel renforcé.</p>
             <p><strong>1.2.0</strong> — refonte des classements Famille et amélioration du bloc Mode Famille dans le profil.</p>
             <p><strong>1.0.18</strong> — mini-record “Greffier du grimoire” : date fournie par Supabase et égalités conservées par le premier détenteur.</p>
@@ -440,13 +441,12 @@ const App = {
             <p><strong>1.0.5</strong> — dashboard mobile/desktop stabilisé, sans chevauchement des cartes.</p>
           </section>
           <section>
-            <h3>Évolutions V1.2.0</h3>
+            <h3>Évolutions V1.2.1</h3>
             <ul class="changelog-list">
-              <li>Classement Teams bureau général ajouté.</li>
-              <li>Classement Teams bureau par phase conservé.</li>
-              <li>Les deux classements Teams bureau peuvent être affichés en moyenne ou par points.</li>
-              <li>Le bouton “Moyenne team” de l’accueil mène directement au classement Teams bureau général en moyenne.</li>
-              <li>Nouveau badge négatif : champion annoncé éliminé en phase de groupes.</li>
+              <li>Les 6 réactions ne sont plus affichées sous chaque message à zéro.</li>
+              <li>Un clic sur une bulle de message ouvre une fenêtre de choix avec les 6 PNG.</li>
+              <li>Après le choix, la fenêtre se ferme et le compteur se met à jour.</li>
+              <li>Un clic sur un compteur ouvre le détail : avatar, pseudo, team et réaction utilisée.</li>
             </ul>
           </section>
           <section>
@@ -4974,24 +4974,199 @@ const App = {
     return [];
   },
 
-  reactionButtonsHtml(message) {
-    const counts = this.parseReactionCounts(message.reaction_counts);
-    const countsByKey = new Map(counts.map((row) => [row.reaction_key, Number(row.count || 0)]));
-    const myReaction = message.my_reaction || null;
+  chatReactionCounts(message) {
+    const counts = this.parseReactionCounts(message?.reaction_counts);
+    const countsByKey = new Map(counts.map((row) => [row.reaction_key, Number(row.count || row.reaction_count || 0)]));
+    return (this.state.chatReactions || [])
+      .map((reaction) => ({ ...reaction, count: countsByKey.get(reaction.key) || 0 }))
+      .filter((reaction) => reaction.count > 0);
+  },
+
+  reactionSummaryHtml(message) {
+    const reactions = this.chatReactionCounts(message);
+    if (!reactions.length) return "";
     return `
-      <div class="chat-reaction-row" data-message-id="${H.escapeHtml(message.id)}">
-        ${(this.state.chatReactions || []).map((reaction) => {
-          const count = countsByKey.get(reaction.key) || 0;
-          const active = myReaction === reaction.key;
-          return `
-            <button class="chat-reaction-btn ${active ? "active" : ""}" type="button" data-react-message-id="${H.escapeHtml(message.id)}" data-reaction-key="${H.escapeHtml(reaction.key)}" title="${H.escapeHtml(reaction.label)}">
-              <img src="${H.escapeHtml(reaction.file)}" alt="${H.escapeHtml(reaction.label)}" loading="lazy">
-              ${count ? `<span>${count}</span>` : ""}
-            </button>
-          `;
-        }).join("")}
+      <div class="chat-reaction-summary" data-message-id="${H.escapeHtml(message.id)}" aria-label="Réactions au message">
+        ${reactions.map((reaction) => `
+          <button class="chat-reaction-pill ${message.my_reaction === reaction.key ? "active" : ""}" type="button" data-reaction-detail-message-id="${H.escapeHtml(message.id)}" data-reaction-key="${H.escapeHtml(reaction.key)}" title="Voir qui a réagi avec ${H.escapeHtml(reaction.label)}">
+            <span>${Number(reaction.count || 0)}</span>
+            <img src="${H.escapeHtml(reaction.file)}" alt="${H.escapeHtml(reaction.label)}" loading="lazy">
+          </button>
+        `).join("")}
       </div>
     `;
+  },
+
+  closeChatReactionPicker() {
+    H.$("#chatReactionPicker")?.remove();
+  },
+
+  openChatReactionPicker(messageId) {
+    if (!messageId) return;
+    const message = this.state.teamChatMessages.find((item) => String(item.id) === String(messageId));
+    if (!message) return;
+
+    this.closeChatReactionPicker();
+    const modal = document.createElement("div");
+    modal.id = "chatReactionPicker";
+    modal.className = "chat-reaction-picker-backdrop";
+    modal.innerHTML = `
+      <div class="chat-reaction-picker-panel" role="dialog" aria-modal="true" aria-label="Choisir une réaction">
+        <div class="chat-reaction-picker-head">
+          <strong>Réagir au message</strong>
+          <button class="chat-reaction-picker-close" type="button" aria-label="Fermer">×</button>
+        </div>
+        <div class="chat-reaction-picker-grid">
+          ${(this.state.chatReactions || []).map((reaction) => `
+            <button class="chat-reaction-choice ${message.my_reaction === reaction.key ? "active" : ""}" type="button" data-picker-react-message-id="${H.escapeHtml(message.id)}" data-reaction-key="${H.escapeHtml(reaction.key)}" title="${H.escapeHtml(reaction.label)}">
+              <img src="${H.escapeHtml(reaction.file)}" alt="${H.escapeHtml(reaction.label)}" loading="lazy">
+              <span>${H.escapeHtml(reaction.label)}</span>
+            </button>
+          `).join("")}
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(modal);
+    const close = () => this.closeChatReactionPicker();
+    H.$(".chat-reaction-picker-close", modal)?.addEventListener("click", close);
+    modal.addEventListener("click", (event) => { if (event.target === modal) close(); });
+    H.$$('[data-picker-react-message-id]', modal).forEach((button) => {
+      button.addEventListener("click", async (event) => {
+        event.stopPropagation();
+        await this.toggleChatReaction(button.dataset.pickerReactMessageId, button.dataset.reactionKey);
+        close();
+      });
+    });
+  },
+
+  async fetchChatReactionDetails(messageId) {
+    if (!messageId) return [];
+
+    const { data, error } = await window.sb.rpc("get_team_chat_reaction_details", {
+      p_message_id: messageId
+    });
+
+    if (!error) return data || [];
+
+    console.warn("Détail des réactions indisponible via RPC, fallback local", error);
+    const { data: fallback, error: fallbackError } = await window.sb
+      .from("team_chat_reactions")
+      .select("reaction_key,user_id,created_at")
+      .eq("message_id", messageId)
+      .order("created_at", { ascending: true });
+
+    if (fallbackError) throw fallbackError;
+
+    return (fallback || [])
+      .filter((row) => !(this.state.blockedUserIds || new Set()).has(row.user_id))
+      .map((row) => {
+        const player = this.state.publicProfiles.find((profile) => String(profile.id) === String(row.user_id)) || {};
+        return {
+          ...row,
+          pseudo: player.pseudo || "Joueur",
+          avatar_key: player.avatar_key || "owl-01",
+          badge_shape: player.badge_shape || "rounded",
+          badge_color: player.badge_color || player.office_team_color || "#facc15",
+          office_team_id: player.office_team_id || null,
+          office_team_name: player.office_team_name || "Sans team",
+          office_team_slug: player.office_team_slug || null,
+          office_team_color: player.office_team_color || player.badge_color || "#facc15"
+        };
+      });
+  },
+
+  reactionDetailGroupHtml(reaction, rows = []) {
+    if (!rows.length) return "";
+    return `
+      <section class="chat-reaction-detail-group">
+        <h3>
+          <img src="${H.escapeHtml(reaction.file)}" alt="${H.escapeHtml(reaction.label)}" loading="lazy">
+          <span>${H.escapeHtml(reaction.label)}</span>
+          <b>${rows.length}</b>
+        </h3>
+        <div class="chat-reaction-detail-users">
+          ${rows.map((row) => {
+            const profile = this.playerPublicProfile({
+              id: row.user_id,
+              pseudo: row.pseudo || "Joueur",
+              office_team_id: row.office_team_id,
+              office_team_name: row.office_team_name,
+              office_team_slug: row.office_team_slug,
+              office_team_color: row.office_team_color,
+              avatar_key: row.avatar_key || "owl-01",
+              badge_shape: row.badge_shape || "rounded",
+              badge_color: row.badge_color || row.office_team_color || "#facc15"
+            });
+            return `
+              <article class="chat-reaction-detail-user">
+                ${H.profileBadgeHtml(profile, "profile-badge mini")}
+                <div>
+                  <strong>${H.escapeHtml(row.pseudo || "Joueur")}</strong>
+                  <span>${H.escapeHtml(row.office_team_name || "Sans team")}</span>
+                </div>
+                <time>${H.formatDateTime(row.created_at)}</time>
+              </article>
+            `;
+          }).join("")}
+        </div>
+      </section>
+    `;
+  },
+
+  async openChatReactionDetailsModal(messageId, preferredReactionKey = "") {
+    if (!messageId) return;
+    H.$("#chatReactionDetailsModal")?.remove();
+
+    const loadingModal = document.createElement("div");
+    loadingModal.id = "chatReactionDetailsModal";
+    loadingModal.className = "modal-backdrop chat-reaction-details-modal";
+    loadingModal.innerHTML = `
+      <div class="modal-card chat-reaction-details-card" role="dialog" aria-modal="true" aria-labelledby="chatReactionDetailsTitle">
+        <button class="modal-close" type="button" aria-label="Fermer">×</button>
+        <p class="eyebrow">Réactions</p>
+        <h2 id="chatReactionDetailsTitle">Qui a réagi ?</h2>
+        <p class="muted">Chargement des chouettes indiscrètes…</p>
+      </div>
+    `;
+    document.body.appendChild(loadingModal);
+    const close = () => loadingModal.remove();
+    loadingModal.querySelector(".modal-close")?.addEventListener("click", close);
+    loadingModal.addEventListener("click", (event) => { if (event.target === loadingModal) close(); });
+
+    try {
+      const details = await this.fetchChatReactionDetails(messageId);
+      const orderedReactions = [...(this.state.chatReactions || [])].sort((a, b) => {
+        if (a.key === preferredReactionKey) return -1;
+        if (b.key === preferredReactionKey) return 1;
+        return 0;
+      });
+      const groupsHtml = orderedReactions.map((reaction) => {
+        const rows = details.filter((row) => row.reaction_key === reaction.key);
+        return this.reactionDetailGroupHtml(reaction, rows);
+      }).join("");
+
+      loadingModal.innerHTML = `
+        <div class="modal-card chat-reaction-details-card" role="dialog" aria-modal="true" aria-labelledby="chatReactionDetailsTitle">
+          <button class="modal-close" type="button" aria-label="Fermer">×</button>
+          <p class="eyebrow">Réactions du nid</p>
+          <h2 id="chatReactionDetailsTitle">Qui a fait quoi ?</h2>
+          ${details.length ? groupsHtml : `<p class="muted detail-empty">Aucune réaction visible pour le moment.</p>`}
+        </div>
+      `;
+      loadingModal.querySelector(".modal-close")?.addEventListener("click", close);
+    } catch (error) {
+      console.warn("Impossible de charger le détail des réactions", error);
+      loadingModal.innerHTML = `
+        <div class="modal-card chat-reaction-details-card" role="dialog" aria-modal="true" aria-labelledby="chatReactionDetailsTitle">
+          <button class="modal-close" type="button" aria-label="Fermer">×</button>
+          <p class="eyebrow">Réactions</p>
+          <h2 id="chatReactionDetailsTitle">Détail indisponible</h2>
+          <p class="muted">Le détail des réactions nécessite le patch SQL V1.2.1.</p>
+        </div>
+      `;
+      loadingModal.querySelector(".modal-close")?.addEventListener("click", close);
+    }
   },
 
   stopTeamChatAutoRefresh() {
@@ -5025,11 +5200,26 @@ const App = {
   bindChatMessageActions() {
     const root = H.$("#viewRoot");
     if (!root) return;
-    H.$$('[data-react-message-id]', root).forEach((button) => {
-      if (button.dataset.bound === "true") return;
-      button.dataset.bound = "true";
-      button.addEventListener("click", async () => {
-        await this.toggleChatReaction(button.dataset.reactMessageId, button.dataset.reactionKey);
+    H.$$('[data-open-reaction-picker-message-id]', root).forEach((bubble) => {
+      if (bubble.dataset.boundReactionPicker === "true") return;
+      bubble.dataset.boundReactionPicker = "true";
+      bubble.addEventListener("click", (event) => {
+        if (event.target.closest("button,a,input,textarea,select,.chat-message-tools,.chat-reaction-summary")) return;
+        this.openChatReactionPicker(bubble.dataset.openReactionPickerMessageId);
+      });
+      bubble.addEventListener("keydown", (event) => {
+        if (event.key !== "Enter" && event.key !== " ") return;
+        if (event.target.closest("button,a,input,textarea,select")) return;
+        event.preventDefault();
+        this.openChatReactionPicker(bubble.dataset.openReactionPickerMessageId);
+      });
+    });
+    H.$$('[data-reaction-detail-message-id]', root).forEach((button) => {
+      if (button.dataset.boundReactionDetail === "true") return;
+      button.dataset.boundReactionDetail = "true";
+      button.addEventListener("click", async (event) => {
+        event.stopPropagation();
+        await this.openChatReactionDetailsModal(button.dataset.reactionDetailMessageId, button.dataset.reactionKey || "");
       });
     });
     H.$$('[data-delete-message-id]', root).forEach((button) => {
@@ -5091,7 +5281,7 @@ const App = {
     return `
       <article class="team-chat-message ${isMe ? "me" : ""} ${this.isFamilyChatScope(message.scope) ? "family-message" : ""}">
         ${H.profileBadgeHtml(profile, "profile-badge mini")}
-        <div class="team-chat-bubble">
+        <div class="team-chat-bubble" data-open-reaction-picker-message-id="${H.escapeHtml(message.id)}" role="button" tabindex="0" title="Cliquer pour réagir">
           <div class="team-chat-meta">
             <strong>${H.escapeHtml(message.author_pseudo || "Joueur")}</strong>
             <span>${H.escapeHtml(scopeLabel)}</span>
@@ -5099,7 +5289,7 @@ const App = {
           </div>
           <p>${H.escapeHtml(message.body)}</p>
           <div class="chat-message-actions">
-            ${this.reactionButtonsHtml(message)}
+            ${this.reactionSummaryHtml(message)}
             <div class="chat-message-tools">
               ${!isMe ? `<button class="ghost-btn tiny-btn block-user-btn" type="button" data-block-user-id="${H.escapeHtml(message.user_id)}">Bloquer</button>` : ""}
               ${canDelete ? `<button class="ghost-btn tiny-btn delete-message-btn" type="button" data-delete-message-id="${H.escapeHtml(message.id)}">Masquer</button>` : ""}
@@ -5607,7 +5797,7 @@ const App = {
             <p class="muted">Déconnexion, crédits et historique des évolutions.</p>
           </div>
           <div class="profile-account-actions">
-            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.2.0</button>
+            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.2.1</button>
             <button class="danger-btn" id="profileLogoutBtn" type="button">Déconnexion</button>
           </div>
         </div>
