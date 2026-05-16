@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — ADMIN V1.0.19
+// LE NID DES PRONOS — ADMIN V1.1.0
 // ============================================================
 
 const H = window.Helpers;
@@ -18,7 +18,25 @@ const Admin = {
     chatModerationLimit: 30,
     quickScoreFilter: "work",
     adminSection: "quick",
-    backups: []
+    backups: [],
+    familyInvites: [],
+    appSettings: {},
+    familyModeEnabled: false
+  },
+
+  isSuperAdmin() {
+    return this.state.profile?.role === "super_admin";
+  },
+
+  isScoreAdmin() {
+    return ["admin", "super_admin"].includes(this.state.profile?.role);
+  },
+
+  roleLabel(role) {
+    if (role === "super_admin") return "Super admin";
+    if (role === "admin") return "Admin matchs";
+    if (role === "family") return "Famille";
+    return "Joueur";
   },
 
   async init() {
@@ -26,7 +44,7 @@ const Admin = {
     if (!this.state.session) return;
 
     await this.loadProfile();
-    if (this.state.profile.role !== "admin") {
+    if (!["admin", "super_admin"].includes(this.state.profile.role)) {
       window.location.href = "app.html";
       return;
     }
@@ -125,7 +143,8 @@ const Admin = {
       messages: ["Modération des messages", "Masquer les messages du chat global ou des chats de team."],
       scores: ["Gestion complète des scores", "Modifier les scores, lieux, horaires, diffuseurs et recalculer."],
       backups: ["Sauvegardes", "Sauvegarder, restaurer ou remettre à zéro les pronostics."],
-      users: ["Joueurs", "Gérer les joueurs, rôles, teams et statuts actif/inactif."]
+      users: ["Joueurs", "Gérer les joueurs, rôles, teams et statuts actif/inactif."],
+      family: ["Mode Famille", "Invitations, inscriptions Famille et droits associés."]
     };
 
     H.$$("[data-admin-section]").forEach((btn) => btn.classList.toggle("active", btn.dataset.adminSection === section));
@@ -133,7 +152,7 @@ const Admin = {
 
     const title = H.$("#adminPageTitle");
     const subtitle = H.$("#adminPageSubtitle");
-    if (title) title.innerHTML = `${H.icon(section === "teams" ? "classements" : section === "messages" ? "diffusion" : section === "scores" ? "score-exact" : section === "backups" ? "verrouille" : section === "users" ? "profil" : "admin", "")} ${H.escapeHtml(titles[section]?.[0] || "Administration")}`;
+    if (title) title.innerHTML = `${H.icon(section === "teams" ? "classements" : section === "messages" ? "diffusion" : section === "scores" ? "score-exact" : section === "backups" ? "verrouille" : section === "users" ? "profil" : section === "family" ? "profile" : "admin", "")} ${H.escapeHtml(titles[section]?.[0] || "Administration")}`;
     if (subtitle) subtitle.textContent = titles[section]?.[1] || "Mode gestion.";
   },
 
@@ -265,7 +284,7 @@ const Admin = {
   async loadProfile() {
     const { data, error } = await window.sb
       .from("profiles")
-      .select("id,email,pseudo,role,is_active")
+      .select("id,email,pseudo,role,player_scope,is_active")
       .eq("id", this.state.session.user.id)
       .single();
 
@@ -274,21 +293,37 @@ const Admin = {
   },
 
   async reloadAll() {
-    await Promise.all([
-      this.loadUsers(),
-      this.loadTeams(),
-      this.loadFootballTeams(),
-      this.loadMatches(),
-      this.loadBackups(),
-      this.loadChatMessages()
-    ]);
+    if (this.isSuperAdmin()) {
+      await Promise.all([
+        this.loadUsers(),
+        this.loadTeams(),
+        this.loadFootballTeams(),
+        this.loadMatches(),
+        this.loadBackups(),
+        this.loadChatMessages(),
+        this.loadFamilyInvites(),
+        this.loadFamilyModeSetting()
+      ]);
 
-    this.renderUsers();
-    this.renderTeams();
-    this.renderChatModeration();
-    this.renderQuickScores();
-    this.renderMatches();
-    this.renderBackups();
+      this.renderUsers();
+      this.renderTeams();
+      this.renderChatModeration();
+      this.renderQuickScores();
+      this.renderMatches();
+      this.renderBackups();
+      this.renderFamilyAdmin();
+    } else {
+      await Promise.all([
+        this.loadTeams(),
+        this.loadFootballTeams(),
+        this.loadMatches()
+      ]);
+      this.renderQuickScores();
+      this.renderMatches();
+      if (!["quick", "scores"].includes(this.state.adminSection)) this.state.adminSection = "quick";
+    }
+
+    this.applyRolePermissions();
     this.setAdminSection(this.state.adminSection || "quick");
     H.toast("Admin rafraîchi", "success");
   },
@@ -296,7 +331,7 @@ const Admin = {
   async loadUsers() {
     const { data, error } = await window.sb
       .from("profiles")
-      .select("id,email,pseudo,role,office_team_id,is_active,inactive_reason,created_at,avatar_key,badge_shape,badge_color,profile_setup_done")
+      .select("id,email,pseudo,role,player_scope,office_team_id,is_active,inactive_reason,created_at,avatar_key,badge_shape,badge_color,profile_setup_done,show_family_players,invited_by,is_banned,can_chat,can_predict,can_change_avatar,can_change_pseudo")
       .order("pseudo");
 
     if (error) throw error;
@@ -373,35 +408,91 @@ const Admin = {
     this.state.chatMessages = data || [];
   },
 
+  async loadFamilyInvites() {
+    const { data, error } = await window.sb
+      .from("family_invites")
+      .select("id,code,inviter_id,office_team_id,used_by,used_at,expires_at,created_at,revoked_at")
+      .order("created_at", { ascending: false })
+      .limit(50);
+
+    if (error) {
+      console.warn("Invitations Famille indisponibles", error);
+      this.state.familyInvites = [];
+      return;
+    }
+    this.state.familyInvites = data || [];
+  },
+
+  async loadFamilyModeSetting() {
+    const { data, error } = await window.sb
+      .from("app_settings")
+      .select("key,value")
+      .eq("key", "family_mode_enabled")
+      .maybeSingle();
+
+    if (error) {
+      console.warn("Paramètre Famille indisponible", error);
+      this.state.familyModeEnabled = false;
+      return;
+    }
+
+    const value = data?.value;
+    this.state.familyModeEnabled = typeof value === "boolean" ? value : value === "true" || Boolean(value?.enabled);
+  },
+
+  applyRolePermissions() {
+    const superAdmin = this.isSuperAdmin();
+    H.$$('[data-admin-section]').forEach((btn) => {
+      const section = btn.dataset.adminSection;
+      const allowed = superAdmin || ["quick", "scores"].includes(section);
+      btn.hidden = !allowed;
+      btn.disabled = !allowed;
+    });
+    H.$$('[data-section-panel]').forEach((panel) => {
+      const section = panel.dataset.sectionPanel;
+      panel.hidden = !(superAdmin || ["quick", "scores"].includes(section));
+    });
+  },
+
   renderUsers() {
     const root = H.$("#usersAdmin");
+    if (!root) return;
     root.innerHTML = `
       <div class="admin-list">
         ${this.state.users.map((user) => {
           const teamOptions = this.state.teams.map((team) => `
             <option value="${team.id}" ${user.office_team_id === team.id ? "selected" : ""}>${H.escapeHtml(team.name)}</option>
           `).join("");
+          const role = user.role || (user.player_scope === "family" ? "family" : "user");
 
           return `
-            <article class="admin-row ${!user.is_active ? "inactive" : ""}" data-user-id="${user.id}">
+            <article class="admin-row ${!user.is_active || user.is_banned ? "inactive" : ""}" data-user-id="${user.id}">
               <div class="admin-main user-admin-main">
                 ${H.profileBadgeHtml(user, "profile-badge mini")}
-                <div><strong>${H.escapeHtml(user.pseudo)}</strong>
+                <div><strong>${H.escapeHtml(user.pseudo || "Joueur")}</strong>
                 <small>${H.escapeHtml(user.email || "")}</small>
-                ${!user.is_active ? `<span class="pill danger">Inactif</span>` : `<span class="pill success">Actif</span>`}
-                  ${!user.profile_setup_done ? `<span class="pill neutral">Profil à compléter</span>` : ""}
+                <span class="pill neutral">${H.escapeHtml(this.roleLabel(role))}</span>
+                ${user.is_banned ? `<span class="pill danger">Banni</span>` : (!user.is_active ? `<span class="pill danger">Inactif</span>` : `<span class="pill success">Actif</span>`)}
+                ${!user.profile_setup_done ? `<span class="pill neutral">Profil à compléter</span>` : ""}
                 </div>
               </div>
 
-              <div class="admin-controls">
-                <select class="user-team-select">
+              <div class="admin-controls user-admin-controls-v110">
+                <select class="user-team-select" ${role === "family" ? "disabled" : ""}>
                   <option value="">Sans team</option>
                   ${teamOptions}
                 </select>
                 <select class="user-role-select">
-                  <option value="user" ${user.role === "user" ? "selected" : ""}>Joueur</option>
-                  <option value="admin" ${user.role === "admin" ? "selected" : ""}>Admin</option>
+                  <option value="user" ${role === "user" ? "selected" : ""}>Joueur</option>
+                  <option value="family" ${role === "family" ? "selected" : ""}>Famille</option>
+                  <option value="admin" ${role === "admin" ? "selected" : ""}>Admin matchs</option>
+                  <option value="super_admin" ${role === "super_admin" ? "selected" : ""}>Super admin</option>
                 </select>
+                <label class="mini-check"><input class="user-can-chat" type="checkbox" ${user.can_chat !== false ? "checked" : ""}> Chat</label>
+                <label class="mini-check"><input class="user-can-predict" type="checkbox" ${user.can_predict !== false ? "checked" : ""}> Pronos</label>
+                <label class="mini-check"><input class="user-can-avatar" type="checkbox" ${user.can_change_avatar !== false ? "checked" : ""}> Avatar</label>
+                <label class="mini-check"><input class="user-can-pseudo" type="checkbox" ${user.can_change_pseudo !== false ? "checked" : ""}> Pseudo</label>
+                <label class="mini-check danger"><input class="user-is-banned" type="checkbox" ${user.is_banned ? "checked" : ""}> Ban</label>
                 <button class="ghost-btn save-user-btn">Sauver</button>
                 ${user.is_active
                   ? `<button class="danger-btn toggle-active-btn" data-active="false">Désactiver</button>`
@@ -425,13 +516,21 @@ const Admin = {
 
   async saveUser(row) {
     const userId = row.dataset.userId;
-    const teamId = row.querySelector(".user-team-select").value || null;
-    const role = row.querySelector(".user-role-select").value;
+    const teamId = row.querySelector(".user-team-select")?.value || null;
+    const role = row.querySelector(".user-role-select")?.value || "user";
 
-    const { error } = await window.sb
-      .from("profiles")
-      .update({ office_team_id: teamId, role })
-      .eq("id", userId);
+    const payload = {
+      p_user_id: userId,
+      p_role: role,
+      p_office_team_id: role === "family" ? null : teamId,
+      p_is_banned: row.querySelector(".user-is-banned")?.checked || false,
+      p_can_chat: row.querySelector(".user-can-chat")?.checked !== false,
+      p_can_predict: row.querySelector(".user-can-predict")?.checked !== false,
+      p_can_change_avatar: row.querySelector(".user-can-avatar")?.checked !== false,
+      p_can_change_pseudo: row.querySelector(".user-can-pseudo")?.checked !== false
+    };
+
+    const { error } = await window.sb.rpc("admin_update_profile_controls", payload);
 
     if (error) {
       H.toast(error.message, "error");
@@ -459,6 +558,92 @@ const Admin = {
 
     H.toast(active ? "Joueur réactivé" : "Joueur désactivé", "success");
     await this.reloadAll();
+  },
+
+  renderFamilyAdmin() {
+    const root = H.$("#familyAdmin");
+    if (!root) return;
+    const familyUsers = this.state.users.filter((user) => user.role === "family" || user.player_scope === "family");
+    const teamOptions = this.state.teams.map((team) => `<option value="${team.id}">${H.escapeHtml(team.name)}</option>`).join("");
+    root.innerHTML = `
+      <div class="family-admin-grid">
+        <section class="admin-mini-panel">
+          <h3>Inscriptions Famille</h3>
+          <p class="muted">Quand le mode est fermé, les nouveaux codes ne peuvent pas être utilisés.</p>
+          <label class="family-toggle-line">
+            <input id="adminFamilyModeToggle" type="checkbox" ${this.state.familyModeEnabled ? "checked" : ""}>
+            <span>Activer le mode Famille</span>
+          </label>
+        </section>
+
+        <section class="admin-mini-panel">
+          <h3>Dépannage super admin</h3>
+          <p class="muted">Créer une invitation Famille directement sur une team, sans passer par un joueur.</p>
+          <div class="inline-form">
+            <select id="adminFamilyInviteTeam"><option value="">Choisir une team</option>${teamOptions}</select>
+            <button class="primary-btn" id="adminCreateFamilyInviteBtn" type="button">Créer un code</button>
+          </div>
+        </section>
+      </div>
+
+      <section class="admin-mini-panel family-invites-admin-panel">
+        <h3>Dernières invitations</h3>
+        <div class="admin-list compact">
+          ${this.state.familyInvites.length ? this.state.familyInvites.map((invite) => {
+            const inviter = this.state.users.find((user) => user.id === invite.inviter_id);
+            const usedBy = this.state.users.find((user) => user.id === invite.used_by);
+            const team = this.state.teams.find((item) => item.id === invite.office_team_id);
+            return `
+              <article class="admin-row family-invite-admin-row">
+                <div class="admin-main">
+                  <div>
+                    <strong>${H.escapeHtml(invite.code)}</strong>
+                    <small>Team ${H.escapeHtml(team?.name || "—")} · invité par ${H.escapeHtml(inviter?.pseudo || "Super admin")}</small>
+                    <small>${invite.used_at ? `Utilisé par ${H.escapeHtml(usedBy?.pseudo || "un joueur")} le ${H.formatDateTime(invite.used_at)}` : `Expire le ${H.formatDateTime(invite.expires_at)}`}</small>
+                  </div>
+                </div>
+                <span class="pill ${invite.used_at ? "success" : "neutral"}">${invite.used_at ? "Utilisé" : "Disponible"}</span>
+              </article>
+            `;
+          }).join("") : `<p class="muted">Aucune invitation Famille.</p>`}
+        </div>
+      </section>
+
+      <section class="admin-mini-panel">
+        <h3>Membres Famille</h3>
+        <p class="muted">Ils peuvent jouer et débloquer les badges classiques, mais restent hors concours officiel et hors mini-records.</p>
+        <div class="admin-list compact">
+          ${familyUsers.length ? familyUsers.map((user) => `
+            <article class="admin-row">
+              <div class="admin-main user-admin-main">
+                ${H.profileBadgeHtml(user, "profile-badge mini")}
+                <div><strong>${H.escapeHtml(user.pseudo || "Famille")}</strong><small>${H.escapeHtml(user.email || "")}</small></div>
+              </div>
+              <span class="pill neutral">Famille</span>
+            </article>
+          `).join("") : `<p class="muted">Aucun membre Famille pour le moment.</p>`}
+        </div>
+      </section>
+    `;
+
+    H.$("#adminFamilyModeToggle", root)?.addEventListener("change", async (event) => {
+      const { error } = await window.sb.rpc("admin_set_family_mode", { p_enabled: event.currentTarget.checked });
+      if (error) return H.toast(error.message, "error");
+      await this.loadFamilyModeSetting();
+      this.renderFamilyAdmin();
+      H.toast(event.currentTarget.checked ? "Mode Famille activé" : "Mode Famille désactivé", "success");
+    });
+
+    H.$("#adminCreateFamilyInviteBtn", root)?.addEventListener("click", async () => {
+      const teamId = H.$("#adminFamilyInviteTeam", root)?.value;
+      if (!teamId) return H.toast("Choisis une team.", "error");
+      const { data, error } = await window.sb.rpc("admin_create_family_invite", { p_office_team_id: teamId });
+      if (error) return H.toast(error.message, "error");
+      await this.loadFamilyInvites();
+      const code = Array.isArray(data) ? data[0]?.code : data?.code;
+      H.toast(code ? `Code créé : ${code}` : "Code créé", "success");
+      this.renderFamilyAdmin();
+    });
   },
 
   renderTeams() {

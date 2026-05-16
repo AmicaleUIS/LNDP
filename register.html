@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Inscription — Le Nid des Pronos</title>
   <meta name="theme-color" content="#07111f">
-  <link rel="manifest" href="manifest.json?v=1.0.19">
+  <link rel="manifest" href="manifest.json?v=1.1.0">
   <link rel="icon" href="assets/icons/icon-192.png">
   <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png">
-  <link rel="stylesheet" href="css/style.css?v=1.0.19">
+  <link rel="stylesheet" href="css/style.css?v=1.1.0">
 </head>
 <body class="auth-layout">
   <main class="auth-card">
@@ -21,21 +21,30 @@
     </div>
 
     <h2>Créer un compte</h2>
-    <p class="muted">Crée ton accès avec ton identifiant interne. Aucun vrai email personnel n’est nécessaire.</p>
+    <p class="muted">Aucun vrai email personnel n’est nécessaire. Le site crée automatiquement l’identifiant Supabase adapté.</p>
 
     <form id="registerForm" class="form-stack">
+      <div class="segmented auth-mode-switch" aria-label="Type de compte">
+        <label class="chip-btn active"><input type="radio" name="account_mode" value="uis" checked> UIS</label>
+        <label class="chip-btn"><input type="radio" name="account_mode" value="family"> Famille</label>
+      </div>
       <label>
         <span>prenom.nom</span>
         <input type="text" name="login" autocomplete="username" placeholder="prenom.nom" inputmode="text" autocapitalize="none" spellcheck="false" required>
       </label>
       <label>
-        <span>Surnom</span>
+        <span id="pseudoLabel">Surnom</span>
         <input type="text" name="pseudo" autocomplete="nickname" placeholder="surnom" maxlength="40" required>
+      </label>
+      <label id="familyInviteLabel" hidden>
+        <span>Code d’invitation Famille</span>
+        <input type="text" name="invite_code" placeholder="Ex : Hibou de la honte 42" autocomplete="off">
       </label>
       <label>
         <span>Mot de passe</span>
         <input type="password" name="password" autocomplete="new-password" minlength="6" required>
       </label>
+      <p class="muted small-note" id="accountModeHint">Compte UIS : envoyé à Supabase sous la forme prenom.nom@uis.fr.</p>
       <button class="primary-btn" type="submit">Créer mon compte</button>
     </form>
 
@@ -43,18 +52,41 @@
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="js/config.js?v=1.0.19"></script>
-  <script src="js/supabaseClient.js?v=1.0.19"></script>
-  <script src="js/auth.js?v=1.0.19"></script>
-  <script src="js/common.js?v=1.0.19"></script>
+  <script src="js/config.js?v=1.1.0"></script>
+  <script src="js/supabaseClient.js?v=1.1.0"></script>
+  <script src="js/auth.js?v=1.1.0"></script>
+  <script src="js/common.js?v=1.1.0"></script>
   <script>
     window.addEventListener('DOMContentLoaded', async () => {
       await Auth.redirectIfLoggedIn();
+      const updateModeUi = () => {
+        const mode = document.querySelector('input[name="account_mode"]:checked')?.value || 'uis';
+        document.querySelectorAll('.auth-mode-switch label').forEach((label) => {
+          label.classList.toggle('active', label.querySelector('input')?.checked);
+        });
+        const inviteLabel = document.querySelector('#familyInviteLabel');
+        const inviteInput = inviteLabel?.querySelector('input');
+        if (inviteLabel) inviteLabel.hidden = mode !== 'family';
+        if (inviteInput) inviteInput.required = mode === 'family';
+        const pseudoLabel = document.querySelector('#pseudoLabel');
+        if (pseudoLabel) pseudoLabel.textContent = mode === 'family' ? 'Nom dans le jeu' : 'Surnom';
+        const hint = document.querySelector('#accountModeHint');
+        if (hint) hint.textContent = mode === 'family'
+          ? 'Compte Famille : envoyé à Supabase sous la forme prenom.nom.famille@uis.fr et rattaché à la team du joueur qui invite.'
+          : 'Compte UIS : envoyé à Supabase sous la forme prenom.nom@uis.fr.';
+      };
+      document.querySelectorAll('.auth-mode-switch input').forEach((input) => input.addEventListener('change', updateModeUi));
+      updateModeUi();
+
       document.querySelector('#registerForm').addEventListener('submit', async (event) => {
         event.preventDefault();
         const formData = new FormData(event.currentTarget);
         try {
-          await Auth.register(formData.get('login'), formData.get('password'), formData.get('pseudo'));
+          if ((formData.get('account_mode') || 'uis') === 'family') {
+            await Auth.registerFamily(formData.get('login'), formData.get('password'), formData.get('pseudo'), formData.get('invite_code'));
+          } else {
+            await Auth.register(formData.get('login'), formData.get('password'), formData.get('pseudo'));
+          }
           Helpers.toast('Compte créé. Connexion au nid en cours…', 'success');
           setTimeout(() => window.location.href = 'app.html?view=profile', 900);
         } catch (error) {

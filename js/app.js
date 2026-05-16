@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — APP PRINCIPALE V1.0.19
+// LE NID DES PRONOS — APP PRINCIPALE V1.1.0
 // ============================================================
 
 const H = window.Helpers;
@@ -17,6 +17,9 @@ const App = {
     myPredictions: [],
     visiblePredictions: [],
     miniRecordPredictionCounts: [],
+    familyInvites: [],
+    blockedUserIds: new Set(),
+    appSettings: {},
     publicProfiles: [],
     playerScoreRows: [],
     winnerPredictions: [],
@@ -57,6 +60,11 @@ const App = {
     this.bindMobileMenu();
     this.bindGlobalActions();
     await this.loadBaseData();
+    if (this.state.profile?.is_banned) {
+      H.toast("Compte désactivé par l’administration.", "error");
+      await Auth.logout();
+      return;
+    }
     const rawRequestedView = new URLSearchParams(window.location.search).get("view") || "home";
     const requestedView = rawRequestedView === "mypredictions" ? "matches" : rawRequestedView;
     const allowedViews = ["home", "matches", "worldcup", "leaderboard", "teams", "achievements", "profile"];
@@ -177,7 +185,8 @@ const App = {
         console.warn("Indicateur messages non lus indisponible", error);
         return false;
       }
-      return Boolean((data || []).length);
+      const rows = this.filterBlockedMessages(data || []);
+      return Boolean(rows.length);
     };
 
     const checks = [
@@ -215,6 +224,8 @@ const App = {
   teamChatRealtimeMessageIsVisible(message = {}) {
     if (!message || message.user_id === this.state.session?.user?.id) return false;
     if (message.deleted_at) return false;
+    const isFamilyAuthor = message.author_player_scope === "family" || message.author_role === "family";
+    if (isFamilyAuthor && !this.canSeeFamily()) return false;
     if (message.scope === "global") return true;
     return message.scope === "team" && message.office_team_id === this.state.profile?.office_team_id;
   },
@@ -257,6 +268,47 @@ const App = {
   profileSetupComplete() {
     const p = this.state.profile;
     return Boolean(p?.profile_setup_done && p?.pseudo && p?.office_team_id && p?.avatar_key && p?.badge_shape && p?.badge_color);
+  },
+
+  isSuperAdmin(profile = this.state.profile) {
+    return profile?.role === "super_admin";
+  },
+
+  isScoreAdmin(profile = this.state.profile) {
+    return profile?.role === "admin" || profile?.role === "super_admin";
+  },
+
+  isFamily(profile = this.state.profile) {
+    return profile?.role === "family" || profile?.player_scope === "family";
+  },
+
+  canSeeFamily() {
+    return this.isFamily() || this.isSuperAdmin() || Boolean(this.state.profile?.show_family_players);
+  },
+
+  roleLabel(role, scope) {
+    if (role === "super_admin") return "Super admin";
+    if (role === "admin") return "Admin matchs";
+    if (role === "family" || scope === "family") return "Famille";
+    return "Joueur";
+  },
+
+  officialProfiles(profiles = this.state.publicProfiles) {
+    return profiles.filter((player) => (player.player_scope || player.role || "uis") !== "family" && player.role !== "family");
+  },
+
+  visiblePublicProfiles(profiles = this.state.publicProfiles) {
+    return this.canSeeFamily() ? profiles : this.officialProfiles(profiles);
+  },
+
+  filterBlockedMessages(messages = []) {
+    const blocked = this.state.blockedUserIds || new Set();
+    return messages.filter((message) => {
+      if (blocked.has(String(message.user_id))) return false;
+      const isFamilyAuthor = message.author_player_scope === "family" || message.author_role === "family";
+      if (isFamilyAuthor && !this.canSeeFamily()) return false;
+      return true;
+    });
   },
 
   teamColorForProfile(profile = {}) {
@@ -307,21 +359,21 @@ const App = {
           <div>
             <p class="eyebrow">Crédits cachés</p>
             <h2 id="creditsTitle">Le Nid des Pronos</h2>
-            <p class="muted">Version publique <strong>1.0.19</strong> · classements Teams bureau général et par phase.</p>
+            <p class="muted">Version publique <strong>1.1.0</strong> · classements Teams bureau général et par phase.</p>
           </div>
           <button class="ghost-btn" id="closeCreditsBtn" type="button">Fermer</button>
         </div>
         <div class="credits-grid">
           <section>
             <h3>Version actuelle</h3>
-            <p><strong>1.0.19</strong> — classement Teams bureau enrichi : général et par phase, chacun disponible en moyenne ou par points.</p>
+            <p><strong>1.1.0</strong> — classement Teams bureau enrichi : général et par phase, chacun disponible en moyenne ou par points.</p>
             <p><strong>1.0.18</strong> — mini-record “Greffier du grimoire” : date fournie par Supabase et égalités conservées par le premier détenteur.</p>
             <p><strong>1.0.15</strong> — les mini-records deviennent des trophées dynamiques : un seul détenteur actuel par record, calculé sur tous les joueurs.</p>
             <p><strong>1.0.13</strong> — ajout du badge “Descente du bus impossible” quand le champion pronostiqué reste bloqué en phase de groupes.</p>
             <p><strong>1.0.5</strong> — dashboard mobile/desktop stabilisé, sans chevauchement des cartes.</p>
           </section>
           <section>
-            <h3>Évolutions V1.0.19</h3>
+            <h3>Évolutions V1.1.0</h3>
             <ul class="changelog-list">
               <li>Classement Teams bureau général ajouté.</li>
               <li>Classement Teams bureau par phase conservé.</li>
@@ -381,8 +433,9 @@ const App = {
   },
 
   async loadBaseData() {
+    await this.loadProfile();
+
     await Promise.all([
-      this.loadProfile(),
       this.loadOfficeTeams(),
       this.loadFootballTeams(),
       this.loadActiveCompetition(),
@@ -390,12 +443,15 @@ const App = {
       this.loadGroupStandings(),
       this.loadMyPredictions(),
       this.loadVisiblePredictions(),
-      this.loadPublicProfiles()
+      this.loadAppSettings(),
+      this.loadBlockedUsers()
     ]);
 
     await Promise.all([
+      this.loadPublicProfiles(),
       this.loadWinnerPrediction(),
-      this.loadMiniRecordPredictionCounts()
+      this.loadMiniRecordPredictionCounts(),
+      this.loadMyFamilyInvites()
     ]);
     this.renderShell();
   },
@@ -404,7 +460,7 @@ const App = {
     const userId = this.state.session.user.id;
     const { data, error } = await window.sb
       .from("profiles")
-      .select("id,email,pseudo,role,office_team_id,is_active,avatar_key,badge_shape,badge_color,profile_setup_done,featured_badge_ids")
+      .select("id,email,pseudo,role,player_scope,show_family_players,invited_by,is_banned,can_chat,can_predict,can_change_avatar,can_change_pseudo,office_team_id,is_active,avatar_key,badge_shape,badge_color,profile_setup_done,featured_badge_ids")
       .eq("id", userId)
       .single();
 
@@ -493,6 +549,64 @@ const App = {
     }
 
     this.state.miniRecordPredictionCounts = data || [];
+  },
+
+  async loadAppSettings() {
+    const { data, error } = await window.sb
+      .from("app_settings")
+      .select("key,value")
+      .in("key", ["family_mode_enabled"]);
+
+    if (error) {
+      console.warn("Paramètres app indisponibles", error);
+      this.state.appSettings = {};
+      return;
+    }
+
+    this.state.appSettings = Object.fromEntries((data || []).map((row) => [row.key, row.value]));
+  },
+
+  familyModeEnabled() {
+    const value = this.state.appSettings?.family_mode_enabled;
+    if (typeof value === "boolean") return value;
+    if (typeof value === "string") return value === "true";
+    if (value && typeof value === "object" && "enabled" in value) return Boolean(value.enabled);
+    return false;
+  },
+
+  async loadMyFamilyInvites() {
+    if (!this.state.session?.user?.id || this.isFamily()) {
+      this.state.familyInvites = [];
+      return;
+    }
+
+    const { data, error } = await window.sb
+      .from("family_invites")
+      .select("id,code,office_team_id,expires_at,used_at,used_by,created_at,revoked_at")
+      .eq("inviter_id", this.state.session.user.id)
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      console.warn("Invitations Famille indisponibles", error);
+      this.state.familyInvites = [];
+      return;
+    }
+
+    this.state.familyInvites = data || [];
+  },
+
+  async loadBlockedUsers() {
+    const { data, error } = await window.sb
+      .from("user_blocks")
+      .select("blocked_id");
+
+    if (error) {
+      console.warn("Blocages utilisateurs indisponibles", error);
+      this.state.blockedUserIds = new Set();
+      return;
+    }
+
+    this.state.blockedUserIds = new Set((data || []).map((row) => String(row.blocked_id)));
   },
 
   miniRecordPredictionCountRow(userId) {
@@ -592,14 +706,15 @@ const App = {
       .order("pseudo", { ascending: true });
 
     if (!error) {
-      this.state.publicProfiles = data || [];
+      const rows = data || [];
+      this.state.publicProfiles = this.canSeeFamily() ? rows : this.officialProfiles(rows);
       return;
     }
 
     console.warn("v_public_profiles indisponible, fallback profiles", error);
     const { data: fallback, error: fallbackError } = await window.sb
       .from("profiles")
-      .select("id,pseudo,office_team_id,is_active,avatar_key,badge_shape,badge_color,profile_setup_done,featured_badge_ids")
+      .select("id,pseudo,role,player_scope,office_team_id,is_active,avatar_key,badge_shape,badge_color,profile_setup_done,featured_badge_ids")
       .eq("is_active", true)
       .order("pseudo", { ascending: true });
 
@@ -615,9 +730,12 @@ const App = {
         ...profile,
         office_team_name: team?.name || null,
         office_team_slug: team?.slug || null,
-        office_team_color: team?.color || null
+        office_team_color: team?.color || null,
+        player_scope: profile.player_scope || profile.role || "uis",
+        role: profile.role || "user"
       };
     });
+    this.state.publicProfiles = this.canSeeFamily() ? this.state.publicProfiles : this.officialProfiles(this.state.publicProfiles);
   },
 
   async loadTeamChatMessages() {
@@ -644,7 +762,7 @@ const App = {
       return;
     }
 
-    const rows = data || [];
+    const rows = this.filterBlockedMessages(data || []);
     this.state.teamChatHasMore = rows.length > limit;
     this.state.teamChatMessages = rows.slice(0, limit).reverse();
   },
@@ -658,7 +776,7 @@ const App = {
     const userAvatar = H.$("#userAvatar");
     if (userAvatar) userAvatar.innerHTML = H.profileBadgeHtml(this.visualProfile(profile), "profile-badge small");
 
-    const isAdmin = profile.role === "admin";
+    const isAdmin = this.isScoreAdmin(profile);
 
     const adminLink = H.$("#adminLink");
     if (adminLink) {
@@ -865,6 +983,10 @@ const App = {
   },
 
   async saveChampionPick(teamId) {
+    if (this.state.profile?.can_predict === false || this.state.profile?.is_banned) {
+      H.toast("Les pronostics sont désactivés sur ton compte.", "error");
+      return;
+    }
     if (!this.state.activeCompetition) {
       H.toast("Compétition active introuvable", "error");
       return;
@@ -1020,7 +1142,7 @@ const App = {
 
     return this.state.officeTeams
       .map((team) => {
-        const players = this.teamPlayers(team.id).filter((player) => player.profile_setup_done !== false);
+        const players = this.teamPlayers(team.id, { officialOnly: true }).filter((player) => player.profile_setup_done !== false);
         const total = players.reduce((sum, player) => {
           const score = scoreByUser.get(player.id) || scoreByUser.get(player.user_id);
           return sum + Number(score?.total_points || 0);
@@ -1480,6 +1602,10 @@ const App = {
   },
 
   async savePrediction(form) {
+    if (this.state.profile?.can_predict === false || this.state.profile?.is_banned) {
+      H.toast("Les pronostics sont désactivés sur ton compte.", "error");
+      return;
+    }
     const matchId = form.dataset.matchId;
     const isFinalPhase = form.dataset.finalPhase === "true";
     const formData = new FormData(form);
@@ -1812,6 +1938,7 @@ const App = {
       : this.state.publicProfiles.map((profile) => ({ ...profile, user_id: profile.id }));
 
     return source
+      .filter((row) => (row.player_scope || row.role || "uis") !== "family" && row.role !== "family")
       .filter((row) => row.user_id || row.id)
       .map((row) => {
         const userId = row.user_id || row.id;
@@ -2442,7 +2569,8 @@ const App = {
     await Promise.all([this.loadMatches(), this.loadVisiblePredictions(), this.loadPublicProfiles()]);
 
     const root = H.$("#viewRoot");
-    const tab = ["players", "team", "evolution"].includes(this.state.leaderboardTab) ? this.state.leaderboardTab : "players";
+    const allowedTabs = this.canSeeFamily() ? ["players", "team", "family", "evolution"] : ["players", "team", "evolution"];
+    const tab = allowedTabs.includes(this.state.leaderboardTab) ? this.state.leaderboardTab : "players";
     this.state.leaderboardTab = tab;
     root.innerHTML = `
       <section class="toolbar-card leaderboard-hero-card">
@@ -2455,6 +2583,7 @@ const App = {
       <div class="segmented leaderboard-tabs leaderboard-main-tabs">
         <button class="${tab === "players" ? "active" : ""}" data-leaderboard-tab="players">Classement joueurs</button>
         <button class="${tab === "team" ? "active" : ""}" data-leaderboard-tab="team">Teams bureau</button>
+        ${this.canSeeFamily() ? `<button class="${tab === "family" ? "active" : ""}" data-leaderboard-tab="family">Famille</button>` : ""}
         <button class="${tab === "evolution" ? "active" : ""}" data-leaderboard-tab="evolution">Évolution</button>
       </div>
 
@@ -2475,6 +2604,7 @@ const App = {
   async renderLeaderboardContent() {
     if (this.state.leaderboardTab === "players") return this.renderPlayerLeaderboard();
     if (this.state.leaderboardTab === "team") return this.renderTeamLeaderboard();
+    if (this.state.leaderboardTab === "family") return this.renderFamilyLeaderboard();
     if (this.state.leaderboardTab === "evolution") return this.renderLeaderboardEvolution();
     return this.renderPlayerLeaderboard();
   },
@@ -3682,7 +3812,9 @@ const App = {
         avatar_key: profile.avatar_key || "owl-01",
         badge_shape: profile.badge_shape || "rounded",
         badge_color: profile.badge_color || profile.office_team_color || "#facc15",
-        featured_badge_ids: profile.featured_badge_ids
+        featured_badge_ids: profile.featured_badge_ids,
+        player_scope: profile.player_scope || profile.role || "uis",
+        role: profile.role || "user"
       });
     });
     (data || []).forEach((row) => {
@@ -3789,7 +3921,7 @@ const App = {
   teamPhaseRows(matchIds = [], mode = "average") {
     const matchIdSet = new Set(matchIds);
     const teams = this.state.officeTeams.map((team) => {
-      const players = this.teamPlayers(team.id).filter((player) => player.profile_setup_done !== false);
+      const players = this.teamPlayers(team.id, { officialOnly: true }).filter((player) => player.profile_setup_done !== false);
       const playerIds = new Set(players.map((player) => player.id));
       const details = this.state.visiblePredictions
         .filter((prediction) => playerIds.has(prediction.user_id) && matchIdSet.has(prediction.match_id))
@@ -3832,7 +3964,7 @@ const App = {
     );
 
     const rows = this.state.officeTeams.map((team) => {
-      const players = this.teamPlayers(team.id).filter((player) => player.profile_setup_done !== false);
+      const players = this.teamPlayers(team.id, { officialOnly: true }).filter((player) => player.profile_setup_done !== false);
       const totals = players.reduce((acc, player) => {
         const score = scoreByUser.get(String(player.id || player.user_id)) || {};
         acc.total_points += Number(score.total_points || 0);
@@ -4130,6 +4262,45 @@ const App = {
     `;
   },
 
+  async renderFamilyLeaderboard() {
+    const root = H.$("#leaderboardContent");
+    const familyPlayers = this.state.publicProfiles.filter((player) => (player.player_scope || player.role) === "family" || player.role === "family");
+    const rows = familyPlayers.map((player) => {
+      const userId = player.id || player.user_id;
+      const details = this.scoreDetailRowsForUser(userId);
+      const total = details.reduce((sum, { prediction }) => sum + Number(prediction.points_total || 0), 0);
+      const exact = details.filter(({ prediction }) => prediction.is_exact_score).length;
+      const goodResults = details.filter(({ prediction }) => prediction.is_good_result).length;
+      const goodDiffs = details.filter(({ prediction }) => prediction.is_good_goal_diff).length;
+      return {
+        ...player,
+        user_id: userId,
+        total_points: total,
+        exact_scores: exact,
+        good_results: goodResults,
+        good_goal_diffs: goodDiffs,
+        scored_matches: details.length
+      };
+    }).sort((a, b) =>
+      Number(b.total_points || 0) - Number(a.total_points || 0)
+      || Number(b.exact_scores || 0) - Number(a.exact_scores || 0)
+      || String(a.pseudo || "").localeCompare(String(b.pseudo || ""), "fr")
+    ).map((row, index) => ({ ...row, rank: index + 1 }));
+
+    root.innerHTML = `
+      <section class="card player-leaderboard-card family-leaderboard-card">
+        <div class="card-title-row leaderboard-compact-title">
+          <div>
+            <h3>Classement Famille</h3>
+            <p class="muted">Hors classement officiel du bureau. Les mini-records restent réservés aux joueurs UIS.</p>
+          </div>
+        </div>
+        ${this.leaderboardRowsHtml(rows)}
+      </section>
+    `;
+    this.bindAchievementReplay(root);
+  },
+
   async renderLeaderboardEvolution() {
     await this.loadPlayerScoreRows();
     const root = H.$("#leaderboardContent");
@@ -4197,8 +4368,9 @@ const App = {
     });
   },
 
-  teamPlayers(teamId = null) {
-    return this.state.publicProfiles
+  teamPlayers(teamId = null, options = {}) {
+    const source = options.officialOnly ? this.officialProfiles(this.state.publicProfiles) : this.visiblePublicProfiles(this.state.publicProfiles);
+    return source
       .filter((player) => teamId ? player.office_team_id === teamId : !player.office_team_id)
       .sort((a, b) => String(a.pseudo || "").localeCompare(String(b.pseudo || ""), "fr"));
   },
@@ -4391,6 +4563,7 @@ const App = {
             <strong>${H.escapeHtml(message.author_pseudo || "Joueur")}</strong>
             <span>${H.escapeHtml(message.scope === "team" ? (message.office_team_name || "Ma team") : "Tout le nid")}</span>
             <time>${H.formatDateTime(message.created_at)}</time>
+            ${!isMe ? `<button class="ghost-btn tiny-btn block-user-btn" type="button" data-block-user-id="${H.escapeHtml(message.user_id)}">Bloquer</button>` : ""}
           </div>
           <p>${H.escapeHtml(message.body)}</p>
         </div>
@@ -4511,6 +4684,17 @@ const App = {
 
     H.$("#teamChatForm")?.addEventListener("submit", (event) => this.sendTeamChatMessage(event));
 
+    H.$$("[data-block-user-id]", root).forEach((button) => {
+      button.addEventListener("click", async () => {
+        const name = button.closest(".team-chat-message")?.querySelector("strong")?.textContent || "ce joueur";
+        if (!confirm(`Ne plus voir les messages de ${name} ? Tu pourras le débloquer depuis ton profil.`)) return;
+        const { error } = await window.sb.rpc("block_user", { p_blocked_id: button.dataset.blockUserId });
+        if (error) return H.toast(error.message, "error");
+        await this.loadBlockedUsers();
+        await this.renderTeamsPage();
+      });
+    });
+
     const chatList = H.$("#teamChatList");
     if (chatList) chatList.scrollTop = chatList.scrollHeight;
     this.markTeamChatAsSeen();
@@ -4518,6 +4702,10 @@ const App = {
 
   async sendTeamChatMessage(event) {
     event.preventDefault();
+    if (this.state.profile?.can_chat === false || this.state.profile?.is_banned) {
+      H.toast("Les messages sont désactivés sur ton compte.", "error");
+      return;
+    }
     const form = event.currentTarget;
     const formData = new FormData(form);
     const body = String(formData.get("body") || "").trim();
@@ -4650,6 +4838,88 @@ const App = {
     `;
   },
 
+  blockedUsersSectionHtml() {
+    const blocked = [...(this.state.blockedUserIds || new Set())];
+    if (!blocked.length) return "";
+    const rows = blocked.map((id) => this.state.publicProfiles.find((p) => String(p.id || p.user_id) === String(id)) || { id, pseudo: "Joueur bloqué" });
+    return `
+      <section class="card blocked-users-card">
+        <div class="card-title-row">
+          <div>
+            <h3>Messages masqués</h3>
+            <p class="muted">Tu as bloqué ces personnes dans le chat. Tu peux les réafficher quand tu veux.</p>
+          </div>
+        </div>
+        <div class="blocked-user-list">
+          ${rows.map((row) => `
+            <article class="blocked-user-row">
+              <strong>${H.escapeHtml(row.pseudo || "Joueur")}</strong>
+              <button class="ghost-btn tiny-btn unblock-user-btn" type="button" data-unblock-user-id="${H.escapeHtml(row.id || row.user_id)}">Débloquer</button>
+            </article>
+          `).join("")}
+        </div>
+      </section>
+    `;
+  },
+
+  familyProfileSectionHtml() {
+    const profile = this.state.profile || {};
+    const isFamily = this.isFamily(profile);
+    const invites = this.state.familyInvites || [];
+    const familyEnabled = this.familyModeEnabled();
+    const usedCount = invites.filter((invite) => invite.used_at || invite.used_by).length;
+    const createdCount = invites.filter((invite) => !invite.revoked_at).length;
+
+    if (isFamily) {
+      return `
+        <section class="card family-profile-card">
+          <div class="card-title-row">
+            <div>
+              <h3>Mode Famille</h3>
+              <p class="muted">Tu participes dans la catégorie Famille. Tu vois le classement UIS, mais tes points ne comptent pas dans le classement officiel du bureau ni dans les mini-records.</p>
+            </div>
+            <span class="pill neutral">Famille</span>
+          </div>
+        </section>
+      `;
+    }
+
+    return `
+      <section class="card family-profile-card">
+        <div class="card-title-row">
+          <div>
+            <h3>Mode Famille</h3>
+            <p class="muted">Tu peux choisir d’afficher ou non les joueurs Famille. Par défaut, ils sont masqués pour ne pas polluer ton nid.</p>
+          </div>
+          <span class="pill ${familyEnabled ? "success" : "neutral"}">${familyEnabled ? "Inscriptions ouvertes" : "Inscriptions fermées"}</span>
+        </div>
+        <label class="family-toggle-line">
+          <input id="showFamilyPlayersToggle" type="checkbox" ${profile.show_family_players ? "checked" : ""}>
+          <span>Afficher les joueurs Famille dans mon nid</span>
+        </label>
+        <div class="family-invite-box">
+          <div>
+            <strong>Invitations Famille</strong>
+            <p class="muted small-note">Maximum 3 invitations par joueur UIS. Une invitation = une personne, valable 7 jours, rattachée à ta team actuelle.</p>
+            <p class="muted small-note">Créées : ${createdCount}/3 · utilisées : ${usedCount}</p>
+          </div>
+          <button class="primary-btn" id="createFamilyInviteBtn" type="button" ${(!familyEnabled || createdCount >= 3 || !profile.office_team_id) ? "disabled" : ""}>Créer une invitation</button>
+        </div>
+        <div class="family-invite-list">
+          ${invites.length ? invites.map((invite) => `
+            <article class="family-invite-row ${invite.used_at ? "used" : ""}">
+              <div>
+                <strong>${H.escapeHtml(invite.code)}</strong>
+                <small>${invite.used_at ? `Utilisée le ${H.formatDateTime(invite.used_at)}` : `Expire le ${H.formatDateTime(invite.expires_at)}`}</small>
+              </div>
+              <span class="pill ${invite.used_at ? "success" : "neutral"}">${invite.used_at ? "Utilisée" : "Disponible"}</span>
+            </article>
+          `).join("") : `<p class="muted small-note">Aucune invitation créée.</p>`}
+        </div>
+      </section>
+    `;
+  },
+
   async renderProfile() {
     const root = H.$("#viewRoot");
     const profile = this.state.profile;
@@ -4722,19 +4992,19 @@ const App = {
           <h2>${H.escapeHtml(profile.pseudo || "Joueur")}</h2>
           <p class="muted">${H.escapeHtml(profile.email || "")}</p>
           <div class="profile-pill-row">
-            <span class="pill">${profile.role === "admin" ? "Admin" : "Joueur"}</span>
+            <span class="pill">${H.escapeHtml(this.roleLabel(profile.role, profile.player_scope))}</span>
             <span class="pill neutral">${H.escapeHtml(team?.name || "Team à choisir")}</span>
             ${!setupDone ? `<span class="pill danger">Profil à compléter</span>` : `<span class="pill success">Profil prêt</span>`}
           </div>
         </div>
       </section>
 
-      ${profile.role === "admin" ? `
+      ${this.isScoreAdmin(profile) ? `
         <section class="card admin-mobile-card">
           <div class="card-title-row">
             <div>
               <h3>Administration rapide</h3>
-              <p class="muted">Accès mobile pour saisir les scores et mettre à jour les classements.</p>
+              <p class="muted">Accès ${this.isSuperAdmin(profile) ? "super admin" : "admin matchs"} pour gérer les scores.</p>
             </div>
             <a class="primary-btn" href="admin.html">Ouvrir l’admin</a>
           </div>
@@ -4748,11 +5018,14 @@ const App = {
             <p class="muted">Déconnexion, crédits et historique des évolutions.</p>
           </div>
           <div class="profile-account-actions">
-            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.0.19</button>
+            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.1.0</button>
             <button class="danger-btn" id="profileLogoutBtn" type="button">Déconnexion</button>
           </div>
         </div>
       </section>
+
+      ${this.familyProfileSectionHtml()}
+      ${this.blockedUsersSectionHtml()}
 
       <section class="card profile-editor-card">
         <div class="card-title-row">
@@ -4765,17 +5038,26 @@ const App = {
           <div class="grid two profile-form-main">
             <label>
               <span>Pseudo</span>
-              <input name="pseudo" value="${H.escapeHtml(profile.pseudo || "")}" required maxlength="40" autocomplete="nickname">
+              <input name="pseudo" value="${H.escapeHtml(profile.pseudo || "")}" required maxlength="40" autocomplete="nickname" ${profile.can_change_pseudo === false ? "disabled" : ""}>
             </label>
-            <label>
-              <span>Team bureau</span>
-              <select name="office_team_id" required>
-                <option value="">Choisir une team</option>
-                ${this.state.officeTeams.map((team) => `
-                  <option value="${team.id}" ${profile.office_team_id === team.id ? "selected" : ""}>${H.escapeHtml(team.name)}</option>
-                `).join("")}
-              </select>
-            </label>
+            ${this.isFamily(profile) ? `
+              <label>
+                <span>Team de rattachement</span>
+                <input type="hidden" name="office_team_id" value="${H.escapeHtml(profile.office_team_id || "")}">
+                <input type="text" value="${H.escapeHtml(team?.name || "Team Famille")}" disabled>
+                <small class="muted">La team Famille est fixée par l’invitation.</small>
+              </label>
+            ` : `
+              <label>
+                <span>Team bureau</span>
+                <select name="office_team_id" required>
+                  <option value="">Choisir une team</option>
+                  ${this.state.officeTeams.map((team) => `
+                    <option value="${team.id}" ${profile.office_team_id === team.id ? "selected" : ""}>${H.escapeHtml(team.name)}</option>
+                  `).join("")}
+                </select>
+              </label>
+            `}
           </div>
 
           <div class="avatar-customizer-block">
@@ -4784,7 +5066,7 @@ const App = {
                 <span class="field-title">Avatar chouette</span>
                 <p class="muted small-note">90 chouettes disponibles, renommées et rangées par type pour s’y retrouver sans fouiller le nid.</p>
               </div>
-              <button class="ghost-btn avatar-toggle-btn" id="toggleAvatarPanel" type="button" aria-expanded="false" aria-controls="avatarChoicePanel">Personnaliser l’avatar</button>
+              <button class="ghost-btn avatar-toggle-btn" id="toggleAvatarPanel" type="button" aria-expanded="false" aria-controls="avatarChoicePanel" ${profile.can_change_avatar === false ? "disabled" : ""}>Personnaliser l’avatar</button>
             </div>
             <div class="avatar-choice-panel" id="avatarChoicePanel" hidden>
               <div class="avatar-choice-grouped">${avatarOptions}</div>
@@ -4963,10 +5245,37 @@ const App = {
     H.$("#profileCreditsBtn")?.addEventListener("click", () => this.openCreditsModal());
     H.$("#profileLogoutBtn")?.addEventListener("click", () => Auth.logout());
 
+    H.$("#showFamilyPlayersToggle")?.addEventListener("change", async (event) => {
+      const { error } = await window.sb.rpc("set_show_family_players", { p_enabled: event.currentTarget.checked });
+      if (error) return H.toast(error.message, "error");
+      await this.loadProfile();
+      await this.loadPublicProfiles();
+      H.toast(event.currentTarget.checked ? "Mode Famille affiché" : "Mode Famille masqué", "success");
+      await this.renderProfile();
+    });
+
+    H.$("#createFamilyInviteBtn")?.addEventListener("click", async () => {
+      const { data, error } = await window.sb.rpc("create_family_invite");
+      if (error) return H.toast(error.message, "error");
+      await this.loadMyFamilyInvites();
+      const code = Array.isArray(data) ? data[0]?.code : data?.code;
+      H.toast(code ? `Invitation créée : ${code}` : "Invitation créée", "success");
+      await this.renderProfile();
+    });
+
+    H.$$("[data-unblock-user-id]").forEach((button) => {
+      button.addEventListener("click", async () => {
+        const { error } = await window.sb.rpc("unblock_user", { p_blocked_id: button.dataset.unblockUserId });
+        if (error) return H.toast(error.message, "error");
+        await this.loadBlockedUsers();
+        await this.renderProfile();
+      });
+    });
+
     H.$("#profileForm").addEventListener("submit", async (event) => {
       event.preventDefault();
       const formData = new FormData(event.currentTarget);
-      const pseudo = String(formData.get("pseudo") || "").trim();
+      const pseudo = String(formData.get("pseudo") || profile.pseudo || "").trim();
       const officeTeamId = formData.get("office_team_id") || null;
       if (!pseudo) return H.toast("Choisis un pseudo.", "error");
       if (!officeTeamId) return H.toast("Choisis une team bureau.", "error");

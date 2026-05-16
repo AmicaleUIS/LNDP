@@ -1,5 +1,5 @@
 -- ============================================================
--- LE NID DES PRONOS — PATCH V1.0.19
+-- LE NID DES PRONOS — PATCH V1.1.0
 -- Mini-record Greffier du grimoire : date du trophée + égalités stables
 -- ============================================================
 -- But : compter les pronos validés de tous les joueurs sans révéler les scores,

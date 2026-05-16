@@ -13108,7 +13108,7 @@ body[data-current-view="leaderboard"] .team-leaderboard-card .muted {
 }
 
 /* ============================================================
-   V1.0.19 — accueil desktop plus respirant
+   V1.1.0 — accueil desktop plus respirant
    Le dashboard desktop utilise enfin toute la largeur disponible,
    sans compresser les cartes au centre de l'écran.
    ============================================================ */
@@ -13254,7 +13254,7 @@ body[data-current-view="leaderboard"] .team-leaderboard-card .muted {
 }
 
 /* ============================================================
-   V1.0.19 — classements Teams bureau général / par phase
+   V1.1.0 — classements Teams bureau général / par phase
    ============================================================ */
 .team-leaderboard-control-stack {
   display: flex;
@@ -13289,5 +13289,110 @@ body[data-current-view="leaderboard"] .team-leaderboard-card .muted {
   .team-leaderboard-scope button,
   .team-leaderboard-mode button {
     flex: 1 1 0;
+  }
+}
+
+/* ============================================================
+   V1.1.0 — Mode Famille / Super admin
+   ============================================================ */
+.auth-mode-switch {
+  width: 100%;
+  justify-content: stretch;
+}
+.auth-mode-switch label {
+  flex: 1;
+  text-align: center;
+  cursor: pointer;
+}
+.auth-mode-switch input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+.family-profile-card,
+.blocked-users-card {
+  overflow: hidden;
+}
+.family-toggle-line,
+.mini-check {
+  display: inline-flex;
+  align-items: center;
+  gap: .45rem;
+  font-size: .9rem;
+  color: var(--text-muted, #94a3b8);
+}
+.family-invite-box {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: 1rem;
+  padding: .9rem;
+  border: 1px solid rgba(148, 163, 184, .18);
+  border-radius: 18px;
+  background: rgba(15, 23, 42, .32);
+}
+.family-invite-list,
+.blocked-user-list {
+  display: grid;
+  gap: .65rem;
+  margin-top: .8rem;
+}
+.family-invite-row,
+.blocked-user-row,
+.family-invite-admin-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .75rem;
+  padding: .7rem .8rem;
+  border: 1px solid rgba(148, 163, 184, .16);
+  border-radius: 16px;
+  background: rgba(2, 6, 23, .22);
+}
+.family-invite-row strong {
+  letter-spacing: .02em;
+}
+.family-invite-row small,
+.blocked-user-row small {
+  display: block;
+  color: var(--text-muted, #94a3b8);
+}
+.block-user-btn {
+  padding: .18rem .45rem;
+  font-size: .72rem;
+  opacity: .78;
+}
+.block-user-btn:hover { opacity: 1; }
+.family-admin-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+.admin-mini-panel {
+  padding: 1rem;
+  border: 1px solid rgba(148, 163, 184, .18);
+  border-radius: 20px;
+  background: rgba(15, 23, 42, .26);
+}
+.user-admin-controls-v110 {
+  grid-template-columns: minmax(140px, 1fr) minmax(130px, .8fr) repeat(5, auto) auto auto;
+  align-items: center;
+}
+.mini-check.danger { color: #fca5a5; }
+.family-leaderboard-card .leader-details::before {
+  background: linear-gradient(180deg, #facc15, #fb923c);
+}
+@media (max-width: 820px) {
+  .family-admin-grid,
+  .user-admin-controls-v110 {
+    grid-template-columns: 1fr;
+  }
+  .family-invite-box,
+  .family-invite-row,
+  .blocked-user-row {
+    align-items: stretch;
+    flex-direction: column;
   }
 }
