@@ -1,9 +1,9 @@
 // ============================================================
-// LE NID DES PRONOS — SERVICE WORKER V1.2.1
-// Cache public V1.2.1 : identifiant UIS + mini-records dynamiques.
+// LE NID DES PRONOS — SERVICE WORKER V1.2.2
+// Cache public V1.2.2 : identifiant UIS + mini-records dynamiques.
 // ============================================================
 
-const CACHE_NAME = "le-nid-des-pronos-v1-2-1";
+const CACHE_NAME = "le-nid-des-pronos-v1-2-2";
 
 // Les avatars ne sont pas précachés : ils peuvent aller de owl-01.png à owl-90.png et être ajoutés/remplacés librement.
 const ASSETS = [
@@ -13,13 +13,13 @@ const ASSETS = [
   "./register.html",
   "./app.html",
   "./admin.html",
-  "./css/style.css?v=1.2.1",
-  "./js/supabaseClient.js?v=1.2.1",
-  "./js/auth.js?v=1.2.1",
-  "./js/common.js?v=1.2.1",
-  "./js/app.js?v=1.2.1",
-  "./js/admin.js?v=1.2.1",
-  "./manifest.json?v=1.2.1",
+  "./css/style.css?v=1.2.2",
+  "./js/supabaseClient.js?v=1.2.2",
+  "./js/auth.js?v=1.2.2",
+  "./js/common.js?v=1.2.2",
+  "./js/app.js?v=1.2.2",
+  "./js/admin.js?v=1.2.2",
+  "./manifest.json?v=1.2.2",
   "./assets/icons/icon-192.png",
   "./assets/icons/icon-512.png",
   "./assets/icons/icon-maskable-192.png",
@@ -34,6 +34,7 @@ const ASSETS = [
   "./assets/icons/owl-png/exploits.png",
   "./assets/icons/owl-png/profil.png",
   "./assets/icons/owl-png/admin.png",
+  "./assets/icons/owl-png/famille.png",
   "./assets/icons/owl-png/lieu.png",
   "./assets/icons/owl-png/horaire.png",
   "./assets/icons/owl-png/tv.png",
@@ -61,12 +62,12 @@ const ASSETS = [
   "./assets/records/README.md",
   "./assets/icons/owl-png/README.md",
   "./assets/avatars/avatars.json",
-  "./assets/reactions/reaction-owl.png",
-  "./assets/reactions/reaction-ball.png",
-  "./assets/reactions/reaction-laugh.png",
-  "./assets/reactions/reaction-fire.png",
-  "./assets/reactions/reaction-cry.png",
-  "./assets/reactions/reaction-eyes.png",
+  "./assets/reactions/reaction-casserole.png",
+  "./assets/reactions/reaction-approuve.png",
+  "./assets/reactions/reaction-coeur.png",
+  "./assets/reactions/reaction-oups.png",
+  "./assets/reactions/reaction-chaud.png",
+  "./assets/reactions/reaction-lol.png",
 ];
 
 self.addEventListener("install", (event) => {

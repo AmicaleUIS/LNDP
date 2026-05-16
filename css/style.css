@@ -13924,3 +13924,117 @@ body[data-current-view="leaderboard"] .team-leaderboard-card .muted {
     grid-column: 2;
   }
 }
+
+/* ============================================================
+   V1.2.2 — Icône Famille admin + stickers de réactions ajustés
+   ============================================================ */
+
+.chat-reaction-picker-panel {
+  width: min(650px, calc(100vw - 2rem));
+  padding: 1rem;
+}
+
+.chat-reaction-picker-grid {
+  gap: .6rem;
+}
+
+.chat-reaction-choice {
+  min-height: 102px;
+  padding: .7rem .42rem .62rem;
+  border-radius: 1.05rem;
+}
+
+.chat-reaction-choice img {
+  width: 54px;
+  height: 54px;
+  filter: drop-shadow(0 8px 12px rgba(0, 0, 0, .22));
+}
+
+.chat-reaction-choice span {
+  font-size: .74rem;
+}
+
+.chat-reaction-pill {
+  min-height: 32px;
+  padding: .14rem .42rem .14rem .48rem;
+}
+
+.chat-reaction-pill img {
+  width: 28px;
+  height: 28px;
+}
+
+.chat-reaction-detail-group h3 img {
+  width: 34px;
+  height: 34px;
+}
+
+.family-help-modal .family-help-card {
+  position: relative;
+  padding-top: 2.15rem;
+}
+
+.family-help-modal .family-help-close {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  width: 44px;
+  height: 44px;
+  display: inline-grid;
+  place-items: center;
+  border: 1px solid rgba(250, 204, 21, .45);
+  border-radius: 999px;
+  background:
+    radial-gradient(circle at 30% 20%, rgba(255, 255, 255, .18), transparent 34%),
+    linear-gradient(135deg, rgba(15, 23, 42, .98), rgba(30, 41, 59, .94));
+  color: #f8fafc;
+  font-size: 2rem;
+  line-height: 1;
+  font-weight: 500;
+  cursor: pointer;
+  box-shadow: 0 14px 30px rgba(0, 0, 0, .28), inset 0 0 0 1px rgba(255, 255, 255, .05);
+  transition: transform .15s ease, border-color .15s ease, background .15s ease, color .15s ease;
+}
+
+.family-help-modal .family-help-close:hover,
+.family-help-modal .family-help-close:focus-visible {
+  transform: translateY(-1px) scale(1.04);
+  border-color: rgba(250, 204, 21, .9);
+  background:
+    radial-gradient(circle at 30% 20%, rgba(255, 255, 255, .25), transparent 34%),
+    linear-gradient(135deg, rgba(250, 204, 21, .22), rgba(15, 23, 42, .96));
+  color: #facc15;
+  outline: none;
+}
+
+@media (max-width: 720px) {
+  .chat-reaction-picker-panel {
+    width: min(420px, calc(100vw - 1rem));
+    padding: .85rem;
+  }
+
+  .chat-reaction-choice {
+    min-height: 96px;
+  }
+
+  .chat-reaction-choice img {
+    width: 50px;
+    height: 50px;
+  }
+
+  .chat-reaction-pill img {
+    width: 26px;
+    height: 26px;
+  }
+
+  .family-help-modal .family-help-card {
+    padding-top: 2.6rem;
+  }
+
+  .family-help-modal .family-help-close {
+    top: .8rem;
+    right: .8rem;
+    width: 42px;
+    height: 42px;
+  }
+}

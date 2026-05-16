@@ -1,6 +1,6 @@
-# Le Nid des Pronos — V1.2.1
+# Le Nid des Pronos — V1.2.2
 
-## Version V1.2.1 — Réactions du chat façon WhatsApp
+## Version V1.2.2 — Icône Famille et réactions du Nid
 
 Cette version améliore les réactions PNG du tchat du Nid : elles ne s'affichent plus à zéro sous chaque message, le choix se fait dans une fenêtre au clic sur un message, et les compteurs ouvrent le détail des personnes qui ont réagi.
 
@@ -23,7 +23,7 @@ patch_v1_2_1_reactions_whatsapp.sql
 - 10 derniers messages au chargement.
 - Bouton pour charger 20 messages précédents.
 - Auto-refresh toutes les 8 secondes.
-- Réactions PNG : Chouette, Bien joué, Chambrage, Chaud, Casserole, Je surveille.
+- Réactions PNG : LOL, Chaud, Oups..., Coeur, Approuvé, Casserole.
 - Les réactions ne s'affichent sous un message que s'il y a au moins une réaction.
 - Clic sur une bulle de message : ouverture d'une fenêtre avec les 6 réactions PNG.
 - Clic sur un compteur de réaction : détail avec avatar, pseudo, team et date.
@@ -43,11 +43,20 @@ patch_v1_2_1_reactions_whatsapp.sql
 Publier tous les fichiers sur GitHub Pages. Les assets sont appelés avec :
 
 ```txt
-?v=1.2.1
+?v=1.2.2
 ```
 
 Le cache PWA est passé en :
 
 ```txt
-le-nid-des-pronos-v1-2-1
+le-nid-des-pronos-v1-2-2
 ```
+
+
+### V1.2.2
+
+- Icône `famille.png` utilisée dans l’onglet Famille de l’admin, desktop et mobile.
+- Réactions du chat renommées : LOL, Chaud, Oups..., Coeur, Approuvé, Casserole.
+- Nouveaux fichiers de réactions descriptifs ajoutés dans `assets/reactions/`.
+- Icônes de réactions agrandies dans la popup et les compteurs.
+- Croix de fermeture du popup “Comprendre le mode Famille” stylisée.

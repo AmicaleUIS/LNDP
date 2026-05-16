@@ -363,6 +363,8 @@ const OWL_PNG_ICON_MAP = {
   exploits: "exploits",
   profile: "profil",
   profil: "profil",
+  family: "famille",
+  famille: "famille",
   admin: "admin",
   mobile: "admin",
   pin: "lieu",

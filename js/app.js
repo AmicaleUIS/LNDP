@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — APP PRINCIPALE V1.2.1
+// LE NID DES PRONOS — APP PRINCIPALE V1.2.2
 // ============================================================
 
 const H = window.Helpers;
@@ -33,12 +33,14 @@ const App = {
     teamChatError: null,
     teamChatRefreshTimer: null,
     chatReactions: [
-      { key: "owl", label: "Chouette", file: "assets/reactions/reaction-owl.png" },
-      { key: "ball", label: "Bien joué", file: "assets/reactions/reaction-ball.png" },
-      { key: "laugh", label: "Chambrage", file: "assets/reactions/reaction-laugh.png" },
-      { key: "fire", label: "Chaud", file: "assets/reactions/reaction-fire.png" },
-      { key: "cry", label: "Casserole", file: "assets/reactions/reaction-cry.png" },
-      { key: "eyes", label: "Je surveille", file: "assets/reactions/reaction-eyes.png" }
+      // Les clés restent compatibles avec le patch SQL V1.2.0/V1.2.1.
+      // Les labels et fichiers correspondent aux nouveaux stickers hibou.
+      { key: "ball", label: "LOL", file: "assets/reactions/reaction-lol.png" },
+      { key: "fire", label: "Chaud", file: "assets/reactions/reaction-chaud.png" },
+      { key: "cry", label: "Oups...", file: "assets/reactions/reaction-oups.png" },
+      { key: "eyes", label: "Coeur", file: "assets/reactions/reaction-coeur.png" },
+      { key: "laugh", label: "Approuvé", file: "assets/reactions/reaction-approuve.png" },
+      { key: "owl", label: "Casserole", file: "assets/reactions/reaction-casserole.png" }
     ],
     hasUnreadTeamMessages: false,
     currentView: "home",
@@ -425,14 +427,14 @@ const App = {
           <div>
             <p class="eyebrow">Crédits cachés</p>
             <h2 id="creditsTitle">Le Nid des Pronos</h2>
-            <p class="muted">Version publique <strong>1.2.1</strong> · réactions PNG façon WhatsApp dans le tchat du nid.</p>
+            <p class="muted">Version publique <strong>1.2.2</strong> · icônes Famille et réactions du Nid ajustées.</p>
           </div>
           <button class="ghost-btn" id="closeCreditsBtn" type="button">Fermer</button>
         </div>
         <div class="credits-grid">
           <section>
             <h3>Version actuelle</h3>
-            <p><strong>1.2.1</strong> — réactions PNG façon WhatsApp : choix au clic sur un message, compteurs uniquement s’il y a des réactions, détail des joueurs au clic.</p>
+            <p><strong>1.2.2</strong> — icône Famille dans l’admin, stickers de réactions renommés/agrandis, fermeture du mode Famille améliorée.</p>
             <p><strong>1.2.0</strong> — nouveau tchat : salons Général / Team / Famille / Team Famille, chargement des anciens messages, réactions PNG, blocage individuel renforcé.</p>
             <p><strong>1.2.0</strong> — refonte des classements Famille et amélioration du bloc Mode Famille dans le profil.</p>
             <p><strong>1.0.18</strong> — mini-record “Greffier du grimoire” : date fournie par Supabase et égalités conservées par le premier détenteur.</p>
@@ -441,12 +443,12 @@ const App = {
             <p><strong>1.0.5</strong> — dashboard mobile/desktop stabilisé, sans chevauchement des cartes.</p>
           </section>
           <section>
-            <h3>Évolutions V1.2.1</h3>
+            <h3>Évolutions V1.2.2</h3>
             <ul class="changelog-list">
-              <li>Les 6 réactions ne sont plus affichées sous chaque message à zéro.</li>
-              <li>Un clic sur une bulle de message ouvre une fenêtre de choix avec les 6 PNG.</li>
-              <li>Après le choix, la fenêtre se ferme et le compteur se met à jour.</li>
-              <li>Un clic sur un compteur ouvre le détail : avatar, pseudo, team et réaction utilisée.</li>
+              <li>L’onglet Famille de l’admin utilise maintenant l’icône dédiée.</li>
+              <li>Les réactions du chat sont renommées : LOL, Chaud, Oups..., Coeur, Approuvé, Casserole.</li>
+              <li>Les stickers sont plus grands dans la fenêtre de réaction et dans les compteurs.</li>
+              <li>La fenêtre “Comprendre le mode Famille” reçoit une vraie croix de fermeture.</li>
             </ul>
           </section>
           <section>
@@ -5582,10 +5584,10 @@ const App = {
     const modal = document.createElement("div");
     modal.className = "modal-backdrop family-help-modal";
     modal.innerHTML = `
-      <div class="modal-card">
-        <button class="modal-close" type="button" aria-label="Fermer">×</button>
+      <div class="modal-card family-help-card" role="dialog" aria-modal="true" aria-labelledby="familyHelpTitle">
+        <button class="modal-close family-help-close" type="button" aria-label="Fermer le mode Famille">×</button>
         <p class="eyebrow">Mode Famille</p>
-        <h2>Un nid parallèle, sans toucher au classement officiel.</h2>
+        <h2 id="familyHelpTitle">Un nid parallèle, sans toucher au classement officiel.</h2>
         <div class="family-help-grid">
           <article><strong>Officiel préservé</strong><p>Les joueurs Famille ne comptent pas dans le classement UIS, les teams bureau ni les mini-records.</p></article>
           <article><strong>Classement Famille</strong><p>Les comptes Famille et les joueurs UIS qui activent ce mode jouent ensemble dans un classement séparé.</p></article>
@@ -5797,7 +5799,7 @@ const App = {
             <p class="muted">Déconnexion, crédits et historique des évolutions.</p>
           </div>
           <div class="profile-account-actions">
-            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.2.1</button>
+            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.2.2</button>
             <button class="danger-btn" id="profileLogoutBtn" type="button">Déconnexion</button>
           </div>
         </div>

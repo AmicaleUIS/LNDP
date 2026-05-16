@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — ADMIN V1.2.1
+// LE NID DES PRONOS — ADMIN V1.2.2
 // ============================================================
 
 const H = window.Helpers;
@@ -152,7 +152,7 @@ const Admin = {
 
     const title = H.$("#adminPageTitle");
     const subtitle = H.$("#adminPageSubtitle");
-    if (title) title.innerHTML = `${H.icon(section === "teams" ? "classements" : section === "messages" ? "diffusion" : section === "scores" ? "score-exact" : section === "backups" ? "verrouille" : section === "users" ? "profil" : section === "family" ? "profile" : "admin", "")} ${H.escapeHtml(titles[section]?.[0] || "Administration")}`;
+    if (title) title.innerHTML = `${H.icon(section === "teams" ? "classements" : section === "messages" ? "diffusion" : section === "scores" ? "score-exact" : section === "backups" ? "verrouille" : section === "users" ? "profil" : section === "family" ? "famille" : "admin", "")} ${H.escapeHtml(titles[section]?.[0] || "Administration")}`;
     if (subtitle) subtitle.textContent = titles[section]?.[1] || "Mode gestion.";
   },
 
