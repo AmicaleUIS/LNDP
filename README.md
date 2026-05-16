@@ -44,3 +44,13 @@ Le cache PWA est passé en :
 ```txt
 le-nid-des-pronos-v1-2-4
 ```
+
+
+## V1.2.5 — Santé du Nid + Journal super admin
+
+- Ajout d’un onglet admin **Santé du Nid** avec voyants : joueurs, famille, coupons, matchs, sauvegardes, badges, chat et module préparation.
+- Ajout d’un onglet admin **Journal du Nid** pour suivre les actions sensibles super admin.
+- Ajout des emplacements icônes :
+  - `assets/icons/owl-png/sante.png`
+  - `assets/icons/owl-png/journal.png`
+- Patch SQL à lancer : `patch_v1_2_5_sante_journal_admin.sql`.

@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — ADMIN V1.2.4
+// LE NID DES PRONOS — ADMIN V1.2.5
 // ============================================================
 
 const H = window.Helpers;
@@ -22,7 +22,10 @@ const Admin = {
     familyInvites: [],
     appSettings: {},
     familyModeEnabled: false,
-    preparationModuleEnabled: true
+    preparationModuleEnabled: true,
+    auditLogs: [],
+    healthSnapshot: null,
+    healthError: null
   },
 
   isSuperAdmin() {
@@ -31,6 +34,24 @@ const Admin = {
 
   isScoreAdmin() {
     return ["admin", "super_admin"].includes(this.state.profile?.role);
+  },
+
+  async logAdminAction(action, category = "system", details = {}) {
+    if (!this.isSuperAdmin()) return;
+
+    const { error } = await window.sb.rpc("admin_log_action", {
+      p_action: action,
+      p_category: category,
+      p_details: details || {},
+      p_metadata: {
+        app_version: "1.2.5",
+        source: "admin_front"
+      }
+    });
+
+    if (error) {
+      console.warn("Journal admin indisponible", error);
+    }
   },
 
   roleLabel(role) {
@@ -69,6 +90,8 @@ const Admin = {
     H.$("#resetPredictionsBtn")?.addEventListener("click", () => this.resetAllPredictions());
     H.$("#resetPreparationScoresBtn")?.addEventListener("click", () => this.resetPreparationScores());
     H.$("#togglePreparationModuleBtn")?.addEventListener("click", () => this.togglePreparationModule());
+    H.$("#refreshHealthBtn")?.addEventListener("click", async () => { await this.loadHealthSnapshot(); this.renderHealth(); });
+    H.$("#refreshAuditBtn")?.addEventListener("click", async () => { await this.loadAuditLogs(); this.renderAudit(); });
 
     const scrollTopBtn = H.$("#adminScrollTopOwl");
     if (scrollTopBtn && scrollTopBtn.dataset.bound !== "true") {
@@ -145,6 +168,8 @@ const Admin = {
       messages: ["Modération des messages", "Masquer les messages du chat global ou des chats de team."],
       scores: ["Gestion complète des scores", "Modifier les scores, lieux, horaires, diffuseurs et recalculer."],
       backups: ["Sauvegardes", "Sauvegarder, restaurer ou remettre à zéro les pronostics."],
+      health: ["Santé du Nid", "Contrôler rapidement les voyants essentiels de l’application."],
+      audit: ["Journal du Nid", "Consulter les actions sensibles effectuées dans l’administration."],
       users: ["Joueurs", "Gérer les joueurs, rôles, teams et statuts actif/inactif."],
       family: ["Mode Famille", "Invitations, inscriptions Famille et droits associés."]
     };
@@ -154,7 +179,18 @@ const Admin = {
 
     const title = H.$("#adminPageTitle");
     const subtitle = H.$("#adminPageSubtitle");
-    if (title) title.innerHTML = `${H.icon(section === "teams" ? "classements" : section === "messages" ? "diffusion" : section === "scores" ? "score-exact" : section === "backups" ? "verrouille" : section === "users" ? "profil" : section === "family" ? "famille" : "admin", "")} ${H.escapeHtml(titles[section]?.[0] || "Administration")}`;
+    const sectionIcon = {
+      quick: "admin",
+      teams: "classements",
+      messages: "diffusion",
+      scores: "score-exact",
+      backups: "verrouille",
+      health: "sante",
+      audit: "journal",
+      users: "profil",
+      family: "famille"
+    }[section] || "admin";
+    if (title) title.innerHTML = `${H.icon(sectionIcon, "")} ${H.escapeHtml(titles[section]?.[0] || "Administration")}`;
     if (subtitle) subtitle.textContent = titles[section]?.[1] || "Mode gestion.";
   },
 
@@ -304,7 +340,9 @@ const Admin = {
         this.loadBackups(),
         this.loadChatMessages(),
         this.loadFamilyInvites(),
-        this.loadFamilyModeSetting()
+        this.loadFamilyModeSetting(),
+        this.loadAuditLogs(),
+        this.loadHealthSnapshot()
       ]);
 
       this.renderUsers();
@@ -314,6 +352,8 @@ const Admin = {
       this.renderMatches();
       this.renderBackups();
       this.renderFamilyAdmin();
+      this.renderHealth();
+      this.renderAudit();
     } else {
       await Promise.all([
         this.loadTeams(),
@@ -453,6 +493,45 @@ const Admin = {
     this.state.preparationModuleEnabled = this.settingBoolean(settings.preparation_module_enabled, true);
   },
 
+  async loadAuditLogs() {
+    if (!this.isSuperAdmin()) {
+      this.state.auditLogs = [];
+      return;
+    }
+
+    const { data, error } = await window.sb
+      .from("admin_audit_logs")
+      .select("id,created_at,actor_id,actor_email,actor_pseudo,action,category,details,metadata")
+      .order("created_at", { ascending: false })
+      .limit(80);
+
+    if (error) {
+      console.warn("Journal admin indisponible : lance le patch SQL V1.2.5", error);
+      this.state.auditLogs = [];
+      return;
+    }
+
+    this.state.auditLogs = data || [];
+  },
+
+  async loadHealthSnapshot() {
+    if (!this.isSuperAdmin()) {
+      this.state.healthSnapshot = null;
+      return;
+    }
+
+    const { data, error } = await window.sb.rpc("admin_get_health_snapshot");
+    if (error) {
+      console.warn("Santé du Nid indisponible : lance le patch SQL V1.2.5", error);
+      this.state.healthSnapshot = null;
+      this.state.healthError = error;
+      return;
+    }
+
+    this.state.healthError = null;
+    this.state.healthSnapshot = Array.isArray(data) ? data[0] : data;
+  },
+
   adminVisibleMatches(matches = this.state.matches) {
     return this.state.preparationModuleEnabled === false
       ? matches.filter((match) => !match.is_test_match)
@@ -471,6 +550,201 @@ const Admin = {
       const section = panel.dataset.sectionPanel;
       panel.hidden = !(superAdmin || ["quick", "scores"].includes(section));
     });
+  },
+
+
+  healthLevelMeta(level) {
+    const key = level || "info";
+    if (key === "ok") return { label: "OK", className: "ok", emoji: "🟢" };
+    if (key === "warning") return { label: "Attention", className: "warning", emoji: "🟠" };
+    if (key === "danger") return { label: "Problème", className: "danger", emoji: "🔴" };
+    return { label: "Info", className: "info", emoji: "🔵" };
+  },
+
+  renderHealth() {
+    const root = H.$("#healthAdmin");
+    if (!root) return;
+
+    if (this.state.healthError) {
+      root.innerHTML = `
+        <div class="admin-empty-state health-error-state">
+          <strong>Diagnostic indisponible</strong>
+          <p class="muted">Lance le patch SQL V1.2.5 pour activer la Santé du Nid.</p>
+          <p class="muted small-note">${H.escapeHtml(this.state.healthError.message || "Erreur inconnue")}</p>
+        </div>
+      `;
+      return;
+    }
+
+    const snapshot = this.state.healthSnapshot;
+    if (!snapshot) {
+      root.innerHTML = `<p class="muted">Diagnostic en attente...</p>`;
+      return;
+    }
+
+    const summary = snapshot.summary || {};
+    const checks = Array.isArray(snapshot.checks) ? snapshot.checks : [];
+    const overall = this.healthLevelMeta(snapshot.overall || "info");
+
+    const metric = (label, value, note = "") => `
+      <article class="health-metric-card">
+        <strong>${H.escapeHtml(String(value ?? "—"))}</strong>
+        <span>${H.escapeHtml(label)}</span>
+        ${note ? `<small>${H.escapeHtml(note)}</small>` : ""}
+      </article>
+    `;
+
+    root.innerHTML = `
+      <section class="health-hero health-${overall.className}">
+        <div>
+          <p class="eyebrow">${overall.emoji} ${overall.label}</p>
+          <h3>${H.escapeHtml(snapshot.message || "État du Nid")}</h3>
+          <p class="muted">Dernier diagnostic : ${H.formatDateTime(snapshot.checked_at || new Date().toISOString())}</p>
+        </div>
+        <button class="ghost-btn" type="button" id="healthRefreshInlineBtn">Relancer</button>
+      </section>
+
+      <div class="health-metrics-grid">
+        ${metric("Joueurs actifs", summary.active_users)}
+        ${metric("Comptes Famille", summary.family_users)}
+        ${metric("Matchs officiels", summary.official_matches)}
+        ${metric("Matchs préparation", summary.preparation_matches, summary.preparation_module_enabled === false ? "masqués" : "visibles")}
+        ${metric("Coupons disponibles", summary.available_family_invites)}
+        ${metric("Sauvegardes", summary.backups_count)}
+        ${metric("Badges attribués", summary.badges_count)}
+        ${metric("Messages chat visibles", summary.visible_chat_messages)}
+      </div>
+
+      <section class="admin-mini-panel health-checks-panel">
+        <h3>Voyants détaillés</h3>
+        <div class="health-check-list">
+          ${checks.map((check) => {
+            const meta = this.healthLevelMeta(check.level);
+            return `
+              <article class="health-check-row ${meta.className}">
+                <span class="health-dot">${meta.emoji}</span>
+                <div>
+                  <strong>${H.escapeHtml(check.title || "Contrôle")}</strong>
+                  <p class="muted">${H.escapeHtml(check.message || "")}</p>
+                </div>
+                <span class="pill ${meta.className === "ok" ? "success" : meta.className === "danger" ? "danger" : meta.className === "warning" ? "warning" : "neutral"}">${meta.label}</span>
+              </article>
+            `;
+          }).join("") || `<p class="muted">Aucun voyant à afficher.</p>`}
+        </div>
+      </section>
+    `;
+
+    H.$("#healthRefreshInlineBtn", root)?.addEventListener("click", async () => {
+      await this.loadHealthSnapshot();
+      this.renderHealth();
+    });
+  },
+
+  auditCategoryLabel(category) {
+    const labels = {
+      backup: "Sauvegarde",
+      reset: "Reset",
+      preparation: "Préparation",
+      family: "Famille",
+      user: "Joueur",
+      chat: "Chat",
+      score: "Score",
+      system: "Système"
+    };
+    return labels[category] || category || "Action";
+  },
+
+  auditActionLabel(action) {
+    const labels = {
+      create_backup: "Sauvegarde créée",
+      restore_backup: "Sauvegarde restaurée",
+      reset_all_predictions: "Remise à zéro pronos",
+      reset_preparation_scores: "Reset scores préparation",
+      set_preparation_module: "Module préparation modifié",
+      set_family_mode: "Mode Famille modifié",
+      create_family_invite: "Coupon Famille créé",
+      create_bonus_family_invite: "Coupon bonus créé",
+      reset_family_invite: "Coupon réinitialisé",
+      update_profile_controls: "Profil modifié",
+      set_profile_active: "Activation joueur modifiée",
+      hide_chat_message: "Message masqué",
+      recalc_all_points: "Recalcul global",
+      recalc_match_points: "Recalcul match",
+      save_match: "Match modifié",
+      save_quick_score: "Score rapide modifié"
+    };
+    return labels[action] || action || "Action admin";
+  },
+
+  renderAudit() {
+    const root = H.$("#auditAdmin");
+    if (!root) return;
+
+    if (!this.state.auditLogs.length) {
+      root.innerHTML = `
+        <div class="admin-empty-state audit-empty-state">
+          <strong>Aucune trace pour l’instant</strong>
+          <p class="muted">Le journal se remplira avec les prochaines actions super admin. Lance le patch SQL V1.2.5 si cette zone reste vide après une action.</p>
+        </div>
+      `;
+      return;
+    }
+
+    const filters = [
+      ["all", "Tout"],
+      ["reset", "Resets"],
+      ["family", "Famille"],
+      ["backup", "Sauvegardes"],
+      ["preparation", "Préparation"],
+      ["user", "Joueurs"],
+      ["chat", "Chat"]
+    ];
+
+    root.innerHTML = `
+      <div class="audit-toolbar segmented-control" id="auditFilters">
+        ${filters.map(([key, label]) => `<button class="chip-btn ${key === "all" ? "active" : ""}" type="button" data-audit-filter="${key}">${label}</button>`).join("")}
+      </div>
+      <div class="admin-list audit-list" id="auditList">
+        ${this.auditRowsHtml("all")}
+      </div>
+    `;
+
+    H.$$("[data-audit-filter]", root).forEach((button) => {
+      button.addEventListener("click", () => {
+        H.$$("[data-audit-filter]", root).forEach((btn) => btn.classList.toggle("active", btn === button));
+        const list = H.$("#auditList", root);
+        if (list) list.innerHTML = this.auditRowsHtml(button.dataset.auditFilter || "all");
+      });
+    });
+  },
+
+  auditRowsHtml(filter = "all") {
+    const rows = this.state.auditLogs.filter((log) => filter === "all" || log.category === filter);
+    if (!rows.length) return `<p class="muted">Aucune action dans ce filtre.</p>`;
+
+    return rows.map((log) => {
+      const details = log.details || {};
+      const detailItems = Object.entries(details)
+        .filter(([, value]) => value !== null && value !== undefined && value !== "")
+        .slice(0, 4)
+        .map(([key, value]) => `<span class="audit-detail-chip">${H.escapeHtml(key)} : ${H.escapeHtml(typeof value === "object" ? JSON.stringify(value) : String(value))}</span>`)
+        .join("");
+
+      return `
+        <article class="admin-row audit-row">
+          <div class="admin-main audit-main">
+            <span class="profile-badge mini audit-icon">${H.icon("journal", "")}</span>
+            <div>
+              <strong>${H.escapeHtml(this.auditActionLabel(log.action))}</strong>
+              <small>${H.formatDateTime(log.created_at)} · par ${H.escapeHtml(log.actor_pseudo || log.actor_email || "super admin")}</small>
+              ${detailItems ? `<div class="audit-detail-line">${detailItems}</div>` : ""}
+            </div>
+          </div>
+          <span class="pill neutral">${H.escapeHtml(this.auditCategoryLabel(log.category))}</span>
+        </article>
+      `;
+    }).join("");
   },
 
   renderUsers() {
@@ -556,6 +830,12 @@ const Admin = {
       return;
     }
 
+    await this.logAdminAction("update_profile_controls", "user", {
+      user_id: userId,
+      role,
+      office_team_id: teamId,
+      banned: payload.p_is_banned
+    });
     H.toast("Utilisateur mis à jour", "success");
     await this.reloadAll();
   },
@@ -575,6 +855,11 @@ const Admin = {
       return;
     }
 
+    await this.logAdminAction("set_profile_active", "user", {
+      user_id: userId,
+      active,
+      reason
+    });
     H.toast(active ? "Joueur réactivé" : "Joueur désactivé", "success");
     await this.reloadAll();
   },
@@ -1000,9 +1285,15 @@ const Admin = {
       return;
     }
 
+    await this.logAdminAction("hide_chat_message", "chat", {
+      message_id: messageId,
+      reason
+    });
     H.toast("Message masqué", "success");
     await this.loadChatMessages();
+    await this.loadAuditLogs();
     this.renderChatModeration();
+    this.renderAudit();
   },
 
 
@@ -1340,6 +1631,12 @@ const Admin = {
       return;
     }
 
+    await this.logAdminAction("save_quick_score", "score", {
+      match_id: matchId,
+      status,
+      home_score: homeScore,
+      away_score: awayScore
+    });
     H.toast(status === "finished" ? "Score enregistré et match terminé" : "Match enregistré", "success");
     await this.reloadAll();
   },
@@ -1443,6 +1740,12 @@ const Admin = {
       return;
     }
 
+    await this.logAdminAction("save_match", "score", {
+      match_id: matchId,
+      status,
+      home_score: homeScore,
+      away_score: awayScore
+    });
     H.toast("Match mis à jour", "success");
     await this.reloadAll();
   },
@@ -1453,7 +1756,10 @@ const Admin = {
       H.toast(error.message, "error");
       return;
     }
+    await this.logAdminAction("recalc_match_points", "score", { match_id: matchId });
     H.toast("Points du match recalculés", "success");
+    await this.loadAuditLogs();
+    this.renderAudit();
   },
 
   async recalcAll() {
@@ -1463,6 +1769,8 @@ const Admin = {
       return;
     }
     H.toast("Tous les points ont été recalculés", "success");
+    await this.loadAuditLogs();
+    this.renderAudit();
   },
 
   renderBackups() {
@@ -1514,6 +1822,7 @@ const Admin = {
       return;
     }
 
+    await this.logAdminAction("create_backup", "backup", { label: label || "Sauvegarde manuelle" });
     H.toast("Sauvegarde créée", "success");
     await this.loadBackups();
     this.renderBackups();
@@ -1530,6 +1839,7 @@ const Admin = {
       return;
     }
 
+    await this.logAdminAction("restore_backup", "backup", { backup_id: backupId });
     H.toast("Sauvegarde restaurée", "success");
     await this.reloadAll();
   },
@@ -1548,6 +1858,7 @@ const Admin = {
       return;
     }
 
+    await this.logAdminAction("reset_all_predictions", "reset", { confirmed: true });
     H.$("#resetConfirmInput").value = "";
     H.toast("Pronos et messages remis à zéro", "success");
     await this.reloadAll();
@@ -1569,9 +1880,13 @@ const Admin = {
     }
 
     await this.loadFamilyModeSetting();
+    await this.loadAuditLogs();
+    await this.loadHealthSnapshot();
     this.renderBackups();
     this.renderQuickScores();
     this.renderMatches();
+    this.renderHealth();
+    this.renderAudit();
     H.toast(nextEnabled ? "Module préparation réactivé" : "Module préparation désactivé", "success");
   },
 
@@ -1584,6 +1899,7 @@ const Admin = {
       return;
     }
 
+    await this.logAdminAction("reset_preparation_scores", "preparation", {});
     H.toast("Scores de préparation remis à zéro", "success");
     await this.reloadAll();
   },
