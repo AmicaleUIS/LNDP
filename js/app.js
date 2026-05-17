@@ -428,7 +428,7 @@ const App = {
           <div>
             <p class="eyebrow">Crédits cachés</p>
             <h2 id="creditsTitle">Le Nid des Pronos</h2>
-            <p class="muted">Version publique <strong>1.3.0</strong> · reset lancement complet et bilan PDF collector.</p>
+            <p class="muted">Version publique <strong>1.3.0</strong> · reset lancement complet, autosauvegarde des pronos et bilan PDF collector.</p>
           </div>
           <button class="ghost-btn" id="closeCreditsBtn" type="button">Fermer</button>
         </div>
