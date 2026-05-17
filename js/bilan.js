@@ -1,6 +1,6 @@
 
 // ============================================================
-// LE NID DES PRONOS — BILAN PDF V1.2.6
+// LE NID DES PRONOS — BILAN PDF V1.3.0
 // ============================================================
 
 const H = window.Helpers;
@@ -32,6 +32,9 @@ const BilanPDF = {
     H.$("#printBilanBtn")?.addEventListener("click", () => window.print());
 
     await this.loadAndRender();
+    if (params.get("print") === "1") {
+      window.setTimeout(() => window.print(), 700);
+    }
     this.setupRealtime();
   },
 
@@ -58,7 +61,7 @@ const BilanPDF = {
     });
 
     if (error) {
-      this.renderError("Bilan indisponible", `${error.message || "Erreur inconnue"}<br><br>Lance le patch SQL V1.2.6 si ce n’est pas encore fait.`);
+      this.renderError("Bilan indisponible", `${error.message || "Erreur inconnue"}<br><br>Lance le patch SQL V1.3.0 si ce n’est pas encore fait.`);
       return;
     }
 
@@ -107,6 +110,11 @@ const BilanPDF = {
 
   officialPredictions() {
     return (this.state.report.predictions || []).filter((row) => !row.is_test_match);
+  },
+
+  showFamilyContext() {
+    const player = this.state.report.profile || {};
+    return player.role === "family" || player.player_scope === "family" || player.show_family_players === true;
   },
 
   scoredRows() {
@@ -331,6 +339,11 @@ const BilanPDF = {
   },
 
   pageStats(player, leaderboard, team, family, familyTeam, champion, stats) {
+    const showFamily = this.showFamilyContext();
+    const familyRows = showFamily ? `
+          <div class="rank-row"><div><strong>Famille joueur</strong><small>classement parallèle</small></div><span class="big-rank">#${this.e(family.rank || "—")}</span></div>
+          <div class="rank-row"><div><strong>Famille team</strong><small>moyenne équipe famille</small></div><span class="big-rank">#${this.e(familyTeam.rank || "—")}</span></div>
+    ` : "";
     return `<section class="bilan-page stats"><div class="bilan-page-content">
       <div class="bilan-page-head"><div><h2>Tableau de chasse</h2><p>Les chiffres froids, les plumes chaudes, et les quelques casseroles assumées.</p></div><span class="page-number">02</span></div>
       <div class="stats-grid">
@@ -347,8 +360,7 @@ const BilanPDF = {
         <div class="graph-card"><h3>Classements</h3><div class="ranking-list">
           <div class="rank-row"><div><strong>Joueur officiel</strong><small>${this.e(player.pseudo)}</small></div><span class="big-rank">#${this.e(leaderboard.rank || "—")}</span></div>
           <div class="rank-row"><div><strong>Team officielle</strong><small>${this.e(team.office_team_name || player.office_team_name || "Sans team")}</small></div><span class="big-rank">#${this.e(team.rank || "—")}</span></div>
-          <div class="rank-row"><div><strong>Famille joueur</strong><small>classement parallèle</small></div><span class="big-rank">#${this.e(family.rank || "—")}</span></div>
-          <div class="rank-row"><div><strong>Famille team</strong><small>moyenne équipe famille</small></div><span class="big-rank">#${this.e(familyTeam.rank || "—")}</span></div>
+          ${familyRows}
         </div></div>
         <div class="graph-card"><h3>Champion du monde</h3>${champion ? `<p>Choix : <strong>${this.e(champion.predicted_team_name)}</strong></p><p>Bonus : <strong>${this.e(champion.points_total || 0)} pts</strong></p><p class="muted">${champion.actual_winner_team_name ? `Vainqueur réel : ${this.e(champion.actual_winner_team_name)}` : "En attente du vainqueur final."}</p>` : `<p class="muted">Aucun champion choisi ou donnée indisponible.</p>`}</div>
       </div>

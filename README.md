@@ -36,7 +36,7 @@ patch_v1_2_4_module_preparation.sql
 Publier tous les fichiers sur GitHub Pages. Les assets sont appelés avec :
 
 ```txt
-?v=1.2.4
+?v=1.3.0
 ```
 
 Le cache PWA est passé en :
@@ -46,7 +46,7 @@ le-nid-des-pronos-v1-2-4
 ```
 
 
-## V1.2.5 — Santé du Nid + Journal super admin
+## V1.3.0 — Santé du Nid + Journal super admin
 
 - Ajout d’un onglet admin **Santé du Nid** avec voyants : joueurs, famille, coupons, matchs, sauvegardes, badges, chat et module préparation.
 - Ajout d’un onglet admin **Journal du Nid** pour suivre les actions sensibles super admin.
@@ -56,9 +56,22 @@ le-nid-des-pronos-v1-2-4
 - Patch SQL à lancer : `patch_v1_2_5_sante_journal_admin.sql`.
 
 
-## V1.2.6 — Bilan PDF final
+## V1.3.0 — Bilan PDF final
 
 - Ajout d’un onglet admin **Bilan PDF** avec aperçu temps réel par joueur.
 - Ajout de `bilan.html` imprimable en PDF : couverture, résumé, badges, records, graphiques, historique des pronos et diplôme.
 - Ajout des emplacements : `assets/icons/owl-png/bilan.png`, `assets/icons/owl-png/diplome.png` et dossier `assets/reports/` pour les futurs fonds.
 - Patch SQL à lancer : `patch_v1_2_6_bilan_pdf_final.sql`.
+
+
+## V1.3.0 — Reset lancement + bilan PDF collector
+
+- Ajout d’un bouton super admin ultra sécurisé **Reset complet lancement** dans Admin > Sauvegardes.
+- Le reset supprime l’activité de test : pronos, points, champion, coupons, sauvegardes, messages, réactions, blocages et journal admin.
+- Les matchs et leurs informations modifiées restent conservés.
+- Le Bilan PDF est réservé à l’admin desktop et masqué sur mobile.
+- Le diplôme final passe en format paysage.
+- Les fonds PDF sont câblés dans `assets/reports/`.
+- Les infos Famille sont masquées dans le PDF si le joueur n’a pas activé le mode Famille.
+- Le journal admin remplace les UUID joueurs par les pseudos quand ils sont connus.
+- Patch SQL à lancer : `patch_v1_3_0_lancement_bilan.sql`.

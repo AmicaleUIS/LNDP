@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — ADMIN V1.2.6
+// LE NID DES PRONOS — ADMIN V1.3.0
 // ============================================================
 
 const H = window.Helpers;
@@ -45,7 +45,7 @@ const Admin = {
       p_category: category,
       p_details: details || {},
       p_metadata: {
-        app_version: "1.2.5",
+        app_version: "1.3.0",
         source: "admin_front"
       }
     });
@@ -91,6 +91,7 @@ const Admin = {
     H.$("#resetPredictionsBtn")?.addEventListener("click", () => this.resetAllPredictions());
     H.$("#resetPreparationScoresBtn")?.addEventListener("click", () => this.resetPreparationScores());
     H.$("#togglePreparationModuleBtn")?.addEventListener("click", () => this.togglePreparationModule());
+    H.$("#fullLaunchResetBtn")?.addEventListener("click", () => this.fullLaunchReset());
     H.$("#refreshHealthBtn")?.addEventListener("click", async () => { await this.loadHealthSnapshot(); this.renderHealth(); });
     H.$("#refreshAuditBtn")?.addEventListener("click", async () => { await this.loadAuditLogs(); this.renderAudit(); });
 
@@ -510,7 +511,7 @@ const Admin = {
       .limit(80);
 
     if (error) {
-      console.warn("Journal admin indisponible : lance le patch SQL V1.2.5", error);
+      console.warn("Journal admin indisponible : lance le patch SQL V1.3.0", error);
       this.state.auditLogs = [];
       return;
     }
@@ -526,7 +527,7 @@ const Admin = {
 
     const { data, error } = await window.sb.rpc("admin_get_health_snapshot");
     if (error) {
-      console.warn("Santé du Nid indisponible : lance le patch SQL V1.2.5", error);
+      console.warn("Santé du Nid indisponible : lance le patch SQL V1.3.0", error);
       this.state.healthSnapshot = null;
       this.state.healthError = error;
       return;
@@ -573,7 +574,7 @@ const Admin = {
       root.innerHTML = `
         <div class="admin-empty-state health-error-state">
           <strong>Diagnostic indisponible</strong>
-          <p class="muted">Lance le patch SQL V1.2.5 pour activer la Santé du Nid.</p>
+          <p class="muted">Lance le patch SQL V1.3.0 pour activer la Santé du Nid.</p>
           <p class="muted small-note">${H.escapeHtml(this.state.healthError.message || "Erreur inconnue")}</p>
         </div>
       `;
@@ -689,7 +690,7 @@ const Admin = {
       root.innerHTML = `
         <div class="admin-empty-state audit-empty-state">
           <strong>Aucune trace pour l’instant</strong>
-          <p class="muted">Le journal se remplira avec les prochaines actions super admin. Lance le patch SQL V1.2.5 si cette zone reste vide après une action.</p>
+          <p class="muted">Le journal se remplira avec les prochaines actions super admin. Lance le patch SQL V1.3.0 si cette zone reste vide après une action.</p>
         </div>
       `;
       return;
@@ -723,6 +724,39 @@ const Admin = {
     });
   },
 
+
+  auditDetailLabel(key) {
+    const labels = {
+      user_id: "joueur",
+      p_user_id: "joueur",
+      target_user_id: "joueur",
+      inviter_id: "inviteur",
+      previous_used_by: "ancien invité",
+      office_team_id: "team",
+      match_id: "match",
+      backup_id: "sauvegarde"
+    };
+    return labels[key] || key;
+  },
+
+  auditDetailValue(key, value) {
+    if (value === null || value === undefined || value === "") return "—";
+    const stringValue = String(value);
+    const uuidLike = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(stringValue);
+
+    if (["user_id", "p_user_id", "target_user_id", "inviter_id", "previous_used_by"].includes(key) || uuidLike) {
+      const user = this.state.users.find((item) => item.id === stringValue);
+      if (user) return this.userDisplayName(user, "Joueur");
+    }
+
+    if (key === "office_team_id") {
+      return this.teamName(stringValue);
+    }
+
+    if (typeof value === "object") return JSON.stringify(value);
+    return stringValue;
+  },
+
   auditRowsHtml(filter = "all") {
     const rows = this.state.auditLogs.filter((log) => filter === "all" || log.category === filter);
     if (!rows.length) return `<p class="muted">Aucune action dans ce filtre.</p>`;
@@ -732,7 +766,7 @@ const Admin = {
       const detailItems = Object.entries(details)
         .filter(([, value]) => value !== null && value !== undefined && value !== "")
         .slice(0, 4)
-        .map(([key, value]) => `<span class="audit-detail-chip">${H.escapeHtml(key)} : ${H.escapeHtml(typeof value === "object" ? JSON.stringify(value) : String(value))}</span>`)
+        .map(([key, value]) => `<span class="audit-detail-chip">${H.escapeHtml(this.auditDetailLabel(key))} : ${H.escapeHtml(this.auditDetailValue(key, value))}</span>`)
         .join("");
 
       return `
@@ -777,10 +811,9 @@ const Admin = {
             <select id="finalReportPlayerSelect">
               ${players.map((player) => `<option value="${H.escapeHtml(player.id)}" ${player.id === selectedId ? "selected" : ""}>${H.escapeHtml(player.pseudo || player.email || "Joueur")} · ${H.escapeHtml(this.teamName(player.office_team_id))}</option>`).join("")}
             </select>
-            <button class="ghost-btn" id="openFinalReportBtn" type="button" ${selected ? "" : "disabled"}>Ouvrir</button>
-            <button class="primary-btn" id="printFinalReportBtn" type="button" ${selected ? "" : "disabled"}>Imprimer / PDF</button>
+            <button class="primary-btn" id="openFinalReportBtn" type="button" ${selected ? "" : "disabled"}>Ouvrir</button>
           </div>
-          <p class="muted tiny-note">Les fonds de pages pourront être ajoutés plus tard dans <code>assets/reports/</code>. Les emplacements sont déjà prévus.</p>
+          <p class="muted tiny-note">Les fonds de pages sont câblés dans <code>assets/reports/</code>. Ouvre le bilan pour imprimer/exporter en PDF.</p>
         </section>
         <section class="final-report-preview-wrap">
           ${selected ? `<iframe id="finalReportPreview" class="final-report-preview" src="${H.escapeHtml(previewUrl)}" title="Aperçu bilan PDF"></iframe>` : `<p class="muted">Aucun joueur disponible.</p>`}
@@ -797,16 +830,6 @@ const Admin = {
     H.$("#openFinalReportBtn", root)?.addEventListener("click", () => {
       if (!selected) return;
       window.open(`bilan.html?player=${encodeURIComponent(selected.id)}&preview=admin`, "_blank", "noopener");
-    });
-
-    H.$("#printFinalReportBtn", root)?.addEventListener("click", () => {
-      const iframe = H.$("#finalReportPreview", root);
-      if (iframe?.contentWindow) {
-        iframe.contentWindow.focus();
-        iframe.contentWindow.print();
-      } else if (selected) {
-        window.open(`bilan.html?player=${encodeURIComponent(selected.id)}&print=1`, "_blank", "noopener");
-      }
     });
   },
 
@@ -1904,6 +1927,32 @@ const Admin = {
 
     await this.logAdminAction("restore_backup", "backup", { backup_id: backupId });
     H.toast("Sauvegarde restaurée", "success");
+    await this.reloadAll();
+  },
+
+
+  async fullLaunchReset() {
+    const typed = H.$("#launchResetConfirmInput")?.value || "";
+    if (typed !== "LANCEMENT PROPRE") {
+      H.toast("Tape exactement : LANCEMENT PROPRE", "error");
+      return;
+    }
+
+    const first = confirm("Reset lancement complet ? Cela supprime pronos, points, choix champion, coupons, sauvegardes, messages, réactions, blocages et journal admin. Les matchs, teams et comptes restent.");
+    if (!first) return;
+
+    const second = confirm("Dernière sécurité : cette action prépare l’application pour un lancement propre. Continuer ?");
+    if (!second) return;
+
+    const { data, error } = await window.sb.rpc("admin_full_launch_reset", { p_confirm: "LANCEMENT PROPRE" });
+    if (error) {
+      H.toast(error.message || "Reset lancement impossible. As-tu lancé le patch SQL V1.3.0 ?", "error");
+      return;
+    }
+
+    const summary = Array.isArray(data) ? data[0] : data;
+    H.$("#launchResetConfirmInput").value = "";
+    H.toast(summary?.message || "Application remise à blanc pour le lancement", "success");
     await this.reloadAll();
   },
 

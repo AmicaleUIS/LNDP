@@ -1,6 +1,6 @@
 
 /* ============================================================
-   LE NID DES PRONOS — BILAN PDF V1.2.6
+   LE NID DES PRONOS — BILAN PDF V1.3.0
    Aperçu temps réel + impression PDF
    ============================================================ */
 
@@ -12,12 +12,12 @@
   --bilan-text: #f8fafc;
   --bilan-muted: rgba(226, 232, 240, .76);
   --bilan-border: rgba(250, 204, 21, .28);
-  --bilan-cover-bg: radial-gradient(circle at 18% 10%, rgba(250,204,21,.25), transparent 36%), radial-gradient(circle at 82% 20%, rgba(56,189,248,.22), transparent 38%), linear-gradient(135deg, #07111f, #10213d 58%, #050816);
-  --bilan-stats-bg: linear-gradient(135deg, #07111f, #112a49);
-  --bilan-badges-bg: linear-gradient(135deg, #081120, #1e293b 72%, #0f172a);
-  --bilan-records-bg: linear-gradient(135deg, #09111f, #312e81 120%);
-  --bilan-graphs-bg: linear-gradient(135deg, #07111f, #0f3b4d 115%);
-  --bilan-diplome-bg: radial-gradient(circle at center top, rgba(250,204,21,.18), transparent 42%), linear-gradient(135deg, #07111f, #111827);
+  --bilan-cover-bg: linear-gradient(rgba(2,6,23,.18), rgba(2,6,23,.20)), url("../assets/reports/bg-cover.png"), radial-gradient(circle at 18% 10%, rgba(250,204,21,.25), transparent 36%), linear-gradient(135deg, #07111f, #10213d 58%, #050816);
+  --bilan-stats-bg: linear-gradient(rgba(2,6,23,.20), rgba(2,6,23,.24)), url("../assets/reports/bg-stats.png"), linear-gradient(135deg, #07111f, #112a49);
+  --bilan-badges-bg: linear-gradient(rgba(2,6,23,.20), rgba(2,6,23,.24)), url("../assets/reports/bg-badges.png"), linear-gradient(135deg, #081120, #1e293b 72%, #0f172a);
+  --bilan-records-bg: linear-gradient(rgba(2,6,23,.20), rgba(2,6,23,.24)), url("../assets/reports/bg-records.png"), linear-gradient(135deg, #09111f, #312e81 120%);
+  --bilan-graphs-bg: linear-gradient(rgba(2,6,23,.20), rgba(2,6,23,.24)), url("../assets/reports/bg-graphs.png"), linear-gradient(135deg, #07111f, #0f3b4d 115%);
+  --bilan-diplome-bg: linear-gradient(rgba(2,6,23,.12), rgba(2,6,23,.16)), url("../assets/reports/bg-diplome.png"), radial-gradient(circle at center top, rgba(250,204,21,.18), transparent 42%), linear-gradient(135deg, #07111f, #111827);
 }
 
 .bilan-body {
@@ -74,6 +74,9 @@
   border-radius: 34px;
   border: 1px solid var(--bilan-border);
   background: var(--bilan-stats-bg);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
   box-shadow: 0 24px 70px rgba(0,0,0,.36);
   page-break-after: always;
 }
@@ -104,7 +107,12 @@
 .bilan-page.badges { background: var(--bilan-badges-bg); }
 .bilan-page.records { background: var(--bilan-records-bg); }
 .bilan-page.graphs { background: var(--bilan-graphs-bg); }
-.bilan-page.diploma { background: var(--bilan-diplome-bg); }
+.bilan-page.diploma {
+  background: var(--bilan-diplome-bg);
+  min-height: 760px;
+  aspect-ratio: 1.414 / 1;
+}
+
 
 .bilan-page-content { position: relative; z-index: 2; }
 .bilan-page-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; margin-bottom: 26px; }
@@ -179,7 +187,7 @@
 .result-pill.mid { background: rgba(250,204,21,.16); color:#fde68a; }
 .result-pill.bad { background: rgba(239,68,68,.16); color:#fecaca; }
 
-.diploma .bilan-page-content { min-height: 1040px; display:grid; place-items:center; }
+.diploma .bilan-page-content { min-height: 650px; display:grid; place-items:center; }
 .diploma-card { width: min(820px, 100%); text-align:center; padding: 54px 46px; border-width:2px; background: rgba(255, 251, 235, .08); }
 .diploma-card .profile-badge { width: 118px; height:118px; margin: 0 auto 20px; }
 .diploma-kicker { color: var(--bilan-gold); font-weight: 900; letter-spacing: .14em; text-transform: uppercase; }
@@ -205,6 +213,7 @@
 
 @media print {
   @page { size: A4 portrait; margin: 0; }
+  @page diploma { size: A4 landscape; margin: 0; }
   html, body { background: #07111f !important; width: 210mm; }
   .no-print, #toast { display:none !important; }
   .bilan-root { width: 210mm; margin: 0; }
@@ -219,6 +228,17 @@
     padding: 14mm;
     page-break-after: always;
     break-after: page;
+  }
+  .bilan-page.diploma {
+    page: diploma;
+    width: 297mm;
+    height: 210mm;
+    min-height: 210mm;
+    aspect-ratio: auto;
+    padding: 12mm 18mm;
+  }
+  .bilan-page.diploma .bilan-page-content {
+    min-height: 186mm;
   }
   .bilan-page:last-child { page-break-after: auto; break-after: auto; }
   .bilan-page::before { inset: 6mm; border-radius: 4mm; }

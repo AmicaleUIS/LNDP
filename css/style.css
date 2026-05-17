@@ -14231,7 +14231,7 @@ body[data-current-view="leaderboard"] .team-leaderboard-card .muted {
 
 
 /* ============================================================
-   V1.2.5 — Santé du Nid + Journal super admin
+   V1.3.0 — Santé du Nid + Journal super admin
    ============================================================ */
 
 .admin-empty-state {
@@ -14410,7 +14410,7 @@ body[data-current-view="leaderboard"] .team-leaderboard-card .muted {
 
 
 /* ============================================================
-   V1.2.6 — Admin aperçu Bilan PDF final
+   V1.3.0 — Admin aperçu Bilan PDF final
    ============================================================ */
 .final-report-admin-shell {
   display: grid;
@@ -14447,4 +14447,92 @@ body[data-current-view="leaderboard"] .team-leaderboard-card .muted {
 @media (max-width: 900px) {
   .final-report-preview-wrap { min-height: 520px; }
   .final-report-preview { min-height: 560px; }
+}
+
+
+/* ============================================================
+   V1.3.0 — Reset lancement + Bilan PDF desktop only
+   ============================================================ */
+
+.launch-reset-box {
+  border-color: rgba(239, 68, 68, .45);
+  background:
+    radial-gradient(circle at 18% 0%, rgba(239, 68, 68, .22), transparent 38%),
+    rgba(127, 29, 29, .16);
+}
+
+.launch-reset-box h3 {
+  color: #fecaca;
+}
+
+.launch-reset-box input {
+  border-color: rgba(239, 68, 68, .38);
+  background: rgba(2, 6, 23, .56);
+}
+
+@media (max-width: 860px) {
+  [data-admin-section="final-report"],
+  [data-section-panel="final-report"] {
+    display: none !important;
+  }
+}
+
+/* ============================================================
+   V1.3.0 — Autosauvegarde des pronostics
+   ============================================================ */
+
+.prediction-autosave-status {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.6rem;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: .78rem;
+  font-weight: 800;
+  color: rgba(226, 232, 240, .72);
+  background: rgba(15, 23, 42, .34);
+  border: 1px solid rgba(148, 163, 184, .14);
+}
+
+.prediction-autosave-status:empty {
+  display: none;
+}
+
+.prediction-autosave-status[data-status="saving"] {
+  color: #fde68a;
+  border-color: rgba(250, 204, 21, .32);
+  background: rgba(250, 204, 21, .10);
+}
+
+.prediction-autosave-status[data-status="success"] {
+  color: #bbf7d0;
+  border-color: rgba(34, 197, 94, .30);
+  background: rgba(34, 197, 94, .10);
+}
+
+.prediction-autosave-status[data-status="error"] {
+  color: #fecaca;
+  border-color: rgba(239, 68, 68, .34);
+  background: rgba(239, 68, 68, .10);
+}
+
+
+.auto-save-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 42px;
+  padding: 9px 13px;
+  border-radius: 999px;
+  border: 1px solid rgba(34, 197, 94, .25);
+  background: rgba(34, 197, 94, .10);
+  color: #bbf7d0;
+  font-weight: 800;
+  font-size: .88rem;
+  white-space: nowrap;
+}
+
+.auto-save-label .owl-icon {
+  width: 22px;
+  height: 22px;
 }

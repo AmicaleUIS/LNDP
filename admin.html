@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Admin — Le Nid des Pronos</title>
   <meta name="theme-color" content="#07111f">
-  <link rel="manifest" href="manifest.json?v=1.2.6">
+  <link rel="manifest" href="manifest.json?v=1.3.0">
   <link rel="icon" href="assets/icons/icon-192.png">
   <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png">
-  <link rel="stylesheet" href="css/style.css?v=1.2.6">
+  <link rel="stylesheet" href="css/style.css?v=1.3.0">
 </head>
 <body>
   <div class="admin-shell">
@@ -64,7 +64,7 @@
     <main class="admin-main-area">
       <header class="admin-header admin-page-header">
         <div>
-          <p class="eyebrow">Administration · v1.2.6</p>
+          <p class="eyebrow">Administration · v1.3.0</p>
           <h1 id="adminPageTitle"><img class="owl-icon title-icon" src="assets/icons/owl-png/admin.png" alt="" aria-hidden="true" loading="lazy"> Saisie rapide des scores</h1>
           <p class="muted" id="adminPageSubtitle">Prochains matchs en haut, scores manuels, classement recalculé automatiquement.</p>
         </div>
@@ -157,6 +157,17 @@
               <p class="muted tiny-note">Désactiver masque les matchs test, les règles et les classements liés. Les 2 badges préparation restent dans les exploits.</p>
             </section>
 
+            <section class="backup-box danger-zone launch-reset-box">
+              <h3>Reset lancement complet</h3>
+              <p class="muted">Remet l’application à blanc sans supprimer les matchs : pronos, points, champion, scores/statuts, coupons, sauvegardes, messages, réactions, blocages et journal admin.</p>
+              <label>
+                Tape exactement <strong>LANCEMENT PROPRE</strong>
+                <input id="launchResetConfirmInput" type="text" placeholder="LANCEMENT PROPRE" autocomplete="off">
+              </label>
+              <button class="danger-btn" id="fullLaunchResetBtn" type="button">Reset complet lancement</button>
+              <p class="muted tiny-note">Ultra sécurisé : demande une phrase exacte + une confirmation. Les matchs, teams, comptes et réglages restent conservés. Les infos modifiées des matchs restent, seuls scores/statuts repartent à zéro.</p>
+            </section>
+
             <section class="backup-box danger-zone">
               <h3>Remise à zéro sécurisée</h3>
               <p class="muted">Supprime tous les pronostics joueurs, les pronos champion, les points/badges calculés et les messages du chat. Une sauvegarde est créée avant la remise à zéro.</p>
@@ -233,7 +244,6 @@
     <button class="nav-btn" type="button" data-admin-section="backups"><img class="owl-icon" src="assets/icons/owl-png/verrouille.png" alt="" aria-hidden="true" loading="lazy"><span>Sauvegardes</span></button>
     <button class="nav-btn" type="button" data-admin-section="health"><img class="owl-icon" src="assets/icons/owl-png/sante.png" alt="" aria-hidden="true" loading="lazy" onerror="this.onerror=null;this.src='assets/icons/owl-png/admin.png';"><span>Santé du Nid</span></button>
     <button class="nav-btn" type="button" data-admin-section="audit"><img class="owl-icon" src="assets/icons/owl-png/journal.png" alt="" aria-hidden="true" loading="lazy" onerror="this.onerror=null;this.src='assets/icons/owl-png/admin.png';"><span>Journal</span></button>
-    <button class="nav-btn" type="button" data-admin-section="final-report"><img class="owl-icon" src="assets/icons/owl-png/bilan.png" alt="" aria-hidden="true" loading="lazy" onerror="this.onerror=null;this.src='assets/icons/owl-png/admin.png';"><span>Bilan PDF</span></button>
     <button class="nav-btn" type="button" data-admin-section="users"><img class="owl-icon" src="assets/icons/owl-png/profil.png" alt="" aria-hidden="true" loading="lazy"><span>Joueurs</span></button>
     <button class="nav-btn" type="button" data-admin-section="family"><img class="owl-icon" src="assets/icons/owl-png/famille.png" alt="" aria-hidden="true" loading="lazy"><span>Famille</span></button>
     <div class="admin-mobile-menu-actions">
@@ -248,10 +258,10 @@
   </button>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="js/config.js?v=1.2.6"></script>
-  <script src="js/supabaseClient.js?v=1.2.6"></script>
-  <script src="js/auth.js?v=1.2.6"></script>
-  <script src="js/common.js?v=1.2.6"></script>
-  <script src="js/admin.js?v=1.2.6"></script>
+  <script src="js/config.js?v=1.3.0"></script>
+  <script src="js/supabaseClient.js?v=1.3.0"></script>
+  <script src="js/auth.js?v=1.3.0"></script>
+  <script src="js/common.js?v=1.3.0"></script>
+  <script src="js/admin.js?v=1.3.0"></script>
 </body>
 </html>

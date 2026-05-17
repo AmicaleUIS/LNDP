@@ -1,5 +1,5 @@
 -- ============================================================
--- LE NID DES PRONOS — PATCH V1.2.6
+-- LE NID DES PRONOS — PATCH V1.3.0
 -- Bilan PDF final : rapport joueur temps réel pour super admin
 -- À lancer après patch_v1_2_5_sante_journal_admin.sql.
 -- ============================================================
@@ -240,7 +240,7 @@ grant execute on function public.admin_get_final_player_report(uuid) to authenti
 insert into public.app_settings (key, value, updated_at)
 values (
   'changelog_1_2_6',
-  '{"version":"1.2.6","title":"Bilan PDF final","changes":["Aperçu super admin du carnet de vol joueur en temps réel","Page imprimable en PDF avec couverture, stats, badges, records, graphiques, pronos et diplôme","Emplacements prévus pour les images de fond de la surprise finale"]}'::jsonb,
+  '{"version":"1.3.0","title":"Bilan PDF final","changes":["Aperçu super admin du carnet de vol joueur en temps réel","Page imprimable en PDF avec couverture, stats, badges, records, graphiques, pronos et diplôme","Emplacements prévus pour les images de fond de la surprise finale"]}'::jsonb,
   now()
 )
 on conflict (key) do update set value = excluded.value, updated_at = now();

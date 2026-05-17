@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — APP PRINCIPALE V1.2.4
+// LE NID DES PRONOS — APP PRINCIPALE V1.3.0
 // ============================================================
 
 const H = window.Helpers;
@@ -67,7 +67,8 @@ const App = {
     achievementNotificationTimer: null,
     achievementResyncTimers: [],
     homeRecordCarouselTimer: null,
-    lastAchievementIds: null
+    lastAchievementIds: null,
+    predictionAutoSaveTimers: new Map()
   },
 
   async init() {
@@ -427,7 +428,7 @@ const App = {
           <div>
             <p class="eyebrow">Crédits cachés</p>
             <h2 id="creditsTitle">Le Nid des Pronos</h2>
-            <p class="muted">Version publique <strong>1.2.4</strong> · préparation masquable et admin desktop plus lisible.</p>
+            <p class="muted">Version publique <strong>1.3.0</strong> · reset lancement complet et bilan PDF collector.</p>
           </div>
           <button class="ghost-btn" id="closeCreditsBtn" type="button">Fermer</button>
         </div>
@@ -455,7 +456,7 @@ const App = {
           <section>
             <h3>Crédits</h3>
             <p>Application : Le Nid des Pronos · pronostics, chouettes, teams et mauvaise foi sportive assumée.</p>
-            <p>Version publique préparée par Parkaf.</p>
+            <p>Version publique couvée au chaud par Parkaf, testée au bec et approuvée par le Grand Hibou du Nid.</p>
           </section>
         </div>
       </div>
@@ -1074,7 +1075,8 @@ const App = {
 
   async saveChampionPick(teamId) {
     if (this.state.profile?.can_predict === false || this.state.profile?.is_banned) {
-      H.toast("Les pronostics sont désactivés sur ton compte.", "error");
+      if (!silent) H.toast("Les pronostics sont désactivés sur ton compte.", "error");
+      this.setPredictionAutoSaveStatus(form, "Pronos désactivés", "error");
       return;
     }
     if (!this.state.activeCompetition) {
@@ -1718,8 +1720,9 @@ const App = {
           <div class="prediction-actions">
             ${locked
               ? `<span class="locked-label">${H.icon("lock")} Prono verrouillé</span>`
-              : `<button class="primary-btn" type="submit">${myPrediction ? "Modifier" : "Valider"}</button>`
+              : `<span class="auto-save-label">${H.icon("check", "")} Auto-enregistré</span>`
             }
+            <span class="prediction-autosave-status" aria-live="polite"></span>
             ${myPrediction ? this.myPredictionInlineHtml(myPrediction) : `<span class="muted">Aucun prono posé</span>`}
           </div>
           ${this.myPredictionResultHtml(match, myPrediction)}
@@ -1747,14 +1750,100 @@ const App = {
     H.$$(".prediction-form").forEach((form) => {
       form.addEventListener("submit", async (event) => {
         event.preventDefault();
-        await this.savePrediction(form);
+        this.clearPredictionAutoSave(form);
+        await this.savePrediction(form, { silent: false, reloadView: true, source: "manual" });
+      });
+
+      H.$$('input[name="home_score_pred"], input[name="away_score_pred"]', form).forEach((input) => {
+        input.addEventListener("input", () => this.triggerPredictionAutoSave(form));
+        input.addEventListener("change", () => this.triggerPredictionAutoSave(form));
+        input.addEventListener("blur", () => this.triggerPredictionAutoSave(form));
+      });
+
+      H.$$('select[name="qualified_team_pred"]', form).forEach((select) => {
+        select.addEventListener("change", () => this.triggerPredictionAutoSave(form));
       });
     });
   },
 
-  async savePrediction(form) {
+  predictionFormReadyForAutoSave(form) {
+    if (!form) return false;
+    if (this.state.profile?.can_predict === false || this.state.profile?.is_banned) return false;
+    const homeInput = form.querySelector('input[name="home_score_pred"]');
+    const awayInput = form.querySelector('input[name="away_score_pred"]');
+    const homeRaw = homeInput?.value;
+    const awayRaw = awayInput?.value;
+    if (homeRaw === "" || awayRaw === "") return false;
+
+    const home = Number(homeRaw);
+    const away = Number(awayRaw);
+    if (!Number.isInteger(home) || !Number.isInteger(away) || home < 0 || away < 0) return false;
+
+    const isFinalPhase = form.dataset.finalPhase === "true";
+    const qualifiedSelect = form.querySelector('select[name="qualified_team_pred"]');
+    if (isFinalPhase && qualifiedSelect) {
+      if (!qualifiedSelect.value && home !== away) {
+        const options = [...qualifiedSelect.options].map((option) => option.value).filter(Boolean);
+        qualifiedSelect.value = home > away ? options[0] || "" : options[1] || "";
+      }
+      if (!qualifiedSelect.value) return false;
+    }
+
+    return true;
+  },
+
+  setPredictionAutoSaveStatus(form, message = "", type = "info") {
+    const status = form?.querySelector(".prediction-autosave-status");
+    if (!status) return;
+    status.textContent = message;
+    status.dataset.status = type;
+  },
+
+  clearPredictionAutoSave(form) {
+    const matchId = form?.dataset?.matchId;
+    if (!matchId) return;
+    const timer = this.state.predictionAutoSaveTimers?.get(matchId);
+    if (timer) window.clearTimeout(timer);
+    this.state.predictionAutoSaveTimers?.delete(matchId);
+  },
+
+  schedulePredictionAutoSave(form, delay = 0) {
+    if (!delay) {
+      this.triggerPredictionAutoSave(form);
+      return;
+    }
+
+    if (!form || form.querySelector('input:disabled, select:disabled')) return;
+    this.clearPredictionAutoSave(form);
+
+    const timer = window.setTimeout(() => this.triggerPredictionAutoSave(form), delay);
+    this.state.predictionAutoSaveTimers?.set(form.dataset.matchId, timer);
+  },
+
+  async triggerPredictionAutoSave(form) {
+    if (!form || form.querySelector('input:disabled, select:disabled')) return;
+    this.clearPredictionAutoSave(form);
+
+    if (!this.predictionFormReadyForAutoSave(form)) {
+      this.setPredictionAutoSaveStatus(form, "", "info");
+      return;
+    }
+
+    if (form.dataset.autoSaving === "true") {
+      form.dataset.pendingAutoSave = "true";
+      this.setPredictionAutoSaveStatus(form, "Modification en attente…", "saving");
+      return;
+    }
+
+    this.setPredictionAutoSaveStatus(form, "Sauvegarde auto…", "saving");
+    await this.savePrediction(form, { silent: true, reloadView: false, source: "auto" });
+  },
+
+  async savePrediction(form, options = {}) {
+    const { silent = false, reloadView = true, source = "manual" } = options;
     if (this.state.profile?.can_predict === false || this.state.profile?.is_banned) {
-      H.toast("Les pronostics sont désactivés sur ton compte.", "error");
+      if (!silent) H.toast("Les pronostics sont désactivés sur ton compte.", "error");
+      this.setPredictionAutoSaveStatus(form, "Pronos désactivés", "error");
       return;
     }
     const matchId = form.dataset.matchId;
@@ -1771,16 +1860,22 @@ const App = {
     };
 
     if (Number.isNaN(payload.home_score_pred) || Number.isNaN(payload.away_score_pred)) {
-      H.toast("Entre deux scores valides.", "error");
+      if (!silent) H.toast("Entre deux scores valides.", "error");
+      this.setPredictionAutoSaveStatus(form, "Scores incomplets", "error");
       return;
     }
+
+    form.dataset.autoSaving = "true";
 
     const { error } = await window.sb
       .from("predictions")
       .upsert(payload, { onConflict: "user_id,match_id" });
 
     if (error) {
-      H.toast(error.message || "Impossible d’enregistrer le prono.", "error");
+      form.dataset.autoSaving = "false";
+      form.dataset.pendingAutoSave = "false";
+      if (!silent) H.toast(error.message || "Impossible d’enregistrer le prono.", "error");
+      this.setPredictionAutoSaveStatus(form, "Erreur sauvegarde", "error");
       return;
     }
 
@@ -1794,8 +1889,19 @@ const App = {
     this.queueAchievementDiffFromSnapshot(achievementIdsBeforeSave);
     this.syncAchievementNotifications();
     this.scheduleAchievementResync([120, 700, 1800]);
-    H.toast("Prono enregistré", "success");
-    await this.loadView(this.state.currentView);
+    form.dataset.autoSaving = "false";
+    const pendingAutoSave = form.dataset.pendingAutoSave === "true";
+    form.dataset.pendingAutoSave = "false";
+
+    if (source === "auto" && pendingAutoSave) {
+      this.setPredictionAutoSaveStatus(form, "Sauvegarde de la dernière modification…", "saving");
+      await this.triggerPredictionAutoSave(form);
+      return;
+    }
+
+    this.setPredictionAutoSaveStatus(form, source === "auto" ? "Enregistré automatiquement" : "Enregistré", "success");
+    if (!silent) H.toast("Prono enregistré", "success");
+    if (reloadView) await this.loadView(this.state.currentView);
     this.syncAchievementNotifications();
     this.scheduleAchievementResync([300, 1200, 3500]);
   },
