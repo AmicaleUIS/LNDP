@@ -435,6 +435,7 @@ const App = {
         <div class="credits-grid">
           <section>
             <h3>Version actuelle</h3>
+            <p><strong>1.3.0</strong> — reset lancement complet, autosauvegarde immédiate des pronos sans bouton Valider, bilan PDF collector, diplôme paysage et journal plus lisible.</p>
             <p><strong>1.2.4</strong> — super admin : bouton pour masquer/réactiver le module préparation, règles et classements nettoyés, barre admin desktop améliorée.</p>
             <p><strong>1.2.3</strong> — super admin : coupons Famille bonus, réinitialisation des invitations et vue détaillée des invités.</p>
             <p><strong>1.2.0</strong> — nouveau tchat : salons Général / Team / Famille / Team Famille, chargement des anciens messages, réactions PNG, blocage individuel renforcé.</p>
@@ -445,7 +446,7 @@ const App = {
             <p><strong>1.0.5</strong> — dashboard mobile/desktop stabilisé, sans chevauchement des cartes.</p>
           </section>
           <section>
-            <h3>Évolutions V1.2.4</h3>
+            <h3>Évolutions V1.3.0</h3>
             <ul class="changelog-list">
               <li>Le super admin peut désactiver ou réactiver l’affichage du module préparation.</li>
               <li>Quand la préparation est désactivée, les matchs test disparaissent des matchs/pronos, classements par phase et règles.</li>
@@ -5926,7 +5927,7 @@ const App = {
             <p class="muted">Déconnexion, crédits et historique des évolutions.</p>
           </div>
           <div class="profile-account-actions">
-            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.2.4</button>
+            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.3.0</button>
             <button class="danger-btn" id="profileLogoutBtn" type="button">Déconnexion</button>
           </div>
         </div>

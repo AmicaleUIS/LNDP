@@ -1,4 +1,8 @@
-# Le Nid des Pronos — V1.2.4
+# Le Nid des Pronos — V1.3.0
+
+## Version V1.3.0 — Reset lancement + bilan PDF collector
+
+Voir aussi l'historique V1.2.4 plus bas.
 
 ## Version V1.2.4 — Module préparation masquable
 
