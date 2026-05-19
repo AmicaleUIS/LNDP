@@ -1,4 +1,10 @@
-# Le Nid des Pronos — V1.3.1
+# Le Nid des Pronos — V1.3.2
+
+## V1.3.2 — Points rouges chat + accueil compact
+
+- Les salons de chat affichent un point rouge par catégorie non lue : Général, Team, Famille ou Team Famille.
+- Sur l’accueil, le décompte du prochain match passe dans une pastille à côté du titre.
+- Sur l’accueil, l’état du prono devient une petite pastille compacte.
 
 ## V1.3.1 — Accueil cliquable + modales UX
 

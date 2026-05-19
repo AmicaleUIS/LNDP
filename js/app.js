@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — APP PRINCIPALE V1.3.1
+// LE NID DES PRONOS — APP PRINCIPALE V1.3.2
 // ============================================================
 
 const H = window.Helpers;
@@ -32,6 +32,7 @@ const App = {
     teamChatHasMore: false,
     teamChatError: null,
     teamChatRefreshTimer: null,
+    unreadTeamChatScopes: new Set(),
     chatReactions: [
       // Les clés restent compatibles avec le patch SQL V1.2.0/V1.2.1.
       // Les labels et fichiers correspondent aux nouveaux stickers hibou.
@@ -151,121 +152,93 @@ const App = {
     }, 160);
   },
 
-  teamChatSeenKey() {
-    return `nid-team-chat-last-seen:${this.state.session?.user?.id || "anonymous"}`;
+  teamChatSeenKey(scope = "global") {
+    return `nid-team-chat-last-seen:${this.state.session?.user?.id || "anonymous"}:${scope || "global"}`;
   },
 
-  getTeamChatLastSeenAt() {
+  getTeamChatLastSeenAt(scope = "global") {
     try {
-      const raw = localStorage.getItem(this.teamChatSeenKey());
+      const raw = localStorage.getItem(this.teamChatSeenKey(scope));
       return raw ? new Date(raw) : null;
     } catch (error) {
       return null;
     }
   },
 
-  setTeamChatLastSeenNow() {
+  setTeamChatLastSeenNow(scope = this.state.teamChatScope || "global") {
     try {
-      localStorage.setItem(this.teamChatSeenKey(), new Date().toISOString());
+      localStorage.setItem(this.teamChatSeenKey(scope), new Date().toISOString());
     } catch (error) {
       console.warn("Impossible d’enregistrer la lecture du chat", error);
     }
   },
 
-  markTeamChatAsSeen() {
-    this.setTeamChatLastSeenNow();
-    this.state.hasUnreadTeamMessages = false;
+  markTeamChatAsSeen(scope = this.state.teamChatScope || "global") {
+    const normalizedScope = this.normalizeChatScope(scope);
+    this.setTeamChatLastSeenNow(normalizedScope);
+    this.state.unreadTeamChatScopes?.delete(normalizedScope);
+    this.state.hasUnreadTeamMessages = Boolean(this.state.unreadTeamChatScopes?.size);
     this.updateTeamUnreadIndicators();
   },
 
   updateTeamUnreadIndicators() {
+    this.state.hasUnreadTeamMessages = Boolean(this.state.unreadTeamChatScopes?.size);
     const shouldShow = Boolean(this.state.hasUnreadTeamMessages && this.state.currentView !== "teams");
     H.$$('[data-view="teams"]').forEach((btn) => {
       btn.classList.toggle("has-unread", shouldShow);
       btn.setAttribute("aria-label", shouldShow ? "Les teams du nid — nouveau message non lu" : "Les teams du nid");
     });
+    H.$$("[data-chat-scope]").forEach((btn) => {
+      const hasUnread = this.state.unreadTeamChatScopes?.has(btn.dataset.chatScope);
+      btn.classList.toggle("has-scope-unread", Boolean(hasUnread));
+      btn.setAttribute("aria-label", hasUnread ? `${btn.textContent.trim()} — nouveau message non lu` : btn.textContent.trim());
+    });
   },
 
   async refreshTeamChatUnreadIndicator() {
     if (!this.state.session?.user?.id) return;
-    const lastSeen = this.getTeamChatLastSeenAt();
-    if (!lastSeen || Number.isNaN(lastSeen.getTime())) {
-      this.setTeamChatLastSeenNow();
-      this.state.hasUnreadTeamMessages = false;
-      this.updateTeamUnreadIndicators();
-      return;
-    }
-
-    const after = lastSeen.toISOString();
     const ownUserId = this.state.session.user.id;
+    const unreadScopes = new Set();
 
-    const hasUnreadInQuery = async (query) => {
+    const hasUnreadForScope = async (scope) => {
+      const lastSeen = this.getTeamChatLastSeenAt(scope);
+      if (!lastSeen || Number.isNaN(lastSeen.getTime())) {
+        this.setTeamChatLastSeenNow(scope);
+        return false;
+      }
+
+      let query = window.sb
+        .from("v_team_chat_messages")
+        .select("id,created_at,user_id,scope,office_team_id")
+        .eq("scope", scope)
+        .neq("user_id", ownUserId)
+        .gt("created_at", lastSeen.toISOString())
+        .order("created_at", { ascending: false })
+        .limit(8);
+
+      if (this.chatScopeNeedsTeam(scope) && this.state.profile?.office_team_id) {
+        query = query.eq("office_team_id", this.state.profile.office_team_id);
+      }
+
       const { data, error } = await query;
       if (error) {
         console.warn("Indicateur messages non lus indisponible", error);
         return false;
       }
-      const rows = this.filterBlockedMessages(data || []);
-      return Boolean(rows.length);
+
+      return Boolean(this.filterBlockedMessages(data || []).length);
     };
 
-    const checks = [];
+    const scopes = this.availableChatScopes();
+    const results = await Promise.all(scopes.map(async (scope) => [scope.key, await hasUnreadForScope(scope.key)]));
 
-    if (!this.isFamily(this.state.profile)) {
-      checks.push(hasUnreadInQuery(
-        window.sb
-          .from("v_team_chat_messages")
-          .select("id,created_at,user_id")
-          .eq("scope", "global")
-          .neq("user_id", ownUserId)
-          .gt("created_at", after)
-          .order("created_at", { ascending: false })
-          .limit(1)
-      ));
-    }
+    results.forEach(([scope, hasUnread]) => {
+      if (hasUnread && scope !== this.state.teamChatScope) unreadScopes.add(scope);
+      if (hasUnread && this.state.currentView !== "teams") unreadScopes.add(scope);
+    });
 
-    if (!this.isFamily(this.state.profile) && this.state.profile?.office_team_id) {
-      checks.push(hasUnreadInQuery(
-        window.sb
-          .from("v_team_chat_messages")
-          .select("id,created_at,user_id")
-          .eq("scope", "team")
-          .eq("office_team_id", this.state.profile.office_team_id)
-          .neq("user_id", ownUserId)
-          .gt("created_at", after)
-          .order("created_at", { ascending: false })
-          .limit(1)
-      ));
-    }
-
-    if (this.canSeeFamily()) {
-      checks.push(hasUnreadInQuery(
-        window.sb
-          .from("v_team_chat_messages")
-          .select("id,created_at,user_id")
-          .eq("scope", "family_global")
-          .neq("user_id", ownUserId)
-          .gt("created_at", after)
-          .order("created_at", { ascending: false })
-          .limit(1)
-      ));
-      if (this.state.profile?.office_team_id) {
-        checks.push(hasUnreadInQuery(
-          window.sb
-            .from("v_team_chat_messages")
-            .select("id,created_at,user_id")
-            .eq("scope", "family_team")
-            .eq("office_team_id", this.state.profile.office_team_id)
-            .neq("user_id", ownUserId)
-            .gt("created_at", after)
-            .order("created_at", { ascending: false })
-            .limit(1)
-        ));
-      }
-    }
-
-    const results = await Promise.all(checks);
-    this.state.hasUnreadTeamMessages = results.some(Boolean);
+    this.state.unreadTeamChatScopes = unreadScopes;
+    this.state.hasUnreadTeamMessages = unreadScopes.size > 0;
     this.updateTeamUnreadIndicators();
   },
 
@@ -280,15 +253,26 @@ const App = {
   },
 
   async handleTeamChatRealtime(payload = {}) {
+    const messageScope = payload.new?.scope;
+
+    if (payload.eventType === "INSERT" && this.teamChatRealtimeMessageIsVisible(payload.new)) {
+      if (this.state.currentView === "teams" && messageScope === this.state.teamChatScope) {
+        await this.loadTeamChatMessages();
+        await this.renderTeamsPage();
+        return;
+      }
+
+      if (messageScope) {
+        this.state.unreadTeamChatScopes?.add(messageScope);
+        this.state.hasUnreadTeamMessages = true;
+        this.updateTeamUnreadIndicators();
+        return;
+      }
+    }
+
     if (this.state.currentView === "teams") {
       await this.loadTeamChatMessages();
       await this.renderTeamsPage();
-      return;
-    }
-
-    if (payload.eventType === "INSERT" && this.teamChatRealtimeMessageIsVisible(payload.new)) {
-      this.state.hasUnreadTeamMessages = true;
-      this.updateTeamUnreadIndicators();
       return;
     }
 
@@ -430,7 +414,7 @@ const App = {
           <div>
             <p class="eyebrow">Crédits cachés</p>
             <h2 id="creditsTitle">Le Nid des Pronos</h2>
-            <p class="muted">Version publique <strong>1.3.1</strong> · accueil cliquable, décompte du prochain match et modales plus propres.</p>
+            <p class="muted">Version publique <strong>1.3.2</strong> · points rouges par salon et accueil plus compact.</p>
           </div>
         </div>
         <div class="credits-grid">
@@ -447,7 +431,7 @@ const App = {
             <p><strong>1.0.5</strong> — dashboard mobile/desktop stabilisé, sans chevauchement des cartes.</p>
           </section>
           <section>
-            <h3>Évolutions V1.3.1</h3>
+            <h3>Évolutions V1.3.2</h3>
             <ul class="changelog-list">
               <li>Le super admin peut désactiver ou réactiver l’affichage du module préparation.</li>
               <li>Quand la préparation est désactivée, les matchs test disparaissent des matchs/pronos, classements par phase et règles.</li>
@@ -1144,19 +1128,18 @@ const App = {
         <section class="home-dashboard-grid">
           <section class="home-dashboard-left" aria-label="Match et mini-records">
             <article class="card next-match-card home-clickable-card" ${next ? `data-home-next-match-id="${H.escapeHtml(next.id)}" role="button" tabindex="0"` : ""}>
-              <div class="card-title-row compact-title-row">
+              <div class="card-title-row compact-title-row home-next-title-row">
                 <h3>Prochain match</h3>
-                <span class="pill">${next ? H.statusLabel(next.status) : "Aucun"}</span>
+                <div class="home-next-pills">
+                  ${next ? `<span class="pill home-next-countdown-pill" data-countdown-at="${H.escapeHtml(next.kickoff_at || "")}">${this.matchCountdownLabel(next.kickoff_at)}</span>` : ""}
+                  <span class="pill">${next ? H.statusLabel(next.status) : "Aucun"}</span>
+                </div>
               </div>
               ${next ? `
                 ${this.matchMiniHtml(next)}
-                <div class="home-next-countdown" data-countdown-at="${H.escapeHtml(next.kickoff_at || "")}">
-                  <small>Décompte avant coup d’envoi</small>
-                  <strong>${this.matchCountdownLabel(next.kickoff_at)}</strong>
-                </div>
-                <div class="home-next-prono-state ${nextPrediction ? "done" : "missing"}">
+                <div class="home-next-prono-state compact ${nextPrediction ? "done" : "missing"}">
                   <strong>${nextPrediction ? "Prono posé" : "Prono à faire"}</strong>
-                  <span>${nextPrediction ? `${nextPrediction.home_score_pred} - ${nextPrediction.away_score_pred}` : "Clique ici pour aller directement au prono."}</span>
+                  <span>${nextPrediction ? `${nextPrediction.home_score_pred} - ${nextPrediction.away_score_pred}` : "Clique pour pronostiquer"}</span>
                 </div>
               ` : `<p class="muted">Aucun match à venir pour le moment.</p>`}
             </article>
@@ -1596,7 +1579,7 @@ const App = {
     const updateAll = () => {
       nodes.forEach((node) => {
         const target = node.dataset.countdownAt;
-        const label = node.querySelector("strong");
+        const label = node.querySelector("strong") || node;
         if (!label || !target) return;
         label.textContent = this.matchCountdownLabel(target);
       });
@@ -5619,8 +5602,9 @@ const App = {
 
           <div class="segmented small team-chat-scope chat-scope-v120">
             ${scopes.map((scope) => `
-              <button class="${chatScope === scope.key ? "active" : ""} ${this.isFamilyChatScope(scope.key) ? "family-tab" : ""}" data-chat-scope="${H.escapeHtml(scope.key)}" type="button" title="${H.escapeHtml(scope.hint)}">
-                ${H.escapeHtml(scope.short)}
+              <button class="${chatScope === scope.key ? "active" : ""} ${this.isFamilyChatScope(scope.key) ? "family-tab" : ""} ${this.state.unreadTeamChatScopes?.has(scope.key) ? "has-scope-unread" : ""}" data-chat-scope="${H.escapeHtml(scope.key)}" type="button" title="${H.escapeHtml(scope.hint)}">
+                <span>${H.escapeHtml(scope.short)}</span>
+                ${this.state.unreadTeamChatScopes?.has(scope.key) ? `<span class="chat-scope-dot" aria-hidden="true"></span>` : ""}
               </button>
             `).join("")}
           </div>
@@ -6061,7 +6045,7 @@ const App = {
             <p class="muted">Déconnexion, crédits et historique des évolutions.</p>
           </div>
           <div class="profile-account-actions">
-            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.3.1</button>
+            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.3.2</button>
             <button class="danger-btn" id="profileLogoutBtn" type="button">Déconnexion</button>
           </div>
         </div>

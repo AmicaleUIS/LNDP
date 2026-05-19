@@ -14680,3 +14680,104 @@ body[data-current-view="leaderboard"] .team-leaderboard-card .muted {
     text-align: left;
   }
 }
+
+
+/* ============================================================
+   V1.3.2 — Points rouges salons + accueil prochain match compact
+   ============================================================ */
+
+.team-chat-scope [data-chat-scope] {
+  position: relative;
+}
+
+.chat-scope-dot,
+.team-chat-scope [data-chat-scope].has-scope-unread::after {
+  position: absolute;
+  top: 5px;
+  right: 7px;
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: #ef4444;
+  border: 2px solid rgba(15, 23, 42, .98);
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, .16), 0 0 14px rgba(239, 68, 68, .65);
+  content: "";
+}
+
+.chat-scope-dot {
+  display: inline-block;
+}
+
+.home-next-title-row {
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.home-next-pills {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.home-next-countdown-pill {
+  border-color: rgba(56, 189, 248, .28);
+  background: rgba(56, 189, 248, .14);
+  color: #bae6fd;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.home-next-prono-state.compact {
+  display: inline-flex;
+  width: auto;
+  max-width: 100%;
+  margin-top: 12px;
+  padding: 7px 11px;
+  border-radius: 999px;
+  gap: 8px;
+  font-size: .86rem;
+}
+
+.home-next-prono-state.compact strong {
+  font-size: .86rem;
+}
+
+.home-next-prono-state.compact span {
+  font-size: .82rem;
+}
+
+.home-next-prono-state.compact::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  flex: 0 0 auto;
+  align-self: center;
+  border-radius: 999px;
+}
+
+.home-next-prono-state.compact.done::before {
+  background: #22c55e;
+  box-shadow: 0 0 10px rgba(34,197,94,.68);
+}
+
+.home-next-prono-state.compact.missing::before {
+  background: #facc15;
+  box-shadow: 0 0 10px rgba(250,204,21,.68);
+}
+
+@media (max-width: 640px) {
+  .home-next-title-row {
+    align-items: stretch;
+  }
+
+  .home-next-pills {
+    justify-content: flex-start;
+  }
+
+  .home-next-prono-state.compact {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+  }
+}
