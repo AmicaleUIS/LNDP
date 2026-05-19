@@ -1,4 +1,12 @@
-# Le Nid des Pronos — V1.3.0
+# Le Nid des Pronos — V1.3.1
+
+## V1.3.1 — Accueil cliquable + modales UX
+
+- La carte Prochain match de l’accueil ouvre directement le prono du match.
+- Elle indique si le prono est déjà posé ou à faire.
+- Elle affiche un décompte avant le coup d’envoi.
+- Les tuiles de classement de l’accueil ouvrent directement le bon classement.
+- Les modales importantes utilisent une croix visible en haut à droite.
 
 ## Version V1.3.0 — Reset lancement + bilan PDF collector
 

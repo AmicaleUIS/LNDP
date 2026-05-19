@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — APP PRINCIPALE V1.3.0
+// LE NID DES PRONOS — APP PRINCIPALE V1.3.1
 // ============================================================
 
 const H = window.Helpers;
@@ -67,6 +67,7 @@ const App = {
     achievementNotificationTimer: null,
     achievementResyncTimers: [],
     homeRecordCarouselTimer: null,
+    homeCountdownTimer: null,
     lastAchievementIds: null,
     predictionAutoSaveTimers: new Map()
   },
@@ -424,13 +425,13 @@ const App = {
     modal.className = "modal-backdrop credits-modal";
     modal.innerHTML = `
       <div class="modal-card credits-card" role="dialog" aria-modal="true" aria-labelledby="creditsTitle">
+        <button class="modal-x-btn" id="closeCreditsBtn" type="button" aria-label="Fermer les crédits">×</button>
         <div class="card-title-row">
           <div>
             <p class="eyebrow">Crédits cachés</p>
             <h2 id="creditsTitle">Le Nid des Pronos</h2>
-            <p class="muted">Version publique <strong>1.3.0</strong> · reset lancement complet, autosauvegarde des pronos et bilan PDF collector.</p>
+            <p class="muted">Version publique <strong>1.3.1</strong> · accueil cliquable, décompte du prochain match et modales plus propres.</p>
           </div>
-          <button class="ghost-btn" id="closeCreditsBtn" type="button">Fermer</button>
         </div>
         <div class="credits-grid">
           <section>
@@ -446,7 +447,7 @@ const App = {
             <p><strong>1.0.5</strong> — dashboard mobile/desktop stabilisé, sans chevauchement des cartes.</p>
           </section>
           <section>
-            <h3>Évolutions V1.3.0</h3>
+            <h3>Évolutions V1.3.1</h3>
             <ul class="changelog-list">
               <li>Le super admin peut désactiver ou réactiver l’affichage du module préparation.</li>
               <li>Quand la préparation est désactivée, les matchs test disparaissent des matchs/pronos, classements par phase et règles.</li>
@@ -476,13 +477,13 @@ const App = {
     const preparationEnabled = this.preparationModuleEnabled();
     modal.innerHTML = `
       <div class="modal-card rules-card" role="dialog" aria-modal="true" aria-labelledby="rulesTitle">
+        <button class="modal-x-btn" id="closeRulesBtn" type="button" aria-label="Fermer les règles">×</button>
         <div class="card-title-row">
           <div>
             <p class="eyebrow">${H.icon("list")} Règles du nid</p>
             <h2 id="rulesTitle">Comment les points tombent</h2>
             <p class="muted">Les matchs officiels comptent pour le classement Coupe du monde. Les pronos restent cachés jusqu’au coup d’envoi.</p>
           </div>
-          <button class="ghost-btn" id="closeRulesBtn" type="button">Fermer</button>
         </div>
         <div class="rules-grid">
           <article><strong>Score exact</strong><span>Tu poses le score pile comme au coup de sifflet final. Le hibou sort les confettis.</span><b>+5 pts</b></article>
@@ -1121,6 +1122,7 @@ const App = {
     const root = H.$("#viewRoot");
     await this.loadPlayerScoreRows();
     const next = this.nextMatch();
+    const nextPrediction = next ? this.getMyPrediction(next.id) : null;
     const missing = this.missingPredictions();
     const myRank = await this.fetchMyRank();
     const teamAverageRows = this.overallTeamAverageRows();
@@ -1141,12 +1143,22 @@ const App = {
 
         <section class="home-dashboard-grid">
           <section class="home-dashboard-left" aria-label="Match et mini-records">
-            <article class="card next-match-card">
+            <article class="card next-match-card home-clickable-card" ${next ? `data-home-next-match-id="${H.escapeHtml(next.id)}" role="button" tabindex="0"` : ""}>
               <div class="card-title-row compact-title-row">
                 <h3>Prochain match</h3>
                 <span class="pill">${next ? H.statusLabel(next.status) : "Aucun"}</span>
               </div>
-              ${next ? this.matchMiniHtml(next) : `<p class="muted">Aucun match à venir pour le moment.</p>`}
+              ${next ? `
+                ${this.matchMiniHtml(next)}
+                <div class="home-next-countdown" data-countdown-at="${H.escapeHtml(next.kickoff_at || "")}">
+                  <small>Décompte avant coup d’envoi</small>
+                  <strong>${this.matchCountdownLabel(next.kickoff_at)}</strong>
+                </div>
+                <div class="home-next-prono-state ${nextPrediction ? "done" : "missing"}">
+                  <strong>${nextPrediction ? "Prono posé" : "Prono à faire"}</strong>
+                  <span>${nextPrediction ? `${nextPrediction.home_score_pred} - ${nextPrediction.away_score_pred}` : "Clique ici pour aller directement au prono."}</span>
+                </div>
+              ` : `<p class="muted">Aucun match à venir pour le moment.</p>`}
             </article>
 
             ${this.homeRecordCarouselHtml()}
@@ -1208,16 +1220,18 @@ const App = {
       this.state.familyTeamTab = "average";
       this.loadView("leaderboard");
     });
+    this.bindHomeClickableCards(root);
     this.bindNavigation();
     this.bindGoToNearestMissingActions();
     this.bindHomeRecordCarousel(root);
+    this.startHomeCountdowns(root);
   },
 
 
   homeRankCardHtml(myRank) {
     if (!myRank) {
       return `
-        <article class="card home-rank-card">
+        <article class="card home-rank-card home-clickable-card" data-home-leaderboard-action="go-overall-leaderboard" role="button" tabindex="0">
           <div class="card-title-row">
             <h3>Classement général</h3>
             <button class="ghost-btn tiny-btn" type="button" data-action="go-overall-leaderboard">Voir</button>
@@ -1234,7 +1248,7 @@ const App = {
     }
 
     return `
-      <article class="card home-rank-card">
+      <article class="card home-rank-card home-clickable-card" data-home-leaderboard-action="go-overall-leaderboard" role="button" tabindex="0">
         <div class="card-title-row">
           <h3>Classement général</h3>
           <button class="ghost-btn tiny-btn" type="button" data-action="go-overall-leaderboard">Voir</button>
@@ -1288,7 +1302,7 @@ const App = {
 
     if (!myTeam) {
       return `
-        <article class="card home-team-average-card">
+        <article class="card home-team-average-card home-clickable-card" data-home-leaderboard-action="go-team-average-leaderboard" role="button" tabindex="0">
           <div class="card-title-row">
             <h3>Moyenne team</h3>
           </div>
@@ -1299,7 +1313,7 @@ const App = {
 
     if (!myRow) {
       return `
-        <article class="card home-team-average-card">
+        <article class="card home-team-average-card home-clickable-card" data-home-leaderboard-action="go-team-average-leaderboard" role="button" tabindex="0">
           <div class="card-title-row">
             <h3>Moyenne team</h3>
             <button class="ghost-btn tiny-btn" type="button" data-action="go-team-average-leaderboard">Voir</button>
@@ -1316,7 +1330,7 @@ const App = {
     }
 
     return `
-      <article class="card home-team-average-card" style="--team-color:${this.safeColor(myRow.office_team_color, "#facc15")}">
+      <article class="card home-team-average-card home-clickable-card" data-home-leaderboard-action="go-team-average-leaderboard" role="button" tabindex="0" style="--team-color:${this.safeColor(myRow.office_team_color, "#facc15")}">
         <div class="card-title-row">
           <h3>Moyenne team</h3>
           <button class="ghost-btn tiny-btn" type="button" data-action="go-team-average-leaderboard">Voir</button>
@@ -1337,7 +1351,7 @@ const App = {
 
   homeFamilyRankCardHtml(myRank) {
     return `
-      <article class="card home-rank-card home-family-rank-card">
+      <article class="card home-rank-card home-family-rank-card home-clickable-card" data-home-leaderboard-action="go-family-player-leaderboard" role="button" tabindex="0">
         <div class="card-title-row">
           <h3>Classement Famille</h3>
           <button class="ghost-btn tiny-btn" type="button" data-action="go-family-player-leaderboard">Voir</button>
@@ -1357,7 +1371,7 @@ const App = {
     const myTeamId = this.state.profile?.office_team_id;
     const myRow = rows.find((row) => row.office_team_id === myTeamId);
     return `
-      <article class="card home-team-average-card home-family-team-card" style="--team-color:${this.safeColor(myRow?.office_team_color, "#facc15")}">
+      <article class="card home-team-average-card home-family-team-card home-clickable-card" data-home-leaderboard-action="go-family-team-average-leaderboard" role="button" tabindex="0" style="--team-color:${this.safeColor(myRow?.office_team_color, "#facc15")}">
         <div class="card-title-row">
           <h3>Team Famille</h3>
           <button class="ghost-btn tiny-btn" type="button" data-action="go-family-team-average-leaderboard">Voir</button>
@@ -1491,6 +1505,128 @@ const App = {
     `;
   },
 
+
+  bindHomeClickableCards(root = document) {
+    H.$$("[data-home-next-match-id]", root).forEach((card) => {
+      const open = async () => {
+        const matchId = card.dataset.homeNextMatchId;
+        if (matchId) await this.goToMatchPrediction(matchId);
+      };
+
+      card.addEventListener("click", async (event) => {
+        if (event.target.closest("button,a,input,select,textarea,summary")) return;
+        await open();
+      });
+
+      card.addEventListener("keydown", async (event) => {
+        if (event.key !== "Enter" && event.key !== " ") return;
+        event.preventDefault();
+        await open();
+      });
+    });
+
+    H.$$("[data-home-leaderboard-action]", root).forEach((card) => {
+      const open = async () => {
+        const action = card.dataset.homeLeaderboardAction;
+        if (action === "go-overall-leaderboard") {
+          this.state.leaderboardTab = "players";
+          this.state.playerLeaderboardMode = "overall";
+        } else if (action === "go-team-average-leaderboard") {
+          this.state.leaderboardTab = "team";
+          this.state.teamLeaderboardScope = "overall";
+          this.state.teamTab = "average";
+        } else if (action === "go-family-player-leaderboard") {
+          this.state.leaderboardTab = "family";
+          this.state.familyLeaderboardTab = "players";
+          this.state.familyPlayerLeaderboardMode = "overall";
+        } else if (action === "go-family-team-average-leaderboard") {
+          this.state.leaderboardTab = "family";
+          this.state.familyLeaderboardTab = "team";
+          this.state.familyTeamLeaderboardScope = "overall";
+          this.state.familyTeamTab = "average";
+        }
+        await this.loadView("leaderboard");
+      };
+
+      card.addEventListener("click", async (event) => {
+        if (event.target.closest("button,a,input,select,textarea,summary")) return;
+        await open();
+      });
+
+      card.addEventListener("keydown", async (event) => {
+        if (event.key !== "Enter" && event.key !== " ") return;
+        event.preventDefault();
+        await open();
+      });
+    });
+  },
+
+  matchCountdownLabel(kickoffAt) {
+    if (!kickoffAt) return "Date à confirmer";
+    const target = new Date(kickoffAt).getTime();
+    if (!Number.isFinite(target)) return "Date à confirmer";
+
+    const diffMs = target - Date.now();
+    if (diffMs <= 0) return "Coup d’envoi passé";
+
+    const totalMinutes = Math.ceil(diffMs / 60000);
+    const days = Math.floor(totalMinutes / 1440);
+    const hours = Math.floor((totalMinutes % 1440) / 60);
+    const minutes = totalMinutes % 60;
+
+    const parts = [];
+    if (days) parts.push(`${days} j`);
+    if (hours || days) parts.push(`${hours} h`);
+    parts.push(`${minutes} min`);
+
+    return `Dans ${parts.join(" ")}`;
+  },
+
+  clearHomeCountdowns() {
+    if (this.state.homeCountdownTimer) {
+      window.clearInterval(this.state.homeCountdownTimer);
+      this.state.homeCountdownTimer = null;
+    }
+  },
+
+  startHomeCountdowns(root = document) {
+    const nodes = H.$$("[data-countdown-at]", root);
+    if (!nodes.length) return;
+
+    const updateAll = () => {
+      nodes.forEach((node) => {
+        const target = node.dataset.countdownAt;
+        const label = node.querySelector("strong");
+        if (!label || !target) return;
+        label.textContent = this.matchCountdownLabel(target);
+      });
+    };
+
+    updateAll();
+    this.state.homeCountdownTimer = window.setInterval(updateAll, 30000);
+  },
+
+  async goToMatchPrediction(matchId) {
+    const match = this.state.matches.find((item) => item.id === matchId);
+    if (!match) {
+      await this.loadView("matches");
+      setTimeout(() => this.scrollToMatch(matchId), 150);
+      return;
+    }
+
+    const groups = this.groupMatchesByPouleRound(this.displayMatches());
+    const groupIndex = groups.findIndex((group) => group.matches.some((item) => item.id === match.id));
+    if (groupIndex >= 0) this.state.matchPhaseIndex = groupIndex;
+
+    if (this.state.currentView !== "matches") {
+      await this.loadView("matches");
+    } else {
+      await this.renderMatches();
+    }
+
+    setTimeout(() => this.scrollToMatch(match.id), 120);
+  },
+
   bindCombinedPredictionSummaryActions() {
     H.$$("[data-jump-match]").forEach((button) => {
       button.addEventListener("click", () => {
@@ -1510,7 +1646,7 @@ const App = {
     if (!target) return;
     target.scrollIntoView({ behavior: "smooth", block: "center" });
     target.classList.add("match-card-highlight");
-    const firstInput = target.querySelector('input:not([disabled]), select:not([disabled]), button[type="submit"]');
+    const firstInput = target.querySelector('input:not([disabled]), select:not([disabled])');
     if (firstInput) setTimeout(() => firstInput.focus({ preventScroll: true }), 450);
     setTimeout(() => target.classList.remove("match-card-highlight"), 1200);
   },
@@ -2485,17 +2621,15 @@ const App = {
         </div>
         <div class="achievement-unlock-actions">
           <small>Le grimoire des mini-records est à jour.</small>
-          <button class="primary-btn" id="closeRecordDetailBtn" type="button">Fermer</button>
         </div>
       </div>
     `;
 
     document.body.appendChild(modal);
     const close = () => modal.remove();
-    H.$("#closeRecordDetailBtn", modal)?.addEventListener("click", close);
     H.$("#closeRecordDetailXBtn", modal)?.addEventListener("click", close);
     modal.addEventListener("click", (event) => { if (event.target === modal) close(); });
-    H.$("#closeRecordDetailBtn", modal)?.focus();
+    H.$("#closeRecordDetailXBtn", modal)?.focus();
   },
 
   renderAchievementRecords() {
@@ -4991,7 +5125,7 @@ const App = {
               <p class="muted">${H.escapeHtml(profile.office_team_name || "Sans team")} · ${scoreRow?.scored_matches || 0} match${Number(scoreRow?.scored_matches || 0) > 1 ? "s" : ""} comptabilisé${Number(scoreRow?.scored_matches || 0) > 1 ? "s" : ""}</p>
             </div>
           </div>
-          <button class="ghost-btn" id="closeTeamPlayerModalBtn" type="button">Fermer</button>
+          <button class="modal-x-btn team-player-modal-x" id="closeTeamPlayerModalBtn" type="button" aria-label="Fermer la fiche joueur">×</button>
         </div>
 
         ${this.playerStatsCardsHtml(scoreRow, badges)}
@@ -5927,7 +6061,7 @@ const App = {
             <p class="muted">Déconnexion, crédits et historique des évolutions.</p>
           </div>
           <div class="profile-account-actions">
-            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.3.0</button>
+            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.3.1</button>
             <button class="danger-btn" id="profileLogoutBtn" type="button">Déconnexion</button>
           </div>
         </div>
