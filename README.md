@@ -1,4 +1,11 @@
-# Le Nid des Pronos — V1.3.3
+# Le Nid des Pronos — V1.3.4
+
+## V1.3.4 — Prévisualisation graphs avec matchs test
+
+- Admin > Sauvegardes : bouton super admin pour inclure temporairement les matchs test dans les graphs d’évolution.
+- Quand le bouton est coupé, les graphs reviennent aux règles normales : matchs officiels terminés uniquement.
+- Une pastille prévient quand la prévisualisation est active.
+- Patch SQL à lancer : `patch_v1_3_4_graph_preview.sql`.
 
 ## V1.3.3 — Progression pronos + actus du Nid
 

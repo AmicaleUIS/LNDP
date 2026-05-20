@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Admin — Le Nid des Pronos</title>
   <meta name="theme-color" content="#07111f">
-  <link rel="manifest" href="manifest.json?v=1.3.3">
+  <link rel="manifest" href="manifest.json?v=1.3.4">
   <link rel="icon" href="assets/icons/icon-192.png">
   <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png">
-  <link rel="stylesheet" href="css/style.css?v=1.3.3">
+  <link rel="stylesheet" href="css/style.css?v=1.3.4">
 </head>
 <body>
   <div class="admin-shell">
@@ -64,7 +64,7 @@
     <main class="admin-main-area">
       <header class="admin-header admin-page-header">
         <div>
-          <p class="eyebrow">Administration · v1.3.0</p>
+          <p class="eyebrow">Administration · v1.3.4</p>
           <h1 id="adminPageTitle"><img class="owl-icon title-icon" src="assets/icons/owl-png/admin.png" alt="" aria-hidden="true" loading="lazy"> Saisie rapide des scores</h1>
           <p class="muted" id="adminPageSubtitle">Prochains matchs en haut, scores manuels, classement recalculé automatiquement.</p>
         </div>
@@ -154,7 +154,12 @@
                 <button class="ghost-btn" id="resetPreparationScoresBtn" type="button">Reset scores préparation</button>
                 <button class="danger-btn" id="togglePreparationModuleBtn" type="button">Désactiver le module préparation</button>
               </div>
-              <p class="muted tiny-note">Désactiver masque les matchs test, les règles et les classements liés. Les 2 badges préparation restent dans les exploits.</p>
+              <div class="graph-preview-admin-box">
+                <h4>Prévisualisation des graphs</h4>
+                <p class="prep-module-status muted" id="graphPreviewStatusText">Chargement du statut graph...</p>
+                <button class="ghost-btn" id="toggleGraphPreviewBtn" type="button">Prévisualiser les graphs avec matchs test</button>
+              </div>
+              <p class="muted tiny-note">Désactiver masque les matchs test, les règles et les classements liés. Les 2 badges préparation restent dans les exploits. La prévisualisation graphs ne sert qu’à vérifier l’affichage avant le premier match officiel.</p>
             </section>
 
             <section class="backup-box danger-zone launch-reset-box">
@@ -258,10 +263,10 @@
   </button>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="js/config.js?v=1.3.3"></script>
-  <script src="js/supabaseClient.js?v=1.3.3"></script>
-  <script src="js/auth.js?v=1.3.3"></script>
-  <script src="js/common.js?v=1.3.3"></script>
-  <script src="js/admin.js?v=1.3.3"></script>
+  <script src="js/config.js?v=1.3.4"></script>
+  <script src="js/supabaseClient.js?v=1.3.4"></script>
+  <script src="js/auth.js?v=1.3.4"></script>
+  <script src="js/common.js?v=1.3.4"></script>
+  <script src="js/admin.js?v=1.3.4"></script>
 </body>
 </html>

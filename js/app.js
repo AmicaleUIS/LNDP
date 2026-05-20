@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — APP PRINCIPALE V1.3.3
+// LE NID DES PRONOS — APP PRINCIPALE V1.3.4
 // ============================================================
 
 const H = window.Helpers;
@@ -414,7 +414,7 @@ const App = {
           <div>
             <p class="eyebrow">Crédits cachés</p>
             <h2 id="creditsTitle">Le Nid des Pronos</h2>
-            <p class="muted">Version publique <strong>1.3.3</strong> · progression des pronos et actus du Nid.</p>
+            <p class="muted">Version publique <strong>1.3.4</strong> · prévisualisation des graphs avec matchs test.</p>
           </div>
         </div>
         <div class="credits-grid">
@@ -431,7 +431,7 @@ const App = {
             <p><strong>1.0.5</strong> — dashboard mobile/desktop stabilisé, sans chevauchement des cartes.</p>
           </section>
           <section>
-            <h3>Évolutions V1.3.3</h3>
+            <h3>Évolutions V1.3.4</h3>
             <ul class="changelog-list">
               <li>Le super admin peut désactiver ou réactiver l’affichage du module préparation.</li>
               <li>Quand la préparation est désactivée, les matchs test disparaissent des matchs/pronos, classements par phase et règles.</li>
@@ -615,7 +615,7 @@ const App = {
     const { data, error } = await window.sb
       .from("app_settings")
       .select("key,value")
-      .in("key", ["family_mode_enabled", "preparation_module_enabled"]);
+      .in("key", ["family_mode_enabled", "preparation_module_enabled", "graph_preview_test_matches_enabled"]);
 
     if (error) {
       console.warn("Paramètres app indisponibles", error);
@@ -641,6 +641,19 @@ const App = {
     if (typeof value === "string") return value === "true";
     if (value && typeof value === "object" && "enabled" in value) return Boolean(value.enabled);
     return Boolean(value);
+  },
+
+  graphPreviewTestMatchesEnabled() {
+    const value = this.state.appSettings?.graph_preview_test_matches_enabled;
+    if (value === undefined || value === null) return false;
+    if (typeof value === "boolean") return value;
+    if (typeof value === "string") return value === "true";
+    if (value && typeof value === "object" && "enabled" in value) return Boolean(value.enabled);
+    return Boolean(value);
+  },
+
+  graphEvolutionCanUseMatch(match) {
+    return Boolean(match && (!match.is_test_match || (this.graphPreviewTestMatchesEnabled() && match.is_test_match)));
   },
 
   displayMatches() {
@@ -4728,7 +4741,7 @@ const App = {
   playerEvolutionSeries(mode = "day") {
     const finishedRows = this.state.visiblePredictions
       .map((prediction) => ({ prediction, match: this.state.matches.find((m) => m.id === prediction.match_id) }))
-      .filter(({ prediction, match }) => match?.status === "finished" && !match.is_test_match && prediction.points_total !== null && prediction.points_total !== undefined)
+      .filter(({ prediction, match }) => match?.status === "finished" && this.graphEvolutionCanUseMatch(match) && prediction.points_total !== null && prediction.points_total !== undefined)
       .sort((a, b) => new Date(a.match.kickoff_at || 0) - new Date(b.match.kickoff_at || 0));
 
     const periodKey = (date) => {
@@ -4903,7 +4916,7 @@ const App = {
     const allowedIds = this.familyProfileIds();
     const finishedRows = this.state.visiblePredictions
       .map((prediction) => ({ prediction, match: this.state.matches.find((m) => m.id === prediction.match_id) }))
-      .filter(({ prediction, match }) => allowedIds.has(String(prediction.user_id)) && match?.status === "finished" && !match.is_test_match && prediction.points_total !== null && prediction.points_total !== undefined)
+      .filter(({ prediction, match }) => allowedIds.has(String(prediction.user_id)) && match?.status === "finished" && this.graphEvolutionCanUseMatch(match) && prediction.points_total !== null && prediction.points_total !== undefined)
       .sort((a, b) => new Date(a.match.kickoff_at || 0) - new Date(b.match.kickoff_at || 0));
 
     const periodKey = (date) => {
@@ -5125,6 +5138,7 @@ const App = {
           <div>
             <h3>Évolution du nid</h3>
             <p class="muted">Les courbes montrent les points cumulés des 8 meilleurs joueurs au fil des matchs terminés.</p>
+            ${this.graphPreviewTestMatchesEnabled() ? `<p class="graph-preview-note">${H.icon("info")} Prévisualisation admin active : les matchs test sont inclus dans ce graph.</p>` : ""}
           </div>
           <div class="segmented small">
             <button class="${mode === "day" ? "active" : ""}" data-evolution-mode="day">Jour</button>
@@ -6227,7 +6241,7 @@ const App = {
             <p class="muted">Déconnexion, crédits et historique des évolutions.</p>
           </div>
           <div class="profile-account-actions">
-            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.3.3</button>
+            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.3.4</button>
             <button class="danger-btn" id="profileLogoutBtn" type="button">Déconnexion</button>
           </div>
         </div>

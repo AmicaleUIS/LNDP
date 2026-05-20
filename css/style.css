@@ -14891,3 +14891,40 @@ body[data-current-view="leaderboard"] .team-leaderboard-card .muted {
     width: 100%;
   }
 }
+
+
+/* ============================================================
+   V1.3.4 — Prévisualisation graphs avec matchs test
+   ============================================================ */
+
+.graph-preview-admin-box {
+  margin-top: 14px;
+  padding: 13px;
+  border-radius: 18px;
+  border: 1px solid rgba(56, 189, 248, .22);
+  background: rgba(56, 189, 248, .08);
+}
+
+.graph-preview-admin-box h4 {
+  margin: 0 0 6px;
+  color: #bae6fd;
+  font-size: .98rem;
+}
+
+.graph-preview-note {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  padding: 8px 11px;
+  border-radius: 999px;
+  border: 1px solid rgba(56, 189, 248, .24);
+  background: rgba(56, 189, 248, .10);
+  color: #bae6fd;
+  font-weight: 800;
+}
+
+.graph-preview-note .owl-icon {
+  width: 20px;
+  height: 20px;
+}
