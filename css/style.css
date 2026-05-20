@@ -14781,3 +14781,113 @@ body[data-current-view="leaderboard"] .team-leaderboard-card .muted {
     align-items: center;
   }
 }
+
+
+/* ============================================================
+   V1.3.3 — Progression pronos + actus du Nid
+   ============================================================ */
+
+.home-prono-progress {
+  display: grid;
+  grid-template-columns: auto minmax(120px, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  margin: 18px 0 14px;
+  padding: 12px;
+  border-radius: 22px;
+  border: 1px solid rgba(250, 204, 21, .20);
+  background: rgba(15, 23, 42, .38);
+}
+
+.home-prono-progress strong {
+  display: block;
+  color: #facc15;
+  font-size: clamp(1.25rem, 2.2vw, 1.7rem);
+  line-height: 1;
+}
+
+.home-prono-progress span {
+  color: rgba(226, 232, 240, .75);
+  font-weight: 800;
+}
+
+.home-prono-progress-bar {
+  min-width: 110px;
+  height: 12px;
+  border-radius: 999px;
+  overflow: hidden;
+  border: 1px solid rgba(250, 204, 21, .16);
+  background: rgba(2, 6, 23, .62);
+}
+
+.home-prono-progress-bar span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #facc15, #f97316);
+  box-shadow: 0 0 18px rgba(250,204,21,.35);
+}
+
+.compact-continue-btn {
+  padding: 9px 13px;
+  min-height: 38px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.home-story-slide .home-record-main p {
+  max-width: 100%;
+}
+
+.home-story-slide.story-hot {
+  border-color: rgba(249, 115, 22, .35);
+  background:
+    radial-gradient(circle at 18% 30%, rgba(249,115,22,.18), transparent 36%),
+    rgba(15, 23, 42, .46);
+}
+
+.home-story-slide.story-casserole {
+  border-color: rgba(239, 68, 68, .34);
+  background:
+    radial-gradient(circle at 18% 30%, rgba(239,68,68,.16), transparent 36%),
+    rgba(15, 23, 42, .46);
+}
+
+.home-story-slide.story-perfect {
+  border-color: rgba(34, 197, 94, .34);
+  background:
+    radial-gradient(circle at 18% 30%, rgba(34,197,94,.16), transparent 36%),
+    rgba(15, 23, 42, .46);
+}
+
+.home-story-slide.story-gold {
+  border-color: rgba(250, 204, 21, .38);
+  background:
+    radial-gradient(circle at 18% 30%, rgba(250,204,21,.15), transparent 36%),
+    rgba(15, 23, 42, .46);
+}
+
+.home-story-slide .story-art {
+  display: grid;
+  place-items: center;
+}
+
+.home-story-slide .story-art > .owl-icon {
+  width: 74px;
+  height: 74px;
+  padding: 14px;
+  border-radius: 24px;
+  border: 1px solid rgba(250, 204, 21, .22);
+  background: rgba(2, 6, 23, .42);
+}
+
+@media (max-width: 720px) {
+  .home-prono-progress {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+
+  .compact-continue-btn {
+    width: 100%;
+  }
+}

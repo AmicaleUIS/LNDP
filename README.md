@@ -1,4 +1,10 @@
-# Le Nid des Pronos — V1.3.2
+# Le Nid des Pronos — V1.3.3
+
+## V1.3.3 — Progression pronos + actus du Nid
+
+- Accueil : progression visible des pronos posés avec barre et bouton Continuer mes pronos.
+- Le carrousel d’accueil mélange les records uniques avec des actus du Nid : hibou en feu, casserole du jour, dernier score exact et match qui a rapporté gros.
+- Les actus défilent toutes les 10 secondes comme les mini-records.
 
 ## V1.3.2 — Points rouges chat + accueil compact
 

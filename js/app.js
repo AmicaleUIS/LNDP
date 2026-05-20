@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — APP PRINCIPALE V1.3.2
+// LE NID DES PRONOS — APP PRINCIPALE V1.3.3
 // ============================================================
 
 const H = window.Helpers;
@@ -414,7 +414,7 @@ const App = {
           <div>
             <p class="eyebrow">Crédits cachés</p>
             <h2 id="creditsTitle">Le Nid des Pronos</h2>
-            <p class="muted">Version publique <strong>1.3.2</strong> · points rouges par salon et accueil plus compact.</p>
+            <p class="muted">Version publique <strong>1.3.3</strong> · progression des pronos et actus du Nid.</p>
           </div>
         </div>
         <div class="credits-grid">
@@ -431,7 +431,7 @@ const App = {
             <p><strong>1.0.5</strong> — dashboard mobile/desktop stabilisé, sans chevauchement des cartes.</p>
           </section>
           <section>
-            <h3>Évolutions V1.3.2</h3>
+            <h3>Évolutions V1.3.3</h3>
             <ul class="changelog-list">
               <li>Le super admin peut désactiver ou réactiver l’affichage du module préparation.</li>
               <li>Quand la préparation est désactivée, les matchs test disparaissent des matchs/pronos, classements par phase et règles.</li>
@@ -1108,6 +1108,9 @@ const App = {
     const next = this.nextMatch();
     const nextPrediction = next ? this.getMyPrediction(next.id) : null;
     const missing = this.missingPredictions();
+    const availablePredictionCount = this.availablePredictionMatches().length;
+    const donePredictionCount = Math.max(0, availablePredictionCount - missing.length);
+    const predictionProgress = availablePredictionCount ? Math.round((donePredictionCount / availablePredictionCount) * 100) : 0;
     const myRank = await this.fetchMyRank();
     const teamAverageRows = this.overallTeamAverageRows();
     const familyRows = this.canSeeFamily() ? this.familyPlayerRows() : [];
@@ -1121,6 +1124,16 @@ const App = {
             <p class="eyebrow">${H.icon("nest")} Bienvenue dans le nid</p>
             <h2>Fais tes scores avant le coup d’envoi.</h2>
             <p class="muted">Les pronos des autres restent cachés jusqu’au début du match. Pas de copie, que du flair.</p>
+            <div class="home-prono-progress">
+              <div>
+                <strong>${donePredictionCount} / ${availablePredictionCount}</strong>
+                <span>pronos posés</span>
+              </div>
+              <div class="home-prono-progress-bar" aria-label="${predictionProgress}% des pronos posés">
+                <span style="width:${predictionProgress}%"></span>
+              </div>
+              <button class="primary-btn compact-continue-btn" type="button" data-action="continue-predictions">${missing.length ? "Continuer mes pronos" : "Voir le prochain match"}</button>
+            </div>
             <button class="ghost-btn rules-home-btn" id="rulesHomeBtn" type="button">${H.icon("list")} Règles & points</button>
           </div>
         </section>
@@ -1175,6 +1188,15 @@ const App = {
     `;
 
     H.$("#rulesHomeBtn")?.addEventListener("click", () => this.openRulesModal());
+    H.$('[data-action="continue-predictions"]', root)?.addEventListener("click", async () => {
+      if (missing.length) {
+        await this.goToNearestMissingPrediction();
+      } else if (next) {
+        await this.goToMatchPrediction(next.id);
+      } else {
+        this.loadView("leaderboard");
+      }
+    });
     H.$("#homeRecordsBtn", root)?.addEventListener("click", () => {
       this.state.achievementsTab = "records";
       this.loadView("achievements");
@@ -2467,20 +2489,195 @@ const App = {
     `;
   },
 
+
+  homeStoryHighlights(recordHighlights = []) {
+    const slides = [];
+    const profileName = (profile) => profile?.pseudo || "Le Nid";
+    const teamName = (profile) => profile?.office_team_name || "Sans team";
+    const finishedMatches = this.state.matches
+      .filter((match) => match.status === "finished" && !match.is_test_match)
+      .sort((a, b) => new Date(b.kickoff_at || 0) - new Date(a.kickoff_at || 0));
+
+    const predictionRows = this.state.visiblePredictions
+      .map((prediction) => ({ prediction, match: this.state.matches.find((match) => match.id === prediction.match_id) }))
+      .filter(({ prediction, match }) => match?.status === "finished"
+        && !match.is_test_match
+        && prediction.points_total !== null
+        && prediction.points_total !== undefined
+      );
+
+    // 1) Forme du moment : meilleur score sur les 5 derniers matchs officiels terminés.
+    const lastFiveMatchIds = new Set(finishedMatches.slice(0, 5).map((match) => match.id));
+    if (lastFiveMatchIds.size) {
+      const totals = new Map();
+      predictionRows
+        .filter(({ match }) => lastFiveMatchIds.has(match.id))
+        .forEach(({ prediction }) => {
+          const current = totals.get(prediction.user_id) || { points: 0, exact: 0, count: 0 };
+          current.points += Number(prediction.points_total || 0);
+          current.exact += prediction.is_exact_score ? 1 : 0;
+          current.count += 1;
+          totals.set(prediction.user_id, current);
+        });
+
+      const best = [...totals.entries()]
+        .map(([userId, stats]) => ({ userId, ...stats, profile: this.profileForUser(userId) }))
+        .filter((item) => item.points > 0)
+        .sort((a, b) => b.points - a.points || b.exact - a.exact || profileName(a.profile).localeCompare(profileName(b.profile), "fr"))[0];
+
+      if (best) {
+        slides.push({
+          kind: "story",
+          theme: "hot",
+          label: "Hibou en feu",
+          title: profileName(best.profile),
+          subtitle: teamName(best.profile),
+          value: `${Math.round(best.points * 10) / 10} pts sur les 5 derniers matchs`,
+          detail: `${best.exact} score${best.exact > 1 ? "s" : ""} exact${best.exact > 1 ? "s" : ""} dans la série`,
+          date: finishedMatches[0]?.kickoff_at,
+          icon: "fire",
+          profile: best.profile
+        });
+      }
+    }
+
+    // 2) Casserole du jour : un zéro pointé sur le dernier match terminé.
+    const latestFinished = finishedMatches[0];
+    if (latestFinished) {
+      const zeroRows = predictionRows
+        .filter(({ match, prediction }) => match.id === latestFinished.id && Number(prediction.points_total || 0) === 0)
+        .map(({ prediction, match }) => ({
+          prediction,
+          match,
+          profile: this.profileForUser(prediction.user_id)
+        }))
+        .sort((a, b) => profileName(a.profile).localeCompare(profileName(b.profile), "fr"));
+
+      const casserole = zeroRows[0];
+      if (casserole) {
+        slides.push({
+          kind: "story",
+          theme: "casserole",
+          label: "Casserole du jour",
+          title: profileName(casserole.profile),
+          subtitle: teamName(casserole.profile),
+          value: `${casserole.prediction.home_score_pred}-${casserole.prediction.away_score_pred} au lieu de ${H.scoreText(latestFinished.home_score, latestFinished.away_score)}`,
+          detail: `${latestFinished.home_team_short_name || latestFinished.home_team_name} - ${latestFinished.away_team_short_name || latestFinished.away_team_name}`,
+          date: latestFinished.kickoff_at,
+          icon: "badges",
+          profile: casserole.profile
+        });
+      }
+    }
+
+    // 3) Score exact récent : le dernier joueur qui a mis dans le mille.
+    const latestExact = predictionRows
+      .filter(({ prediction }) => prediction.is_exact_score)
+      .sort((a, b) => new Date(b.match.kickoff_at || 0) - new Date(a.match.kickoff_at || 0))[0];
+
+    if (latestExact) {
+      const exactProfile = this.profileForUser(latestExact.prediction.user_id);
+      slides.push({
+        kind: "story",
+        theme: "perfect",
+        label: "Dans le mille",
+        title: profileName(exactProfile),
+        subtitle: teamName(exactProfile),
+        value: `Score exact ${latestExact.prediction.home_score_pred}-${latestExact.prediction.away_score_pred}`,
+        detail: `${latestExact.match.home_team_short_name || latestExact.match.home_team_name} - ${latestExact.match.away_team_short_name || latestExact.match.away_team_name}`,
+        date: latestExact.match.kickoff_at,
+        icon: "target",
+        profile: exactProfile
+      });
+    }
+
+    // 4) Match rentable : le match qui a distribué le plus de points au Nid.
+    const matchTotals = new Map();
+    predictionRows.forEach(({ prediction, match }) => {
+      const current = matchTotals.get(match.id) || { match, points: 0, count: 0 };
+      current.points += Number(prediction.points_total || 0);
+      current.count += 1;
+      matchTotals.set(match.id, current);
+    });
+
+    const richMatch = [...matchTotals.values()]
+      .filter((item) => item.points > 0)
+      .sort((a, b) => b.points - a.points || new Date(b.match.kickoff_at || 0) - new Date(a.match.kickoff_at || 0))[0];
+
+    if (richMatch) {
+      slides.push({
+        kind: "story",
+        theme: "gold",
+        label: "Match qui a gavé le Nid",
+        title: "Tout le Nid",
+        subtitle: `${richMatch.count} prono${richMatch.count > 1 ? "s" : ""} compté${richMatch.count > 1 ? "s" : ""}`,
+        value: `${Math.round(richMatch.points * 10) / 10} pts distribués`,
+        detail: `${richMatch.match.home_team_short_name || richMatch.match.home_team_name} - ${richMatch.match.away_team_short_name || richMatch.match.away_team_name}`,
+        date: richMatch.match.kickoff_at,
+        icon: "trophy",
+        profile: null
+      });
+    }
+
+    // On complète avec 1 ou 2 records vivants pour garder l’esprit mini-record.
+    recordHighlights.slice(0, Math.max(1, 5 - slides.length)).forEach((item) => slides.push({ kind: "record", ...item }));
+
+    return slides.slice(0, 5);
+  },
+
+  homeStorySlideHtml(item, index) {
+    if (item.kind === "record") {
+      const { record, best, bestProfile, detail, date } = item;
+      return `
+        <article class="home-record-slide home-record-slide-record ${index === 0 ? "active" : ""}" data-home-record-slide data-record-popup-id="${H.escapeHtml(record.id)}" role="button" tabindex="0" title="Voir le détail du mini-record">
+          <div class="home-record-art">${this.recordArtHtml(record)}</div>
+          <div class="home-record-main">
+            <small class="home-record-label">${H.escapeHtml(record.title)}</small>
+            <strong>${H.escapeHtml(bestProfile.pseudo)}</strong>
+            <span>${H.escapeHtml(bestProfile.office_team_name || "Sans team")}</span>
+            <p>${H.escapeHtml(this.formatRecordValue(best.value, record))}${detail ? ` · ${H.escapeHtml(detail)}` : ""}</p>
+          </div>
+          <div class="home-record-date">
+            ${H.icon("time")}
+            <span>${H.escapeHtml(this.formatRecordDateLabel(date))}</span>
+          </div>
+        </article>
+      `;
+    }
+
+    return `
+      <article class="home-record-slide home-story-slide story-${H.escapeHtml(item.theme || "default")} ${index === 0 ? "active" : ""}" data-home-record-slide>
+        <div class="home-record-art story-art">${item.profile ? H.profileBadgeHtml(item.profile, "profile-badge leaderboard-badge") : H.icon(item.icon || "badges")}</div>
+        <div class="home-record-main">
+          <small class="home-record-label">${H.escapeHtml(item.label)}</small>
+          <strong>${H.escapeHtml(item.title)}</strong>
+          <span>${H.escapeHtml(item.subtitle || "")}</span>
+          <p>${H.escapeHtml(item.value)}${item.detail ? ` · ${H.escapeHtml(item.detail)}` : ""}</p>
+        </div>
+        <div class="home-record-date">
+          ${H.icon(item.icon || "time")}
+          <span>${H.escapeHtml(this.formatRecordDateLabel(item.date))}</span>
+        </div>
+      </article>
+    `;
+  },
+
   homeRecordCarouselHtml() {
     const rows = this.achievementRecordRows();
-    const highlights = this.achievementRecordDefinitions()
+    const recordHighlights = this.achievementRecordDefinitions()
       .map((record) => this.recordWinner(record, rows))
       .filter((item) => item.best && item.bestProfile);
+
+    const highlights = this.homeStoryHighlights(recordHighlights);
 
     if (!highlights.length) {
       return `
         <section class="card home-record-carousel-card empty-record-carousel">
           <div class="card-title-row">
             <div>
-              <p class="eyebrow">${H.icon("badges")} Mini-records du nid</p>
+              <p class="eyebrow">${H.icon("badges")} Actus du nid</p>
               <h3>Le tableau des petits exploits arrive</h3>
-              <p class="muted">Dès que les premiers matchs seront comptabilisés, les détenteurs de mini-records défileront ici.</p>
+              <p class="muted">Dès que les premiers matchs seront comptabilisés, les records, casseroles et hiboux en feu défileront ici.</p>
             </div>
           </div>
         </section>
@@ -2491,31 +2688,14 @@ const App = {
       <section class="card home-record-carousel-card">
         <div class="card-title-row compact-title-row">
           <div>
-            <p class="eyebrow">${H.icon("badges")} Mini-records du nid</p>
-            <h3>Les chouettes qui tiennent un record</h3>
-            <p class="muted">Un seul détenteur par mini-record : si quelqu’un passe devant, le trophée change de perchoir.</p>
+            <p class="eyebrow">${H.icon("badges")} Actus du nid</p>
+            <h3>Les chouettes qui font parler le perchoir</h3>
+            <p class="muted">Records uniques, forme du moment, casseroles et coups parfaits défilent ici toutes les 10 secondes.</p>
           </div>
-          <button class="ghost-btn" id="homeRecordsBtn" type="button">Voir tous</button>
+          <button class="ghost-btn" id="homeRecordsBtn" type="button">Voir les records</button>
         </div>
         <div class="home-record-carousel" data-home-record-carousel aria-live="polite">
-          ${highlights.map((item, index) => {
-            const { record, best, bestProfile, detail, date } = item;
-            return `
-              <article class="home-record-slide ${index === 0 ? "active" : ""}" data-home-record-slide data-record-popup-id="${H.escapeHtml(record.id)}" role="button" tabindex="0" title="Voir le détail du mini-record">
-                <div class="home-record-art">${this.recordArtHtml(record)}</div>
-                <div class="home-record-main">
-                  <small class="home-record-label">${H.escapeHtml(record.title)}</small>
-                  <strong>${H.escapeHtml(bestProfile.pseudo)}</strong>
-                  <span>${H.escapeHtml(bestProfile.office_team_name || "Sans team")}</span>
-                  <p>${H.escapeHtml(this.formatRecordValue(best.value, record))}${detail ? ` · ${H.escapeHtml(detail)}` : ""}</p>
-                </div>
-                <div class="home-record-date">
-                  ${H.icon("time")}
-                  <span>${H.escapeHtml(this.formatRecordDateLabel(date))}</span>
-                </div>
-              </article>
-            `;
-          }).join("")}
+          ${highlights.map((item, index) => this.homeStorySlideHtml(item, index)).join("")}
         </div>
       </section>
     `;
@@ -2533,7 +2713,9 @@ const App = {
     };
 
     slides.forEach((slide) => {
-      const open = () => this.showRecordPopup(slide.dataset.recordPopupId);
+      const recordId = slide.dataset.recordPopupId;
+      if (!recordId) return;
+      const open = () => this.showRecordPopup(recordId);
       slide.addEventListener("click", open);
       slide.addEventListener("keydown", (event) => {
         if (event.key === "Enter" || event.key === " ") {
@@ -6045,7 +6227,7 @@ const App = {
             <p class="muted">Déconnexion, crédits et historique des évolutions.</p>
           </div>
           <div class="profile-account-actions">
-            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.3.2</button>
+            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.3.3</button>
             <button class="danger-btn" id="profileLogoutBtn" type="button">Déconnexion</button>
           </div>
         </div>
