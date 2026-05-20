@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — APP PRINCIPALE V1.3.4
+// LE NID DES PRONOS — APP PRINCIPALE V1.3.5
 // ============================================================
 
 const H = window.Helpers;
@@ -414,7 +414,7 @@ const App = {
           <div>
             <p class="eyebrow">Crédits cachés</p>
             <h2 id="creditsTitle">Le Nid des Pronos</h2>
-            <p class="muted">Version publique <strong>1.3.4</strong> · prévisualisation des graphs avec matchs test.</p>
+            <p class="muted">Version publique <strong>1.3.5</strong> · maquette graphs et état lancement Coupe du monde.</p>
           </div>
         </div>
         <div class="credits-grid">
@@ -431,7 +431,7 @@ const App = {
             <p><strong>1.0.5</strong> — dashboard mobile/desktop stabilisé, sans chevauchement des cartes.</p>
           </section>
           <section>
-            <h3>Évolutions V1.3.4</h3>
+            <h3>Évolutions V1.3.5</h3>
             <ul class="changelog-list">
               <li>Le super admin peut désactiver ou réactiver l’affichage du module préparation.</li>
               <li>Quand la préparation est désactivée, les matchs test disparaissent des matchs/pronos, classements par phase et règles.</li>
@@ -615,7 +615,7 @@ const App = {
     const { data, error } = await window.sb
       .from("app_settings")
       .select("key,value")
-      .in("key", ["family_mode_enabled", "preparation_module_enabled", "graph_preview_test_matches_enabled"]);
+      .in("key", ["family_mode_enabled", "preparation_module_enabled", "graph_preview_test_matches_enabled", "graph_mock_preview_enabled"]);
 
     if (error) {
       console.warn("Paramètres app indisponibles", error);
@@ -645,6 +645,15 @@ const App = {
 
   graphPreviewTestMatchesEnabled() {
     const value = this.state.appSettings?.graph_preview_test_matches_enabled;
+    if (value === undefined || value === null) return false;
+    if (typeof value === "boolean") return value;
+    if (typeof value === "string") return value === "true";
+    if (value && typeof value === "object" && "enabled" in value) return Boolean(value.enabled);
+    return Boolean(value);
+  },
+
+  graphMockPreviewEnabled() {
+    const value = this.state.appSettings?.graph_mock_preview_enabled;
     if (value === undefined || value === null) return false;
     if (typeof value === "boolean") return value;
     if (typeof value === "string") return value === "true";
@@ -5125,11 +5134,63 @@ const App = {
     this.bindAchievementReplay(root);
   },
 
+
+  mockEvolutionSeries(mode = "day") {
+    const names = ["Parkaf", "Sol141381", "Mimi du Nid", "Coach Hibou", "La Casserole", "Madame Exact", "Le Renard", "Grand Duc"];
+    const teams = ["Les SNA", "Les Rapaces", "Les Chouettes", "Les Aiglons"];
+    const colors = ["#facc15", "#38bdf8", "#a78bfa", "#fb7185", "#34d399", "#fb923c", "#f472b6", "#c4b5fd"];
+    const playerIds = names.map((_, index) => `mock-player-${index + 1}`);
+    const base = new Date();
+    base.setHours(20, 0, 0, 0);
+
+    const increments = [
+      [5, 3, 0, 1, 2, 5, 0, 3],
+      [3, 5, 2, 0, 0, 3, 1, 5],
+      [1, 0, 5, 3, 0, 2, 5, 0],
+      [5, 1, 3, 5, 2, 0, 1, 3],
+      [0, 5, 3, 1, 5, 2, 0, 1],
+      [3, 2, 1, 5, 0, 5, 3, 0]
+    ];
+
+    const cumulative = new Map(playerIds.map((id) => [id, 0]));
+    const snapshots = increments.map((row, index) => {
+      const d = new Date(base);
+      d.setDate(base.getDate() + index);
+      const label = mode === "week" && index >= 3 ? "Semaine maquette 2" : `Jour test ${index + 1}`;
+
+      row.forEach((points, playerIndex) => {
+        const id = playerIds[playerIndex];
+        cumulative.set(id, (cumulative.get(id) || 0) + points);
+      });
+
+      return {
+        key: `mock-${index + 1}`,
+        label,
+        totals: new Map(playerIds.map((id) => [id, cumulative.get(id) || 0]))
+      };
+    });
+
+    const mockProfiles = new Map(playerIds.map((id, index) => [id, {
+      id,
+      user_id: id,
+      pseudo: names[index],
+      office_team_name: teams[index % teams.length],
+      office_team_color: colors[index % colors.length],
+      badge_color: colors[index % colors.length],
+      avatar_key: `owl-${String((index % 18) + 1).padStart(2, "0")}`,
+      badge_shape: "rounded"
+    }]));
+
+    const totalsByUser = new Map(playerIds.map((id) => [id, snapshots[snapshots.length - 1].totals.get(id) || 0]));
+    return { playerIds, snapshots, totalsByUser, mockProfiles, isMock: true };
+  },
+
   async renderLeaderboardEvolution() {
     await this.loadPlayerScoreRows();
     const root = H.$("#leaderboardContent");
     const mode = this.state.leaderboardEvolutionMode === "week" ? "week" : "day";
-    const series = this.playerEvolutionSeries(mode);
+    const useMockGraph = this.graphMockPreviewEnabled();
+    const series = useMockGraph ? this.mockEvolutionSeries(mode) : this.playerEvolutionSeries(mode);
     const latestSnapshot = series.snapshots[series.snapshots.length - 1];
 
     root.innerHTML = `
@@ -5138,7 +5199,8 @@ const App = {
           <div>
             <h3>Évolution du nid</h3>
             <p class="muted">Les courbes montrent les points cumulés des 8 meilleurs joueurs au fil des matchs terminés.</p>
-            ${this.graphPreviewTestMatchesEnabled() ? `<p class="graph-preview-note">${H.icon("info")} Prévisualisation admin active : les matchs test sont inclus dans ce graph.</p>` : ""}
+            ${useMockGraph ? `<p class="graph-preview-note">${H.icon("info")} Maquette graph active : données fictives, aucun impact sur Supabase.</p>` : ""}
+            ${!useMockGraph && this.graphPreviewTestMatchesEnabled() ? `<p class="graph-preview-note">${H.icon("info")} Prévisualisation admin active : les matchs test sont inclus dans ce graph.</p>` : ""}
           </div>
           <div class="segmented small">
             <button class="${mode === "day" ? "active" : ""}" data-evolution-mode="day">Jour</button>
@@ -5150,7 +5212,7 @@ const App = {
             <div class="evolution-chart-wrap">${this.evolutionChartSvg(series)}</div>
             <div class="evolution-legend">
               ${series.playerIds.map((userId, index) => {
-                const source = this.state.playerScoreRows.find((row) => row.user_id === userId);
+                const source = series.mockProfiles?.get(userId) || this.state.playerScoreRows.find((row) => row.user_id === userId);
                 const profile = this.profileForUser(userId, source);
                 const color = this.safeColor(profile.badge_color || profile.office_team_color, ["#facc15", "#38bdf8", "#a78bfa", "#fb7185", "#34d399", "#fb923c", "#f472b6", "#c4b5fd"][index % 8]);
                 const total = latestSnapshot?.totals.get(userId) || 0;
@@ -6241,7 +6303,7 @@ const App = {
             <p class="muted">Déconnexion, crédits et historique des évolutions.</p>
           </div>
           <div class="profile-account-actions">
-            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.3.4</button>
+            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.3.5</button>
             <button class="danger-btn" id="profileLogoutBtn" type="button">Déconnexion</button>
           </div>
         </div>

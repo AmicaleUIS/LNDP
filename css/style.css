@@ -14928,3 +14928,134 @@ body[data-current-view="leaderboard"] .team-leaderboard-card .muted {
   width: 20px;
   height: 20px;
 }
+
+
+/* ============================================================
+   V1.3.5 — Admin clair + maquette graph sécurisée
+   ============================================================ */
+
+.backup-ux-guide {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 0 0 16px;
+}
+
+.backup-ux-guide span {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, .20);
+  background: rgba(15, 23, 42, .42);
+  color: rgba(226, 232, 240, .88);
+  font-weight: 800;
+}
+
+.backup-ux-guide strong {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: rgba(250, 204, 21, .16);
+  color: #facc15;
+}
+
+.backup-ux-guide .danger-step {
+  border-color: rgba(239, 68, 68, .32);
+  background: rgba(127, 29, 29, .20);
+}
+
+.backup-box-kicker {
+  margin: 0 0 6px;
+  color: #93c5fd;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  font-size: .74rem;
+  font-weight: 900;
+}
+
+.danger-kicker {
+  color: #fecaca;
+}
+
+.real-pronos-warning {
+  margin: 8px 0 10px;
+  padding: 10px 12px;
+  border-radius: 16px;
+  border: 1px solid rgba(239, 68, 68, .36);
+  background: rgba(127, 29, 29, .22);
+  color: #fecaca;
+  font-weight: 900;
+}
+
+.graph-preview-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 8px 0;
+}
+
+.worldcup-ready-panel {
+  margin: 16px 0;
+  border: 1px solid rgba(148, 163, 184, .16);
+  border-radius: 24px;
+  padding: 16px;
+  background: rgba(15, 23, 42, .36);
+}
+
+.worldcup-ready-panel.is-ready {
+  border-color: rgba(34, 197, 94, .26);
+  background: rgba(34, 197, 94, .07);
+}
+
+.worldcup-ready-panel.has-warning {
+  border-color: rgba(250, 204, 21, .26);
+  background: rgba(250, 204, 21, .06);
+}
+
+.worldcup-ready-list {
+  display: grid;
+  gap: 10px;
+}
+
+.worldcup-ready-row {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 12px;
+  border-radius: 18px;
+  border: 1px solid rgba(148, 163, 184, .14);
+  background: rgba(2, 6, 23, .28);
+}
+
+.worldcup-ready-row.warning {
+  border-color: rgba(250, 204, 21, .22);
+}
+
+.worldcup-ready-row.ok {
+  border-color: rgba(34, 197, 94, .20);
+}
+
+.worldcup-ready-row.info {
+  border-color: rgba(56, 189, 248, .20);
+}
+
+.worldcup-ready-row strong {
+  display: block;
+  color: #f8fafc;
+}
+
+@media (max-width: 700px) {
+  .worldcup-ready-row {
+    grid-template-columns: auto 1fr;
+  }
+
+  .worldcup-ready-row .pill {
+    grid-column: 2;
+    justify-self: start;
+  }
+}

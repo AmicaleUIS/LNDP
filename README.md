@@ -1,4 +1,11 @@
-# Le Nid des Pronos — V1.3.4
+# Le Nid des Pronos — V1.3.5
+
+## V1.3.5 — Maquette graph + santé lancement sécurisé
+
+- Admin : ajoute une maquette graph fictive pour tester les courbes avant le premier match test, sans toucher à Supabase.
+- Sauvegardes & remise à zéro devient plus clair avec des zones non destructives et des zones danger.
+- Santé du Nid affiche un état Coupe du monde basé sur les réglages à couper, sans demander de reset si des joueurs ont déjà posé des pronos.
+- Patch SQL à lancer : `patch_v1_3_5_graph_mock_health.sql`.
 
 ## V1.3.4 — Prévisualisation graphs avec matchs test
 

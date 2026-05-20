@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — ADMIN V1.3.4
+// LE NID DES PRONOS — ADMIN V1.3.5
 // ============================================================
 
 const H = window.Helpers;
@@ -24,6 +24,7 @@ const Admin = {
     familyModeEnabled: false,
     preparationModuleEnabled: true,
     graphPreviewTestMatchesEnabled: false,
+    graphMockPreviewEnabled: false,
     auditLogs: [],
     healthSnapshot: null,
     healthError: null,
@@ -93,6 +94,7 @@ const Admin = {
     H.$("#resetPreparationScoresBtn")?.addEventListener("click", () => this.resetPreparationScores());
     H.$("#togglePreparationModuleBtn")?.addEventListener("click", () => this.togglePreparationModule());
     H.$("#toggleGraphPreviewBtn")?.addEventListener("click", () => this.toggleGraphPreviewTestMatches());
+    H.$("#toggleGraphMockPreviewBtn")?.addEventListener("click", () => this.toggleGraphMockPreview());
     H.$("#fullLaunchResetBtn")?.addEventListener("click", () => this.fullLaunchReset());
     H.$("#refreshHealthBtn")?.addEventListener("click", async () => { await this.loadHealthSnapshot(); this.renderHealth(); });
     H.$("#refreshAuditBtn")?.addEventListener("click", async () => { await this.loadAuditLogs(); this.renderAudit(); });
@@ -485,13 +487,14 @@ const Admin = {
     const { data, error } = await window.sb
       .from("app_settings")
       .select("key,value")
-      .in("key", ["family_mode_enabled", "preparation_module_enabled", "graph_preview_test_matches_enabled"]);
+      .in("key", ["family_mode_enabled", "preparation_module_enabled", "graph_preview_test_matches_enabled", "graph_mock_preview_enabled"]);
 
     if (error) {
       console.warn("Paramètres app indisponibles", error);
       this.state.familyModeEnabled = false;
       this.state.preparationModuleEnabled = true;
       this.state.graphPreviewTestMatchesEnabled = false;
+      this.state.graphMockPreviewEnabled = false;
       return;
     }
 
@@ -500,6 +503,7 @@ const Admin = {
     this.state.familyModeEnabled = this.settingBoolean(settings.family_mode_enabled, false);
     this.state.preparationModuleEnabled = this.settingBoolean(settings.preparation_module_enabled, true);
     this.state.graphPreviewTestMatchesEnabled = this.settingBoolean(settings.graph_preview_test_matches_enabled, false);
+    this.state.graphMockPreviewEnabled = this.settingBoolean(settings.graph_mock_preview_enabled, false);
   },
 
   async loadAuditLogs() {
@@ -515,7 +519,7 @@ const Admin = {
       .limit(80);
 
     if (error) {
-      console.warn("Journal admin indisponible : lance le patch SQL V1.3.4", error);
+      console.warn("Journal admin indisponible : lance le patch SQL V1.3.5", error);
       this.state.auditLogs = [];
       return;
     }
@@ -531,7 +535,7 @@ const Admin = {
 
     const { data, error } = await window.sb.rpc("admin_get_health_snapshot");
     if (error) {
-      console.warn("Santé du Nid indisponible : lance le patch SQL V1.3.4", error);
+      console.warn("Santé du Nid indisponible : lance le patch SQL V1.3.5", error);
       this.state.healthSnapshot = null;
       this.state.healthError = error;
       return;
@@ -570,6 +574,56 @@ const Admin = {
     return { label: "Info", className: "info", emoji: "🔵" };
   },
 
+
+  worldCupLaunchStatusHtml(summary = {}) {
+    const prepOff = summary.preparation_module_enabled === false || this.state.preparationModuleEnabled === false;
+    const graphTestOff = this.state.graphPreviewTestMatchesEnabled !== true;
+    const graphMockOff = this.state.graphMockPreviewEnabled !== true;
+    const noFinishedWithoutScore = Number(summary.finished_without_score || 0) === 0;
+    const allGreen = prepOff && graphTestOff && graphMockOff && noFinishedWithoutScore;
+
+    const item = (ok, title, message) => `
+      <article class="worldcup-ready-row ${ok ? "ok" : "warning"}">
+        <span class="health-dot">${ok ? "🟢" : "🟠"}</span>
+        <div>
+          <strong>${H.escapeHtml(title)}</strong>
+          <p class="muted">${H.escapeHtml(message)}</p>
+        </div>
+        <span class="pill ${ok ? "success" : "warning"}">${ok ? "OK" : "À régler"}</span>
+      </article>
+    `;
+
+    const info = (title, message) => `
+      <article class="worldcup-ready-row info">
+        <span class="health-dot">🔒</span>
+        <div>
+          <strong>${H.escapeHtml(title)}</strong>
+          <p class="muted">${H.escapeHtml(message)}</p>
+        </div>
+        <span class="pill neutral">Protégé</span>
+      </article>
+    `;
+
+    return `
+      <section class="admin-mini-panel worldcup-ready-panel ${allGreen ? "is-ready" : "has-warning"}">
+        <div class="card-title-row">
+          <div>
+            <h3>${allGreen ? "🟢 État Coupe du monde : réglages propres" : "🟠 État Coupe du monde : réglages à vérifier"}</h3>
+            <p class="muted">Checklist non destructive : on ne touche pas aux pronos déjà posés par les joueurs.</p>
+          </div>
+        </div>
+        <div class="worldcup-ready-list">
+          ${item(prepOff, "Matchs test masqués", prepOff ? "Le module préparation est désactivé." : "Désactive le module préparation dans Sauvegardes > Préparation.")}
+          ${item(graphTestOff, "Graph avec matchs test désactivé", graphTestOff ? "Les graphs ignorent les matchs test." : "Désactive la prévisualisation graphs avec matchs test.")}
+          ${item(graphMockOff, "Maquette graph désactivée", graphMockOff ? "Aucune courbe fictive n’est affichée." : "Désactive la maquette graph avant lancement.")}
+          ${item(noFinishedWithoutScore, "Scores terminés cohérents", noFinishedWithoutScore ? "Aucun match terminé sans score complet." : `${Number(summary.finished_without_score || 0)} match(s) terminé(s) sans score complet.`)}
+          ${info("Pronos joueurs conservés", "Des joueurs peuvent déjà avoir posé des pronos : ne lance pas de reset complet sauf vraie volonté de repartir à zéro.")}
+        </div>
+        <p class="muted tiny-note">Ce voyant peut être au vert sans supprimer les sauvegardes, coupons ou messages. On privilégie la sécurité des données réelles.</p>
+      </section>
+    `;
+  },
+
   renderHealth() {
     const root = H.$("#healthAdmin");
     if (!root) return;
@@ -578,7 +632,7 @@ const Admin = {
       root.innerHTML = `
         <div class="admin-empty-state health-error-state">
           <strong>Diagnostic indisponible</strong>
-          <p class="muted">Lance le patch SQL V1.3.4 pour activer la Santé du Nid.</p>
+          <p class="muted">Lance le patch SQL V1.3.5 pour activer la Santé du Nid.</p>
           <p class="muted small-note">${H.escapeHtml(this.state.healthError.message || "Erreur inconnue")}</p>
         </div>
       `;
@@ -612,6 +666,8 @@ const Admin = {
         </div>
         <button class="ghost-btn" type="button" id="healthRefreshInlineBtn">Relancer</button>
       </section>
+
+      ${this.worldCupLaunchStatusHtml(summary)}
 
       <div class="health-metrics-grid">
         ${metric("Joueurs actifs", summary.active_users)}
@@ -694,7 +750,7 @@ const Admin = {
       root.innerHTML = `
         <div class="admin-empty-state audit-empty-state">
           <strong>Aucune trace pour l’instant</strong>
-          <p class="muted">Le journal se remplira avec les prochaines actions super admin. Lance le patch SQL V1.3.4 si cette zone reste vide après une action.</p>
+          <p class="muted">Le journal se remplira avec les prochaines actions super admin. Lance le patch SQL V1.3.5 si cette zone reste vide après une action.</p>
         </div>
       `;
       return;
@@ -1868,10 +1924,13 @@ const Admin = {
     const list = H.$("#backupListAdmin");
     const prepEnabled = this.state.preparationModuleEnabled !== false;
     const graphPreviewEnabled = this.state.graphPreviewTestMatchesEnabled === true;
+    const graphMockPreviewEnabled = this.state.graphMockPreviewEnabled === true;
     const prepStatus = H.$("#prepModuleStatusText");
     const prepToggle = H.$("#togglePreparationModuleBtn");
     const graphPreviewStatus = H.$("#graphPreviewStatusText");
     const graphPreviewToggle = H.$("#toggleGraphPreviewBtn");
+    const graphMockStatus = H.$("#graphMockPreviewStatusText");
+    const graphMockToggle = H.$("#toggleGraphMockPreviewBtn");
 
     if (prepStatus) {
       prepStatus.innerHTML = prepEnabled
@@ -1892,9 +1951,21 @@ const Admin = {
     }
 
     if (graphPreviewToggle) {
-      graphPreviewToggle.textContent = graphPreviewEnabled ? "Désactiver la prévisualisation graphs" : "Prévisualiser les graphs avec matchs test";
+      graphPreviewToggle.textContent = graphPreviewEnabled ? "Désactiver les graphs avec matchs test" : "Graphs avec matchs test";
       graphPreviewToggle.classList.toggle("danger-btn", graphPreviewEnabled);
       graphPreviewToggle.classList.toggle("ghost-btn", !graphPreviewEnabled);
+    }
+
+    if (graphMockStatus) {
+      graphMockStatus.innerHTML = graphMockPreviewEnabled
+        ? `<strong>Actif</strong> · une courbe fictive apparaît même sans match terminé.`
+        : `<strong>Désactivé</strong> · aucune donnée fictive n’est injectée dans les graphs.`;
+    }
+
+    if (graphMockToggle) {
+      graphMockToggle.textContent = graphMockPreviewEnabled ? "Désactiver la maquette graph" : "Maquette graph sans données";
+      graphMockToggle.classList.toggle("danger-btn", graphMockPreviewEnabled);
+      graphMockToggle.classList.toggle("ghost-btn", !graphMockPreviewEnabled);
     }
 
     if (!select) return;
@@ -1957,7 +2028,7 @@ const Admin = {
       return;
     }
 
-    const first = confirm("Reset lancement complet ? Cela supprime pronos, points, choix champion, coupons, sauvegardes, messages, réactions, blocages et journal admin. Les matchs, teams et comptes restent.");
+    const first = confirm("DANGER : reset complet lancement. À ne PAS utiliser si des joueurs ont déjà posé de vrais pronos. Cela supprime pronos, points, champion, coupons, sauvegardes, messages, réactions, blocages et journal admin. Continuer ?");
     if (!first) return;
 
     const second = confirm("Dernière sécurité : cette action prépare l’application pour un lancement propre. Continuer ?");
@@ -1965,7 +2036,7 @@ const Admin = {
 
     const { data, error } = await window.sb.rpc("admin_full_launch_reset", { p_confirm: "LANCEMENT PROPRE" });
     if (error) {
-      H.toast(error.message || "Reset lancement impossible. As-tu lancé le patch SQL V1.3.4 ?", "error");
+      H.toast(error.message || "Reset lancement impossible. As-tu lancé le patch SQL V1.3.5 ?", "error");
       return;
     }
 
@@ -1996,6 +2067,30 @@ const Admin = {
   },
 
 
+
+  async toggleGraphMockPreview() {
+    const enabledNow = this.state.graphMockPreviewEnabled === true;
+    const nextEnabled = !enabledNow;
+    const message = enabledNow
+      ? "Désactiver la maquette graph ? Les graphs reviendront aux vraies données."
+      : "Activer une maquette graph fictive ? Cela permet de vérifier l’affichage avant même le premier match test. Aucun impact sur Supabase.";
+
+    if (!confirm(message)) return;
+
+    const { error } = await window.sb.rpc("admin_set_graph_mock_preview", { p_enabled: nextEnabled });
+    if (error) {
+      H.toast(error.message || "Impossible de modifier la maquette graph. Lance le patch SQL V1.3.5.", "error");
+      return;
+    }
+
+    await this.loadFamilyModeSetting();
+    await this.loadAuditLogs();
+    this.renderBackups();
+    this.renderHealth();
+    this.renderAudit();
+    H.toast(nextEnabled ? "Maquette graph activée" : "Maquette graph désactivée", "success");
+  },
+
   async toggleGraphPreviewTestMatches() {
     const enabledNow = this.state.graphPreviewTestMatchesEnabled === true;
     const nextEnabled = !enabledNow;
@@ -2007,7 +2102,7 @@ const Admin = {
 
     const { error } = await window.sb.rpc("admin_set_graph_preview_test_matches", { p_enabled: nextEnabled });
     if (error) {
-      H.toast(error.message || "Impossible de modifier la prévisualisation graphs. Lance le patch SQL V1.3.4.", "error");
+      H.toast(error.message || "Impossible de modifier la prévisualisation graphs. Lance le patch SQL V1.3.5.", "error");
       return;
     }
 
