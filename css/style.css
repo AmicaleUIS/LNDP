@@ -15059,3 +15059,138 @@ body[data-current-view="leaderboard"] .team-leaderboard-card .muted {
     justify-self: start;
   }
 }
+
+
+/* ============================================================
+   V1.3.6 — Graphs intégrés + accueil nettoyé + MP + PDF print
+   ============================================================ */
+
+.home-prono-progress {
+  position: relative;
+}
+
+.home-prono-progress-note {
+  grid-column: 2 / -1;
+  color: rgba(226, 232, 240, .68);
+  font-weight: 800;
+}
+
+.home-clickable-card::after {
+  top: 50%;
+  right: 14px;
+  bottom: auto;
+  transform: translateY(-50%);
+}
+
+.home-clickable-card:hover::after,
+.home-clickable-card:focus-visible::after {
+  transform: translateY(-50%) scale(1.04);
+}
+
+.home-rank-card,
+.home-team-average-card {
+  padding-right: 54px;
+}
+
+.embedded-evolution-card {
+  margin-top: 18px;
+}
+
+.compact-evolution-card .evolution-layout {
+  grid-template-columns: minmax(0, 1fr) minmax(210px, .34fr);
+}
+
+.evolution-line {
+  filter: drop-shadow(0 0 8px currentColor);
+}
+
+.evolution-player {
+  border-left: 6px solid var(--player-color, #facc15);
+}
+
+.evolution-player > span {
+  margin-left: auto;
+  color: #facc15;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.team-player-chip {
+  position: relative;
+}
+
+.team-player-mp-dot {
+  margin-left: auto;
+  padding: 4px 7px;
+  border-radius: 999px;
+  border: 1px solid rgba(56, 189, 248, .28);
+  background: rgba(56, 189, 248, .12);
+  color: #bae6fd;
+  font-size: .68rem;
+  font-weight: 900;
+  letter-spacing: .04em;
+}
+
+.chat-private-nudge {
+  width: 100%;
+  margin: 0 0 10px;
+  padding: 10px 12px;
+  border-radius: 16px;
+  border: 1px solid rgba(56, 189, 248, .26);
+  background: rgba(56, 189, 248, .12);
+  color: #dff6ff;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.direct-message-card {
+  max-width: 560px;
+}
+
+.direct-message-form {
+  display: grid;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.direct-message-form textarea,
+.private-chat-form select {
+  width: 100%;
+  border: 1px solid rgba(148, 163, 184, .25);
+  background: rgba(2, 6, 23, .46);
+  color: #f8fafc;
+  border-radius: 16px;
+  padding: 12px 14px;
+  font: inherit;
+}
+
+.private-chat-form {
+  grid-template-columns: minmax(180px, .35fr) minmax(180px, 1fr) auto;
+}
+
+.backup-panel-grid {
+  grid-template-columns: minmax(260px, .72fr) minmax(300px, 1fr);
+  align-items: start;
+}
+
+.backup-panel-grid > .backup-box:first-child {
+  min-height: auto;
+  align-self: start;
+}
+
+.backup-panel-grid > .backup-box:first-child .backup-list-items {
+  max-height: 260px;
+  overflow: auto;
+}
+
+.backup-panel-grid > .backup-box:first-child select {
+  min-height: 46px;
+}
+
+@media (max-width: 980px) {
+  .compact-evolution-card .evolution-layout,
+  .backup-panel-grid,
+  .private-chat-form {
+    grid-template-columns: 1fr;
+  }
+}

@@ -247,3 +247,27 @@
   .diploma-card h2 { font-size: 42pt; }
   .diploma-card h3 { font-size: 25pt; }
 }
+
+
+/* V1.3.6 — Impression : conserver les fonds PDF */
+@media print {
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  .bilan-page {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    background-size: cover !important;
+    background-position: center !important;
+    background-repeat: no-repeat !important;
+  }
+
+  .bilan-page.cover { background: var(--bilan-cover-bg) !important; }
+  .bilan-page.stats { background: var(--bilan-stats-bg) !important; }
+  .bilan-page.badges { background: var(--bilan-badges-bg) !important; }
+  .bilan-page.records { background: var(--bilan-records-bg) !important; }
+  .bilan-page.graphs { background: var(--bilan-graphs-bg) !important; }
+  .bilan-page.diploma { background: var(--bilan-diplome-bg) !important; }
+}

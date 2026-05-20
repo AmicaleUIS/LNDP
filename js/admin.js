@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — ADMIN V1.3.5
+// LE NID DES PRONOS — ADMIN V1.3.6
 // ============================================================
 
 const H = window.Helpers;
@@ -25,6 +25,7 @@ const Admin = {
     preparationModuleEnabled: true,
     graphPreviewTestMatchesEnabled: false,
     graphMockPreviewEnabled: false,
+    homeProgressIncludeTestMatches: false,
     auditLogs: [],
     healthSnapshot: null,
     healthError: null,
@@ -95,6 +96,7 @@ const Admin = {
     H.$("#togglePreparationModuleBtn")?.addEventListener("click", () => this.togglePreparationModule());
     H.$("#toggleGraphPreviewBtn")?.addEventListener("click", () => this.toggleGraphPreviewTestMatches());
     H.$("#toggleGraphMockPreviewBtn")?.addEventListener("click", () => this.toggleGraphMockPreview());
+    H.$("#toggleHomeProgressTestMatchesBtn")?.addEventListener("click", () => this.toggleHomeProgressTestMatches());
     H.$("#fullLaunchResetBtn")?.addEventListener("click", () => this.fullLaunchReset());
     H.$("#refreshHealthBtn")?.addEventListener("click", async () => { await this.loadHealthSnapshot(); this.renderHealth(); });
     H.$("#refreshAuditBtn")?.addEventListener("click", async () => { await this.loadAuditLogs(); this.renderAudit(); });
@@ -487,7 +489,7 @@ const Admin = {
     const { data, error } = await window.sb
       .from("app_settings")
       .select("key,value")
-      .in("key", ["family_mode_enabled", "preparation_module_enabled", "graph_preview_test_matches_enabled", "graph_mock_preview_enabled"]);
+      .in("key", ["family_mode_enabled", "preparation_module_enabled", "graph_preview_test_matches_enabled", "graph_mock_preview_enabled", "home_progress_include_test_matches"]);
 
     if (error) {
       console.warn("Paramètres app indisponibles", error);
@@ -495,6 +497,7 @@ const Admin = {
       this.state.preparationModuleEnabled = true;
       this.state.graphPreviewTestMatchesEnabled = false;
       this.state.graphMockPreviewEnabled = false;
+      this.state.homeProgressIncludeTestMatches = false;
       return;
     }
 
@@ -504,6 +507,7 @@ const Admin = {
     this.state.preparationModuleEnabled = this.settingBoolean(settings.preparation_module_enabled, true);
     this.state.graphPreviewTestMatchesEnabled = this.settingBoolean(settings.graph_preview_test_matches_enabled, false);
     this.state.graphMockPreviewEnabled = this.settingBoolean(settings.graph_mock_preview_enabled, false);
+    this.state.homeProgressIncludeTestMatches = this.settingBoolean(settings.home_progress_include_test_matches, false);
   },
 
   async loadAuditLogs() {
@@ -519,7 +523,7 @@ const Admin = {
       .limit(80);
 
     if (error) {
-      console.warn("Journal admin indisponible : lance le patch SQL V1.3.5", error);
+      console.warn("Journal admin indisponible : lance le patch SQL V1.3.6", error);
       this.state.auditLogs = [];
       return;
     }
@@ -535,7 +539,7 @@ const Admin = {
 
     const { data, error } = await window.sb.rpc("admin_get_health_snapshot");
     if (error) {
-      console.warn("Santé du Nid indisponible : lance le patch SQL V1.3.5", error);
+      console.warn("Santé du Nid indisponible : lance le patch SQL V1.3.6", error);
       this.state.healthSnapshot = null;
       this.state.healthError = error;
       return;
@@ -579,6 +583,7 @@ const Admin = {
     const prepOff = summary.preparation_module_enabled === false || this.state.preparationModuleEnabled === false;
     const graphTestOff = this.state.graphPreviewTestMatchesEnabled !== true;
     const graphMockOff = this.state.graphMockPreviewEnabled !== true;
+    const homeProgressOfficialOnly = this.state.homeProgressIncludeTestMatches !== true;
     const noFinishedWithoutScore = Number(summary.finished_without_score || 0) === 0;
     const allGreen = prepOff && graphTestOff && graphMockOff && noFinishedWithoutScore;
 
@@ -616,6 +621,7 @@ const Admin = {
           ${item(prepOff, "Matchs test masqués", prepOff ? "Le module préparation est désactivé." : "Désactive le module préparation dans Sauvegardes > Préparation.")}
           ${item(graphTestOff, "Graph avec matchs test désactivé", graphTestOff ? "Les graphs ignorent les matchs test." : "Désactive la prévisualisation graphs avec matchs test.")}
           ${item(graphMockOff, "Maquette graph désactivée", graphMockOff ? "Aucune courbe fictive n’est affichée." : "Désactive la maquette graph avant lancement.")}
+          ${item(homeProgressOfficialOnly, "Progression accueil officielle", homeProgressOfficialOnly ? "La progression de l’accueil ignore les matchs test." : "La progression de l’accueil inclut les matchs test. À couper pour le vrai lancement.")}
           ${item(noFinishedWithoutScore, "Scores terminés cohérents", noFinishedWithoutScore ? "Aucun match terminé sans score complet." : `${Number(summary.finished_without_score || 0)} match(s) terminé(s) sans score complet.`)}
           ${info("Pronos joueurs conservés", "Des joueurs peuvent déjà avoir posé des pronos : ne lance pas de reset complet sauf vraie volonté de repartir à zéro.")}
         </div>
@@ -632,7 +638,7 @@ const Admin = {
       root.innerHTML = `
         <div class="admin-empty-state health-error-state">
           <strong>Diagnostic indisponible</strong>
-          <p class="muted">Lance le patch SQL V1.3.5 pour activer la Santé du Nid.</p>
+          <p class="muted">Lance le patch SQL V1.3.6 pour activer la Santé du Nid.</p>
           <p class="muted small-note">${H.escapeHtml(this.state.healthError.message || "Erreur inconnue")}</p>
         </div>
       `;
@@ -750,7 +756,7 @@ const Admin = {
       root.innerHTML = `
         <div class="admin-empty-state audit-empty-state">
           <strong>Aucune trace pour l’instant</strong>
-          <p class="muted">Le journal se remplira avec les prochaines actions super admin. Lance le patch SQL V1.3.5 si cette zone reste vide après une action.</p>
+          <p class="muted">Le journal se remplira avec les prochaines actions super admin. Lance le patch SQL V1.3.6 si cette zone reste vide après une action.</p>
         </div>
       `;
       return;
@@ -1925,12 +1931,15 @@ const Admin = {
     const prepEnabled = this.state.preparationModuleEnabled !== false;
     const graphPreviewEnabled = this.state.graphPreviewTestMatchesEnabled === true;
     const graphMockPreviewEnabled = this.state.graphMockPreviewEnabled === true;
+    const homeProgressIncludeTestMatches = this.state.homeProgressIncludeTestMatches === true;
     const prepStatus = H.$("#prepModuleStatusText");
     const prepToggle = H.$("#togglePreparationModuleBtn");
     const graphPreviewStatus = H.$("#graphPreviewStatusText");
     const graphPreviewToggle = H.$("#toggleGraphPreviewBtn");
     const graphMockStatus = H.$("#graphMockPreviewStatusText");
     const graphMockToggle = H.$("#toggleGraphMockPreviewBtn");
+    const homeProgressStatus = H.$("#homeProgressTestMatchesStatusText");
+    const homeProgressToggle = H.$("#toggleHomeProgressTestMatchesBtn");
 
     if (prepStatus) {
       prepStatus.innerHTML = prepEnabled
@@ -1966,6 +1975,18 @@ const Admin = {
       graphMockToggle.textContent = graphMockPreviewEnabled ? "Désactiver la maquette graph" : "Maquette graph sans données";
       graphMockToggle.classList.toggle("danger-btn", graphMockPreviewEnabled);
       graphMockToggle.classList.toggle("ghost-btn", !graphMockPreviewEnabled);
+    }
+
+    if (homeProgressStatus) {
+      homeProgressStatus.innerHTML = homeProgressIncludeTestMatches
+        ? `<strong>Actif</strong> · la progression de l’accueil inclut aussi les matchs test.`
+        : `<strong>Désactivé</strong> · la progression de l’accueil compte uniquement les matchs officiels.`;
+    }
+
+    if (homeProgressToggle) {
+      homeProgressToggle.textContent = homeProgressIncludeTestMatches ? "Exclure les matchs test de la progression" : "Inclure les matchs test dans la progression";
+      homeProgressToggle.classList.toggle("danger-btn", homeProgressIncludeTestMatches);
+      homeProgressToggle.classList.toggle("ghost-btn", !homeProgressIncludeTestMatches);
     }
 
     if (!select) return;
@@ -2036,7 +2057,7 @@ const Admin = {
 
     const { data, error } = await window.sb.rpc("admin_full_launch_reset", { p_confirm: "LANCEMENT PROPRE" });
     if (error) {
-      H.toast(error.message || "Reset lancement impossible. As-tu lancé le patch SQL V1.3.5 ?", "error");
+      H.toast(error.message || "Reset lancement impossible. As-tu lancé le patch SQL V1.3.6 ?", "error");
       return;
     }
 
@@ -2068,6 +2089,30 @@ const Admin = {
 
 
 
+
+  async toggleHomeProgressTestMatches() {
+    const enabledNow = this.state.homeProgressIncludeTestMatches === true;
+    const nextEnabled = !enabledNow;
+    const message = enabledNow
+      ? "Exclure les matchs test de la progression de l’accueil ?"
+      : "Inclure les matchs test dans la progression de l’accueil ? Utile pendant la phase de préparation.";
+
+    if (!confirm(message)) return;
+
+    const { error } = await window.sb.rpc("admin_set_home_progress_test_matches", { p_enabled: nextEnabled });
+    if (error) {
+      H.toast(error.message || "Impossible de modifier la progression accueil. Lance le patch SQL V1.3.6.", "error");
+      return;
+    }
+
+    await this.loadFamilyModeSetting();
+    await this.loadAuditLogs();
+    this.renderBackups();
+    this.renderHealth();
+    this.renderAudit();
+    H.toast(nextEnabled ? "Progression accueil : matchs test inclus" : "Progression accueil : officiels uniquement", "success");
+  },
+
   async toggleGraphMockPreview() {
     const enabledNow = this.state.graphMockPreviewEnabled === true;
     const nextEnabled = !enabledNow;
@@ -2079,7 +2124,7 @@ const Admin = {
 
     const { error } = await window.sb.rpc("admin_set_graph_mock_preview", { p_enabled: nextEnabled });
     if (error) {
-      H.toast(error.message || "Impossible de modifier la maquette graph. Lance le patch SQL V1.3.5.", "error");
+      H.toast(error.message || "Impossible de modifier la maquette graph. Lance le patch SQL V1.3.6.", "error");
       return;
     }
 
@@ -2102,7 +2147,7 @@ const Admin = {
 
     const { error } = await window.sb.rpc("admin_set_graph_preview_test_matches", { p_enabled: nextEnabled });
     if (error) {
-      H.toast(error.message || "Impossible de modifier la prévisualisation graphs. Lance le patch SQL V1.3.5.", "error");
+      H.toast(error.message || "Impossible de modifier la prévisualisation graphs. Lance le patch SQL V1.3.6.", "error");
       return;
     }
 

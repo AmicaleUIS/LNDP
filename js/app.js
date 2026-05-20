@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — APP PRINCIPALE V1.3.5
+// LE NID DES PRONOS — APP PRINCIPALE V1.3.6
 // ============================================================
 
 const H = window.Helpers;
@@ -246,6 +246,7 @@ const App = {
     if (!message || message.user_id === this.state.session?.user?.id) return false;
     if (message.deleted_at) return false;
     const isFamilyAuthor = message.author_player_scope === "family" || message.author_role === "family";
+    if (message.scope === "private") return message.recipient_id === this.state.session?.user?.id;
     if ((isFamilyAuthor || this.isFamilyChatScope(message.scope)) && !this.canSeeFamily()) return false;
     if (this.isFamily(this.state.profile) && !this.isFamilyChatScope(message.scope)) return false;
     if (message.scope === "global" || message.scope === "family_global") return true;
@@ -414,7 +415,7 @@ const App = {
           <div>
             <p class="eyebrow">Crédits cachés</p>
             <h2 id="creditsTitle">Le Nid des Pronos</h2>
-            <p class="muted">Version publique <strong>1.3.5</strong> · maquette graphs et état lancement Coupe du monde.</p>
+            <p class="muted">Version publique <strong>1.3.6</strong> · graphs intégrés, accueil nettoyé et messages privés.</p>
           </div>
         </div>
         <div class="credits-grid">
@@ -431,7 +432,7 @@ const App = {
             <p><strong>1.0.5</strong> — dashboard mobile/desktop stabilisé, sans chevauchement des cartes.</p>
           </section>
           <section>
-            <h3>Évolutions V1.3.5</h3>
+            <h3>Évolutions V1.3.6</h3>
             <ul class="changelog-list">
               <li>Le super admin peut désactiver ou réactiver l’affichage du module préparation.</li>
               <li>Quand la préparation est désactivée, les matchs test disparaissent des matchs/pronos, classements par phase et règles.</li>
@@ -615,7 +616,7 @@ const App = {
     const { data, error } = await window.sb
       .from("app_settings")
       .select("key,value")
-      .in("key", ["family_mode_enabled", "preparation_module_enabled", "graph_preview_test_matches_enabled", "graph_mock_preview_enabled"]);
+      .in("key", ["family_mode_enabled", "preparation_module_enabled", "graph_preview_test_matches_enabled", "graph_mock_preview_enabled", "home_progress_include_test_matches"]);
 
     if (error) {
       console.warn("Paramètres app indisponibles", error);
@@ -659,6 +660,22 @@ const App = {
     if (typeof value === "string") return value === "true";
     if (value && typeof value === "object" && "enabled" in value) return Boolean(value.enabled);
     return Boolean(value);
+  },
+
+  homeProgressIncludeTestMatches() {
+    const value = this.state.appSettings?.home_progress_include_test_matches;
+    if (value === undefined || value === null) return false;
+    if (typeof value === "boolean") return value;
+    if (typeof value === "string") return value === "true";
+    if (value && typeof value === "object" && "enabled" in value) return Boolean(value.enabled);
+    return Boolean(value);
+  },
+
+  homeProgressMatches() {
+    return this.state.matches.filter((m) =>
+      !["cancelled", "postponed"].includes(m.status)
+      && (!m.is_test_match || this.homeProgressIncludeTestMatches())
+    );
   },
 
   graphEvolutionCanUseMatch(match) {
@@ -1130,8 +1147,9 @@ const App = {
     const next = this.nextMatch();
     const nextPrediction = next ? this.getMyPrediction(next.id) : null;
     const missing = this.missingPredictions();
-    const availablePredictionCount = this.availablePredictionMatches().length;
-    const donePredictionCount = Math.max(0, availablePredictionCount - missing.length);
+    const homeProgressMatches = this.homeProgressMatches();
+    const availablePredictionCount = homeProgressMatches.length;
+    const donePredictionCount = homeProgressMatches.filter((match) => this.getMyPrediction(match.id)).length;
     const predictionProgress = availablePredictionCount ? Math.round((donePredictionCount / availablePredictionCount) * 100) : 0;
     const myRank = await this.fetchMyRank();
     const teamAverageRows = this.overallTeamAverageRows();
@@ -1155,6 +1173,7 @@ const App = {
                 <span style="width:${predictionProgress}%"></span>
               </div>
               <button class="primary-btn compact-continue-btn" type="button" data-action="continue-predictions">${missing.length ? "Continuer mes pronos" : "Voir le prochain match"}</button>
+              <small class="home-prono-progress-note">${this.homeProgressIncludeTestMatches() ? "Matchs test inclus dans cette progression" : "Matchs officiels uniquement"}</small>
             </div>
             <button class="ghost-btn rules-home-btn" id="rulesHomeBtn" type="button">${H.icon("list")} Règles & points</button>
           </div>
@@ -1193,17 +1212,6 @@ const App = {
                 ${this.homeFamilyTeamAverageCardHtml(familyTeamRows)}
               </section>
             ` : ""}
-
-            <article class="card warning-soft home-missing-card">
-              <div class="card-title-row">
-                <h3>Pronos manquants</h3>
-                <span class="count-badge">${missing.length}</span>
-              </div>
-              ${missing.length ? `
-                <p class="muted">Encore ${missing.length} match${missing.length > 1 ? "s" : ""} à poser.</p>
-                <button class="primary-btn" type="button" data-action="go-nearest-missing">Aller au plus proche</button>
-              ` : `<p class="muted">Nickel, tous tes pronos à venir sont posés.</p>`}
-            </article>
           </aside>
         </section>
       </section>
@@ -1261,7 +1269,6 @@ const App = {
         <article class="card home-rank-card home-clickable-card" data-home-leaderboard-action="go-overall-leaderboard" role="button" tabindex="0">
           <div class="card-title-row">
             <h3>Classement général</h3>
-            <button class="ghost-btn tiny-btn" type="button" data-action="go-overall-leaderboard">Voir</button>
           </div>
           <div class="home-rank-main empty">
             <span class="home-rank-number">—</span>
@@ -1278,7 +1285,6 @@ const App = {
       <article class="card home-rank-card home-clickable-card" data-home-leaderboard-action="go-overall-leaderboard" role="button" tabindex="0">
         <div class="card-title-row">
           <h3>Classement général</h3>
-          <button class="ghost-btn tiny-btn" type="button" data-action="go-overall-leaderboard">Voir</button>
         </div>
         <div class="home-rank-main">
           <span class="home-rank-number">#${myRank.rank}</span>
@@ -1343,7 +1349,6 @@ const App = {
         <article class="card home-team-average-card home-clickable-card" data-home-leaderboard-action="go-team-average-leaderboard" role="button" tabindex="0">
           <div class="card-title-row">
             <h3>Moyenne team</h3>
-            <button class="ghost-btn tiny-btn" type="button" data-action="go-team-average-leaderboard">Voir</button>
           </div>
           <div class="home-team-average-main empty">
             <span class="home-team-rank">—</span>
@@ -1360,7 +1365,6 @@ const App = {
       <article class="card home-team-average-card home-clickable-card" data-home-leaderboard-action="go-team-average-leaderboard" role="button" tabindex="0" style="--team-color:${this.safeColor(myRow.office_team_color, "#facc15")}">
         <div class="card-title-row">
           <h3>Moyenne team</h3>
-          <button class="ghost-btn tiny-btn" type="button" data-action="go-team-average-leaderboard">Voir</button>
         </div>
         <div class="home-team-average-main">
           <span class="home-team-rank">#${myRow.rank}</span>
@@ -1381,7 +1385,6 @@ const App = {
       <article class="card home-rank-card home-family-rank-card home-clickable-card" data-home-leaderboard-action="go-family-player-leaderboard" role="button" tabindex="0">
         <div class="card-title-row">
           <h3>Classement Famille</h3>
-          <button class="ghost-btn tiny-btn" type="button" data-action="go-family-player-leaderboard">Voir</button>
         </div>
         <div class="home-rank-main ${myRank ? "" : "empty"}">
           <span class="home-rank-number">${myRank ? `#${myRank.rank}` : "—"}</span>
@@ -1401,7 +1404,6 @@ const App = {
       <article class="card home-team-average-card home-family-team-card home-clickable-card" data-home-leaderboard-action="go-family-team-average-leaderboard" role="button" tabindex="0" style="--team-color:${this.safeColor(myRow?.office_team_color, "#facc15")}">
         <div class="card-title-row">
           <h3>Team Famille</h3>
-          <button class="ghost-btn tiny-btn" type="button" data-action="go-family-team-average-leaderboard">Voir</button>
         </div>
         <div class="home-team-average-main ${myRow ? "" : "empty"}">
           <span class="home-team-rank">${myRow ? `#${myRow.rank}` : "—"}</span>
@@ -3149,7 +3151,7 @@ const App = {
     await Promise.all([this.loadMatches(), this.loadVisiblePredictions(), this.loadPublicProfiles()]);
 
     const root = H.$("#viewRoot");
-    const allowedTabs = this.canSeeFamily() ? ["players", "team", "family", "evolution"] : ["players", "team", "evolution"];
+    const allowedTabs = this.canSeeFamily() ? ["players", "team", "family"] : ["players", "team"];
     const tab = allowedTabs.includes(this.state.leaderboardTab) ? this.state.leaderboardTab : "players";
     this.state.leaderboardTab = tab;
     root.innerHTML = `
@@ -3164,7 +3166,7 @@ const App = {
         <button class="${tab === "players" ? "active" : ""}" data-leaderboard-tab="players">Classement joueurs</button>
         <button class="${tab === "team" ? "active" : ""}" data-leaderboard-tab="team">Teams bureau</button>
         ${this.canSeeFamily() ? `<button class="${tab === "family" ? "active" : ""}" data-leaderboard-tab="family">Famille</button>` : ""}
-        <button class="${tab === "evolution" ? "active" : ""}" data-leaderboard-tab="evolution">Évolution</button>
+
       </div>
 
       <section id="leaderboardContent"></section>
@@ -3189,7 +3191,7 @@ const App = {
     if (this.state.leaderboardTab === "players") return this.renderPlayerLeaderboard();
     if (this.state.leaderboardTab === "team") return this.renderTeamLeaderboard();
     if (this.state.leaderboardTab === "family") return this.renderFamilyLeaderboard();
-    if (this.state.leaderboardTab === "evolution") return this.renderLeaderboardEvolution();
+
     return this.renderPlayerLeaderboard();
   },
 
@@ -3210,6 +3212,7 @@ const App = {
           <button class="${mode === "phase" ? "active" : ""}" type="button" data-player-leaderboard-mode="phase">Par phase</button>
         </div>
         <div id="playerLeaderboardRows"></div>
+        <div id="playerEvolutionEmbed"></div>
       </section>
     `;
 
@@ -3224,6 +3227,21 @@ const App = {
       await this.renderPoolRoundLeaderboard("#playerLeaderboardRows");
     } else {
       await this.renderOverallLeaderboard("#playerLeaderboardRows");
+    }
+
+    const evolutionMode = this.state.leaderboardEvolutionMode === "week" ? "week" : "day";
+    const useMockGraph = this.graphMockPreviewEnabled();
+    const series = useMockGraph ? this.mockEvolutionSeries(evolutionMode) : this.playerEvolutionSeries(evolutionMode);
+    const evolutionTarget = H.$("#playerEvolutionEmbed", root);
+    if (evolutionTarget) {
+      evolutionTarget.innerHTML = this.evolutionBlockHtml(series, {
+        title: "Évolution · classement général",
+        description: "Points cumulés des meilleurs joueurs.",
+        mode: evolutionMode,
+        attrName: "data-player-evolution-mode",
+        emptyText: "Pas encore assez de matchs terminés pour dessiner l’évolution générale."
+      });
+      this.bindEmbeddedEvolutionControls(evolutionTarget);
     }
   },
 
@@ -4676,9 +4694,17 @@ const App = {
             <small>Classement Coupe du monde, hors matchs test</small>
           </div>
           ${this.teamLeaderboardRowsHtml(rows, { mode: teamTab })}
+          ${this.evolutionBlockHtml(this.graphMockPreviewEnabled() ? this.mockTeamEvolutionSeries(this.state.teamLeaderboardEvolutionMode === "week" ? "week" : "day", false) : this.teamEvolutionSeries(this.state.teamLeaderboardEvolutionMode === "week" ? "week" : "day", false), {
+            title: "Évolution · teams bureau",
+            description: "Points cumulés par team.",
+            mode: this.state.teamLeaderboardEvolutionMode === "week" ? "week" : "day",
+            attrName: "data-team-evolution-mode",
+            emptyText: "Pas encore assez de matchs terminés pour dessiner l’évolution des teams."
+          })}
         </section>
       `;
       this.bindTeamLeaderboardControls(root);
+      this.bindEmbeddedEvolutionControls(root);
       return;
     }
 
@@ -4724,10 +4750,18 @@ const App = {
         </div>
         ${this.teamLeaderboardRowsHtml(rows, { mode: teamTab })}
         ${pager}
+        ${this.evolutionBlockHtml(this.graphMockPreviewEnabled() ? this.mockTeamEvolutionSeries(this.state.teamLeaderboardEvolutionMode === "week" ? "week" : "day", false) : this.teamEvolutionSeries(this.state.teamLeaderboardEvolutionMode === "week" ? "week" : "day", false), {
+          title: "Évolution · teams bureau",
+          description: "Points cumulés par team.",
+          mode: this.state.teamLeaderboardEvolutionMode === "week" ? "week" : "day",
+          attrName: "data-team-evolution-mode",
+          emptyText: "Pas encore assez de matchs terminés pour dessiner l’évolution des teams."
+        })}
       </section>
     `;
 
     this.bindTeamLeaderboardControls(root);
+    this.bindEmbeddedEvolutionControls(root);
     this.bindPhaseNavigation("teamLeaderboardPhaseIndex", () => this.renderTeamLeaderboard());
   },
 
@@ -4815,15 +4849,16 @@ const App = {
     const yTicks = [0, Math.ceil(maxPoints / 2), maxPoints];
 
     const lines = playerIds.map((userId, index) => {
-      const profile = this.profileForUser(userId);
+      const source = series.mockProfiles?.get(userId) || this.state.playerScoreRows.find((row) => row.user_id === userId || row.id === userId);
+      const profile = this.profileForUser(userId, source);
       const color = this.safeColor(profile.badge_color || profile.office_team_color, ["#facc15", "#38bdf8", "#a78bfa", "#fb7185", "#34d399", "#fb923c", "#f472b6", "#c4b5fd"][index % 8]);
       const points = snapshots.map((snapshot, i) => `${x(i).toFixed(1)},${y(snapshot.totals.get(userId) || 0).toFixed(1)}`).join(" ");
       const last = snapshots[snapshots.length - 1];
       const lastX = x(snapshots.length - 1);
       const lastY = y(last.totals.get(userId) || 0);
       return `
-        <polyline class="evolution-line" points="${points}" fill="none" stroke="${color}" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
-        <circle class="evolution-dot" cx="${lastX.toFixed(1)}" cy="${lastY.toFixed(1)}" r="5" fill="${color}" />
+        <polyline class="evolution-line" points="${points}" fill="none" stroke="${color}" style="stroke:${color}" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
+        <circle class="evolution-dot" cx="${lastX.toFixed(1)}" cy="${lastY.toFixed(1)}" r="5" fill="${color}" style="fill:${color}" />
       `;
     }).join("");
 
@@ -4999,14 +5034,14 @@ const App = {
 
   async renderFamilyLeaderboard() {
     const root = H.$("#leaderboardContent");
-    const pane = ["players", "team", "evolution"].includes(this.state.familyLeaderboardTab) ? this.state.familyLeaderboardTab : "players";
+    const pane = ["players", "team"].includes(this.state.familyLeaderboardTab) ? this.state.familyLeaderboardTab : "players";
     this.state.familyLeaderboardTab = pane;
 
     const paneControls = `
       <div class="segmented small family-leaderboard-panes">
         <button class="${pane === "players" ? "active" : ""}" data-family-pane="players">Joueurs</button>
         <button class="${pane === "team" ? "active" : ""}" data-family-pane="team">Par équipe</button>
-        <button class="${pane === "evolution" ? "active" : ""}" data-family-pane="evolution">Évolution</button>
+
       </div>
     `;
 
@@ -5034,8 +5069,16 @@ const App = {
             <div class="team-leaderboard-control-stack">${paneControls}${scopeControls}${modeControls}</div>
             <div class="team-phase-head"><strong>Général</strong><small>Joueurs Famille + joueurs UIS ayant activé le mode Famille</small></div>
             ${this.teamLeaderboardRowsHtml(rows, { mode: teamTab })}
+            ${this.evolutionBlockHtml(this.graphMockPreviewEnabled() ? this.mockTeamEvolutionSeries(this.state.familyTeamLeaderboardEvolutionMode === "week" ? "week" : "day", true) : this.teamEvolutionSeries(this.state.familyTeamLeaderboardEvolutionMode === "week" ? "week" : "day", true), {
+              title: "Évolution · team Famille",
+              description: "Points cumulés par team dans le classement Famille.",
+              mode: this.state.familyTeamLeaderboardEvolutionMode === "week" ? "week" : "day",
+              attrName: "data-family-team-evolution-mode",
+              emptyText: "Pas encore assez de matchs terminés pour dessiner l’évolution des teams Famille."
+            })}
           </section>`;
         this.bindFamilyLeaderboardControls(root);
+        this.bindEmbeddedEvolutionControls(root);
         return;
       }
 
@@ -5053,8 +5096,16 @@ const App = {
           ${group ? `<div class="team-phase-head"><strong>${H.escapeHtml(group.key)}</strong><small>${finishedCount}/${group.matches.length} match${group.matches.length > 1 ? "s" : ""} terminé${finishedCount > 1 ? "s" : ""} · ${H.matchDateRangeLabel(group.matches)}</small></div>` : `<p class="muted">Aucune phase à afficher pour le moment.</p>`}
           ${this.teamLeaderboardRowsHtml(rows, { mode: teamTab })}
           ${pager}
+          ${this.evolutionBlockHtml(this.graphMockPreviewEnabled() ? this.mockTeamEvolutionSeries(this.state.familyTeamLeaderboardEvolutionMode === "week" ? "week" : "day", true) : this.teamEvolutionSeries(this.state.familyTeamLeaderboardEvolutionMode === "week" ? "week" : "day", true), {
+            title: "Évolution · team Famille",
+            description: "Points cumulés par team dans le classement Famille.",
+            mode: this.state.familyTeamLeaderboardEvolutionMode === "week" ? "week" : "day",
+            attrName: "data-family-team-evolution-mode",
+            emptyText: "Pas encore assez de matchs terminés pour dessiner l’évolution des teams Famille."
+          })}
         </section>`;
       this.bindFamilyLeaderboardControls(root);
+      this.bindEmbeddedEvolutionControls(root);
       this.bindPhaseNavigation("familyTeamLeaderboardPhaseIndex", () => this.renderFamilyLeaderboard());
       return;
     }
@@ -5113,8 +5164,16 @@ const App = {
           ${group ? `<div class="team-phase-head"><strong>${H.escapeHtml(group.key)}</strong><small>${finishedCount}/${group.matches.length} match${group.matches.length > 1 ? "s" : ""} terminé${finishedCount > 1 ? "s" : ""} · ${H.matchDateRangeLabel(group.matches)}</small></div>` : `<p class="muted">Aucune phase à afficher pour le moment.</p>`}
           ${this.leaderboardRowsHtml(rows)}
           ${pager}
+          ${this.evolutionBlockHtml(this.graphMockPreviewEnabled() ? this.mockEvolutionSeries(this.state.familyLeaderboardEvolutionMode === "week" ? "week" : "day") : this.familyEvolutionSeries(this.state.familyLeaderboardEvolutionMode === "week" ? "week" : "day"), {
+            title: "Évolution · classement Famille",
+            description: "Points cumulés des meilleurs joueurs Famille.",
+            mode: this.state.familyLeaderboardEvolutionMode === "week" ? "week" : "day",
+            attrName: "data-family-evolution-mode",
+            emptyText: "Pas encore assez de matchs terminés pour dessiner l’évolution Famille."
+          })}
         </section>`;
       this.bindFamilyLeaderboardControls(root);
+      this.bindEmbeddedEvolutionControls(root);
       this.bindAchievementReplay(root);
       this.bindPhaseNavigation("familyLeaderboardPhaseIndex", () => this.renderFamilyLeaderboard());
       return;
@@ -5128,9 +5187,17 @@ const App = {
         </div>
         <div class="team-leaderboard-control-stack">${paneControls}${modeControls}</div>
         ${this.leaderboardRowsHtml(rows)}
+        ${this.evolutionBlockHtml(this.graphMockPreviewEnabled() ? this.mockEvolutionSeries(this.state.familyLeaderboardEvolutionMode === "week" ? "week" : "day") : this.familyEvolutionSeries(this.state.familyLeaderboardEvolutionMode === "week" ? "week" : "day"), {
+          title: "Évolution · classement Famille",
+          description: "Points cumulés des meilleurs joueurs Famille.",
+          mode: this.state.familyLeaderboardEvolutionMode === "week" ? "week" : "day",
+          attrName: "data-family-evolution-mode",
+          emptyText: "Pas encore assez de matchs terminés pour dessiner l’évolution Famille."
+        })}
       </section>
     `;
     this.bindFamilyLeaderboardControls(root);
+    this.bindEmbeddedEvolutionControls(root);
     this.bindAchievementReplay(root);
   },
 
@@ -5183,6 +5250,197 @@ const App = {
 
     const totalsByUser = new Map(playerIds.map((id) => [id, snapshots[snapshots.length - 1].totals.get(id) || 0]));
     return { playerIds, snapshots, totalsByUser, mockProfiles, isMock: true };
+  },
+
+
+  bindEmbeddedEvolutionControls(root = document) {
+    H.$$('[data-player-evolution-mode]', root).forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        this.state.leaderboardEvolutionMode = btn.dataset.playerEvolutionMode;
+        await this.renderPlayerLeaderboard();
+      });
+    });
+
+    H.$$('[data-team-evolution-mode]', root).forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        this.state.teamLeaderboardEvolutionMode = btn.dataset.teamEvolutionMode;
+        await this.renderTeamLeaderboard();
+      });
+    });
+
+    H.$$('[data-family-evolution-mode]', root).forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        this.state.familyLeaderboardEvolutionMode = btn.dataset.familyEvolutionMode;
+        await this.renderFamilyLeaderboard();
+      });
+    });
+
+    H.$$('[data-family-team-evolution-mode]', root).forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        this.state.familyTeamLeaderboardEvolutionMode = btn.dataset.familyTeamEvolutionMode;
+        await this.renderFamilyLeaderboard();
+      });
+    });
+  },
+
+
+  evolutionModeControls(mode, attrName = "data-evolution-mode") {
+    return `
+      <div class="segmented small">
+        <button class="${mode === "day" ? "active" : ""}" ${attrName}="day">Jour</button>
+        <button class="${mode === "week" ? "active" : ""}" ${attrName}="week">Semaine</button>
+      </div>
+    `;
+  },
+
+  evolutionBlockHtml(series, {
+    title = "Évolution du nid",
+    description = "Courbe des meilleurs joueurs.",
+    mode = "day",
+    attrName = "data-evolution-mode",
+    emptyText = "Pas assez de matchs terminés pour dessiner l’évolution.",
+    compact = true
+  } = {}) {
+    const latestSnapshot = series.snapshots[series.snapshots.length - 1];
+    return `
+      <section class="card evolution-card embedded-evolution-card ${compact ? "compact-evolution-card" : ""}">
+        <div class="card-title-row">
+          <div>
+            <h3>${H.escapeHtml(title)}</h3>
+            <p class="muted">${H.escapeHtml(description)}</p>
+            ${series.isMock ? `<p class="graph-preview-note">${H.icon("info")} Maquette graph active : données fictives, aucun impact sur Supabase.</p>` : ""}
+            ${!series.isMock && this.graphPreviewTestMatchesEnabled() ? `<p class="graph-preview-note">${H.icon("info")} Prévisualisation admin active : les matchs test sont inclus dans ce graph.</p>` : ""}
+          </div>
+          ${this.evolutionModeControls(mode, attrName)}
+        </div>
+        ${series.playerIds.length ? `
+          <div class="evolution-layout">
+            <div class="evolution-chart-wrap">${this.evolutionChartSvg(series)}</div>
+            <div class="evolution-legend">
+              ${series.playerIds.map((userId, index) => {
+                const source = series.mockProfiles?.get(userId) || this.state.playerScoreRows.find((row) => row.user_id === userId || row.id === userId);
+                const profile = this.profileForUser(userId, source);
+                const color = this.safeColor(profile.badge_color || profile.office_team_color, ["#facc15", "#38bdf8", "#a78bfa", "#fb7185", "#34d399", "#fb923c", "#f472b6", "#c4b5fd"][index % 8]);
+                const total = latestSnapshot?.totals.get(userId) || 0;
+                return `
+                  <div class="evolution-player" style="--player-color:${color}">
+                    ${H.profileBadgeHtml(profile, "profile-badge mini")}
+                    <div><strong>${H.escapeHtml(profile.pseudo)}</strong><small>${H.escapeHtml(profile.office_team_name || "Sans team")}</small></div>
+                    <span>${total} pts</span>
+                  </div>`;
+              }).join("")}
+            </div>
+          </div>
+        ` : `<p class="muted">${H.escapeHtml(emptyText)}</p>`}
+      </section>
+    `;
+  },
+
+  teamEvolutionSeries(mode = "day", familyOnly = false) {
+    const allowedFamilyIds = familyOnly ? this.familyProfileIds() : null;
+    const rows = this.state.visiblePredictions
+      .map((prediction) => ({ prediction, match: this.state.matches.find((m) => m.id === prediction.match_id), profile: this.profileForUser(prediction.user_id) }))
+      .filter(({ prediction, match, profile }) =>
+        match?.status === "finished"
+        && this.graphEvolutionCanUseMatch(match)
+        && prediction.points_total !== null
+        && prediction.points_total !== undefined
+        && profile.office_team_name
+        && (!familyOnly || allowedFamilyIds.has(String(prediction.user_id)))
+      )
+      .sort((a, b) => new Date(a.match.kickoff_at || 0) - new Date(b.match.kickoff_at || 0));
+
+    const periodKey = (date) => {
+      const d = new Date(date);
+      if (mode === "week") {
+        const monday = new Date(d);
+        const day = monday.getDay() || 7;
+        monday.setHours(0, 0, 0, 0);
+        monday.setDate(monday.getDate() - day + 1);
+        return monday.toISOString().slice(0, 10);
+      }
+      return d.toISOString().slice(0, 10);
+    };
+    const periodLabel = (key) => mode === "week" ? `Semaine du ${H.formatShortDate(key)}` : H.formatShortDate(key);
+
+    const periods = [...new Set(rows.map(({ match }) => periodKey(match.kickoff_at)))].sort();
+    const teamMeta = new Map();
+    const totalsByTeam = new Map();
+    const pointsByPeriod = new Map(periods.map((key) => [key, new Map()]));
+
+    rows.forEach(({ prediction, match, profile }) => {
+      const teamId = profile.office_team_id || profile.office_team_name || "sans-team";
+      teamMeta.set(teamId, {
+        id: teamId,
+        user_id: teamId,
+        pseudo: profile.office_team_name || "Sans team",
+        office_team_name: familyOnly ? "Team Famille" : "Team bureau",
+        office_team_color: profile.office_team_color || profile.badge_color || "#facc15",
+        badge_color: profile.office_team_color || profile.badge_color || "#facc15",
+        avatar_key: "owl-01",
+        badge_shape: "rounded"
+      });
+      const key = periodKey(match.kickoff_at);
+      const map = pointsByPeriod.get(key);
+      const points = Number(prediction.points_total || 0);
+      map.set(teamId, (map.get(teamId) || 0) + points);
+      totalsByTeam.set(teamId, (totalsByTeam.get(teamId) || 0) + points);
+    });
+
+    const playerIds = [...totalsByTeam.keys()].sort((a, b) => (totalsByTeam.get(b) || 0) - (totalsByTeam.get(a) || 0)).slice(0, 8);
+    const cumulative = new Map(playerIds.map((id) => [id, 0]));
+    const snapshots = periods.map((key) => {
+      const periodPoints = pointsByPeriod.get(key) || new Map();
+      playerIds.forEach((id) => cumulative.set(id, (cumulative.get(id) || 0) + (periodPoints.get(id) || 0)));
+      return { key, label: periodLabel(key), totals: new Map(playerIds.map((id) => [id, cumulative.get(id) || 0])) };
+    });
+
+    return { playerIds, snapshots, totalsByUser: totalsByTeam, mockProfiles: teamMeta, isTeamSeries: true };
+  },
+
+
+  mockTeamEvolutionSeries(mode = "day", familyOnly = false) {
+    const names = familyOnly ? ["Famille SNA", "Famille Rapaces", "Famille Chouettes", "Famille Aiglons"] : ["Les SNA", "Les Rapaces", "Les Chouettes", "Les Aiglons"];
+    const colors = ["#facc15", "#38bdf8", "#a78bfa", "#fb7185"];
+    const teamIds = names.map((_, index) => `mock-team-${familyOnly ? "family-" : ""}${index + 1}`);
+    const base = new Date();
+    base.setHours(20, 0, 0, 0);
+    const increments = [
+      [8, 5, 3, 1],
+      [4, 9, 2, 5],
+      [6, 2, 8, 3],
+      [3, 7, 4, 9],
+      [9, 4, 6, 2],
+      [5, 8, 3, 6]
+    ];
+
+    const cumulative = new Map(teamIds.map((id) => [id, 0]));
+    const snapshots = increments.map((row, index) => {
+      const label = mode === "week" && index >= 3 ? "Semaine maquette 2" : `Jour test ${index + 1}`;
+      row.forEach((points, teamIndex) => {
+        const id = teamIds[teamIndex];
+        cumulative.set(id, (cumulative.get(id) || 0) + points);
+      });
+      return {
+        key: `mock-team-${index + 1}`,
+        label,
+        totals: new Map(teamIds.map((id) => [id, cumulative.get(id) || 0]))
+      };
+    });
+
+    const mockProfiles = new Map(teamIds.map((id, index) => [id, {
+      id,
+      user_id: id,
+      pseudo: names[index],
+      office_team_name: familyOnly ? "Team Famille" : "Team bureau",
+      office_team_color: colors[index % colors.length],
+      badge_color: colors[index % colors.length],
+      avatar_key: "owl-01",
+      badge_shape: "rounded"
+    }]));
+
+    const totalsByUser = new Map(teamIds.map((id) => [id, snapshots[snapshots.length - 1].totals.get(id) || 0]));
+    return { playerIds: teamIds, snapshots, totalsByUser, mockProfiles, isMock: true, isTeamSeries: true };
   },
 
   async renderLeaderboardEvolution() {
@@ -5421,6 +5679,7 @@ const App = {
                   <strong>${H.escapeHtml(player.pseudo || "Joueur")}</strong>
                   <small>${isMe ? "Toi" : H.escapeHtml(profile.office_team_name || "Sans team")}</small>
                 </div>
+                ${!isMe ? `<span class="team-player-mp-dot" data-direct-message-user-id="${H.escapeHtml(player.id)}" title="Envoyer un MP">MP</span>` : ""}
               </button>
             `;
           }).join("") : `<p class="muted team-empty-message">Aucun joueur dans cette team pour l’instant.</p>`}
@@ -5450,11 +5709,12 @@ const App = {
       scopes.push({ key: "global", label: "Général", short: "Général", hint: "Tous les joueurs UIS" });
       if (hasTeam) scopes.push({ key: "team", label: "Ma team", short: "Team", hint: "Ta team bureau" });
     }
+    scopes.push({ key: "private", label: "Messages privés", short: "MP", hint: "Tes messages privés du Nid" });
     if (this.canSeeFamily()) {
       scopes.push({ key: "family_global", label: "Famille", short: "Famille", hint: "Famille + UIS ayant activé le mode" });
       if (hasTeam) scopes.push({ key: "family_team", label: "Famille team", short: "Team famille", hint: "Ta team dans le mode Famille" });
     }
-    return scopes.length ? scopes : [{ key: "global", label: "Général", short: "Général", hint: "Tous les joueurs UIS" }];
+    return scopes.length ? scopes : [{ key: "private", label: "Messages privés", short: "MP", hint: "Tes messages privés du Nid" }];
   },
 
   chatScopeLabel(scope = "global") {
@@ -5462,7 +5722,8 @@ const App = {
       global: "Général",
       team: "Ma team",
       family_global: "Famille",
-      family_team: "Famille team"
+      family_team: "Famille team",
+      private: "Messages privés"
     }[scope] || "Messages";
   },
 
@@ -5506,6 +5767,61 @@ const App = {
     H.$("#chatReactionPicker")?.remove();
   },
 
+
+  openDirectMessageModal(userId, pseudo = "ce joueur") {
+    if (!userId || userId === this.state.session?.user?.id) return;
+    H.$("#directMessageModal")?.remove();
+
+    const modal = document.createElement("div");
+    modal.id = "directMessageModal";
+    modal.className = "modal-backdrop direct-message-modal";
+    modal.innerHTML = `
+      <div class="modal-card direct-message-card" role="dialog" aria-modal="true" aria-labelledby="directMessageTitle">
+        <button class="modal-x-btn" id="closeDirectMessageBtn" type="button" aria-label="Fermer">×</button>
+        <p class="eyebrow">${H.icon("messages")} MP du Nid</p>
+        <h2 id="directMessageTitle">Envoyer un hibou discret à ${H.escapeHtml(pseudo)}</h2>
+        <p class="muted">Un message privé visible uniquement par vous deux. Le hibou promet de ne pas crier dans le salon général.</p>
+        <form id="directMessageForm" class="direct-message-form">
+          <textarea name="body" maxlength="600" rows="4" placeholder="Ton MP..." required></textarea>
+          <button class="primary-btn" type="submit">Envoyer le hibou 🦉</button>
+        </form>
+      </div>
+    `;
+    document.body.appendChild(modal);
+
+    const close = () => modal.remove();
+    H.$("#closeDirectMessageBtn", modal)?.addEventListener("click", close);
+    modal.addEventListener("click", (event) => { if (event.target === modal) close(); });
+    H.$("#directMessageForm", modal)?.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const body = String(new FormData(event.currentTarget).get("body") || "").trim();
+      if (!body) return;
+
+      const { error } = await window.sb
+        .from("team_chat_messages")
+        .insert({
+          user_id: this.state.session.user.id,
+          recipient_id: userId,
+          scope: "private",
+          office_team_id: null,
+          body
+        });
+
+      if (error) {
+        H.toast(error.message || "Impossible d’envoyer le MP.", "error");
+        return;
+      }
+
+      close();
+      H.toast("MP envoyé par hibou discret", "success");
+      this.state.teamChatScope = "private";
+      this.state.teamChatLimit = Math.max(this.state.teamChatLimit, 10);
+      if (this.state.currentView === "teams") await this.renderTeamsPage();
+    });
+
+    H.$("textarea", modal)?.focus();
+  },
+
   openChatReactionPicker(messageId) {
     if (!messageId) return;
     const message = this.state.teamChatMessages.find((item) => String(item.id) === String(messageId));
@@ -5521,6 +5837,7 @@ const App = {
           <strong>Réagir au message</strong>
           <button class="chat-reaction-picker-close" type="button" aria-label="Fermer">×</button>
         </div>
+        ${message.user_id !== this.state.session.user.id ? `<button class="chat-private-nudge" type="button" data-picker-private-user-id="${H.escapeHtml(message.user_id)}">🦉 Envoyer un MP de hibou discret</button>` : ""}
         <div class="chat-reaction-picker-grid">
           ${(this.state.chatReactions || []).map((reaction) => `
             <button class="chat-reaction-choice ${message.my_reaction === reaction.key ? "active" : ""}" type="button" data-picker-react-message-id="${H.escapeHtml(message.id)}" data-reaction-key="${H.escapeHtml(reaction.key)}" title="${H.escapeHtml(reaction.label)}">
@@ -5536,6 +5853,14 @@ const App = {
     const close = () => this.closeChatReactionPicker();
     H.$(".chat-reaction-picker-close", modal)?.addEventListener("click", close);
     modal.addEventListener("click", (event) => { if (event.target === modal) close(); });
+    H.$$('[data-picker-private-user-id]', modal).forEach((button) => {
+      button.addEventListener("click", (event) => {
+        event.stopPropagation();
+        const profile = this.profileForUser(button.dataset.pickerPrivateUserId);
+        close();
+        this.openDirectMessageModal(button.dataset.pickerPrivateUserId, profile?.pseudo || "ce joueur");
+      });
+    });
     H.$$('[data-picker-react-message-id]', modal).forEach((button) => {
       button.addEventListener("click", async (event) => {
         event.stopPropagation();
@@ -5781,6 +6106,8 @@ const App = {
       badge_color: message.badge_color || message.author_office_team_color || message.office_team_color || "#facc15"
     });
     const isMe = message.user_id === this.state.session.user.id;
+    const authorRole = String(message.author_role || "").toLowerCase();
+    const canBlockAuthor = !isMe && !["admin", "super_admin"].includes(authorRole);
     const canDelete = isMe || this.isSuperAdmin();
     const scopeLabel = this.chatScopeLabel(message.scope);
     return `
@@ -5796,7 +6123,7 @@ const App = {
           <div class="chat-message-actions">
             ${this.reactionSummaryHtml(message)}
             <div class="chat-message-tools">
-              ${!isMe ? `<button class="ghost-btn tiny-btn block-user-btn" type="button" data-block-user-id="${H.escapeHtml(message.user_id)}">Bloquer</button>` : ""}
+              ${canBlockAuthor ? `<button class="ghost-btn tiny-btn block-user-btn" type="button" data-block-user-id="${H.escapeHtml(message.user_id)}">Bloquer</button>` : ""}
               ${canDelete ? `<button class="ghost-btn tiny-btn delete-message-btn" type="button" data-delete-message-id="${H.escapeHtml(message.id)}">Masquer</button>` : ""}
             </div>
           </div>
@@ -5879,8 +6206,14 @@ const App = {
               ${this.state.teamChatMessages.length ? this.state.teamChatMessages.map((message) => this.chatMessageHtml(message)).join("") : `<p class="muted empty-chat">Aucun message ici pour l’instant. Ouvre le bal 🦉</p>`}
             </div>
 
-            <form id="teamChatForm" class="team-chat-form chat-form-v120">
-              <input type="text" name="body" maxlength="600" placeholder="Écris dans ${H.escapeHtml(chatTitle)}..." autocomplete="off" required ${this.state.profile?.can_chat === false ? "disabled" : ""}>
+            <form id="teamChatForm" class="team-chat-form chat-form-v120 ${chatScope === "private" ? "private-chat-form" : ""}">
+              ${chatScope === "private" ? `
+                <select name="recipient_id" required ${this.state.profile?.can_chat === false ? "disabled" : ""}>
+                  <option value="">Choisir un destinataire MP</option>
+                  ${activePlayers.filter((player) => player.id !== this.state.session.user.id).map((player) => `<option value="${H.escapeHtml(player.id)}">${H.escapeHtml(player.pseudo || "Joueur")} · ${H.escapeHtml(player.office_team_name || "Sans team")}</option>`).join("")}
+                </select>
+              ` : ""}
+              <input type="text" name="body" maxlength="600" placeholder="${chatScope === "private" ? "Écris ton MP de hibou secret..." : `Écris dans ${H.escapeHtml(chatTitle)}...`}" autocomplete="off" required ${this.state.profile?.can_chat === false ? "disabled" : ""}>
               <button class="primary-btn" type="submit" ${this.state.profile?.can_chat === false ? "disabled" : ""}>Envoyer</button>
             </form>
           `}
@@ -5920,6 +6253,14 @@ const App = {
       });
     });
 
+    H.$$('[data-direct-message-user-id]', root).forEach((button) => {
+      button.addEventListener("click", (event) => {
+        event.stopPropagation();
+        const profile = this.profileForUser(button.dataset.directMessageUserId);
+        this.openDirectMessageModal(button.dataset.directMessageUserId, profile?.pseudo || "ce joueur");
+      });
+    });
+
     H.$$('[data-player-id]', root).forEach((button) => {
       button.addEventListener("click", () => this.openTeamPlayerModal(button.dataset.playerId));
     });
@@ -5950,11 +6291,16 @@ const App = {
     if (!body) return;
 
     const scope = this.normalizeChatScope(this.state.teamChatScope || "global");
-    if (this.isFamily(this.state.profile) && !this.isFamilyChatScope(scope)) {
+    const recipientId = scope === "private" ? String(formData.get("recipient_id") || "").trim() : null;
+    if (scope === "private" && !recipientId) {
+      H.toast("Choisis un destinataire pour le MP.", "error");
+      return;
+    }
+    if (this.isFamily(this.state.profile) && scope !== "private" && !this.isFamilyChatScope(scope)) {
       H.toast("Les comptes Famille écrivent dans les salons Famille uniquement.", "error");
       return;
     }
-    if (this.isFamilyChatScope(scope) && !this.canSeeFamily()) {
+    if (scope !== "private" && this.isFamilyChatScope(scope) && !this.canSeeFamily()) {
       H.toast("Active le mode Famille pour écrire ici.", "error");
       return;
     }
@@ -5970,6 +6316,7 @@ const App = {
         user_id: this.state.session.user.id,
         scope,
         office_team_id: officeTeamId,
+        recipient_id: recipientId,
         body
       });
 
@@ -6303,7 +6650,7 @@ const App = {
             <p class="muted">Déconnexion, crédits et historique des évolutions.</p>
           </div>
           <div class="profile-account-actions">
-            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.3.5</button>
+            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.3.6</button>
             <button class="danger-btn" id="profileLogoutBtn" type="button">Déconnexion</button>
           </div>
         </div>

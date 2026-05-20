@@ -1,4 +1,17 @@
-# Le Nid des Pronos — V1.3.5
+# Le Nid des Pronos — V1.3.6
+
+## V1.3.6 — Graphs intégrés + accueil nettoyé + messages privés
+
+- 4 graphs d’évolution intégrés dans les bons classements : général, teams bureau, Famille, team Famille.
+- Couleurs des joueurs/teams appliquées sur les courbes et la légende.
+- Boutons Jour/Semaine corrigés dans les graphs intégrés.
+- Accueil : suppression du cartouche Pronos manquants, tuiles classement sans bouton Voir, flèche recentrée.
+- Accueil : progression des pronos réglable avec ou sans matchs test depuis l’admin.
+- Teams du Nid : messages privés depuis l’annuaire et depuis le popup réaction d’un message.
+- Sécurité chat : impossible de bloquer un admin ou super admin.
+- Admin : bloc Charger une sauvegarde plus compact.
+- Bilan PDF : CSS d’impression renforcé pour conserver les fonds quand le navigateur imprime les arrière-plans.
+- Patch SQL à lancer : `patch_v1_3_6_graphs_mp_pdf.sql`.
 
 ## V1.3.5 — Maquette graph + santé lancement sécurisé
 
