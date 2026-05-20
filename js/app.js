@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — APP PRINCIPALE V1.3.6
+// LE NID DES PRONOS — APP PRINCIPALE V1.3.7
 // ============================================================
 
 const H = window.Helpers;
@@ -415,7 +415,7 @@ const App = {
           <div>
             <p class="eyebrow">Crédits cachés</p>
             <h2 id="creditsTitle">Le Nid des Pronos</h2>
-            <p class="muted">Version publique <strong>1.3.6</strong> · graphs intégrés, accueil nettoyé et messages privés.</p>
+            <p class="muted">Version publique <strong>1.3.7</strong> · graphs en boutons et MP rangés par conversation.</p>
           </div>
         </div>
         <div class="credits-grid">
@@ -432,7 +432,7 @@ const App = {
             <p><strong>1.0.5</strong> — dashboard mobile/desktop stabilisé, sans chevauchement des cartes.</p>
           </section>
           <section>
-            <h3>Évolutions V1.3.6</h3>
+            <h3>Évolutions V1.3.7</h3>
             <ul class="changelog-list">
               <li>Le super admin peut désactiver ou réactiver l’affichage du module préparation.</li>
               <li>Quand la préparation est désactivée, les matchs test disparaissent des matchs/pronos, classements par phase et règles.</li>
@@ -856,7 +856,7 @@ const App = {
     this.state.teamChatError = null;
     const scope = this.normalizeChatScope(this.state.teamChatScope || "global");
     this.state.teamChatScope = scope;
-    const limit = Math.max(10, Number(this.state.teamChatLimit || this.state.teamChatPageSize || 20));
+    const limit = scope === "private" ? Math.max(80, Number(this.state.teamChatLimit || 80)) : Math.max(10, Number(this.state.teamChatLimit || this.state.teamChatPageSize || 20));
     let query = window.sb
       .from("v_team_chat_messages")
       .select("*")
@@ -3197,22 +3197,22 @@ const App = {
 
   async renderPlayerLeaderboard() {
     const root = H.$("#leaderboardContent");
-    const mode = this.state.playerLeaderboardMode === "phase" ? "phase" : "overall";
+    const mode = ["overall", "phase", "evolution"].includes(this.state.playerLeaderboardMode) ? this.state.playerLeaderboardMode : "overall";
     this.state.playerLeaderboardMode = mode;
 
     root.innerHTML = `
       <section class="card player-leaderboard-card">
         <div class="card-title-row leaderboard-compact-title">
           <div>
-            <h3>Classement joueurs</h3>
+            <h3>${mode === "evolution" ? "Évolution joueurs" : "Classement joueurs"}</h3>
           </div>
         </div>
-        <div class="segmented small player-leaderboard-mode">
+        <div class="segmented small player-leaderboard-mode leaderboard-view-switch">
           <button class="${mode === "overall" ? "active" : ""}" type="button" data-player-leaderboard-mode="overall">Général</button>
           <button class="${mode === "phase" ? "active" : ""}" type="button" data-player-leaderboard-mode="phase">Par phase</button>
+          <button class="${mode === "evolution" ? "active" : ""}" type="button" data-player-leaderboard-mode="evolution">Évolution</button>
         </div>
         <div id="playerLeaderboardRows"></div>
-        <div id="playerEvolutionEmbed"></div>
       </section>
     `;
 
@@ -3223,25 +3223,26 @@ const App = {
       });
     });
 
-    if (mode === "phase") {
-      await this.renderPoolRoundLeaderboard("#playerLeaderboardRows");
-    } else {
-      await this.renderOverallLeaderboard("#playerLeaderboardRows");
-    }
-
-    const evolutionMode = this.state.leaderboardEvolutionMode === "week" ? "week" : "day";
-    const useMockGraph = this.graphMockPreviewEnabled();
-    const series = useMockGraph ? this.mockEvolutionSeries(evolutionMode) : this.playerEvolutionSeries(evolutionMode);
-    const evolutionTarget = H.$("#playerEvolutionEmbed", root);
-    if (evolutionTarget) {
-      evolutionTarget.innerHTML = this.evolutionBlockHtml(series, {
+    const target = H.$("#playerLeaderboardRows", root);
+    if (mode === "evolution") {
+      const evolutionMode = this.state.leaderboardEvolutionMode === "week" ? "week" : "day";
+      const useMockGraph = this.graphMockPreviewEnabled();
+      const series = useMockGraph ? this.mockEvolutionSeries(evolutionMode) : this.playerEvolutionSeries(evolutionMode);
+      target.innerHTML = this.evolutionBlockHtml(series, {
         title: "Évolution · classement général",
         description: "Points cumulés des meilleurs joueurs.",
         mode: evolutionMode,
         attrName: "data-player-evolution-mode",
         emptyText: "Pas encore assez de matchs terminés pour dessiner l’évolution générale."
       });
-      this.bindEmbeddedEvolutionControls(evolutionTarget);
+      this.bindEmbeddedEvolutionControls(target);
+      return;
+    }
+
+    if (mode === "phase") {
+      await this.renderPoolRoundLeaderboard("#playerLeaderboardRows");
+    } else {
+      await this.renderOverallLeaderboard("#playerLeaderboardRows");
     }
   },
 
@@ -4657,8 +4658,10 @@ const App = {
 
   async renderTeamLeaderboard() {
     const root = H.$("#leaderboardContent");
-    const teamTab = ["average", "points"].includes(this.state.teamTab) ? this.state.teamTab : "average";
+    const teamTab = ["average", "points", "evolution_average", "evolution_points"].includes(this.state.teamTab) ? this.state.teamTab : "average";
     const scope = this.state.teamLeaderboardScope === "phase" ? "phase" : "overall";
+    const isEvolution = teamTab.startsWith("evolution_");
+    const evolutionValueMode = teamTab === "evolution_average" ? "average" : "points";
     this.state.teamTab = teamTab;
     this.state.teamLeaderboardScope = scope;
 
@@ -4669,35 +4672,27 @@ const App = {
       </div>
     `;
     const modeControls = `
-      <div class="segmented small team-leaderboard-mode">
+      <div class="segmented small team-leaderboard-mode leaderboard-view-switch wide-switch">
         <button class="${teamTab === "average" ? "active" : ""}" data-team-tab="average">Moyenne</button>
         <button class="${teamTab === "points" ? "active" : ""}" data-team-tab="points">Par points</button>
+        <button class="${teamTab === "evolution_average" ? "active" : ""}" data-team-tab="evolution_average">Évolution moyenne</button>
+        <button class="${teamTab === "evolution_points" ? "active" : ""}" data-team-tab="evolution_points">Évolution points</button>
       </div>
     `;
 
-    if (scope === "overall") {
-      await this.loadPlayerScoreRows();
-      const rows = this.teamOverallRows(teamTab);
+    if (isEvolution) {
+      const evolutionMode = this.state.teamLeaderboardEvolutionMode === "week" ? "week" : "day";
+      const series = this.graphMockPreviewEnabled()
+        ? this.mockTeamEvolutionSeries(evolutionMode, false, evolutionValueMode)
+        : this.teamEvolutionSeries(evolutionMode, false, evolutionValueMode);
       root.innerHTML = `
         <section class="card team-leaderboard-card">
-          <div class="card-title-row">
-            <div>
-              <h3>Teams bureau général</h3>
-            </div>
-          </div>
-          <div class="team-leaderboard-control-stack">
-            ${scopeControls}
-            ${modeControls}
-          </div>
-          <div class="team-phase-head">
-            <strong>Général</strong>
-            <small>Classement Coupe du monde, hors matchs test</small>
-          </div>
-          ${this.teamLeaderboardRowsHtml(rows, { mode: teamTab })}
-          ${this.evolutionBlockHtml(this.graphMockPreviewEnabled() ? this.mockTeamEvolutionSeries(this.state.teamLeaderboardEvolutionMode === "week" ? "week" : "day", false) : this.teamEvolutionSeries(this.state.teamLeaderboardEvolutionMode === "week" ? "week" : "day", false), {
-            title: "Évolution · teams bureau",
-            description: "Points cumulés par team.",
-            mode: this.state.teamLeaderboardEvolutionMode === "week" ? "week" : "day",
+          <div class="card-title-row"><h3>${evolutionValueMode === "average" ? "Évolution moyenne · teams bureau" : "Évolution points · teams bureau"}</h3></div>
+          <div class="team-leaderboard-control-stack">${scopeControls}${modeControls}</div>
+          ${this.evolutionBlockHtml(series, {
+            title: evolutionValueMode === "average" ? "Évolution moyenne · teams bureau" : "Évolution points · teams bureau",
+            description: evolutionValueMode === "average" ? "Moyenne cumulée par joueur dans chaque team." : "Points cumulés par team.",
+            mode: evolutionMode,
             attrName: "data-team-evolution-mode",
             emptyText: "Pas encore assez de matchs terminés pour dessiner l’évolution des teams."
           })}
@@ -4705,6 +4700,21 @@ const App = {
       `;
       this.bindTeamLeaderboardControls(root);
       this.bindEmbeddedEvolutionControls(root);
+      return;
+    }
+
+    if (scope === "overall") {
+      await this.loadPlayerScoreRows();
+      const rows = this.teamOverallRows(teamTab);
+      root.innerHTML = `
+        <section class="card team-leaderboard-card">
+          <div class="card-title-row"><h3>Teams bureau général</h3></div>
+          <div class="team-leaderboard-control-stack">${scopeControls}${modeControls}</div>
+          <div class="team-phase-head"><strong>Général</strong><small>Classement Coupe du monde, hors matchs test</small></div>
+          ${this.teamLeaderboardRowsHtml(rows, { mode: teamTab })}
+        </section>
+      `;
+      this.bindTeamLeaderboardControls(root);
       return;
     }
 
@@ -4716,10 +4726,7 @@ const App = {
       root.innerHTML = `
         <section class="card team-leaderboard-card">
           <div class="card-title-row"><h3>Teams bureau par phase</h3></div>
-          <div class="team-leaderboard-control-stack">
-            ${scopeControls}
-            ${modeControls}
-          </div>
+          <div class="team-leaderboard-control-stack">${scopeControls}${modeControls}</div>
           <p class="muted">Aucune phase à afficher pour le moment.</p>
         </section>
       `;
@@ -4734,15 +4741,8 @@ const App = {
 
     root.innerHTML = `
       <section class="card team-leaderboard-card">
-        <div class="card-title-row">
-          <div>
-            <h3>Teams bureau par phase</h3>
-          </div>
-        </div>
-        <div class="team-leaderboard-control-stack">
-          ${scopeControls}
-          ${modeControls}
-        </div>
+        <div class="card-title-row"><h3>Teams bureau par phase</h3></div>
+        <div class="team-leaderboard-control-stack">${scopeControls}${modeControls}</div>
         ${pager}
         <div class="team-phase-head">
           <strong>${H.escapeHtml(group.key)}</strong>
@@ -4750,18 +4750,10 @@ const App = {
         </div>
         ${this.teamLeaderboardRowsHtml(rows, { mode: teamTab })}
         ${pager}
-        ${this.evolutionBlockHtml(this.graphMockPreviewEnabled() ? this.mockTeamEvolutionSeries(this.state.teamLeaderboardEvolutionMode === "week" ? "week" : "day", false) : this.teamEvolutionSeries(this.state.teamLeaderboardEvolutionMode === "week" ? "week" : "day", false), {
-          title: "Évolution · teams bureau",
-          description: "Points cumulés par team.",
-          mode: this.state.teamLeaderboardEvolutionMode === "week" ? "week" : "day",
-          attrName: "data-team-evolution-mode",
-          emptyText: "Pas encore assez de matchs terminés pour dessiner l’évolution des teams."
-        })}
       </section>
     `;
 
     this.bindTeamLeaderboardControls(root);
-    this.bindEmbeddedEvolutionControls(root);
     this.bindPhaseNavigation("teamLeaderboardPhaseIndex", () => this.renderTeamLeaderboard());
   },
 
@@ -5041,25 +5033,51 @@ const App = {
       <div class="segmented small family-leaderboard-panes">
         <button class="${pane === "players" ? "active" : ""}" data-family-pane="players">Joueurs</button>
         <button class="${pane === "team" ? "active" : ""}" data-family-pane="team">Par équipe</button>
-
       </div>
     `;
 
     if (pane === "team") {
-      const teamTab = ["average", "points"].includes(this.state.familyTeamTab) ? this.state.familyTeamTab : "average";
+      const teamTab = ["average", "points", "evolution_average", "evolution_points"].includes(this.state.familyTeamTab) ? this.state.familyTeamTab : "average";
       const scope = this.state.familyTeamLeaderboardScope === "phase" ? "phase" : "overall";
+      const isEvolution = teamTab.startsWith("evolution_");
+      const evolutionValueMode = teamTab === "evolution_average" ? "average" : "points";
       this.state.familyTeamTab = teamTab;
       this.state.familyTeamLeaderboardScope = scope;
+
       const scopeControls = `
         <div class="segmented small team-leaderboard-scope">
           <button class="${scope === "overall" ? "active" : ""}" data-family-team-scope="overall">Général</button>
           <button class="${scope === "phase" ? "active" : ""}" data-family-team-scope="phase">Par phase</button>
         </div>`;
       const modeControls = `
-        <div class="segmented small team-leaderboard-mode">
+        <div class="segmented small team-leaderboard-mode leaderboard-view-switch wide-switch">
           <button class="${teamTab === "average" ? "active" : ""}" data-family-team-tab="average">Moyenne</button>
           <button class="${teamTab === "points" ? "active" : ""}" data-family-team-tab="points">Par points</button>
+          <button class="${teamTab === "evolution_average" ? "active" : ""}" data-family-team-tab="evolution_average">Évolution moyenne</button>
+          <button class="${teamTab === "evolution_points" ? "active" : ""}" data-family-team-tab="evolution_points">Évolution points</button>
         </div>`;
+
+      if (isEvolution) {
+        const evolutionMode = this.state.familyTeamLeaderboardEvolutionMode === "week" ? "week" : "day";
+        const series = this.graphMockPreviewEnabled()
+          ? this.mockTeamEvolutionSeries(evolutionMode, true, evolutionValueMode)
+          : this.teamEvolutionSeries(evolutionMode, true, evolutionValueMode);
+        root.innerHTML = `
+          <section class="card team-leaderboard-card family-leaderboard-card">
+            <div class="card-title-row leaderboard-compact-title"><h3>${evolutionValueMode === "average" ? "Évolution moyenne · team Famille" : "Évolution points · team Famille"}</h3></div>
+            <div class="team-leaderboard-control-stack">${paneControls}${scopeControls}${modeControls}</div>
+            ${this.evolutionBlockHtml(series, {
+              title: evolutionValueMode === "average" ? "Évolution moyenne · team Famille" : "Évolution points · team Famille",
+              description: evolutionValueMode === "average" ? "Moyenne cumulée par joueur dans chaque team Famille." : "Points cumulés par team dans le classement Famille.",
+              mode: evolutionMode,
+              attrName: "data-family-team-evolution-mode",
+              emptyText: "Pas encore assez de matchs terminés pour dessiner l’évolution des teams Famille."
+            })}
+          </section>`;
+        this.bindFamilyLeaderboardControls(root);
+        this.bindEmbeddedEvolutionControls(root);
+        return;
+      }
 
       if (scope === "overall") {
         const rows = this.familyTeamRows(null, teamTab);
@@ -5069,16 +5087,8 @@ const App = {
             <div class="team-leaderboard-control-stack">${paneControls}${scopeControls}${modeControls}</div>
             <div class="team-phase-head"><strong>Général</strong><small>Joueurs Famille + joueurs UIS ayant activé le mode Famille</small></div>
             ${this.teamLeaderboardRowsHtml(rows, { mode: teamTab })}
-            ${this.evolutionBlockHtml(this.graphMockPreviewEnabled() ? this.mockTeamEvolutionSeries(this.state.familyTeamLeaderboardEvolutionMode === "week" ? "week" : "day", true) : this.teamEvolutionSeries(this.state.familyTeamLeaderboardEvolutionMode === "week" ? "week" : "day", true), {
-              title: "Évolution · team Famille",
-              description: "Points cumulés par team dans le classement Famille.",
-              mode: this.state.familyTeamLeaderboardEvolutionMode === "week" ? "week" : "day",
-              attrName: "data-family-team-evolution-mode",
-              emptyText: "Pas encore assez de matchs terminés pour dessiner l’évolution des teams Famille."
-            })}
           </section>`;
         this.bindFamilyLeaderboardControls(root);
-        this.bindEmbeddedEvolutionControls(root);
         return;
       }
 
@@ -5096,58 +5106,40 @@ const App = {
           ${group ? `<div class="team-phase-head"><strong>${H.escapeHtml(group.key)}</strong><small>${finishedCount}/${group.matches.length} match${group.matches.length > 1 ? "s" : ""} terminé${finishedCount > 1 ? "s" : ""} · ${H.matchDateRangeLabel(group.matches)}</small></div>` : `<p class="muted">Aucune phase à afficher pour le moment.</p>`}
           ${this.teamLeaderboardRowsHtml(rows, { mode: teamTab })}
           ${pager}
-          ${this.evolutionBlockHtml(this.graphMockPreviewEnabled() ? this.mockTeamEvolutionSeries(this.state.familyTeamLeaderboardEvolutionMode === "week" ? "week" : "day", true) : this.teamEvolutionSeries(this.state.familyTeamLeaderboardEvolutionMode === "week" ? "week" : "day", true), {
-            title: "Évolution · team Famille",
-            description: "Points cumulés par team dans le classement Famille.",
-            mode: this.state.familyTeamLeaderboardEvolutionMode === "week" ? "week" : "day",
-            attrName: "data-family-team-evolution-mode",
-            emptyText: "Pas encore assez de matchs terminés pour dessiner l’évolution des teams Famille."
-          })}
         </section>`;
       this.bindFamilyLeaderboardControls(root);
-      this.bindEmbeddedEvolutionControls(root);
       this.bindPhaseNavigation("familyTeamLeaderboardPhaseIndex", () => this.renderFamilyLeaderboard());
       return;
     }
 
-    if (pane === "evolution") {
-      const mode = this.state.familyLeaderboardEvolutionMode === "week" ? "week" : "day";
-      const series = this.familyEvolutionSeries(mode);
-      const latestSnapshot = series.snapshots[series.snapshots.length - 1];
-      root.innerHTML = `
-        <section class="card evolution-card family-leaderboard-card">
-          <div class="card-title-row">
-            <div><h3>Famille · évolution</h3><p class="muted">Courbe des 8 meilleurs joueurs du mode Famille.</p></div>
-            <div class="segmented small">
-              <button class="${mode === "day" ? "active" : ""}" data-family-evolution-mode="day">Jour</button>
-              <button class="${mode === "week" ? "active" : ""}" data-family-evolution-mode="week">Semaine</button>
-            </div>
-          </div>
-          ${paneControls}
-          ${series.playerIds.length ? `
-            <div class="evolution-layout">
-              <div class="evolution-chart-wrap">${this.evolutionChartSvg(series)}</div>
-              <div class="evolution-legend">
-                ${series.playerIds.map((userId, index) => {
-                  const profile = this.profileForUser(userId);
-                  const color = this.safeColor(profile.badge_color || profile.office_team_color, ["#facc15", "#38bdf8", "#a78bfa", "#fb7185", "#34d399", "#fb923c", "#f472b6", "#c4b5fd"][index % 8]);
-                  const total = latestSnapshot?.totals.get(userId) || 0;
-                  return `<div class="evolution-player" style="--player-color:${color}">${H.profileBadgeHtml(profile, "profile-badge mini")}<div><strong>${H.escapeHtml(profile.pseudo)}</strong><small>${H.escapeHtml(profile.office_team_name || "Sans team")} · ${total} pts</small></div></div>`;
-                }).join("")}
-              </div>
-            </div>` : `<p class="muted">Pas encore assez de matchs terminés pour afficher une courbe Famille.</p>`}
-        </section>`;
-      this.bindFamilyLeaderboardControls(root);
-      return;
-    }
-
-    const mode = this.state.familyPlayerLeaderboardMode === "phase" ? "phase" : "overall";
+    const mode = ["overall", "phase", "evolution"].includes(this.state.familyPlayerLeaderboardMode) ? this.state.familyPlayerLeaderboardMode : "overall";
     this.state.familyPlayerLeaderboardMode = mode;
     const modeControls = `
-      <div class="segmented small player-leaderboard-mode">
+      <div class="segmented small player-leaderboard-mode leaderboard-view-switch">
         <button class="${mode === "overall" ? "active" : ""}" data-family-player-mode="overall">Général</button>
         <button class="${mode === "phase" ? "active" : ""}" data-family-player-mode="phase">Par phase</button>
+        <button class="${mode === "evolution" ? "active" : ""}" data-family-player-mode="evolution">Évolution général</button>
       </div>`;
+
+    if (mode === "evolution") {
+      const evolutionMode = this.state.familyLeaderboardEvolutionMode === "week" ? "week" : "day";
+      const series = this.graphMockPreviewEnabled() ? this.mockEvolutionSeries(evolutionMode) : this.familyEvolutionSeries(evolutionMode);
+      root.innerHTML = `
+        <section class="card player-leaderboard-card family-leaderboard-card">
+          <div class="card-title-row leaderboard-compact-title"><div><h3>Famille · évolution joueurs</h3><p class="muted">Joueurs Famille + joueurs UIS ayant activé le mode Famille.</p></div></div>
+          <div class="team-leaderboard-control-stack">${paneControls}${modeControls}</div>
+          ${this.evolutionBlockHtml(series, {
+            title: "Évolution général · Famille",
+            description: "Points cumulés des meilleurs joueurs Famille.",
+            mode: evolutionMode,
+            attrName: "data-family-evolution-mode",
+            emptyText: "Pas encore assez de matchs terminés pour dessiner l’évolution Famille."
+          })}
+        </section>`;
+      this.bindFamilyLeaderboardControls(root);
+      this.bindEmbeddedEvolutionControls(root);
+      return;
+    }
 
     if (mode === "phase") {
       const groups = this.groupMatchesByPouleRound(this.phaseLeaderboardMatches());
@@ -5164,16 +5156,8 @@ const App = {
           ${group ? `<div class="team-phase-head"><strong>${H.escapeHtml(group.key)}</strong><small>${finishedCount}/${group.matches.length} match${group.matches.length > 1 ? "s" : ""} terminé${finishedCount > 1 ? "s" : ""} · ${H.matchDateRangeLabel(group.matches)}</small></div>` : `<p class="muted">Aucune phase à afficher pour le moment.</p>`}
           ${this.leaderboardRowsHtml(rows)}
           ${pager}
-          ${this.evolutionBlockHtml(this.graphMockPreviewEnabled() ? this.mockEvolutionSeries(this.state.familyLeaderboardEvolutionMode === "week" ? "week" : "day") : this.familyEvolutionSeries(this.state.familyLeaderboardEvolutionMode === "week" ? "week" : "day"), {
-            title: "Évolution · classement Famille",
-            description: "Points cumulés des meilleurs joueurs Famille.",
-            mode: this.state.familyLeaderboardEvolutionMode === "week" ? "week" : "day",
-            attrName: "data-family-evolution-mode",
-            emptyText: "Pas encore assez de matchs terminés pour dessiner l’évolution Famille."
-          })}
         </section>`;
       this.bindFamilyLeaderboardControls(root);
-      this.bindEmbeddedEvolutionControls(root);
       this.bindAchievementReplay(root);
       this.bindPhaseNavigation("familyLeaderboardPhaseIndex", () => this.renderFamilyLeaderboard());
       return;
@@ -5187,17 +5171,9 @@ const App = {
         </div>
         <div class="team-leaderboard-control-stack">${paneControls}${modeControls}</div>
         ${this.leaderboardRowsHtml(rows)}
-        ${this.evolutionBlockHtml(this.graphMockPreviewEnabled() ? this.mockEvolutionSeries(this.state.familyLeaderboardEvolutionMode === "week" ? "week" : "day") : this.familyEvolutionSeries(this.state.familyLeaderboardEvolutionMode === "week" ? "week" : "day"), {
-          title: "Évolution · classement Famille",
-          description: "Points cumulés des meilleurs joueurs Famille.",
-          mode: this.state.familyLeaderboardEvolutionMode === "week" ? "week" : "day",
-          attrName: "data-family-evolution-mode",
-          emptyText: "Pas encore assez de matchs terminés pour dessiner l’évolution Famille."
-        })}
       </section>
     `;
     this.bindFamilyLeaderboardControls(root);
-    this.bindEmbeddedEvolutionControls(root);
     this.bindAchievementReplay(root);
   },
 
@@ -5336,8 +5312,18 @@ const App = {
     `;
   },
 
-  teamEvolutionSeries(mode = "day", familyOnly = false) {
+  teamEvolutionSeries(mode = "day", familyOnly = false, valueMode = "points") {
     const allowedFamilyIds = familyOnly ? this.familyProfileIds() : null;
+    const eligibleProfiles = (this.state.publicProfiles || [])
+      .filter((profile) => profile.office_team_id)
+      .filter((profile) => !familyOnly || allowedFamilyIds.has(String(profile.id || profile.user_id)));
+
+    const teamSizes = new Map();
+    eligibleProfiles.forEach((profile) => {
+      const teamId = profile.office_team_id || profile.office_team_name || "sans-team";
+      teamSizes.set(teamId, (teamSizes.get(teamId) || 0) + 1);
+    });
+
     const rows = this.state.visiblePredictions
       .map((prediction) => ({ prediction, match: this.state.matches.find((m) => m.id === prediction.match_id), profile: this.profileForUser(prediction.user_id) }))
       .filter(({ prediction, match, profile }) =>
@@ -5365,7 +5351,7 @@ const App = {
 
     const periods = [...new Set(rows.map(({ match }) => periodKey(match.kickoff_at)))].sort();
     const teamMeta = new Map();
-    const totalsByTeam = new Map();
+    const totalsByTeamRaw = new Map();
     const pointsByPeriod = new Map(periods.map((key) => [key, new Map()]));
 
     rows.forEach(({ prediction, match, profile }) => {
@@ -5380,26 +5366,35 @@ const App = {
         avatar_key: "owl-01",
         badge_shape: "rounded"
       });
+      if (!teamSizes.has(teamId)) teamSizes.set(teamId, 1);
       const key = periodKey(match.kickoff_at);
       const map = pointsByPeriod.get(key);
       const points = Number(prediction.points_total || 0);
       map.set(teamId, (map.get(teamId) || 0) + points);
-      totalsByTeam.set(teamId, (totalsByTeam.get(teamId) || 0) + points);
+      totalsByTeamRaw.set(teamId, (totalsByTeamRaw.get(teamId) || 0) + points);
     });
 
-    const playerIds = [...totalsByTeam.keys()].sort((a, b) => (totalsByTeam.get(b) || 0) - (totalsByTeam.get(a) || 0)).slice(0, 8);
+    const valueForTeam = (teamId, rawValue) => valueMode === "average"
+      ? Math.round((rawValue / Math.max(1, teamSizes.get(teamId) || 1)) * 10) / 10
+      : rawValue;
+
+    const playerIds = [...totalsByTeamRaw.keys()]
+      .sort((a, b) => valueForTeam(b, totalsByTeamRaw.get(b) || 0) - valueForTeam(a, totalsByTeamRaw.get(a) || 0))
+      .slice(0, 8);
+
     const cumulative = new Map(playerIds.map((id) => [id, 0]));
     const snapshots = periods.map((key) => {
       const periodPoints = pointsByPeriod.get(key) || new Map();
       playerIds.forEach((id) => cumulative.set(id, (cumulative.get(id) || 0) + (periodPoints.get(id) || 0)));
-      return { key, label: periodLabel(key), totals: new Map(playerIds.map((id) => [id, cumulative.get(id) || 0])) };
+      return { key, label: periodLabel(key), totals: new Map(playerIds.map((id) => [id, valueForTeam(id, cumulative.get(id) || 0)])) };
     });
 
-    return { playerIds, snapshots, totalsByUser: totalsByTeam, mockProfiles: teamMeta, isTeamSeries: true };
+    const totalsByUser = new Map(playerIds.map((id) => [id, snapshots[snapshots.length - 1]?.totals.get(id) || 0]));
+    return { playerIds, snapshots, totalsByUser, mockProfiles: teamMeta, isTeamSeries: true, valueMode };
   },
 
 
-  mockTeamEvolutionSeries(mode = "day", familyOnly = false) {
+  mockTeamEvolutionSeries(mode = "day", familyOnly = false, valueMode = "points") {
     const names = familyOnly ? ["Famille SNA", "Famille Rapaces", "Famille Chouettes", "Famille Aiglons"] : ["Les SNA", "Les Rapaces", "Les Chouettes", "Les Aiglons"];
     const colors = ["#facc15", "#38bdf8", "#a78bfa", "#fb7185"];
     const teamIds = names.map((_, index) => `mock-team-${familyOnly ? "family-" : ""}${index + 1}`);
@@ -5440,7 +5435,7 @@ const App = {
     }]));
 
     const totalsByUser = new Map(teamIds.map((id) => [id, snapshots[snapshots.length - 1].totals.get(id) || 0]));
-    return { playerIds: teamIds, snapshots, totalsByUser, mockProfiles, isMock: true, isTeamSeries: true };
+    return { playerIds: teamIds, snapshots, totalsByUser, mockProfiles, isMock: true, isTeamSeries: true, valueMode };
   },
 
   async renderLeaderboardEvolution() {
@@ -6132,6 +6127,111 @@ const App = {
     `;
   },
 
+
+  privateChatOtherId(message = {}) {
+    return String(message.user_id) === String(this.state.session?.user?.id) ? message.recipient_id : message.user_id;
+  },
+
+  privateChatProfileForId(userId, messages = []) {
+    const profile = this.state.publicProfiles.find((player) => String(player.id) === String(userId)) || this.state.publicProfiles.find((player) => String(player.user_id) === String(userId));
+    if (profile) return this.playerPublicProfile(profile);
+    const sample = messages.find((message) => String(this.privateChatOtherId(message)) === String(userId)) || {};
+    if (String(sample.recipient_id) === String(userId)) {
+      return this.visualProfile({
+        id: userId,
+        pseudo: sample.recipient_pseudo || "Joueur",
+        avatar_key: sample.recipient_avatar_key || "owl-01",
+        badge_shape: sample.recipient_badge_shape || "rounded",
+        badge_color: sample.recipient_badge_color || "#facc15",
+        office_team_name: "MP du Nid"
+      });
+    }
+    return this.profileForUser(userId, sample);
+  },
+
+  privateChatThreads(messages = []) {
+    const grouped = new Map();
+    messages.forEach((message) => {
+      const otherId = this.privateChatOtherId(message);
+      if (!otherId) return;
+      if (!grouped.has(otherId)) grouped.set(otherId, []);
+      grouped.get(otherId).push(message);
+    });
+    return [...grouped.entries()]
+      .map(([userId, rows]) => ({
+        userId,
+        rows: rows.sort((a, b) => new Date(a.created_at || 0) - new Date(b.created_at || 0)),
+        latestAt: rows.reduce((latest, row) => Math.max(latest, new Date(row.created_at || 0).getTime()), 0),
+        profile: this.privateChatProfileForId(userId, rows)
+      }))
+      .sort((a, b) => b.latestAt - a.latestAt);
+  },
+
+  privateChatThreadsHtml(activePlayers = []) {
+    const threads = this.privateChatThreads(this.state.teamChatMessages || []);
+    return `
+      <div class="private-chat-compose card-soft-panel">
+        <strong>Écrire un nouveau MP</strong>
+        <form id="teamChatForm" class="team-chat-form chat-form-v120 private-chat-form">
+          <select name="recipient_id" required ${this.state.profile?.can_chat === false ? "disabled" : ""}>
+            <option value="">Choisir un destinataire MP</option>
+            ${activePlayers.filter((player) => player.id !== this.state.session.user.id).map((player) => `<option value="${H.escapeHtml(player.id)}">${H.escapeHtml(player.pseudo || "Joueur")} · ${H.escapeHtml(player.office_team_name || "Sans team")}</option>`).join("")}
+          </select>
+          <input type="text" name="body" maxlength="600" placeholder="Écris ton MP de hibou secret..." autocomplete="off" required ${this.state.profile?.can_chat === false ? "disabled" : ""}>
+          <button class="primary-btn" type="submit" ${this.state.profile?.can_chat === false ? "disabled" : ""}>Envoyer</button>
+        </form>
+      </div>
+      <div class="private-chat-thread-grid">
+        ${threads.length ? threads.map((thread) => this.privateChatThreadHtml(thread)).join("") : `<p class="muted empty-chat">Aucun MP pour l’instant. Choisis un joueur et lâche un hibou discret 🦉</p>`}
+      </div>
+    `;
+  },
+
+  privateChatThreadHtml(thread) {
+    return `
+      <article class="private-chat-thread-card" data-private-thread-user-id="${H.escapeHtml(thread.userId)}">
+        <header>
+          ${H.profileBadgeHtml(thread.profile, "profile-badge mini")}
+          <div>
+            <strong>${H.escapeHtml(thread.profile.pseudo || "Joueur")}</strong>
+            <small>${thread.rows.length} message${thread.rows.length > 1 ? "s" : ""} · dernier ${H.formatDateTime(new Date(thread.latestAt).toISOString())}</small>
+          </div>
+        </header>
+        <div class="private-chat-thread-messages">
+          ${thread.rows.map((message) => {
+            const isMine = String(message.user_id) === String(this.state.session.user.id);
+            return `<div class="private-chat-bubble ${isMine ? "mine" : "theirs"}"><span>${isMine ? "Moi" : H.escapeHtml(thread.profile.pseudo || "Joueur")}</span><p>${H.escapeHtml(message.body)}</p><small>${H.formatDateTime(message.created_at)}</small></div>`;
+          }).join("")}
+        </div>
+        <form class="private-thread-reply-form" data-private-thread-form data-recipient-id="${H.escapeHtml(thread.userId)}">
+          <input type="text" name="body" maxlength="600" placeholder="Répondre à ${H.escapeHtml(thread.profile.pseudo || "ce joueur")}..." required ${this.state.profile?.can_chat === false ? "disabled" : ""}>
+          <button class="ghost-btn" type="submit" ${this.state.profile?.can_chat === false ? "disabled" : ""}>Répondre</button>
+        </form>
+      </article>
+    `;
+  },
+
+  async sendPrivateThreadMessage(event) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const recipientId = form.dataset.recipientId;
+    const body = String(new FormData(form).get("body") || "").trim();
+    if (!recipientId || !body) return;
+    const { error } = await window.sb.from("team_chat_messages").insert({
+      user_id: this.state.session.user.id,
+      scope: "private",
+      office_team_id: null,
+      recipient_id: recipientId,
+      body
+    });
+    if (error) {
+      H.toast(error.message || "Impossible d’envoyer le MP.", "error");
+      return;
+    }
+    form.reset();
+    await this.renderTeamsPage();
+  },
+
   async renderTeamsPage() {
     await Promise.all([
       this.loadPublicProfiles(),
@@ -6201,21 +6301,16 @@ const App = {
               <small>${H.escapeHtml(this.state.teamChatError?.message || "Table ou vue manquante")}</small>
             </div>
           ` : `
-            ${this.state.teamChatHasMore ? `<button class="ghost-btn load-more-chat-btn" id="loadMoreTeamChatBtn" type="button">Charger 20 messages précédents</button>` : ""}
-            <div class="team-chat-list" id="teamChatList">
-              ${this.state.teamChatMessages.length ? this.state.teamChatMessages.map((message) => this.chatMessageHtml(message)).join("") : `<p class="muted empty-chat">Aucun message ici pour l’instant. Ouvre le bal 🦉</p>`}
-            </div>
-
-            <form id="teamChatForm" class="team-chat-form chat-form-v120 ${chatScope === "private" ? "private-chat-form" : ""}">
-              ${chatScope === "private" ? `
-                <select name="recipient_id" required ${this.state.profile?.can_chat === false ? "disabled" : ""}>
-                  <option value="">Choisir un destinataire MP</option>
-                  ${activePlayers.filter((player) => player.id !== this.state.session.user.id).map((player) => `<option value="${H.escapeHtml(player.id)}">${H.escapeHtml(player.pseudo || "Joueur")} · ${H.escapeHtml(player.office_team_name || "Sans team")}</option>`).join("")}
-                </select>
-              ` : ""}
-              <input type="text" name="body" maxlength="600" placeholder="${chatScope === "private" ? "Écris ton MP de hibou secret..." : `Écris dans ${H.escapeHtml(chatTitle)}...`}" autocomplete="off" required ${this.state.profile?.can_chat === false ? "disabled" : ""}>
-              <button class="primary-btn" type="submit" ${this.state.profile?.can_chat === false ? "disabled" : ""}>Envoyer</button>
-            </form>
+            ${chatScope === "private" ? this.privateChatThreadsHtml(activePlayers) : `
+              ${this.state.teamChatHasMore ? `<button class="ghost-btn load-more-chat-btn" id="loadMoreTeamChatBtn" type="button">Charger 20 messages précédents</button>` : ""}
+              <div class="team-chat-list" id="teamChatList">
+                ${this.state.teamChatMessages.length ? this.state.teamChatMessages.map((message) => this.chatMessageHtml(message)).join("") : `<p class="muted empty-chat">Aucun message ici pour l’instant. Ouvre le bal 🦉</p>`}
+              </div>
+              <form id="teamChatForm" class="team-chat-form chat-form-v120">
+                <input type="text" name="body" maxlength="600" placeholder="Écris dans ${H.escapeHtml(chatTitle)}..." autocomplete="off" required ${this.state.profile?.can_chat === false ? "disabled" : ""}>
+                <button class="primary-btn" type="submit" ${this.state.profile?.can_chat === false ? "disabled" : ""}>Envoyer</button>
+              </form>
+            `}
           `}
         </section>
 
@@ -6271,6 +6366,7 @@ const App = {
     });
 
     H.$("#teamChatForm")?.addEventListener("submit", (event) => this.sendTeamChatMessage(event));
+    H.$$(`[data-private-thread-form]`, root).forEach((form) => form.addEventListener("submit", (event) => this.sendPrivateThreadMessage(event)));
     this.bindChatMessageActions();
 
     const chatList = H.$("#teamChatList");
@@ -6650,7 +6746,7 @@ const App = {
             <p class="muted">Déconnexion, crédits et historique des évolutions.</p>
           </div>
           <div class="profile-account-actions">
-            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.3.6</button>
+            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.3.7</button>
             <button class="danger-btn" id="profileLogoutBtn" type="button">Déconnexion</button>
           </div>
         </div>

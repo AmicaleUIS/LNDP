@@ -1,4 +1,14 @@
-# Le Nid des Pronos — V1.3.6
+# Le Nid des Pronos — V1.3.7
+
+## V1.3.7 — Graphs en boutons + MP par conversation
+
+- Les graphs ne s’empilent plus sous les classements : ils deviennent de vrais boutons dans les sélecteurs.
+- Joueurs : Général / Par phase / Évolution.
+- Teams bureau : Moyenne / Par points / Évolution moyenne / Évolution points.
+- Famille joueurs : Général / Par phase / Évolution général.
+- Team Famille : Moyenne / Par points / Évolution moyenne / Évolution points.
+- Les MP sont rangés par conversation : une fenêtre de discussion par joueur.
+- Aucun nouveau patch SQL obligatoire si le patch V1.3.6 a déjà été lancé.
 
 ## V1.3.6 — Graphs intégrés + accueil nettoyé + messages privés
 
