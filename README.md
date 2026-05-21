@@ -1,4 +1,13 @@
-# Le Nid des Pronos — V1.3.7
+# Le Nid des Pronos — V1.3.8
+
+## V1.3.8 — Chat simplifié + Hall complet
+
+- Matchs : suppression de la capsule visible “Auto-enregistré”.
+- Exploits : dans le Hall du Nid, les exploits visibles ne se limitent plus aux 3 mis en avant.
+- Teams du Nid : choix du salon transformé en sélecteur plus léger.
+- MP : conversations accessibles via un menu déroulant avec avatar/nom, affichage d’une seule conversation à la fois, points rouges par conversation non lue.
+- MP : les réactions/émoticônes fonctionnent aussi sur les messages privés.
+- Messages : fond teinté selon la couleur de la team de l’auteur.
 
 ## V1.3.7 — Graphs en boutons + MP par conversation
 

@@ -15314,3 +15314,178 @@ body[data-current-view="leaderboard"] .team-leaderboard-card .muted {
     grid-template-columns: 1fr;
   }
 }
+
+
+/* ============================================================
+   V1.3.8 — Chat simplifié + MP par conversation + Hall complet
+   ============================================================ */
+
+.hall-all-achievements {
+  margin-top: 8px;
+  max-height: 92px;
+  overflow: auto;
+  padding-right: 4px;
+}
+
+.chat-channel-picker {
+  display: grid;
+  gap: 6px;
+  margin: 12px 0 14px;
+  padding: 12px;
+  border-radius: 20px;
+  border: 1px solid rgba(148, 163, 184, .18);
+  background: rgba(15, 23, 42, .42);
+}
+
+.chat-channel-picker label {
+  display: grid;
+  gap: 7px;
+}
+
+.chat-channel-picker label > span {
+  color: #facc15;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  font-size: .72rem;
+  font-weight: 900;
+}
+
+.chat-channel-picker select,
+.private-thread-dropdown summary,
+.private-thread-menu button {
+  width: 100%;
+  border-radius: 18px;
+  border: 1px solid rgba(148, 163, 184, .22);
+  background: rgba(2, 6, 23, .48);
+  color: #f8fafc;
+  font: inherit;
+}
+
+.chat-channel-picker select {
+  min-height: 48px;
+  padding: 0 14px;
+  font-weight: 900;
+}
+
+.team-chat-message {
+  --message-team-color: #facc15;
+}
+
+.team-chat-bubble {
+  border-color: color-mix(in srgb, var(--message-team-color) 34%, rgba(148,163,184,.24));
+  background:
+    radial-gradient(circle at 0% 0%, color-mix(in srgb, var(--message-team-color) 22%, transparent), transparent 46%),
+    linear-gradient(135deg, color-mix(in srgb, var(--message-team-color) 16%, rgba(15,23,42,.84)), rgba(15,23,42,.78));
+}
+
+.team-chat-message.me .team-chat-bubble {
+  background:
+    radial-gradient(circle at 100% 0%, color-mix(in srgb, var(--message-team-color) 22%, transparent), transparent 46%),
+    linear-gradient(135deg, rgba(15,23,42,.78), color-mix(in srgb, var(--message-team-color) 18%, rgba(15,23,42,.86)));
+}
+
+.private-chat-conversation-shell {
+  display: grid;
+  gap: 14px;
+}
+
+.private-thread-dropdown {
+  border-radius: 22px;
+  border: 1px solid rgba(56, 189, 248, .22);
+  background: rgba(56, 189, 248, .08);
+  overflow: hidden;
+}
+
+.private-thread-dropdown summary {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 10px;
+  align-items: center;
+  padding: 12px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.private-thread-dropdown summary::-webkit-details-marker {
+  display: none;
+}
+
+.private-thread-dropdown summary::after {
+  content: "▾";
+  position: absolute;
+  right: 18px;
+  color: #bae6fd;
+  font-weight: 900;
+}
+
+.private-thread-menu {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  max-height: 330px;
+  overflow: auto;
+  border-top: 1px solid rgba(148,163,184,.12);
+}
+
+.private-thread-menu button {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.private-thread-menu button.active {
+  border-color: rgba(250, 204, 21, .42);
+  background: rgba(250, 204, 21, .12);
+}
+
+.private-thread-menu button span {
+  display: grid;
+  gap: 2px;
+}
+
+.private-thread-menu button small,
+.private-thread-dropdown summary small {
+  color: rgba(226,232,240,.66);
+  font-weight: 700;
+}
+
+.private-thread-unread-dot {
+  width: 11px;
+  height: 11px;
+  border-radius: 999px;
+  background: #ef4444;
+  box-shadow: 0 0 0 3px rgba(239,68,68,.16), 0 0 14px rgba(239,68,68,.65);
+}
+
+.private-chat-thread-card.active-thread-card {
+  border-color: rgba(56,189,248,.22);
+}
+
+.private-message-list {
+  max-height: min(520px, 55vh);
+  overflow: auto;
+  padding-right: 4px;
+}
+
+.private-message-list .team-chat-message {
+  margin-bottom: 10px;
+}
+
+.private-chat-compose {
+  margin-bottom: 12px;
+}
+
+@media (max-width: 720px) {
+  .private-thread-menu {
+    max-height: 260px;
+  }
+
+  .private-message-list {
+    max-height: 56vh;
+  }
+}

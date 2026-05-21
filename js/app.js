@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — APP PRINCIPALE V1.3.7
+// LE NID DES PRONOS — APP PRINCIPALE V1.3.8
 // ============================================================
 
 const H = window.Helpers;
@@ -27,6 +27,7 @@ const App = {
     teamSelectedPlayerId: null,
     teamChatMessages: [],
     teamChatScope: "global",
+    activePrivateThreadId: null,
     teamChatLimit: 10,
     teamChatPageSize: 20,
     teamChatHasMore: false,
@@ -415,7 +416,7 @@ const App = {
           <div>
             <p class="eyebrow">Crédits cachés</p>
             <h2 id="creditsTitle">Le Nid des Pronos</h2>
-            <p class="muted">Version publique <strong>1.3.7</strong> · graphs en boutons et MP rangés par conversation.</p>
+            <p class="muted">Version publique <strong>1.3.8</strong> · chat simplifié, MP propre et hall des exploits complet.</p>
           </div>
         </div>
         <div class="credits-grid">
@@ -432,7 +433,7 @@ const App = {
             <p><strong>1.0.5</strong> — dashboard mobile/desktop stabilisé, sans chevauchement des cartes.</p>
           </section>
           <section>
-            <h3>Évolutions V1.3.7</h3>
+            <h3>Évolutions V1.3.8</h3>
             <ul class="changelog-list">
               <li>Le super admin peut désactiver ou réactiver l’affichage du module préparation.</li>
               <li>Quand la préparation est désactivée, les matchs test disparaissent des matchs/pronos, classements par phase et règles.</li>
@@ -1884,11 +1885,7 @@ const App = {
           ` : ""}
 
           <div class="prediction-actions">
-            ${locked
-              ? `<span class="locked-label">${H.icon("lock")} Prono verrouillé</span>`
-              : `<span class="auto-save-label">${H.icon("check", "")} Auto-enregistré</span>`
-            }
-            <span class="prediction-autosave-status" aria-live="polite"></span>
+            ${locked ? `<span class="locked-label">${H.icon("lock")} Prono verrouillé</span>` : ``}
             ${myPrediction ? this.myPredictionInlineHtml(myPrediction) : `<span class="muted">Aucun prono posé</span>`}
           </div>
           ${this.myPredictionResultHtml(match, myPrediction)}
@@ -2232,7 +2229,7 @@ const App = {
                 <div>
                   <strong>#${index + 1} exploits — ${H.escapeHtml(row.pseudo)}</strong>
                   <small>${H.escapeHtml(row.office_team_name || "Sans team")} · ${badges.length} exploit${badges.length > 1 ? "s" : ""} · classement général #${row.rank}</small>
-                  ${this.badgesPreviewHtml(row.user_id, 3, row)}
+                  ${badges.length ? `<div class="achievement-preview hall-all-achievements">${badges.map((badge) => this.badgeChipHtml(badge)).join("")}</div>` : ""}
                 </div>
               </div>
               <div class="points">${row.total_points || 0}<small>pts</small></div>
@@ -6082,6 +6079,10 @@ const App = {
     const list = H.$("#teamChatList");
     if (list) {
       const nearBottom = list.scrollHeight - list.scrollTop - list.clientHeight < 80;
+      if (this.state.teamChatScope === "private") {
+        await this.renderTeamsPage();
+        return;
+      }
       list.innerHTML = this.state.teamChatMessages.map((message) => this.chatMessageHtml(message)).join("") || `<p class="muted empty-chat">Aucun message ici pour l’instant. Ouvre le bal 🦉</p>`;
       this.bindChatMessageActions();
       if (nearBottom) list.scrollTop = list.scrollHeight;
@@ -6105,8 +6106,9 @@ const App = {
     const canBlockAuthor = !isMe && !["admin", "super_admin"].includes(authorRole);
     const canDelete = isMe || this.isSuperAdmin();
     const scopeLabel = this.chatScopeLabel(message.scope);
+    const messageColor = this.safeColor(profile.office_team_color || profile.badge_color, "#facc15");
     return `
-      <article class="team-chat-message ${isMe ? "me" : ""} ${this.isFamilyChatScope(message.scope) ? "family-message" : ""}">
+      <article class="team-chat-message ${isMe ? "me" : ""} ${this.isFamilyChatScope(message.scope) ? "family-message" : ""} ${message.scope === "private" ? "private-message" : ""}" style="--message-team-color:${messageColor}">
         ${H.profileBadgeHtml(profile, "profile-badge mini")}
         <div class="team-chat-bubble" data-open-reaction-picker-message-id="${H.escapeHtml(message.id)}" role="button" tabindex="0" title="Cliquer pour réagir">
           <div class="team-chat-meta">
@@ -6149,6 +6151,42 @@ const App = {
     return this.profileForUser(userId, sample);
   },
 
+
+  privateThreadSeenKey(userId) {
+    return `nid-private-thread-seen:${this.state.session?.user?.id || "anonymous"}:${userId || "unknown"}`;
+  },
+
+  getPrivateThreadLastSeenAt(userId) {
+    try {
+      const raw = localStorage.getItem(this.privateThreadSeenKey(userId));
+      return raw ? new Date(raw) : null;
+    } catch (error) {
+      return null;
+    }
+  },
+
+  setPrivateThreadSeenNow(userId) {
+    if (!userId) return;
+    try {
+      localStorage.setItem(this.privateThreadSeenKey(userId), new Date().toISOString());
+    } catch (error) {
+      console.warn("Impossible d’enregistrer la lecture du MP", error);
+    }
+  },
+
+  privateThreadHasUnread(thread) {
+    if (!thread?.userId) return false;
+    if (String(thread.userId) === String(this.state.activePrivateThreadId)) return false;
+    const seenAt = this.getPrivateThreadLastSeenAt(thread.userId);
+    if (!seenAt || Number.isNaN(seenAt.getTime())) {
+      return thread.rows.some((message) => String(message.user_id) !== String(this.state.session.user.id));
+    }
+    return thread.rows.some((message) =>
+      String(message.user_id) !== String(this.state.session.user.id)
+      && new Date(message.created_at || 0).getTime() > seenAt.getTime()
+    );
+  },
+
   privateChatThreads(messages = []) {
     const grouped = new Map();
     messages.forEach((message) => {
@@ -6169,6 +6207,20 @@ const App = {
 
   privateChatThreadsHtml(activePlayers = []) {
     const threads = this.privateChatThreads(this.state.teamChatMessages || []);
+    const threadIds = new Set(threads.map((thread) => String(thread.userId)));
+    if (this.state.activePrivateThreadId && !threadIds.has(String(this.state.activePrivateThreadId))) {
+      this.state.activePrivateThreadId = null;
+    }
+    if (!this.state.activePrivateThreadId && threads.length) {
+      this.state.activePrivateThreadId = threads[0].userId;
+    }
+
+    const activeThread = threads.find((thread) => String(thread.userId) === String(this.state.activePrivateThreadId));
+    if (activeThread) this.setPrivateThreadSeenNow(activeThread.userId);
+
+    const currentLabel = activeThread?.profile?.pseudo || "Choisir une conversation";
+    const currentMeta = activeThread ? `${activeThread.rows.length} message${activeThread.rows.length > 1 ? "s" : ""}` : "Aucun fil ouvert";
+
     return `
       <div class="private-chat-compose card-soft-panel">
         <strong>Écrire un nouveau MP</strong>
@@ -6181,15 +6233,32 @@ const App = {
           <button class="primary-btn" type="submit" ${this.state.profile?.can_chat === false ? "disabled" : ""}>Envoyer</button>
         </form>
       </div>
-      <div class="private-chat-thread-grid">
-        ${threads.length ? threads.map((thread) => this.privateChatThreadHtml(thread)).join("") : `<p class="muted empty-chat">Aucun MP pour l’instant. Choisis un joueur et lâche un hibou discret 🦉</p>`}
+
+      <div class="private-chat-conversation-shell">
+        <details class="private-thread-dropdown" ${threads.length ? "" : "open"}>
+          <summary>
+            ${activeThread ? H.profileBadgeHtml(activeThread.profile, "profile-badge mini") : H.icon("messages")}
+            <span><strong>${H.escapeHtml(currentLabel)}</strong><small>${H.escapeHtml(currentMeta)}</small></span>
+          </summary>
+          <div class="private-thread-menu">
+            ${threads.length ? threads.map((thread) => `
+              <button type="button" class="${String(thread.userId) === String(this.state.activePrivateThreadId) ? "active" : ""}" data-private-thread-select="${H.escapeHtml(thread.userId)}">
+                ${H.profileBadgeHtml(thread.profile, "profile-badge mini")}
+                <span><strong>${H.escapeHtml(thread.profile.pseudo || "Joueur")}</strong><small>${thread.rows.length} message${thread.rows.length > 1 ? "s" : ""} · ${H.formatDateTime(new Date(thread.latestAt).toISOString())}</small></span>
+                ${this.privateThreadHasUnread(thread) ? `<b class="private-thread-unread-dot" aria-label="Nouveau MP"></b>` : ""}
+              </button>
+            `).join("") : `<p class="muted">Aucune conversation MP pour l’instant.</p>`}
+          </div>
+        </details>
+
+        ${activeThread ? this.privateChatThreadHtml(activeThread) : `<p class="muted empty-chat">Choisis un joueur et lâche un hibou discret 🦉</p>`}
       </div>
     `;
   },
 
   privateChatThreadHtml(thread) {
     return `
-      <article class="private-chat-thread-card" data-private-thread-user-id="${H.escapeHtml(thread.userId)}">
+      <article class="private-chat-thread-card active-thread-card" data-private-thread-user-id="${H.escapeHtml(thread.userId)}">
         <header>
           ${H.profileBadgeHtml(thread.profile, "profile-badge mini")}
           <div>
@@ -6197,11 +6266,8 @@ const App = {
             <small>${thread.rows.length} message${thread.rows.length > 1 ? "s" : ""} · dernier ${H.formatDateTime(new Date(thread.latestAt).toISOString())}</small>
           </div>
         </header>
-        <div class="private-chat-thread-messages">
-          ${thread.rows.map((message) => {
-            const isMine = String(message.user_id) === String(this.state.session.user.id);
-            return `<div class="private-chat-bubble ${isMine ? "mine" : "theirs"}"><span>${isMine ? "Moi" : H.escapeHtml(thread.profile.pseudo || "Joueur")}</span><p>${H.escapeHtml(message.body)}</p><small>${H.formatDateTime(message.created_at)}</small></div>`;
-          }).join("")}
+        <div class="private-chat-thread-messages team-chat-list private-message-list" id="teamChatList">
+          ${thread.rows.map((message) => this.chatMessageHtml(message)).join("")}
         </div>
         <form class="private-thread-reply-form" data-private-thread-form data-recipient-id="${H.escapeHtml(thread.userId)}">
           <input type="text" name="body" maxlength="600" placeholder="Répondre à ${H.escapeHtml(thread.profile.pseudo || "ce joueur")}..." required ${this.state.profile?.can_chat === false ? "disabled" : ""}>
@@ -6228,6 +6294,8 @@ const App = {
       H.toast(error.message || "Impossible d’envoyer le MP.", "error");
       return;
     }
+    this.state.activePrivateThreadId = recipientId;
+    this.setPrivateThreadSeenNow(recipientId);
     form.reset();
     await this.renderTeamsPage();
   },
@@ -6285,13 +6353,18 @@ const App = {
             <button class="ghost-btn" id="refreshTeamChatBtn" type="button">Rafraîchir</button>
           </div>
 
-          <div class="segmented small team-chat-scope chat-scope-v120">
-            ${scopes.map((scope) => `
-              <button class="${chatScope === scope.key ? "active" : ""} ${this.isFamilyChatScope(scope.key) ? "family-tab" : ""} ${this.state.unreadTeamChatScopes?.has(scope.key) ? "has-scope-unread" : ""}" data-chat-scope="${H.escapeHtml(scope.key)}" type="button" title="${H.escapeHtml(scope.hint)}">
-                <span>${H.escapeHtml(scope.short)}</span>
-                ${this.state.unreadTeamChatScopes?.has(scope.key) ? `<span class="chat-scope-dot" aria-hidden="true"></span>` : ""}
-              </button>
-            `).join("")}
+          <div class="chat-channel-picker">
+            <label>
+              <span>Choisir le coin du Nid</span>
+              <select id="teamChatScopeSelect">
+                ${scopes.map((scope) => `
+                  <option value="${H.escapeHtml(scope.key)}" ${chatScope === scope.key ? "selected" : ""}>
+                    ${this.state.unreadTeamChatScopes?.has(scope.key) ? "● " : ""}${H.escapeHtml(scope.label)}
+                  </option>
+                `).join("")}
+              </select>
+            </label>
+            <p class="muted">${H.escapeHtml(scopes.find((scope) => scope.key === chatScope)?.hint || "Choisis où écrire.")}</p>
           </div>
 
           ${chatUnavailable ? `
@@ -6340,12 +6413,10 @@ const App = {
       H.toast("Messages rafraîchis", "success");
     });
 
-    H.$$('[data-chat-scope]').forEach((button) => {
-      button.addEventListener("click", async () => {
-        this.state.teamChatScope = button.dataset.chatScope || "global";
-        this.state.teamChatLimit = 10;
-        await this.renderTeamsPage();
-      });
+    H.$("#teamChatScopeSelect", root)?.addEventListener("change", async (event) => {
+      this.state.teamChatScope = event.currentTarget.value || "global";
+      this.state.teamChatLimit = this.state.teamChatScope === "private" ? 80 : 10;
+      await this.renderTeamsPage();
     });
 
     H.$$('[data-direct-message-user-id]', root).forEach((button) => {
@@ -6366,6 +6437,13 @@ const App = {
     });
 
     H.$("#teamChatForm")?.addEventListener("submit", (event) => this.sendTeamChatMessage(event));
+    H.$$("[data-private-thread-select]", root).forEach((button) => {
+      button.addEventListener("click", async () => {
+        this.state.activePrivateThreadId = button.dataset.privateThreadSelect;
+        this.setPrivateThreadSeenNow(this.state.activePrivateThreadId);
+        await this.renderTeamsPage();
+      });
+    });
     H.$$(`[data-private-thread-form]`, root).forEach((form) => form.addEventListener("submit", (event) => this.sendPrivateThreadMessage(event)));
     this.bindChatMessageActions();
 
@@ -6421,8 +6499,12 @@ const App = {
       return;
     }
 
+    if (scope === "private" && recipientId) {
+      this.state.activePrivateThreadId = recipientId;
+      this.setPrivateThreadSeenNow(recipientId);
+    }
     form.reset();
-    this.state.teamChatLimit = Math.max(this.state.teamChatLimit, 10);
+    this.state.teamChatLimit = Math.max(this.state.teamChatLimit, scope === "private" ? 80 : 10);
     await this.loadTeamChatMessages();
     await this.renderTeamsPage();
   },
@@ -6746,7 +6828,7 @@ const App = {
             <p class="muted">Déconnexion, crédits et historique des évolutions.</p>
           </div>
           <div class="profile-account-actions">
-            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.3.7</button>
+            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.3.8</button>
             <button class="danger-btn" id="profileLogoutBtn" type="button">Déconnexion</button>
           </div>
         </div>
