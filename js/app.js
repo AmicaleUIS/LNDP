@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — APP PRINCIPALE V1.3.8
+// LE NID DES PRONOS — APP PRINCIPALE V1.3.10
 // ============================================================
 
 const H = window.Helpers;
@@ -416,7 +416,7 @@ const App = {
           <div>
             <p class="eyebrow">Crédits cachés</p>
             <h2 id="creditsTitle">Le Nid des Pronos</h2>
-            <p class="muted">Version publique <strong>1.3.8</strong> · chat simplifié, MP propre et hall des exploits complet.</p>
+            <p class="muted">Version publique <strong>1.3.10</strong> · bilan PDF corrigé et Hall du Nid recalculé avec les données Supabase.</p>
           </div>
         </div>
         <div class="credits-grid">
@@ -433,7 +433,7 @@ const App = {
             <p><strong>1.0.5</strong> — dashboard mobile/desktop stabilisé, sans chevauchement des cartes.</p>
           </section>
           <section>
-            <h3>Évolutions V1.3.8</h3>
+            <h3>Évolutions V1.3.10</h3>
             <ul class="changelog-list">
               <li>Le super admin peut désactiver ou réactiver l’affichage du module préparation.</li>
               <li>Quand la préparation est désactivée, les matchs test disparaissent des matchs/pronos, classements par phase et règles.</li>
@@ -2203,23 +2203,87 @@ const App = {
     this.bindAchievementReplay(root);
   },
 
+
+  computeHallBadgesForUser(userId) {
+    const badges = [...this.computeBadgesForUser(userId)];
+    const has = new Set(badges.map((badge) => badge.id));
+    const unlock = (id, unlockedAt = null) => {
+      if (has.has(id)) return;
+      const badge = this.badgeById(id);
+      if (!badge) return;
+      badges.push({ ...badge, unlockedAt: this.safeDate(unlockedAt) });
+      has.add(id);
+    };
+
+    const countRow = this.miniRecordPredictionCountRow(userId);
+    const predictionCount = Number(countRow?.prediction_count || countRow?.count || 0);
+    const firstPredictionAt = countRow?.first_prediction_at || countRow?.first_at || countRow?.created_at || null;
+    const latestPredictionAt = countRow?.latest_prediction_at || countRow?.latest_at || null;
+    const availableMatchCount = this.availablePredictionMatches().length;
+    const champion = this.winnerPredictionForUser(userId);
+
+    if (predictionCount >= 1) unlock("egg-hatched", firstPredictionAt);
+    if (predictionCount >= 10) unlock("young-feathers", latestPredictionAt || firstPredictionAt);
+    if (availableMatchCount > 0 && predictionCount >= Math.ceil(availableMatchCount / 2)) unlock("half-nest", latestPredictionAt || firstPredictionAt);
+    if (availableMatchCount > 0 && predictionCount >= Math.ceil(availableMatchCount * 0.75)) unlock("three-quarter-perch", latestPredictionAt || firstPredictionAt);
+    if (availableMatchCount > 0 && predictionCount >= availableMatchCount) unlock("all-picks-in", latestPredictionAt || firstPredictionAt);
+    if (champion?.predicted_team_id) unlock("champion-picked", champion.locked_at || champion.updated_at || champion.created_at || firstPredictionAt);
+
+    return badges.sort((a, b) => {
+      const aDate = a.unlockedAt?.getTime?.() || 0;
+      const bDate = b.unlockedAt?.getTime?.() || 0;
+      return bDate - aDate || String(a.title).localeCompare(String(b.title), "fr");
+    });
+  },
+
   async renderAchievementHall() {
     const root = H.$("#achievementsContent");
-    const { data, error } = await window.sb
-      .from("v_leaderboard_overall")
-      .select("*")
-      .order("rank");
 
-    if (error) {
-      root.innerHTML = `<p class="error-text">${H.escapeHtml(error.message)}</p>`;
-      return;
-    }
+    await Promise.all([
+      this.loadPublicProfiles().catch((error) => console.warn("Profils publics indisponibles pour le Hall", error)),
+      this.loadPlayerScoreRows().catch((error) => console.warn("Classement indisponible pour le Hall", error)),
+      this.loadVisiblePredictions().catch((error) => console.warn("Pronos visibles indisponibles pour le Hall", error)),
+      this.loadMiniRecordPredictionCounts().catch((error) => console.warn("Compteurs publics indisponibles pour le Hall", error)),
+      this.loadWinnerPredictionsForTeams().catch((error) => console.warn("Choix champion indisponibles pour le Hall", error))
+    ]);
 
-    const rows = (data || [])
-      .map((row) => ({ row, badges: this.computeBadgesForUser(row.user_id) }))
-      .sort((a, b) => b.badges.length - a.badges.length || Number(a.row.rank || 9999) - Number(b.row.rank || 9999));
+    const byUser = new Map();
+
+    this.state.publicProfiles.forEach((profile) => {
+      const userId = profile.id || profile.user_id;
+      if (!userId) return;
+      byUser.set(String(userId), {
+        ...profile,
+        user_id: userId,
+        total_points: 0,
+        rank: null
+      });
+    });
+
+    this.state.playerScoreRows.forEach((row) => {
+      const userId = row.user_id || row.id;
+      if (!userId) return;
+      byUser.set(String(userId), {
+        ...(byUser.get(String(userId)) || {}),
+        ...row,
+        user_id: userId
+      });
+    });
+
+    const rows = [...byUser.values()]
+      .filter((row) => row.user_id)
+      .map((row) => ({ row, badges: this.computeHallBadgesForUser(row.user_id) }))
+      .sort((a, b) =>
+        b.badges.length - a.badges.length
+        || Number(a.row.rank || 9999) - Number(b.row.rank || 9999)
+        || String(a.row.pseudo || "").localeCompare(String(b.row.pseudo || ""), "fr")
+      );
 
     root.innerHTML = `
+      <div class="badge-hall-note">
+        ${H.icon("info")}
+        <span>Le Hall recalcule les exploits depuis les données Supabase : pronos visibles, compteurs publics, choix champion et points comptabilisés.</span>
+      </div>
       <div class="badge-leaderboard-list">
         ${rows.length ? rows.map(({ row, badges }, index) => `
           <details class="badge-player-card ${row.user_id === this.state.session.user.id ? "me" : ""}" ${index < 3 ? "open" : ""}>
@@ -2227,18 +2291,19 @@ const App = {
               <div class="badge-player-summary-main">
                 ${H.profileBadgeHtml(this.visualProfile(row), "profile-badge leaderboard-badge")}
                 <div>
-                  <strong>#${index + 1} exploits — ${H.escapeHtml(row.pseudo)}</strong>
-                  <small>${H.escapeHtml(row.office_team_name || "Sans team")} · ${badges.length} exploit${badges.length > 1 ? "s" : ""} · classement général #${row.rank}</small>
-                  ${badges.length ? `<div class="achievement-preview hall-all-achievements">${badges.map((badge) => this.badgeChipHtml(badge)).join("")}</div>` : ""}
+                  <strong>#${index + 1} exploits — ${H.escapeHtml(row.pseudo || "Joueur")}</strong>
+                  <small>${H.escapeHtml(row.office_team_name || "Sans team")} · ${badges.length} exploit${badges.length > 1 ? "s" : ""}${row.rank ? ` · classement général #${row.rank}` : ""}</small>
+                  ${badges.length ? `<div class="achievement-preview hall-all-achievements">${badges.map((badge) => this.badgeChipHtml(badge)).join("")}</div>` : `<span class="muted">Aucun exploit public détecté pour l’instant.</span>`}
                 </div>
               </div>
               <div class="points">${row.total_points || 0}<small>pts</small></div>
             </summary>
-            ${this.badgesPanelHtml(row.user_id, { title: "Détail des exploits" })}
+            ${this.badgesPanelHtml(row.user_id, { title: "Tous les exploits publics du joueur", badgesOverride: badges })}
           </details>
-        `).join("") : `<section class="card"><p class="muted">Aucun exploit pour le moment.</p></section>`}
+        `).join("") : `<section class="card"><p class="muted">Aucun joueur actif à afficher pour le moment.</p></section>`}
       </div>
     `;
+
     this.bindAchievementReplay(root);
   },
 
@@ -3486,6 +3551,7 @@ const App = {
       { id: "many-active-days", title: "Toujours au nid", description: "14 jours différents avec au moins une activité de prono. Le nid a ton empreinte dans le bois.", type: "neutral", category: "fidelity" },
       { id: "last-wingbeat", title: "Dernier battement d’aile", description: "Un prono ajusté dans les 2 heures avant le coup d’envoi. Frisson, sueur, validation.", type: "neutral", category: "fidelity" },
 
+      { id: "champion-picked", title: "Champion choisi", description: "L’équipe championne a été désignée avant le grand envol. Le hibou assume son oracle.", type: "neutral", category: "progression" },
       { id: "final-winner-oracle", title: "Oracle de la finale", description: "L’équipe choisie championne avant le départ gagne réellement la Coupe. Là, le nid sort les confettis.", type: "neutral" },
       { id: "bus-stuck", title: "Descente du bus impossible", description: "L’équipe désignée championne reste bloquée en phase de groupes. Le bus a calé avant la sortie des poules.", type: "negative" },
       { id: "final-perfect-score", title: "Finale millimétrée", description: "Score exact trouvé sur la finale. Une plume, une règle, zéro tremblement.", type: "neutral" },
@@ -4120,7 +4186,7 @@ const App = {
   },
 
   badgesPanelHtml(userId, options = {}) {
-    const badges = this.computeBadgesForUser(userId);
+    const badges = Array.isArray(options.badgesOverride) ? options.badgesOverride : this.computeBadgesForUser(userId);
     if (!badges.length) return `<p class="muted detail-empty">Aucun exploit pour le moment. Le nid observe en silence.</p>`;
     const title = options.title ? `<div class="achievement-panel-title"><strong>${H.escapeHtml(options.title)}</strong><small>${badges.length} exploit${badges.length > 1 ? "s" : ""} débloqué${badges.length > 1 ? "s" : ""}</small></div>` : "";
     return `${title}<div class="achievement-grid">${badges.map((badge) => this.badgeCardHtml(badge, true, { showDate: options.showDates !== false })).join("")}</div>`;
@@ -6828,7 +6894,7 @@ const App = {
             <p class="muted">Déconnexion, crédits et historique des évolutions.</p>
           </div>
           <div class="profile-account-actions">
-            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.3.8</button>
+            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.3.10</button>
             <button class="danger-btn" id="profileLogoutBtn" type="button">Déconnexion</button>
           </div>
         </div>

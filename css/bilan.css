@@ -249,7 +249,7 @@
 }
 
 
-/* V1.3.6 — Impression : conserver les fonds PDF */
+/* V1.3.9 — Impression : fonds non coupés + diplôme paysage */
 @media print {
   * {
     -webkit-print-color-adjust: exact !important;
@@ -270,4 +270,124 @@
   .bilan-page.records { background: var(--bilan-records-bg) !important; }
   .bilan-page.graphs { background: var(--bilan-graphs-bg) !important; }
   .bilan-page.diploma { background: var(--bilan-diplome-bg) !important; }
+}
+
+
+/* ============================================================
+   V1.3.10 — Bilan PDF : données + fonds + diplôme paysage
+   ============================================================ */
+
+.bilan-page {
+  background-size: 100% 100%;
+  background-position: center;
+}
+
+.bilan-page.diploma {
+  width: min(1120px, 100%);
+  min-height: 792px;
+  aspect-ratio: 1.414 / 1;
+  background-size: 100% 100%;
+}
+
+.champion-card .champion-pick-line {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.champion-card .team-flag-img {
+  width: 34px;
+  height: 24px;
+  border-radius: 6px;
+  flex: 0 0 auto;
+}
+
+@media print {
+  @page { size: A4 portrait; margin: 0; }
+  @page diploma { size: A4 landscape; margin: 0; }
+
+  html,
+  body {
+    width: auto !important;
+    min-width: 0 !important;
+    margin: 0 !important;
+    background: #07111f !important;
+  }
+
+  .bilan-root {
+    width: auto !important;
+    max-width: none !important;
+    margin: 0 !important;
+  }
+
+  .bilan-document {
+    display: block !important;
+    gap: 0 !important;
+  }
+
+  .bilan-page {
+    width: 210mm !important;
+    height: 297mm !important;
+    min-height: 297mm !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 14mm !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    overflow: hidden !important;
+    page-break-after: always !important;
+    break-after: page !important;
+    background-size: 100% 100% !important;
+    background-position: center !important;
+    background-repeat: no-repeat !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  .bilan-page.diploma {
+    page: diploma !important;
+    width: 297mm !important;
+    height: 210mm !important;
+    min-height: 210mm !important;
+    max-width: none !important;
+    aspect-ratio: auto !important;
+    padding: 10mm 16mm !important;
+    background-size: 100% 100% !important;
+    background-position: center !important;
+  }
+
+  .bilan-page.diploma .bilan-page-content {
+    min-height: 190mm !important;
+    display: grid !important;
+    place-items: center !important;
+  }
+
+  .diploma-card {
+    width: 230mm !important;
+    max-width: 230mm !important;
+    padding: 16mm 18mm !important;
+  }
+
+  .diploma-card h2 {
+    font-size: 40pt !important;
+  }
+
+  .diploma-card h3 {
+    font-size: 22pt !important;
+    white-space: normal !important;
+  }
+
+  .diploma-card p {
+    font-size: 12pt !important;
+  }
+
+  .signature-row {
+    margin-top: 14mm !important;
+  }
+
+  .bilan-page:last-child {
+    page-break-after: auto !important;
+    break-after: auto !important;
+  }
 }

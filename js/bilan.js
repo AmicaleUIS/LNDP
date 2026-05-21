@@ -1,6 +1,6 @@
 
 // ============================================================
-// LE NID DES PRONOS — BILAN PDF V1.3.0
+// LE NID DES PRONOS — BILAN PDF V1.3.10
 // ============================================================
 
 const H = window.Helpers;
@@ -66,6 +66,7 @@ const BilanPDF = {
     }
 
     this.state.report = data || {};
+    await this.enrichReportWithChampionFallback();
     this.render();
     if (root) root.classList.remove("is-loading");
   },
@@ -86,6 +87,154 @@ const BilanPDF = {
       .on("postgres_changes", { event: "*", schema: "public", table: "winner_predictions", filter: `user_id=eq.${this.state.playerId}` }, refresh)
       .on("postgres_changes", { event: "*", schema: "public", table: "matches" }, refresh)
       .subscribe();
+  },
+
+
+  async enrichReportWithChampionFallback() {
+    const report = this.state.report || {};
+    if (report.champion_prediction || report.winner_prediction || report.winner) return;
+
+    const fromView = await this.fetchChampionFromView().catch(() => null);
+    const fromTable = fromView || await this.fetchChampionFromTable().catch(() => null);
+    if (fromTable) {
+      this.state.report = {
+        ...report,
+        champion_prediction: this.normalizeChampionPrediction(fromTable)
+      };
+    }
+  },
+
+  normalizeChampionPrediction(row = null) {
+    if (!row) return null;
+    return {
+      user_id: row.user_id,
+      competition_id: row.competition_id,
+      predicted_team_id: row.predicted_team_id,
+      predicted_team_name: row.predicted_team_name || row.team_name || row.name || row.predicted_team?.name,
+      predicted_team_short_name: row.predicted_team_short_name || row.predicted_team?.short_name,
+      predicted_team_country_code: row.predicted_team_country_code || row.predicted_team?.country_code,
+      predicted_team_flag_url: row.predicted_team_flag_url || row.predicted_team?.flag_url,
+      actual_winner_team_id: row.actual_winner_team_id,
+      actual_winner_team_name: row.actual_winner_team_name,
+      points_total: this.n(row.points_total, 0),
+      created_at: row.created_at,
+      updated_at: row.updated_at,
+      locked_at: row.locked_at
+    };
+  },
+
+  async fetchChampionFromView() {
+    const { data, error } = await window.sb
+      .from("v_winner_predictions")
+      .select("*")
+      .eq("user_id", this.state.playerId)
+      .order("updated_at", { ascending: false, nullsFirst: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (error) return null;
+    return data || null;
+  },
+
+  async fetchChampionFromTable() {
+    const { data, error } = await window.sb
+      .from("winner_predictions")
+      .select("user_id,competition_id,predicted_team_id,locked_at,created_at,updated_at")
+      .eq("user_id", this.state.playerId)
+      .order("updated_at", { ascending: false, nullsFirst: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (error || !data?.predicted_team_id) return null;
+
+    const { data: team } = await window.sb
+      .from("football_teams")
+      .select("id,name,short_name,country_code,flag_url")
+      .eq("id", data.predicted_team_id)
+      .maybeSingle();
+
+    return {
+      ...data,
+      predicted_team_name: team?.name || "Équipe choisie",
+      predicted_team_short_name: team?.short_name,
+      predicted_team_country_code: team?.country_code,
+      predicted_team_flag_url: team?.flag_url,
+      points_total: 0
+    };
+  },
+
+  hasPrediction(row) {
+    return Boolean(row && (
+      row.prediction_id
+      || row.home_score_pred !== null && row.home_score_pred !== undefined
+      || row.away_score_pred !== null && row.away_score_pred !== undefined
+      || row.qualified_team_pred
+    ));
+  },
+
+  allPredictionRows({ includeTest = true } = {}) {
+    return (this.state.report.predictions || []).filter((row) =>
+      (includeTest || !row.is_test_match) && this.hasPrediction(row)
+    );
+  },
+
+  badgeCatalogLite() {
+    return {
+      "egg-hatched": { emoji: "🥚", title: "Éclos de l’œuf", text: "Premier prono validé. La coquille craque, la mini-chouette débarque." },
+      "young-feathers": { emoji: "🪶", title: "Jeune plumage", text: "10 pronos validés. Ça commence à ressembler à une vraie couvée." },
+      "half-nest": { emoji: "🪹", title: "Mi-nid rempli", text: "La moitié des pronos connus sont rentrés." },
+      "three-quarter-perch": { emoji: "🌿", title: "Perchoir presque plein", text: "75 % des pronos connus sont posés." },
+      "all-picks-in": { emoji: "🔒", title: "Couvée complète", text: "Tous les pronos connus sont posés." },
+      "champion-picked": { emoji: "🏆", title: "Champion choisi", text: "Le hibou a désigné son futur champion avant le grand envol." },
+      "preparation-two-picks": { emoji: "🧪", title: "Préparation du nid", text: "Les matchs de préparation test ont été pronostiqués." },
+      "prep-good-pick": { emoji: "✅", title: "Test concluant", text: "Au moins un match test a rapporté des points." },
+      "first-flight": { emoji: "🛫", title: "Premier envol", text: "Premier match comptabilisé." },
+      "first-perfect": { emoji: "🎯", title: "Œil de chouette", text: "Premier score exact trouvé." },
+      "surgical-beak": { emoji: "🔪", title: "Bec chirurgical", text: "3 scores exacts au total." },
+      "owl-sniper": { emoji: "🦉", title: "Sniper à plumes", text: "10 scores exacts. Le nid demande une vérification VAR." },
+      "accountant": { emoji: "📒", title: "Hibou comptable", text: "10 bons résultats. Pas flamboyant, mais rentable." },
+      "geometry": { emoji: "📐", title: "Géomètre du nid", text: "5 bons écarts trouvés." },
+      "knife-edge": { emoji: "⚔️", title: "Match couperet maîtrisé", text: "Premier bon qualifié en phase finale." },
+      "gold-nest": { emoji: "🏅", title: "Nid doré", text: "50 points ou plus. Le nid commence à briller." },
+      "platinum-nest": { emoji: "💎", title: "Nid platine", text: "100 points ou plus. La branche plie." },
+      "streak-3-exact": { emoji: "🔥", title: "Triplé du Grand-Duc", text: "3 scores exacts d’affilée. Ça sent la sorcellerie." },
+      "zero-tunnel": { emoji: "🌫️", title: "Tunnel du néant", text: "5 matchs à zéro point. Même la chouette cherche la lumière." },
+      "empty-nest": { emoji: "🪹", title: "Nid vide", text: "Une constance dans le brouillard que le Nid respecte." }
+    };
+  },
+
+  reportBadgeCandidates() {
+    const report = this.state.report || {};
+    const profile = report.profile || {};
+    const raw = [
+      report.badges,
+      report.achievements,
+      report.exploits,
+      report.unlocked_badges,
+      profile.badges,
+      profile.achievements,
+      profile.unlocked_badges,
+      profile.featured_badge_ids
+    ].filter(Boolean).flat();
+
+    const catalog = this.badgeCatalogLite();
+    return raw.map((item) => {
+      if (typeof item === "string") {
+        const found = catalog[item];
+        return found ? { id: item, ...found } : { id: item, emoji: "🏅", title: item, text: "Exploit enregistré dans le Nid." };
+      }
+      if (item && typeof item === "object") {
+        const id = item.id || item.badge_id || item.key || item.code || item.title;
+        const found = catalog[id];
+        return {
+          id,
+          emoji: item.emoji || found?.emoji || "🏅",
+          title: item.title || item.name || found?.title || id || "Exploit",
+          text: item.text || item.description || found?.text || "Exploit enregistré dans le Nid."
+        };
+      }
+      return null;
+    }).filter(Boolean);
   },
 
   renderError(title, message) {
@@ -162,23 +311,61 @@ const BilanPDF = {
     return best;
   },
 
-  unlockedBadges(stats) {
+  unlockedBadges(stats, champion = null) {
     const badges = [];
-    const add = (condition, emoji, title, text) => { if (condition) badges.push({ emoji, title, text }); };
-    add(stats.rows.length >= 1, "🥚", "Éclos de l’œuf", "Premier prono comptabilisé dans le grand nid.");
-    add(stats.rows.length >= 10, "🪶", "Jeune plumage", "10 matchs comptabilisés, le bec commence à chauffer.");
-    add(stats.exact >= 1, "🎯", "Œil de chouette", "Premier score exact trouvé.");
-    add(stats.exact >= 3, "🔪", "Bec chirurgical", "3 scores exacts, précision suspecte mais acceptée.");
-    add(stats.exact >= 10, "🦉", "Sniper à plumes", "10 scores exacts, le VAR demande une autopsie du marc de café.");
-    add(stats.good >= 10, "📒", "Hibou comptable", "10 bons résultats : pas toujours flamboyant, mais rentable.");
-    add(stats.diff >= 5, "📐", "Géomètre du nid", "5 bons écarts, compas dans les serres.");
-    add(stats.qualified >= 1, "⚔️", "Match couperet maîtrisé", "Au moins un qualifié bien senti.");
-    add(stats.total >= 50, "🏅", "Nid doré", "50 points ou plus, ça commence à briller.");
-    add(stats.total >= 100, "🏆", "Nid platine", "100 points ou plus, la branche plie.");
-    add(this.streak(stats.rows, (r) => r.is_exact_score) >= 3, "🔥", "Triplé du Grand-Duc", "3 scores exacts d’affilée. Là, ça sent la sorcellerie.");
-    add(this.streak(stats.rows, (r) => this.n(r.points_total) === 0) >= 5, "🌫️", "Tunnel du néant", "5 matchs à zéro point. Le nid a éteint la lumière.");
-    add(stats.rows.length && stats.zeros === stats.rows.length, "🪹", "Nid vide", "Une constance dans le brouillard que même les chouettes respectent.");
-    return badges.slice(0, 15);
+    const used = new Set();
+    const catalog = this.badgeCatalogLite();
+
+    const push = (id, condition = true, override = {}) => {
+      if (!condition || used.has(id)) return;
+      const base = catalog[id] || {};
+      badges.push({
+        id,
+        emoji: override.emoji || base.emoji || "🏅",
+        title: override.title || base.title || id,
+        text: override.text || base.text || "Exploit enregistré dans le Nid."
+      });
+      used.add(id);
+    };
+
+    this.reportBadgeCandidates().forEach((badge) => {
+      const id = badge.id || badge.title;
+      if (!id || used.has(id)) return;
+      badges.push(badge);
+      used.add(id);
+    });
+
+    const officialPredictions = this.allPredictionRows({ includeTest: false });
+    const allPredictions = this.allPredictionRows({ includeTest: true });
+    const testPredictions = allPredictions.filter((row) => row.is_test_match);
+    const knownOfficialMatches = (this.state.report.predictions || []).filter((row) => !row.is_test_match);
+    const knownOfficialCount = knownOfficialMatches.length;
+    const predictionCount = officialPredictions.length;
+    const championPicked = Boolean(champion?.predicted_team_id || champion?.predicted_team_name);
+
+    push("egg-hatched", predictionCount >= 1);
+    push("young-feathers", predictionCount >= 10);
+    push("half-nest", knownOfficialCount > 0 && predictionCount >= Math.ceil(knownOfficialCount / 2));
+    push("three-quarter-perch", knownOfficialCount > 0 && predictionCount >= Math.ceil(knownOfficialCount * 0.75));
+    push("all-picks-in", knownOfficialCount > 0 && predictionCount >= knownOfficialCount);
+    push("champion-picked", championPicked, championPicked ? { text: `Champion choisi : ${champion.predicted_team_name || "équipe enregistrée"}.` } : {});
+    push("preparation-two-picks", testPredictions.length >= 2);
+    push("prep-good-pick", testPredictions.some((row) => this.n(row.points_total) > 0 || row.is_exact_score || row.is_good_result || row.is_good_goal_diff || row.is_good_qualified));
+
+    push("first-flight", stats.rows.length >= 1);
+    push("first-perfect", stats.exact >= 1);
+    push("surgical-beak", stats.exact >= 3);
+    push("owl-sniper", stats.exact >= 10);
+    push("accountant", stats.good >= 10);
+    push("geometry", stats.diff >= 5);
+    push("knife-edge", stats.qualified >= 1);
+    push("gold-nest", stats.total >= 50);
+    push("platinum-nest", stats.total >= 100);
+    push("streak-3-exact", this.streak(stats.rows, (r) => r.is_exact_score) >= 3);
+    push("zero-tunnel", this.streak(stats.rows, (r) => this.n(r.points_total) === 0) >= 5);
+    push("empty-nest", stats.rows.length >= 3 && stats.zeros === stats.rows.length);
+
+    return badges.slice(0, 24);
   },
 
   funnyTitle(stats, leaderboard) {
@@ -297,9 +484,9 @@ const BilanPDF = {
     const team = report.team_leaderboard || {};
     const family = report.family_rank || {};
     const familyTeam = report.family_team_rank || {};
-    const champion = report.champion_prediction || null;
+    const champion = this.normalizeChampionPrediction(report.champion_prediction || report.winner_prediction || report.winner || null);
     const stats = this.stats();
-    const badges = this.unlockedBadges(stats);
+    const badges = this.unlockedBadges(stats, champion);
     const title = this.funnyTitle(stats, leaderboard);
     const quote = this.funnyQuote(stats, leaderboard);
     const avatarProfile = {
@@ -362,14 +549,14 @@ const BilanPDF = {
           <div class="rank-row"><div><strong>Team officielle</strong><small>${this.e(team.office_team_name || player.office_team_name || "Sans team")}</small></div><span class="big-rank">#${this.e(team.rank || "—")}</span></div>
           ${familyRows}
         </div></div>
-        <div class="graph-card"><h3>Champion du monde</h3>${champion ? `<p>Choix : <strong>${this.e(champion.predicted_team_name)}</strong></p><p>Bonus : <strong>${this.e(champion.points_total || 0)} pts</strong></p><p class="muted">${champion.actual_winner_team_name ? `Vainqueur réel : ${this.e(champion.actual_winner_team_name)}` : "En attente du vainqueur final."}</p>` : `<p class="muted">Aucun champion choisi ou donnée indisponible.</p>`}</div>
+        <div class="graph-card champion-card"><h3>Champion du monde</h3>${champion ? `<div class="champion-pick-line">${champion.predicted_team_flag_url || champion.predicted_team_country_code ? H.flagImgHtml({ flagUrl: champion.predicted_team_flag_url, countryCode: champion.predicted_team_country_code, shortName: champion.predicted_team_short_name, name: champion.predicted_team_name, className: "team-flag-img champion-option-flag" }) : ""}<p>Choix : <strong>${this.e(champion.predicted_team_name)}</strong></p></div><p>Bonus actuel : <strong>${this.e(champion.points_total || 0)} pts</strong></p><p class="muted">${champion.actual_winner_team_name ? `Vainqueur réel : ${this.e(champion.actual_winner_team_name)}` : "En attente du vainqueur final."}</p>` : `<p class="muted">Aucun champion choisi ou donnée indisponible.</p>`}</div>
       </div>
     </div></section>`;
   },
 
   pageBadges(badges, stats) {
     return `<section class="bilan-page badges"><div class="bilan-page-content">
-      <div class="bilan-page-head"><div><h2>Mur des exploits</h2><p>${badges.length} badge(s) repéré(s) dans ce bilan. Le nid garde les preuves.</p></div><span class="page-number">03</span></div>
+      <div class="bilan-page-head"><div><h2>Mur des exploits</h2><p>${badges.length} exploit(s) repéré(s) : pronos posés, champion choisi, préparation et résultats déjà comptabilisés.</p></div><span class="page-number">03</span></div>
       <div class="badge-grid">
         ${badges.length ? badges.map((badge) => `<article class="badge-card"><span class="badge-emoji">${badge.emoji}</span><strong>${this.e(badge.title)}</strong><p>${this.e(badge.text)}</p></article>`).join("") : `<article class="badge-card"><span class="badge-emoji">🪹</span><strong>Le nid attend</strong><p>Les badges apparaîtront avec les résultats comptabilisés.</p></article>`}
       </div>

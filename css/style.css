@@ -15489,3 +15489,23 @@ body[data-current-view="leaderboard"] .team-leaderboard-card .muted {
     max-height: 56vh;
   }
 }
+
+
+/* V1.3.10 — Hall du Nid recalculé depuis Supabase */
+.badge-hall-note {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 14px;
+  padding: 11px 13px;
+  border-radius: 18px;
+  border: 1px solid rgba(56, 189, 248, .24);
+  background: rgba(56, 189, 248, .10);
+  color: #bae6fd;
+  font-weight: 800;
+}
+
+.badge-hall-note .owl-icon {
+  width: 22px;
+  height: 22px;
+}

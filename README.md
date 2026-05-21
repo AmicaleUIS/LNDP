@@ -1,4 +1,19 @@
-# Le Nid des Pronos — V1.3.8
+# Le Nid des Pronos — V1.3.10
+
+## V1.3.10 — Bilan PDF + Hall du Nid
+
+- Reprend les corrections du bilan PDF : fonds non coupés, diplôme paysage, champion choisi récupéré en fallback, exploits PDF enrichis.
+- Corrige le Hall du Nid : les exploits des autres joueurs sont recalculés depuis les données Supabase publiques/partagées, et plus depuis un état local du joueur connecté.
+- Le Hall combine les profils publics, le classement, les compteurs publics de pronos, les choix champion et les pronos visibles.
+- Aucun patch SQL obligatoire si les vues existantes sont déjà présentes.
+
+## V1.3.9 — Bilan PDF corrigé
+
+- Corrige l’impression du diplôme paysage : vraie page A4 paysage et plus de fond coupé.
+- Force les fonds PDF en `100% 100%` pour éviter les découpes d’images de fond.
+- Récupère plus solidement le champion choisi via `v_winner_predictions` ou `winner_predictions` si le rapport SQL ne le renvoie pas.
+- Le Mur des exploits du PDF tient compte des pronos posés, du champion choisi, des matchs test et des résultats déjà comptabilisés.
+- Aucun patch SQL obligatoire.
 
 ## V1.3.8 — Chat simplifié + Hall complet
 
