@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — APP PRINCIPALE V1.3.11
+// LE NID DES PRONOS — APP PRINCIPALE V1.3.12
 // ============================================================
 
 const H = window.Helpers;
@@ -416,7 +416,7 @@ const App = {
           <div>
             <p class="eyebrow">Crédits cachés</p>
             <h2 id="creditsTitle">Le Nid des Pronos</h2>
-            <p class="muted">Version publique <strong>1.3.11</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
+            <p class="muted">Version publique <strong>1.3.12</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
           </div>
         </div>
         <div class="credits-grid">
@@ -433,7 +433,7 @@ const App = {
             <p><strong>1.0.5</strong> — dashboard mobile/desktop stabilisé, sans chevauchement des cartes.</p>
           </section>
           <section>
-            <h3>Évolutions V1.3.11</h3>
+            <h3>Évolutions V1.3.12</h3>
             <ul class="changelog-list">
               <li>Le super admin peut désactiver ou réactiver l’affichage du module préparation.</li>
               <li>Quand la préparation est désactivée, les matchs test disparaissent des matchs/pronos, classements par phase et règles.</li>
@@ -2236,6 +2236,24 @@ const App = {
     });
   },
 
+
+  hallBadgesPreviewHtml(userId, badges = [], sourceProfile = null) {
+    if (!badges.length) return `<span class="muted">Aucun exploit public détecté pour l’instant.</span>`;
+
+    const selectedIds = this.featuredBadgeIdsForUser(userId, sourceProfile);
+    const byId = new Map(badges.map((badge) => [badge.id, badge]));
+    const selected = selectedIds.map((id) => byId.get(id)).filter(Boolean).slice(0, 3);
+    const shown = selected.length ? selected : badges.slice(0, 3);
+    const hiddenCount = Math.max(0, badges.length - shown.length);
+    return `
+      <div class="achievement-preview hall-closed-preview" title="${selected.length ? "Badges choisis par le joueur" : "Aperçu automatique"}">
+        ${shown.map((badge) => this.badgeChipHtml(badge)).join("")}
+        <span class="achievement-chip achievement-more">${badges.length} exploit${badges.length > 1 ? "s" : ""}</span>
+        ${hiddenCount ? `<span class="achievement-chip achievement-more subtle">+${hiddenCount}</span>` : ""}
+      </div>
+    `;
+  },
+
   async renderAchievementHall() {
     const root = H.$("#achievementsContent");
 
@@ -2280,20 +2298,16 @@ const App = {
       );
 
     root.innerHTML = `
-      <div class="badge-hall-note">
-        ${H.icon("info")}
-        <span>Le Hall recalcule les exploits depuis les données Supabase : pronos visibles, compteurs publics, choix champion et points comptabilisés.</span>
-      </div>
       <div class="badge-leaderboard-list">
         ${rows.length ? rows.map(({ row, badges }, index) => `
-          <details class="badge-player-card ${row.user_id === this.state.session.user.id ? "me" : ""}" ${index < 3 ? "open" : ""}>
+          <details class="badge-player-card ${row.user_id === this.state.session.user.id ? "me" : ""}">
             <summary>
               <div class="badge-player-summary-main">
                 ${H.profileBadgeHtml(this.visualProfile(row), "profile-badge leaderboard-badge")}
                 <div>
                   <strong>#${index + 1} exploits — ${H.escapeHtml(row.pseudo || "Joueur")}</strong>
                   <small>${H.escapeHtml(row.office_team_name || "Sans team")} · ${badges.length} exploit${badges.length > 1 ? "s" : ""}${row.rank ? ` · classement général #${row.rank}` : ""}</small>
-                  ${badges.length ? `<div class="achievement-preview hall-all-achievements">${badges.map((badge) => this.badgeChipHtml(badge)).join("")}</div>` : `<span class="muted">Aucun exploit public détecté pour l’instant.</span>`}
+                  ${this.hallBadgesPreviewHtml(row.user_id, badges, row)}
                 </div>
               </div>
               <div class="points">${row.total_points || 0}<small>pts</small></div>
@@ -5821,6 +5835,102 @@ const App = {
     `;
   },
 
+
+  reactionMessageBody(key) {
+    return `::owl-reaction:${key}::`;
+  },
+
+  reactionMessageKey(body = "") {
+    const match = String(body || "").trim().match(/^::owl-reaction:([a-z0-9_-]+)::$/i);
+    return match ? match[1] : null;
+  },
+
+  chatMessageBodyHtml(message) {
+    const reactionKey = this.reactionMessageKey(message?.body);
+    const reaction = reactionKey ? this.reactionByKey(reactionKey) : null;
+    if (reaction) {
+      return `<p class="chat-sticker-message"><img src="${H.escapeHtml(reaction.file)}" alt="${H.escapeHtml(reaction.label)}" loading="lazy"><span>${H.escapeHtml(reaction.label)}</span></p>`;
+    }
+    return `<p>${H.escapeHtml(message.body)}</p>`;
+  },
+
+  quickOwlMessageButtonsHtml({ recipientId = "", compact = false } = {}) {
+    return `
+      <div class="quick-owl-message-row ${compact ? "compact" : ""}" data-quick-owl-row>
+        <span>Envoyer juste un hibou :</span>
+        ${(this.state.chatReactions || []).map((reaction) => `
+          <button type="button" class="quick-owl-message-btn" data-quick-owl-key="${H.escapeHtml(reaction.key)}" ${recipientId ? `data-quick-owl-recipient-id="${H.escapeHtml(recipientId)}"` : ""} title="${H.escapeHtml(reaction.label)}">
+            <img src="${H.escapeHtml(reaction.file)}" alt="${H.escapeHtml(reaction.label)}" loading="lazy">
+          </button>
+        `).join("")}
+      </div>
+    `;
+  },
+
+  async sendQuickOwlMessage(reactionKey, recipientId = null) {
+    const reaction = this.reactionByKey(reactionKey);
+    if (!reaction) return;
+
+    const scope = recipientId ? "private" : this.normalizeChatScope(this.state.teamChatScope || "global");
+    const targetRecipientId = recipientId || (scope === "private" ? this.state.activePrivateThreadId : null);
+    if (scope === "private" && !targetRecipientId) {
+      H.toast("Choisis un destinataire MP.", "error");
+      return;
+    }
+
+    const officeTeamId = this.chatScopeNeedsTeam(scope) ? this.state.profile?.office_team_id : null;
+    if (this.chatScopeNeedsTeam(scope) && !officeTeamId) {
+      H.toast("Tu dois avoir une team pour écrire dans ce salon.", "error");
+      return;
+    }
+
+    const { error } = await window.sb
+      .from("team_chat_messages")
+      .insert({
+        user_id: this.state.session.user.id,
+        scope,
+        office_team_id: officeTeamId,
+        recipient_id: targetRecipientId,
+        body: this.reactionMessageBody(reaction.key)
+      });
+
+    if (error) {
+      H.toast(error.message || "Impossible d’envoyer le hibou.", "error");
+      return;
+    }
+
+    H.toast("Hibou envoyé", "success");
+    if (scope === "private") {
+      this.state.teamChatScope = "private";
+      this.state.activePrivateThreadId = targetRecipientId;
+      await this.renderTeamsPage();
+      return;
+    }
+
+    await this.loadTeamChatMessages();
+    const list = H.$("#teamChatList");
+    if (list) {
+      list.innerHTML = this.state.teamChatMessages.map((message) => this.chatMessageHtml(message)).join("") || `<p class="muted empty-chat">Aucun message ici pour l’instant. Ouvre le bal 🦉</p>`;
+      this.bindChatMessageActions();
+      list.scrollTop = list.scrollHeight;
+    }
+  },
+
+  async openPrivateThread(userId, { focusInput = true } = {}) {
+    if (!userId || String(userId) === String(this.state.session?.user?.id)) return;
+    this.state.teamChatScope = "private";
+    this.state.activePrivateThreadId = userId;
+    this.state.teamChatLimit = Math.max(this.state.teamChatLimit, 240);
+    if (this.state.currentView !== "teams") {
+      await this.loadView("teams");
+    } else {
+      await this.renderTeamsPage();
+    }
+    if (focusInput) {
+      setTimeout(() => H.$(`[data-private-thread-user-id="${CSS.escape(String(userId))}"] input[name="body"]`)?.focus(), 80);
+    }
+  },
+
   reactionByKey(key) {
     return (this.state.chatReactions || []).find((reaction) => reaction.key === key);
   },
@@ -5950,9 +6060,8 @@ const App = {
     H.$$('[data-picker-private-user-id]', modal).forEach((button) => {
       button.addEventListener("click", (event) => {
         event.stopPropagation();
-        const profile = this.profileForUser(button.dataset.pickerPrivateUserId);
         close();
-        this.openDirectMessageModal(button.dataset.pickerPrivateUserId, profile?.pseudo || "ce joueur");
+        this.openPrivateThread(button.dataset.pickerPrivateUserId);
       });
     });
     H.$$('[data-picker-react-message-id]', modal).forEach((button) => {
@@ -6138,6 +6247,15 @@ const App = {
         this.openChatReactionPicker(bubble.dataset.openReactionPickerMessageId);
       });
     });
+    H.$$('[data-quick-owl-key]', root).forEach((button) => {
+      if (button.dataset.boundQuickOwl === "true") return;
+      button.dataset.boundQuickOwl = "true";
+      button.addEventListener("click", async (event) => {
+        event.stopPropagation();
+        await this.sendQuickOwlMessage(button.dataset.quickOwlKey, button.dataset.quickOwlRecipientId || null);
+      });
+    });
+
     H.$$('[data-reaction-detail-message-id]', root).forEach((button) => {
       if (button.dataset.boundReactionDetail === "true") return;
       button.dataset.boundReactionDetail = "true";
@@ -6218,7 +6336,7 @@ const App = {
             <span>${H.escapeHtml(scopeLabel)}</span>
             <time>${H.formatDateTime(message.created_at)}</time>
           </div>
-          <p>${H.escapeHtml(message.body)}</p>
+          ${this.chatMessageBodyHtml(message)}
           <div class="chat-message-actions">
             ${this.reactionSummaryHtml(message)}
             <div class="chat-message-tools">
@@ -6304,29 +6422,59 @@ const App = {
         latestAt: rows.reduce((latest, row) => Math.max(latest, new Date(row.created_at || 0).getTime()), 0),
         profile: this.privateChatProfileForId(userId, rows)
       }))
-      .sort((a, b) => b.latestAt - a.latestAt);
+      .sort((a, b) => (b.rows.length - a.rows.length) || (b.latestAt - a.latestAt));
+  },
+
+
+  privatePlayerRankLabel(userId) {
+    const row = this.state.playerScoreRows.find((item) => String(item.user_id || item.id) === String(userId));
+    return row?.rank ? `#${row.rank}` : "non classé";
+  },
+
+  privateThreadMessageCountForUser(userId, threadByUser = new Map()) {
+    return threadByUser.get(String(userId))?.rows?.length || 0;
   },
 
   privateChatThreadsHtml(activePlayers = []) {
     const threads = this.privateChatThreads(this.state.teamChatMessages || []);
     const threadByUser = new Map(threads.map((thread) => [String(thread.userId), thread]));
-    const players = activePlayers
+    const allPlayers = activePlayers
       .filter((player) => String(player.id || player.user_id) !== String(this.state.session.user.id))
-      .map((player) => this.playerPublicProfile(player))
-      .sort((a, b) => String(a.pseudo || "").localeCompare(String(b.pseudo || ""), "fr"));
+      .map((player) => this.playerPublicProfile(player));
 
-    // On garde aussi les conversations avec un joueur qui ne serait plus dans l’annuaire actif.
     threads.forEach((thread) => {
-      if (!players.some((player) => String(player.id || player.user_id) === String(thread.userId))) {
-        players.push(thread.profile);
+      if (!allPlayers.some((player) => String(player.id || player.user_id) === String(thread.userId))) {
+        allPlayers.push(thread.profile);
       }
     });
+
+    const sortedPlayers = [...allPlayers].sort((a, b) => {
+      const aId = a.id || a.user_id;
+      const bId = b.id || b.user_id;
+      const aCount = this.privateThreadMessageCountForUser(aId, threadByUser);
+      const bCount = this.privateThreadMessageCountForUser(bId, threadByUser);
+      if (bCount !== aCount) return bCount - aCount;
+      const aLatest = threadByUser.get(String(aId))?.latestAt || 0;
+      const bLatest = threadByUser.get(String(bId))?.latestAt || 0;
+      if (bLatest !== aLatest) return bLatest - aLatest;
+      return String(a.pseudo || "").localeCompare(String(b.pseudo || ""), "fr");
+    });
+
+    const topIds = new Set(threads.slice(0, 5).map((thread) => String(thread.userId)));
+    let visiblePlayers = sortedPlayers.filter((player) => topIds.has(String(player.id || player.user_id))).slice(0, 5);
+
+    if (this.state.activePrivateThreadId && !visiblePlayers.some((player) => String(player.id || player.user_id) === String(this.state.activePrivateThreadId))) {
+      const activeFromAll = sortedPlayers.find((player) => String(player.id || player.user_id) === String(this.state.activePrivateThreadId));
+      if (activeFromAll) visiblePlayers = [activeFromAll, ...visiblePlayers].slice(0, 5);
+    }
 
     if (!this.state.activePrivateThreadId && threads.length) {
       this.state.activePrivateThreadId = threads[0].userId;
     }
 
-    const activeProfile = players.find((player) => String(player.id || player.user_id) === String(this.state.activePrivateThreadId));
+    const visibleIds = new Set(visiblePlayers.map((player) => String(player.id || player.user_id)));
+    const morePlayers = sortedPlayers.filter((player) => !visibleIds.has(String(player.id || player.user_id)));
+    const activeProfile = sortedPlayers.find((player) => String(player.id || player.user_id) === String(this.state.activePrivateThreadId));
     const activeExistingThread = this.state.activePrivateThreadId ? threadByUser.get(String(this.state.activePrivateThreadId)) : null;
     const activeThread = this.state.activePrivateThreadId ? {
       userId: this.state.activePrivateThreadId,
@@ -6337,31 +6485,39 @@ const App = {
 
     if (activeThread) this.setPrivateThreadSeenNow(activeThread.userId);
 
+    const optionHtml = (player, isCompact = false) => {
+      const playerId = player.id || player.user_id;
+      const thread = threadByUser.get(String(playerId));
+      const unread = thread ? this.privateThreadHasUnread(thread) : false;
+      const count = thread?.rows?.length || 0;
+      return `
+        <button type="button" class="private-recipient-option ${isCompact ? "compact" : ""} ${String(playerId) === String(this.state.activePrivateThreadId) ? "active" : ""}" data-private-thread-select="${H.escapeHtml(playerId)}">
+          ${H.profileBadgeHtml(player, "profile-badge mini")}
+          <span>
+            <strong>${H.escapeHtml(player.pseudo || "Joueur")}</strong>
+            <small>${H.escapeHtml(player.office_team_name || "Sans team")} · ${count} MP · ${H.escapeHtml(this.privatePlayerRankLabel(playerId))}</small>
+          </span>
+          ${unread ? `<b class="private-thread-unread-dot" aria-label="Nouveau MP"></b>` : ""}
+        </button>
+      `;
+    };
+
     return `
-      <div class="private-chat-layout-v1311">
+      <div class="private-chat-layout-v1312">
         <aside class="private-recipient-panel">
           <div class="private-recipient-head">
-            <strong>Choisir un destinataire MP</strong>
-            <small>${players.length} joueur${players.length > 1 ? "s" : ""} disponible${players.length > 1 ? "s" : ""}</small>
+            <strong>MP du Nid</strong>
+            <small>Top conversations</small>
           </div>
-          <div class="private-recipient-list">
-            ${players.length ? players.map((player) => {
-              const playerId = player.id || player.user_id;
-              const thread = threadByUser.get(String(playerId));
-              const unread = thread ? this.privateThreadHasUnread(thread) : false;
-              const count = thread?.rows?.length || 0;
-              return `
-                <button type="button" class="private-recipient-option ${String(playerId) === String(this.state.activePrivateThreadId) ? "active" : ""}" data-private-thread-select="${H.escapeHtml(playerId)}">
-                  ${H.profileBadgeHtml(player, "profile-badge mini")}
-                  <span>
-                    <strong>${H.escapeHtml(player.pseudo || "Joueur")}</strong>
-                    <small>${H.escapeHtml(player.office_team_name || "Sans team")}${count ? ` · ${count} message${count > 1 ? "s" : ""}` : " · nouveau fil"}</small>
-                  </span>
-                  ${unread ? `<b class="private-thread-unread-dot" aria-label="Nouveau MP"></b>` : ""}
-                </button>
-              `;
-            }).join("") : `<p class="muted">Aucun destinataire disponible.</p>`}
+          <div class="private-recipient-list top-private-recipients">
+            ${visiblePlayers.length ? visiblePlayers.map((player) => optionHtml(player)).join("") : `<p class="muted">Aucune conversation active. Ouvre un MP dans l’annuaire.</p>`}
           </div>
+          <details class="private-recipient-more">
+            <summary>Choisir un autre joueur <span>${morePlayers.length}</span></summary>
+            <div class="private-recipient-more-list">
+              ${morePlayers.length ? morePlayers.map((player) => optionHtml(player, true)).join("") : `<p class="muted">Tous les joueurs sont déjà dans le top affiché.</p>`}
+            </div>
+          </details>
         </aside>
 
         <section class="private-conversation-panel">
@@ -6388,6 +6544,7 @@ const App = {
         <form class="private-thread-reply-form" data-private-thread-form data-recipient-id="${H.escapeHtml(thread.userId)}">
           <input type="text" name="body" maxlength="600" placeholder="Écrire à ${H.escapeHtml(thread.profile.pseudo || "ce joueur")}..." required ${this.state.profile?.can_chat === false ? "disabled" : ""}>
           <button class="ghost-btn" type="submit" ${this.state.profile?.can_chat === false ? "disabled" : ""}>Envoyer</button>
+          ${this.quickOwlMessageButtonsHtml({ recipientId: thread.userId, compact: true })}
         </form>
       </article>
     `;
@@ -6534,8 +6691,7 @@ const App = {
     H.$$('[data-direct-message-user-id]', root).forEach((button) => {
       button.addEventListener("click", (event) => {
         event.stopPropagation();
-        const profile = this.profileForUser(button.dataset.directMessageUserId);
-        this.openDirectMessageModal(button.dataset.directMessageUserId, profile?.pseudo || "ce joueur");
+        this.openPrivateThread(button.dataset.directMessageUserId);
       });
     });
 
@@ -6940,7 +7096,7 @@ const App = {
             <p class="muted">Déconnexion, crédits et historique des évolutions.</p>
           </div>
           <div class="profile-account-actions">
-            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.3.11</button>
+            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.3.12</button>
             <button class="danger-btn" id="profileLogoutBtn" type="button">Déconnexion</button>
           </div>
         </div>

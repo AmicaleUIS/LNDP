@@ -1,4 +1,15 @@
-# Le Nid des Pronos — V1.3.11
+# Le Nid des Pronos — V1.3.12
+
+## V1.3.12 — Hall fermé + MP top conversations
+
+- Hall du Nid : les cartes joueurs sont fermées par défaut et affichent seulement 3 badges + le total d’exploits.
+- Suppression du message technique “Le Hall recalcule…” dans l’interface.
+- Onglets Exploits/Teams du Nid retravaillés en style carré arrondi propre.
+- Dans Teams du Nid, le bloc Famille reste sombre/noir quand il est sélectionné.
+- Annuaire : le bouton MP ouvre directement l’onglet MP sur la bonne personne.
+- Messages : possibilité d’envoyer directement un sticker hibou comme message dans Général, Team, Famille, Team Famille et MP.
+- MP : affichage des 5 conversations les plus actives en haut, puis menu déroulant avec avatar, nom, team, nombre de MP et classement.
+- MP : les points rouges restent visibles sur les conversations avec nouveaux messages.
 
 ## V1.3.11 — Teams du Nid UX
 

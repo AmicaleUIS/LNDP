@@ -15707,3 +15707,255 @@ body[data-current-view="leaderboard"] .team-leaderboard-card .muted {
     max-height: 260px;
   }
 }
+
+
+/* ============================================================
+   V1.3.12 — Hall fermé + onglets propres + MP top conversations
+   ============================================================ */
+
+.achievement-tabs.segmented,
+.achievement-tabs {
+  width: fit-content;
+  display: inline-flex;
+  gap: 6px;
+  padding: 6px;
+  border-radius: 22px;
+  border: 1px solid rgba(148, 163, 184, .22);
+  background: rgba(15, 23, 42, .64);
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.03);
+}
+
+.achievement-tabs button {
+  min-height: 48px;
+  padding: 0 22px;
+  border-radius: 17px;
+  border: 0;
+  background: transparent;
+  color: rgba(203, 213, 225, .78);
+  font-weight: 900;
+}
+
+.achievement-tabs button.active {
+  background: linear-gradient(135deg, #facc15, #f59e0b);
+  color: #06111f;
+  box-shadow: 0 10px 22px rgba(250, 204, 21, .16);
+}
+
+.badge-player-card:not([open]) .achievement-grid {
+  display: none;
+}
+
+.badge-player-card summary::-webkit-details-marker {
+  display: none;
+}
+
+.badge-player-card summary::after {
+  content: "Ouvrir";
+  flex: 0 0 auto;
+  padding: 8px 11px;
+  border-radius: 999px;
+  border: 1px solid rgba(250, 204, 21, .22);
+  color: #facc15;
+  font-weight: 900;
+  font-size: .8rem;
+}
+
+.badge-player-card[open] summary::after {
+  content: "Fermer";
+}
+
+.hall-closed-preview {
+  margin-top: 8px;
+}
+
+.hall-closed-preview .achievement-more {
+  background: rgba(250, 204, 21, .16);
+  color: #fde68a;
+}
+
+.hall-closed-preview .achievement-more.subtle {
+  background: rgba(148, 163, 184, .12);
+  color: rgba(226,232,240,.72);
+}
+
+.chat-channel-picker-v1311 {
+  padding: 8px;
+  border-radius: 24px;
+  background: rgba(15, 23, 42, .56);
+}
+
+.chat-scope-tabs-v1311 {
+  width: fit-content;
+  display: inline-flex;
+  gap: 6px;
+  padding: 6px;
+  border-radius: 22px;
+  border: 1px solid rgba(148, 163, 184, .22);
+  background: rgba(15, 23, 42, .64);
+}
+
+.chat-scope-tab {
+  min-height: 48px;
+  padding: 0 20px;
+  border-radius: 17px;
+  border: 0;
+  background: transparent;
+}
+
+.chat-scope-tab.active {
+  background: linear-gradient(135deg, #facc15, #f59e0b);
+  color: #06111f;
+  box-shadow: 0 10px 22px rgba(250, 204, 21, .16);
+}
+
+.chat-scope-family-group {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  border-radius: 18px;
+  padding: 5px 6px;
+  background: rgba(2, 6, 23, .52);
+}
+
+.chat-scope-family-group.active {
+  border-color: rgba(250,204,21,.34);
+  background: #07111f;
+  color: #facc15;
+  box-shadow: inset 0 0 0 1px rgba(250,204,21,.14);
+}
+
+.chat-scope-family-group.active > span {
+  color: #facc15;
+}
+
+.chat-scope-family-group > div {
+  display: flex;
+  gap: 6px;
+}
+
+.chat-sticker-message {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  margin: 0;
+  font-weight: 900;
+  color: #f8fafc;
+}
+
+.chat-sticker-message img {
+  width: 56px;
+  height: 56px;
+  object-fit: contain;
+  filter: drop-shadow(0 8px 14px rgba(0,0,0,.28));
+}
+
+.quick-owl-message-row {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 7px;
+  margin-top: -2px;
+  padding: 8px 10px;
+  border-radius: 16px;
+  border: 1px solid rgba(148, 163, 184, .14);
+  background: rgba(2, 6, 23, .28);
+}
+
+.quick-owl-message-row span {
+  color: rgba(226, 232, 240, .68);
+  font-size: .78rem;
+  font-weight: 900;
+}
+
+.quick-owl-message-row.compact {
+  margin-top: 0;
+}
+
+.quick-owl-message-btn {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  border: 1px solid rgba(250, 204, 21, .16);
+  background: rgba(15, 23, 42, .58);
+  cursor: pointer;
+}
+
+.quick-owl-message-btn:hover,
+.quick-owl-message-btn:focus-visible {
+  border-color: rgba(250, 204, 21, .48);
+  transform: translateY(-1px);
+  outline: none;
+}
+
+.quick-owl-message-btn img {
+  width: 26px;
+  height: 26px;
+  object-fit: contain;
+}
+
+.private-chat-layout-v1312 {
+  display: grid;
+  grid-template-columns: minmax(260px, .34fr) minmax(0, 1fr);
+  gap: 14px;
+  align-items: start;
+}
+
+.private-recipient-more {
+  margin-top: 10px;
+  border-radius: 18px;
+  border: 1px solid rgba(148, 163, 184, .16);
+  background: rgba(2, 6, 23, .24);
+  overflow: hidden;
+}
+
+.private-recipient-more summary {
+  cursor: pointer;
+  padding: 11px 12px;
+  font-weight: 900;
+  color: #bae6fd;
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.private-recipient-more summary span {
+  color: #facc15;
+}
+
+.private-recipient-more-list {
+  display: grid;
+  gap: 8px;
+  max-height: 330px;
+  overflow: auto;
+  padding: 0 10px 10px;
+}
+
+.private-recipient-option.compact {
+  padding: 8px;
+}
+
+.private-recipient-option.compact .profile-badge {
+  width: 38px;
+  height: 38px;
+}
+
+@media (max-width: 860px) {
+  .achievement-tabs,
+  .chat-scope-tabs-v1311 {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .chat-scope-family-group {
+    grid-column: 1 / -1;
+    justify-content: space-between;
+  }
+
+  .private-chat-layout-v1312 {
+    grid-template-columns: 1fr;
+  }
+}
