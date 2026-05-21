@@ -15509,3 +15509,201 @@ body[data-current-view="leaderboard"] .team-leaderboard-card .muted {
   width: 22px;
   height: 22px;
 }
+
+
+/* ============================================================
+   V1.3.11 — Teams du Nid : onglets clairs + MP par destinataire
+   ============================================================ */
+
+.chat-channel-picker-v1311 {
+  display: grid;
+  gap: 8px;
+  margin: 12px 0 14px;
+  padding: 12px;
+  border-radius: 22px;
+  border: 1px solid rgba(148, 163, 184, .18);
+  background: rgba(15, 23, 42, .38);
+}
+
+.chat-scope-tabs-v1311 {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: stretch;
+}
+
+.chat-scope-tab {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  padding: 0 18px;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, .22);
+  background: rgba(2, 6, 23, .44);
+  color: rgba(226, 232, 240, .74);
+  font: inherit;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.chat-scope-tab.small {
+  min-height: 38px;
+  padding: 0 13px;
+  font-size: .9rem;
+}
+
+.chat-scope-tab.active,
+.chat-scope-family-group.active {
+  border-color: rgba(250, 204, 21, .78);
+  background: linear-gradient(135deg, rgba(250, 204, 21, .98), rgba(245, 158, 11, .94));
+  color: #07111f;
+  box-shadow: 0 10px 24px rgba(250, 204, 21, .14);
+}
+
+.chat-scope-tab .chat-scope-dot {
+  position: absolute;
+  top: 5px;
+  right: 7px;
+}
+
+.chat-scope-family-group {
+  display: grid;
+  gap: 7px;
+  padding: 7px;
+  border-radius: 22px;
+  border: 1px solid rgba(148, 163, 184, .20);
+  background: rgba(2, 6, 23, .34);
+}
+
+.chat-scope-family-group > span {
+  padding: 0 7px;
+  color: rgba(226, 232, 240, .70);
+  font-size: .72rem;
+  font-weight: 900;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.chat-scope-family-group > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.private-chat-layout-v1311 {
+  display: grid;
+  grid-template-columns: minmax(240px, .34fr) minmax(0, 1fr);
+  gap: 14px;
+  align-items: start;
+}
+
+.private-recipient-panel,
+.private-conversation-panel {
+  border-radius: 22px;
+  border: 1px solid rgba(56, 189, 248, .20);
+  background: rgba(56, 189, 248, .07);
+  padding: 12px;
+}
+
+.private-recipient-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: baseline;
+  margin-bottom: 10px;
+}
+
+.private-recipient-head strong {
+  color: #bae6fd;
+}
+
+.private-recipient-head small {
+  color: rgba(226,232,240,.62);
+  font-weight: 800;
+}
+
+.private-recipient-list {
+  display: grid;
+  gap: 8px;
+  max-height: min(520px, 58vh);
+  overflow: auto;
+  padding-right: 4px;
+}
+
+.private-recipient-option {
+  position: relative;
+  width: 100%;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  border-radius: 18px;
+  border: 1px solid rgba(148, 163, 184, .18);
+  background: rgba(2, 6, 23, .38);
+  color: #f8fafc;
+  text-align: left;
+  cursor: pointer;
+}
+
+.private-recipient-option.active {
+  border-color: rgba(250, 204, 21, .46);
+  background:
+    radial-gradient(circle at 0% 0%, rgba(250,204,21,.16), transparent 48%),
+    rgba(15,23,42,.62);
+}
+
+.private-recipient-option span {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.private-recipient-option strong {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.private-recipient-option small {
+  color: rgba(226, 232, 240, .64);
+  font-weight: 800;
+}
+
+.private-conversation-panel .active-thread-card {
+  border: 0;
+  background: transparent;
+  padding: 0;
+}
+
+.team-chat-bubble {
+  border-color: color-mix(in srgb, var(--message-team-color) 46%, rgba(148,163,184,.24));
+  background:
+    radial-gradient(circle at 0% 0%, color-mix(in srgb, var(--message-team-color) 26%, transparent), transparent 48%),
+    linear-gradient(135deg, color-mix(in srgb, var(--message-team-color) 20%, rgba(15,23,42,.84)), rgba(15,23,42,.78));
+}
+
+.team-chat-message.me .team-chat-bubble {
+  border-color: color-mix(in srgb, var(--message-team-color) 54%, rgba(250,204,21,.24));
+}
+
+@media (max-width: 860px) {
+  .chat-scope-tabs-v1311 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .chat-scope-family-group {
+    grid-column: 1 / -1;
+  }
+
+  .private-chat-layout-v1311 {
+    grid-template-columns: 1fr;
+  }
+
+  .private-recipient-list {
+    max-height: 260px;
+  }
+}

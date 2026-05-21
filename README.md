@@ -1,4 +1,14 @@
-# Le Nid des Pronos — V1.3.10
+# Le Nid des Pronos — V1.3.11
+
+## V1.3.11 — Teams du Nid UX
+
+- Remplace le menu déroulant des salons par des onglets clairs : Général, Team, Famille, MP.
+- Le bloc Famille contient les sous-choix Général famille et Team famille quand le mode Famille est visible.
+- Refonte des MP : un seul panneau destinataires avec avatar, nom et team, plus une conversation dédiée à droite.
+- Choisir un joueur sans historique ouvre une conversation vide prête à écrire ; choisir un joueur existant réouvre l’historique.
+- Suppression du gros doublon de conversation MP qui faisait une carte inutile.
+- Les bulles de messages restent teintées par la couleur de la team dans les salons et les MP.
+- Aucun patch SQL obligatoire si le socle MP V1.3.6 est déjà installé.
 
 ## V1.3.10 — Bilan PDF + Hall du Nid
 

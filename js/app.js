@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — APP PRINCIPALE V1.3.10
+// LE NID DES PRONOS — APP PRINCIPALE V1.3.11
 // ============================================================
 
 const H = window.Helpers;
@@ -416,7 +416,7 @@ const App = {
           <div>
             <p class="eyebrow">Crédits cachés</p>
             <h2 id="creditsTitle">Le Nid des Pronos</h2>
-            <p class="muted">Version publique <strong>1.3.10</strong> · bilan PDF corrigé et Hall du Nid recalculé avec les données Supabase.</p>
+            <p class="muted">Version publique <strong>1.3.11</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
           </div>
         </div>
         <div class="credits-grid">
@@ -433,7 +433,7 @@ const App = {
             <p><strong>1.0.5</strong> — dashboard mobile/desktop stabilisé, sans chevauchement des cartes.</p>
           </section>
           <section>
-            <h3>Évolutions V1.3.10</h3>
+            <h3>Évolutions V1.3.11</h3>
             <ul class="changelog-list">
               <li>Le super admin peut désactiver ou réactiver l’affichage du module préparation.</li>
               <li>Quand la préparation est désactivée, les matchs test disparaissent des matchs/pronos, classements par phase et règles.</li>
@@ -857,7 +857,7 @@ const App = {
     this.state.teamChatError = null;
     const scope = this.normalizeChatScope(this.state.teamChatScope || "global");
     this.state.teamChatScope = scope;
-    const limit = scope === "private" ? Math.max(80, Number(this.state.teamChatLimit || 80)) : Math.max(10, Number(this.state.teamChatLimit || this.state.teamChatPageSize || 20));
+    const limit = scope === "private" ? Math.max(240, Number(this.state.teamChatLimit || 240)) : Math.max(10, Number(this.state.teamChatLimit || this.state.teamChatPageSize || 20));
     let query = window.sb
       .from("v_team_chat_messages")
       .select("*")
@@ -5785,6 +5785,42 @@ const App = {
     }[scope] || "Messages";
   },
 
+  chatScopeTabHtml(scopeKey, label, { small = false } = {}) {
+    const scope = this.availableChatScopes().find((item) => item.key === scopeKey);
+    if (!scope) return "";
+    const active = this.state.teamChatScope === scopeKey;
+    const unread = this.state.unreadTeamChatScopes?.has(scopeKey);
+    return `
+      <button type="button" class="chat-scope-tab ${small ? "small" : ""} ${active ? "active" : ""} ${unread ? "has-scope-unread" : ""}" data-chat-scope="${H.escapeHtml(scopeKey)}">
+        <span>${H.escapeHtml(label || scope.short || scope.label)}</span>
+        ${unread ? `<b class="chat-scope-dot" aria-hidden="true"></b>` : ""}
+      </button>
+    `;
+  },
+
+  chatScopeTabsHtml() {
+    const scopes = this.availableChatScopes();
+    const has = (key) => scopes.some((scope) => scope.key === key);
+    const familyTabs = [
+      has("family_global") ? this.chatScopeTabHtml("family_global", "Général famille", { small: true }) : "",
+      has("family_team") ? this.chatScopeTabHtml("family_team", "Team famille", { small: true }) : ""
+    ].filter(Boolean).join("");
+
+    return `
+      <nav class="chat-scope-tabs-v1311" aria-label="Choisir le salon du Nid">
+        ${has("global") ? this.chatScopeTabHtml("global", "Général") : ""}
+        ${has("team") ? this.chatScopeTabHtml("team", "Team") : ""}
+        ${familyTabs ? `
+          <div class="chat-scope-family-group ${this.isFamilyChatScope(this.state.teamChatScope) ? "active" : ""}">
+            <span>Famille</span>
+            <div>${familyTabs}</div>
+          </div>
+        ` : ""}
+        ${has("private") ? this.chatScopeTabHtml("private", "MP") : ""}
+      </nav>
+    `;
+  },
+
   reactionByKey(key) {
     return (this.state.chatReactions || []).find((reaction) => reaction.key === key);
   },
@@ -6273,71 +6309,85 @@ const App = {
 
   privateChatThreadsHtml(activePlayers = []) {
     const threads = this.privateChatThreads(this.state.teamChatMessages || []);
-    const threadIds = new Set(threads.map((thread) => String(thread.userId)));
-    if (this.state.activePrivateThreadId && !threadIds.has(String(this.state.activePrivateThreadId))) {
-      this.state.activePrivateThreadId = null;
-    }
+    const threadByUser = new Map(threads.map((thread) => [String(thread.userId), thread]));
+    const players = activePlayers
+      .filter((player) => String(player.id || player.user_id) !== String(this.state.session.user.id))
+      .map((player) => this.playerPublicProfile(player))
+      .sort((a, b) => String(a.pseudo || "").localeCompare(String(b.pseudo || ""), "fr"));
+
+    // On garde aussi les conversations avec un joueur qui ne serait plus dans l’annuaire actif.
+    threads.forEach((thread) => {
+      if (!players.some((player) => String(player.id || player.user_id) === String(thread.userId))) {
+        players.push(thread.profile);
+      }
+    });
+
     if (!this.state.activePrivateThreadId && threads.length) {
       this.state.activePrivateThreadId = threads[0].userId;
     }
 
-    const activeThread = threads.find((thread) => String(thread.userId) === String(this.state.activePrivateThreadId));
+    const activeProfile = players.find((player) => String(player.id || player.user_id) === String(this.state.activePrivateThreadId));
+    const activeExistingThread = this.state.activePrivateThreadId ? threadByUser.get(String(this.state.activePrivateThreadId)) : null;
+    const activeThread = this.state.activePrivateThreadId ? {
+      userId: this.state.activePrivateThreadId,
+      rows: activeExistingThread?.rows || [],
+      latestAt: activeExistingThread?.latestAt || 0,
+      profile: activeExistingThread?.profile || activeProfile || this.profileForUser(this.state.activePrivateThreadId)
+    } : null;
+
     if (activeThread) this.setPrivateThreadSeenNow(activeThread.userId);
 
-    const currentLabel = activeThread?.profile?.pseudo || "Choisir une conversation";
-    const currentMeta = activeThread ? `${activeThread.rows.length} message${activeThread.rows.length > 1 ? "s" : ""}` : "Aucun fil ouvert";
-
     return `
-      <div class="private-chat-compose card-soft-panel">
-        <strong>Écrire un nouveau MP</strong>
-        <form id="teamChatForm" class="team-chat-form chat-form-v120 private-chat-form">
-          <select name="recipient_id" required ${this.state.profile?.can_chat === false ? "disabled" : ""}>
-            <option value="">Choisir un destinataire MP</option>
-            ${activePlayers.filter((player) => player.id !== this.state.session.user.id).map((player) => `<option value="${H.escapeHtml(player.id)}">${H.escapeHtml(player.pseudo || "Joueur")} · ${H.escapeHtml(player.office_team_name || "Sans team")}</option>`).join("")}
-          </select>
-          <input type="text" name="body" maxlength="600" placeholder="Écris ton MP de hibou secret..." autocomplete="off" required ${this.state.profile?.can_chat === false ? "disabled" : ""}>
-          <button class="primary-btn" type="submit" ${this.state.profile?.can_chat === false ? "disabled" : ""}>Envoyer</button>
-        </form>
-      </div>
-
-      <div class="private-chat-conversation-shell">
-        <details class="private-thread-dropdown" ${threads.length ? "" : "open"}>
-          <summary>
-            ${activeThread ? H.profileBadgeHtml(activeThread.profile, "profile-badge mini") : H.icon("messages")}
-            <span><strong>${H.escapeHtml(currentLabel)}</strong><small>${H.escapeHtml(currentMeta)}</small></span>
-          </summary>
-          <div class="private-thread-menu">
-            ${threads.length ? threads.map((thread) => `
-              <button type="button" class="${String(thread.userId) === String(this.state.activePrivateThreadId) ? "active" : ""}" data-private-thread-select="${H.escapeHtml(thread.userId)}">
-                ${H.profileBadgeHtml(thread.profile, "profile-badge mini")}
-                <span><strong>${H.escapeHtml(thread.profile.pseudo || "Joueur")}</strong><small>${thread.rows.length} message${thread.rows.length > 1 ? "s" : ""} · ${H.formatDateTime(new Date(thread.latestAt).toISOString())}</small></span>
-                ${this.privateThreadHasUnread(thread) ? `<b class="private-thread-unread-dot" aria-label="Nouveau MP"></b>` : ""}
-              </button>
-            `).join("") : `<p class="muted">Aucune conversation MP pour l’instant.</p>`}
+      <div class="private-chat-layout-v1311">
+        <aside class="private-recipient-panel">
+          <div class="private-recipient-head">
+            <strong>Choisir un destinataire MP</strong>
+            <small>${players.length} joueur${players.length > 1 ? "s" : ""} disponible${players.length > 1 ? "s" : ""}</small>
           </div>
-        </details>
+          <div class="private-recipient-list">
+            ${players.length ? players.map((player) => {
+              const playerId = player.id || player.user_id;
+              const thread = threadByUser.get(String(playerId));
+              const unread = thread ? this.privateThreadHasUnread(thread) : false;
+              const count = thread?.rows?.length || 0;
+              return `
+                <button type="button" class="private-recipient-option ${String(playerId) === String(this.state.activePrivateThreadId) ? "active" : ""}" data-private-thread-select="${H.escapeHtml(playerId)}">
+                  ${H.profileBadgeHtml(player, "profile-badge mini")}
+                  <span>
+                    <strong>${H.escapeHtml(player.pseudo || "Joueur")}</strong>
+                    <small>${H.escapeHtml(player.office_team_name || "Sans team")}${count ? ` · ${count} message${count > 1 ? "s" : ""}` : " · nouveau fil"}</small>
+                  </span>
+                  ${unread ? `<b class="private-thread-unread-dot" aria-label="Nouveau MP"></b>` : ""}
+                </button>
+              `;
+            }).join("") : `<p class="muted">Aucun destinataire disponible.</p>`}
+          </div>
+        </aside>
 
-        ${activeThread ? this.privateChatThreadHtml(activeThread) : `<p class="muted empty-chat">Choisis un joueur et lâche un hibou discret 🦉</p>`}
+        <section class="private-conversation-panel">
+          ${activeThread ? this.privateChatThreadHtml(activeThread) : `<p class="muted empty-chat">Choisis un joueur dans la liste pour ouvrir un MP. Si aucun message n’existe, la conversation commence vide.</p>`}
+        </section>
       </div>
     `;
   },
 
   privateChatThreadHtml(thread) {
+    const hasRows = Boolean(thread.rows?.length);
     return `
       <article class="private-chat-thread-card active-thread-card" data-private-thread-user-id="${H.escapeHtml(thread.userId)}">
         <header>
           ${H.profileBadgeHtml(thread.profile, "profile-badge mini")}
           <div>
             <strong>${H.escapeHtml(thread.profile.pseudo || "Joueur")}</strong>
-            <small>${thread.rows.length} message${thread.rows.length > 1 ? "s" : ""} · dernier ${H.formatDateTime(new Date(thread.latestAt).toISOString())}</small>
+            <small>${H.escapeHtml(thread.profile.office_team_name || "Sans team")} · ${hasRows ? `${thread.rows.length} message${thread.rows.length > 1 ? "s" : ""}` : "conversation vide"}</small>
           </div>
         </header>
         <div class="private-chat-thread-messages team-chat-list private-message-list" id="teamChatList">
-          ${thread.rows.map((message) => this.chatMessageHtml(message)).join("")}
+          ${hasRows ? thread.rows.map((message) => this.chatMessageHtml(message)).join("") : `<p class="muted empty-chat">Aucun MP avec ${H.escapeHtml(thread.profile.pseudo || "ce joueur")} pour l’instant. Tu peux ouvrir le bal 🦉</p>`}
         </div>
         <form class="private-thread-reply-form" data-private-thread-form data-recipient-id="${H.escapeHtml(thread.userId)}">
-          <input type="text" name="body" maxlength="600" placeholder="Répondre à ${H.escapeHtml(thread.profile.pseudo || "ce joueur")}..." required ${this.state.profile?.can_chat === false ? "disabled" : ""}>
-          <button class="ghost-btn" type="submit" ${this.state.profile?.can_chat === false ? "disabled" : ""}>Répondre</button>
+          <input type="text" name="body" maxlength="600" placeholder="Écrire à ${H.escapeHtml(thread.profile.pseudo || "ce joueur")}..." required ${this.state.profile?.can_chat === false ? "disabled" : ""}>
+          <button class="ghost-btn" type="submit" ${this.state.profile?.can_chat === false ? "disabled" : ""}>Envoyer</button>
         </form>
       </article>
     `;
@@ -6419,17 +6469,8 @@ const App = {
             <button class="ghost-btn" id="refreshTeamChatBtn" type="button">Rafraîchir</button>
           </div>
 
-          <div class="chat-channel-picker">
-            <label>
-              <span>Choisir le coin du Nid</span>
-              <select id="teamChatScopeSelect">
-                ${scopes.map((scope) => `
-                  <option value="${H.escapeHtml(scope.key)}" ${chatScope === scope.key ? "selected" : ""}>
-                    ${this.state.unreadTeamChatScopes?.has(scope.key) ? "● " : ""}${H.escapeHtml(scope.label)}
-                  </option>
-                `).join("")}
-              </select>
-            </label>
+          <div class="chat-channel-picker-v1311">
+            ${this.chatScopeTabsHtml()}
             <p class="muted">${H.escapeHtml(scopes.find((scope) => scope.key === chatScope)?.hint || "Choisis où écrire.")}</p>
           </div>
 
@@ -6479,10 +6520,15 @@ const App = {
       H.toast("Messages rafraîchis", "success");
     });
 
-    H.$("#teamChatScopeSelect", root)?.addEventListener("change", async (event) => {
-      this.state.teamChatScope = event.currentTarget.value || "global";
-      this.state.teamChatLimit = this.state.teamChatScope === "private" ? 80 : 10;
-      await this.renderTeamsPage();
+    H.$$("[data-chat-scope]", root).forEach((button) => {
+      button.addEventListener("click", async () => {
+        const nextScope = button.dataset.chatScope || "global";
+        if (this.state.teamChatScope === nextScope) return;
+        this.state.teamChatScope = nextScope;
+        this.state.teamChatLimit = this.state.teamChatScope === "private" ? 240 : 10;
+        if (this.state.teamChatScope !== "private") this.state.activePrivateThreadId = null;
+        await this.renderTeamsPage();
+      });
     });
 
     H.$$('[data-direct-message-user-id]', root).forEach((button) => {
@@ -6894,7 +6940,7 @@ const App = {
             <p class="muted">Déconnexion, crédits et historique des évolutions.</p>
           </div>
           <div class="profile-account-actions">
-            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.3.10</button>
+            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.3.11</button>
             <button class="danger-btn" id="profileLogoutBtn" type="button">Déconnexion</button>
           </div>
         </div>
