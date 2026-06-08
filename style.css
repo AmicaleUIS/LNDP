@@ -1,0 +1,393 @@
+
+/* ============================================================
+   LE NID DES PRONOS — BILAN PDF V1.3.0
+   Aperçu temps réel + impression PDF
+   ============================================================ */
+
+:root {
+  --bilan-bg: #07111f;
+  --bilan-card: rgba(15, 23, 42, .86);
+  --bilan-gold: #facc15;
+  --bilan-gold-2: #f59e0b;
+  --bilan-text: #f8fafc;
+  --bilan-muted: rgba(226, 232, 240, .76);
+  --bilan-border: rgba(250, 204, 21, .28);
+  --bilan-cover-bg: linear-gradient(rgba(2,6,23,.18), rgba(2,6,23,.20)), url("../assets/reports/bg-cover.png"), radial-gradient(circle at 18% 10%, rgba(250,204,21,.25), transparent 36%), linear-gradient(135deg, #07111f, #10213d 58%, #050816);
+  --bilan-stats-bg: linear-gradient(rgba(2,6,23,.20), rgba(2,6,23,.24)), url("../assets/reports/bg-stats.png"), linear-gradient(135deg, #07111f, #112a49);
+  --bilan-badges-bg: linear-gradient(rgba(2,6,23,.20), rgba(2,6,23,.24)), url("../assets/reports/bg-badges.png"), linear-gradient(135deg, #081120, #1e293b 72%, #0f172a);
+  --bilan-records-bg: linear-gradient(rgba(2,6,23,.20), rgba(2,6,23,.24)), url("../assets/reports/bg-records.png"), linear-gradient(135deg, #09111f, #312e81 120%);
+  --bilan-graphs-bg: linear-gradient(rgba(2,6,23,.20), rgba(2,6,23,.24)), url("../assets/reports/bg-graphs.png"), linear-gradient(135deg, #07111f, #0f3b4d 115%);
+  --bilan-diplome-bg: linear-gradient(rgba(2,6,23,.12), rgba(2,6,23,.16)), url("../assets/reports/bg-diplome.png"), radial-gradient(circle at center top, rgba(250,204,21,.18), transparent 42%), linear-gradient(135deg, #07111f, #111827);
+}
+
+.bilan-body {
+  margin: 0;
+  color: var(--bilan-text);
+  background: radial-gradient(circle at top, rgba(250,204,21,.12), transparent 30%), #020617;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.bilan-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 18px;
+  border-bottom: 1px solid rgba(250, 204, 21, .18);
+  background: rgba(2, 6, 23, .88);
+  backdrop-filter: blur(16px);
+}
+
+.bilan-toolbar h1 { margin: 0; display: flex; align-items: center; gap: 10px; }
+.bilan-toolbar .eyebrow { margin: 0 0 4px; }
+.bilan-toolbar-actions { display: flex; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
+
+.bilan-root {
+  width: min(1120px, calc(100% - 24px));
+  margin: 22px auto 60px;
+}
+
+.bilan-loading {
+  min-height: 60vh;
+  display: grid;
+  place-items: center;
+  text-align: center;
+  border: 1px solid var(--bilan-border);
+  border-radius: 32px;
+  background: rgba(15, 23, 42, .7);
+}
+.loader-owl { font-size: 4rem; filter: drop-shadow(0 10px 20px rgba(250,204,21,.2)); }
+
+.bilan-document {
+  display: grid;
+  gap: 26px;
+}
+
+.bilan-page {
+  position: relative;
+  min-height: 1180px;
+  padding: 52px;
+  overflow: hidden;
+  border-radius: 34px;
+  border: 1px solid var(--bilan-border);
+  background: var(--bilan-stats-bg);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  box-shadow: 0 24px 70px rgba(0,0,0,.36);
+  page-break-after: always;
+}
+
+.bilan-page::before {
+  content: "";
+  position: absolute;
+  inset: 18px;
+  border: 1px solid rgba(250, 204, 21, .22);
+  border-radius: 28px;
+  pointer-events: none;
+}
+
+.bilan-page::after {
+  content: "Le Nid des Pronos";
+  position: absolute;
+  right: 42px;
+  bottom: 26px;
+  color: rgba(250,204,21,.38);
+  font-weight: 800;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  font-size: .74rem;
+}
+
+.bilan-page.cover { background: var(--bilan-cover-bg); }
+.bilan-page.stats { background: var(--bilan-stats-bg); }
+.bilan-page.badges { background: var(--bilan-badges-bg); }
+.bilan-page.records { background: var(--bilan-records-bg); }
+.bilan-page.graphs { background: var(--bilan-graphs-bg); }
+.bilan-page.diploma {
+  background: var(--bilan-diplome-bg);
+  min-height: 760px;
+  aspect-ratio: 1.414 / 1;
+}
+
+
+.bilan-page-content { position: relative; z-index: 2; }
+.bilan-page-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; margin-bottom: 26px; }
+.bilan-page-head h2 { font-size: clamp(2rem, 4vw, 3.35rem); line-height: .95; margin: 0; }
+.bilan-page-head p { color: var(--bilan-muted); margin: 8px 0 0; }
+.page-number { color: var(--bilan-gold); font-weight: 900; letter-spacing: .12em; }
+
+.cover-layout { min-height: 1050px; display: grid; align-content: space-between; }
+.cover-top { display: flex; align-items: center; justify-content: space-between; gap: 22px; }
+.cover-brand { display:flex; align-items:center; gap:16px; }
+.cover-brand img { width: 74px; height:74px; border-radius: 22px; box-shadow: 0 14px 30px rgba(0,0,0,.28); }
+.cover-brand strong { display:block; font-size:1.3rem; }
+.cover-brand span { color: var(--bilan-muted); }
+.cover-title { max-width: 760px; }
+.cover-title h2 { margin: 0; font-size: clamp(3.5rem, 8vw, 6.8rem); line-height: .86; letter-spacing: -.06em; }
+.cover-title .gold { color: var(--bilan-gold); text-shadow: 0 10px 40px rgba(250,204,21,.22); }
+.cover-player { display:grid; grid-template-columns: auto 1fr; gap: 24px; align-items:center; padding: 24px; border-radius: 32px; background: rgba(2,6,23,.44); border: 1px solid rgba(250,204,21,.2); }
+.cover-player .profile-badge { width: 148px; height:148px; }
+.cover-player h3 { margin:0; font-size: clamp(2rem, 5vw, 4rem); }
+.cover-player p { margin:8px 0 0; color: var(--bilan-muted); font-size: 1.2rem; }
+.cover-quote { font-size: clamp(1.3rem, 3vw, 2rem); line-height: 1.18; color:#fff7cc; max-width: 850px; }
+.cover-stats { display:grid; grid-template-columns: repeat(4, 1fr); gap:12px; }
+.cover-stat, .stat-card, .record-card, .badge-card, .graph-card, .prediction-card, .diploma-card {
+  border: 1px solid rgba(250,204,21,.18);
+  background: rgba(2,6,23,.36);
+  border-radius: 24px;
+  padding: 18px;
+}
+.cover-stat strong, .stat-card strong { display:block; color: var(--bilan-gold); font-size:2rem; line-height:1; }
+.cover-stat span, .stat-card span { display:block; margin-top:8px; color: var(--bilan-muted); }
+
+.stats-grid { display:grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin: 20px 0 28px; }
+.stat-card strong { font-size: 2.3rem; }
+.stat-card.feature { grid-column: span 2; background: linear-gradient(135deg, rgba(250,204,21,.18), rgba(15,23,42,.38)); }
+.stat-card.feature strong { font-size: 3.2rem; }
+
+.two-col { display:grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+.ranking-list, .record-grid, .badge-grid, .prediction-table-wrap { display:grid; gap: 10px; }
+.rank-row, .record-card { display:flex; justify-content:space-between; gap: 16px; align-items:center; }
+.rank-row strong, .record-card strong { color:#fff; }
+.rank-row small, .record-card small { color: var(--bilan-muted); display:block; margin-top:3px; }
+.big-rank { font-size: 2rem; color: var(--bilan-gold); font-weight: 900; }
+
+.badge-grid { grid-template-columns: repeat(3, 1fr); }
+.badge-card { min-height: 126px; display:grid; align-content:start; gap:8px; }
+.badge-card .badge-emoji { font-size: 2rem; }
+.badge-card strong { color: var(--bilan-gold); }
+.badge-card p { margin:0; color: var(--bilan-muted); font-size:.93rem; }
+
+.record-grid { grid-template-columns: repeat(2, 1fr); }
+.record-card { display:block; min-height: 120px; }
+.record-card .value { font-size: 2.1rem; color: var(--bilan-gold); font-weight: 900; }
+
+.chart-svg { width:100%; height:auto; overflow:visible; }
+.chart-line { fill:none; stroke: var(--bilan-gold); stroke-width: 5; stroke-linecap:round; stroke-linejoin:round; filter: drop-shadow(0 6px 12px rgba(250,204,21,.25)); }
+.chart-area { fill: rgba(250,204,21,.10); }
+.chart-grid { stroke: rgba(226,232,240,.16); stroke-width:1; }
+.chart-dot { fill: #fff7cc; stroke: var(--bilan-gold); stroke-width:3; }
+.chart-label { fill: rgba(226,232,240,.72); font-size: 12px; }
+.bars { display:grid; gap:12px; }
+.bar-row { display:grid; grid-template-columns: 120px 1fr auto; align-items:center; gap:10px; }
+.bar-track { height: 16px; border-radius:999px; background: rgba(226,232,240,.14); overflow:hidden; }
+.bar-fill { height:100%; border-radius:999px; background: linear-gradient(90deg, var(--bilan-gold), #38bdf8); }
+.bar-row strong { color:var(--bilan-muted); font-size:.92rem; }
+
+.prediction-table { width:100%; border-collapse: collapse; font-size:.82rem; overflow:hidden; border-radius:18px; }
+.prediction-table th, .prediction-table td { padding: 7px 8px; border-bottom: 1px solid rgba(226,232,240,.12); vertical-align:top; }
+.prediction-table th { color: var(--bilan-gold); text-align:left; background: rgba(2,6,23,.36); }
+.prediction-table td { color: rgba(248,250,252,.92); }
+.result-pill { display:inline-flex; padding:3px 8px; border-radius:999px; font-weight:800; }
+.result-pill.good { background: rgba(34,197,94,.16); color:#bbf7d0; }
+.result-pill.mid { background: rgba(250,204,21,.16); color:#fde68a; }
+.result-pill.bad { background: rgba(239,68,68,.16); color:#fecaca; }
+
+.diploma .bilan-page-content { min-height: 650px; display:grid; place-items:center; }
+.diploma-card { width: min(820px, 100%); text-align:center; padding: 54px 46px; border-width:2px; background: rgba(255, 251, 235, .08); }
+.diploma-card .profile-badge { width: 118px; height:118px; margin: 0 auto 20px; }
+.diploma-kicker { color: var(--bilan-gold); font-weight: 900; letter-spacing: .14em; text-transform: uppercase; }
+.diploma-card h2 { font-size: clamp(2.4rem, 6vw, 5.4rem); line-height:.9; margin: 10px 0; }
+.diploma-card h3 { font-size: clamp(1.6rem, 4vw, 3.2rem); color: var(--bilan-gold); margin: 12px 0 18px; }
+.diploma-card p { color: rgba(248,250,252,.9); font-size: 1.2rem; line-height:1.55; }
+.signature-row { display:flex; justify-content:space-between; gap:24px; margin-top:48px; color: var(--bilan-muted); }
+.signature-line { border-top: 1px solid rgba(250,204,21,.45); padding-top:10px; min-width: 180px; }
+
+.bilan-note { margin-top: 12px; color: var(--bilan-muted); font-size: .86rem; }
+
+@media (max-width: 900px) {
+  .bilan-toolbar { grid-template-columns:1fr; }
+  .bilan-page { padding: 28px; min-height: auto; }
+  .cover-player, .two-col { grid-template-columns: 1fr; }
+  .cover-stats, .stats-grid, .badge-grid, .record-grid { grid-template-columns: 1fr 1fr; }
+}
+
+@media (max-width: 560px) {
+  .cover-stats, .stats-grid, .badge-grid, .record-grid { grid-template-columns: 1fr; }
+  .bar-row { grid-template-columns: 1fr; }
+}
+
+@media print {
+  @page { size: A4 portrait; margin: 0; }
+  @page diploma { size: A4 landscape; margin: 0; }
+  html, body { background: #07111f !important; width: 210mm; }
+  .no-print, #toast { display:none !important; }
+  .bilan-root { width: 210mm; margin: 0; }
+  .bilan-document { gap:0; }
+  .bilan-page {
+    width: 210mm;
+    height: 297mm;
+    min-height: 297mm;
+    border-radius: 0;
+    border: 0;
+    box-shadow: none;
+    padding: 14mm;
+    page-break-after: always;
+    break-after: page;
+  }
+  .bilan-page.diploma {
+    page: diploma;
+    width: 297mm;
+    height: 210mm;
+    min-height: 210mm;
+    aspect-ratio: auto;
+    padding: 12mm 18mm;
+  }
+  .bilan-page.diploma .bilan-page-content {
+    min-height: 186mm;
+  }
+  .bilan-page:last-child { page-break-after: auto; break-after: auto; }
+  .bilan-page::before { inset: 6mm; border-radius: 4mm; }
+  .prediction-table { font-size: 8.5pt; }
+  .cover-title h2 { font-size: 54pt; }
+  .diploma-card h2 { font-size: 42pt; }
+  .diploma-card h3 { font-size: 25pt; }
+}
+
+
+/* V1.3.9 — Impression : fonds non coupés + diplôme paysage */
+@media print {
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  .bilan-page {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    background-size: cover !important;
+    background-position: center !important;
+    background-repeat: no-repeat !important;
+  }
+
+  .bilan-page.cover { background: var(--bilan-cover-bg) !important; }
+  .bilan-page.stats { background: var(--bilan-stats-bg) !important; }
+  .bilan-page.badges { background: var(--bilan-badges-bg) !important; }
+  .bilan-page.records { background: var(--bilan-records-bg) !important; }
+  .bilan-page.graphs { background: var(--bilan-graphs-bg) !important; }
+  .bilan-page.diploma { background: var(--bilan-diplome-bg) !important; }
+}
+
+
+/* ============================================================
+   V1.3.10 — Bilan PDF : données + fonds + diplôme paysage
+   ============================================================ */
+
+.bilan-page {
+  background-size: 100% 100%;
+  background-position: center;
+}
+
+.bilan-page.diploma {
+  width: min(1120px, 100%);
+  min-height: 792px;
+  aspect-ratio: 1.414 / 1;
+  background-size: 100% 100%;
+}
+
+.champion-card .champion-pick-line {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.champion-card .team-flag-img {
+  width: 34px;
+  height: 24px;
+  border-radius: 6px;
+  flex: 0 0 auto;
+}
+
+@media print {
+  @page { size: A4 portrait; margin: 0; }
+  @page diploma { size: A4 landscape; margin: 0; }
+
+  html,
+  body {
+    width: auto !important;
+    min-width: 0 !important;
+    margin: 0 !important;
+    background: #07111f !important;
+  }
+
+  .bilan-root {
+    width: auto !important;
+    max-width: none !important;
+    margin: 0 !important;
+  }
+
+  .bilan-document {
+    display: block !important;
+    gap: 0 !important;
+  }
+
+  .bilan-page {
+    width: 210mm !important;
+    height: 297mm !important;
+    min-height: 297mm !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 14mm !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    overflow: hidden !important;
+    page-break-after: always !important;
+    break-after: page !important;
+    background-size: 100% 100% !important;
+    background-position: center !important;
+    background-repeat: no-repeat !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  .bilan-page.diploma {
+    page: diploma !important;
+    width: 297mm !important;
+    height: 210mm !important;
+    min-height: 210mm !important;
+    max-width: none !important;
+    aspect-ratio: auto !important;
+    padding: 10mm 16mm !important;
+    background-size: 100% 100% !important;
+    background-position: center !important;
+  }
+
+  .bilan-page.diploma .bilan-page-content {
+    min-height: 190mm !important;
+    display: grid !important;
+    place-items: center !important;
+  }
+
+  .diploma-card {
+    width: 230mm !important;
+    max-width: 230mm !important;
+    padding: 16mm 18mm !important;
+  }
+
+  .diploma-card h2 {
+    font-size: 40pt !important;
+  }
+
+  .diploma-card h3 {
+    font-size: 22pt !important;
+    white-space: normal !important;
+  }
+
+  .diploma-card p {
+    font-size: 12pt !important;
+  }
+
+  .signature-row {
+    margin-top: 14mm !important;
+  }
+
+  .bilan-page:last-child {
+    page-break-after: auto !important;
+    break-after: auto !important;
+  }
+}

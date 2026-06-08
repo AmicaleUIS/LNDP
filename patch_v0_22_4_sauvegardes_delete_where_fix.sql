@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Connexion — Le Nid des Pronos</title>
+  <meta name="theme-color" content="#07111f">
+  <link rel="manifest" href="manifest.json?v=1.3.28">
+  <link rel="icon" href="assets/icons/icon-192.png">
+  <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png">
+  <link rel="stylesheet" href="css/style.css?v=1.3.28">
+</head>
+<body class="auth-layout">
+  <main class="auth-card">
+    <div class="brand-lockup">
+      <img src="assets/icons/icon-192.png" alt="Icône Le Nid des Pronos">
+      <div>
+        <h1>Le Nid des Pronos</h1>
+        <p>Connexion au nid.</p>
+      </div>
+    </div>
+
+    <h2>Connexion</h2>
+    <p class="muted">Entre ton identifiant <strong>prenom.nom</strong> et ton mot de passe. Pour la Famille, le site ajoute automatiquement <strong>.famille@uis.fr</strong>.</p>
+
+    <form id="loginForm" class="form-stack">
+      <div class="segmented auth-mode-switch" aria-label="Type de compte">
+        <label class="chip-btn active"><input type="radio" name="account_mode" value="uis" checked> UIS</label>
+        <label class="chip-btn"><input type="radio" name="account_mode" value="family"> Famille</label>
+      </div>
+      <label>
+        <span>prenom.nom</span>
+        <input type="text" name="login" autocomplete="username" placeholder="prenom.nom" inputmode="text" autocapitalize="none" spellcheck="false" required>
+      </label>
+      <label>
+        <span>Mot de passe</span>
+        <input type="password" name="password" autocomplete="current-password" required>
+      </label>
+      <button class="primary-btn" type="submit">Entrer dans le nid</button>
+    </form>
+
+    <p class="auth-switch">Pas encore de compte ? <a href="register.html">Créer un compte</a></p>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="js/config.js?v=1.3.28"></script>
+  <script src="js/supabaseClient.js?v=1.3.28"></script>
+  <script src="js/auth.js?v=1.3.28"></script>
+  <script src="js/common.js?v=1.3.28"></script>
+  <script>
+    window.addEventListener('DOMContentLoaded', async () => {
+      await Auth.redirectIfLoggedIn();
+      document.querySelectorAll('.auth-mode-switch input').forEach((input) => {
+        input.addEventListener('change', () => {
+          document.querySelectorAll('.auth-mode-switch label').forEach((label) => {
+            label.classList.toggle('active', label.querySelector('input')?.checked);
+          });
+        });
+      });
+      document.querySelector('#loginForm').addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const formData = new FormData(event.currentTarget);
+        try {
+          await Auth.login(formData.get('login'), formData.get('password'), formData.get('account_mode') || 'uis'); 
+          window.location.href = 'app.html';
+        } catch (error) {
+          Helpers.toast(error.message || 'Connexion impossible', 'error');
+        }
+      });
+    });
+  </script>
+</body>
+</html>

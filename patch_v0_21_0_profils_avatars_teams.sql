@@ -1,0 +1,292 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Admin — Le Nid des Pronos</title>
+  <meta name="theme-color" content="#07111f">
+  <link rel="manifest" href="manifest.json?v=1.3.28">
+  <link rel="icon" href="assets/icons/icon-192.png">
+  <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png">
+  <link rel="stylesheet" href="css/style.css?v=1.3.28">
+</head>
+<body>
+  <div class="admin-shell">
+    <aside class="admin-sidebar">
+      <a class="brand-lockup" href="app.html">
+        <img src="assets/icons/icon-192.png" alt="Icône Le Nid des Pronos">
+        <div>
+          <h1>Admin<br>du Nid</h1>
+          <p>Mode gestion</p>
+        </div>
+      </a>
+
+      <nav class="admin-nav" id="adminNav" aria-label="Navigation admin">
+        <button class="admin-nav-btn active" type="button" data-admin-section="quick">
+          <img class="owl-icon" src="assets/icons/owl-png/admin.png" alt="" aria-hidden="true" loading="lazy"><span>Saisie rapide</span>
+        </button>
+        <button class="admin-nav-btn" type="button" data-admin-section="teams">
+          <img class="owl-icon" src="assets/icons/owl-png/classements.png" alt="" aria-hidden="true" loading="lazy"><span>Équipes</span>
+        </button>
+        <button class="admin-nav-btn" type="button" data-admin-section="messages">
+          <img class="owl-icon" src="assets/icons/owl-png/diffusion.png" alt="" aria-hidden="true" loading="lazy"><span>Messages</span>
+        </button>
+        <button class="admin-nav-btn" type="button" data-admin-section="scores">
+          <img class="owl-icon" src="assets/icons/owl-png/score-exact.png" alt="" aria-hidden="true" loading="lazy"><span>Scores</span>
+        </button>
+        <button class="admin-nav-btn" type="button" data-admin-section="backups">
+          <img class="owl-icon" src="assets/icons/owl-png/verrouille.png" alt="" aria-hidden="true" loading="lazy"><span>Sauvegardes</span>
+        </button>
+        <button class="admin-nav-btn" type="button" data-admin-section="health">
+          <img class="owl-icon" src="assets/icons/owl-png/sante.png" alt="" aria-hidden="true" loading="lazy" onerror="this.onerror=null;this.src='assets/icons/owl-png/admin.png';"><span>Santé du Nid</span>
+        </button>
+        <button class="admin-nav-btn" type="button" data-admin-section="audit">
+          <img class="owl-icon" src="assets/icons/owl-png/journal.png" alt="" aria-hidden="true" loading="lazy" onerror="this.onerror=null;this.src='assets/icons/owl-png/admin.png';"><span>Journal</span>
+        </button>
+        <button class="admin-nav-btn" type="button" data-admin-section="final-report">
+          <img class="owl-icon" src="assets/icons/owl-png/bilan.png" alt="" aria-hidden="true" loading="lazy" onerror="this.onerror=null;this.src='assets/icons/owl-png/admin.png';"><span>Bilan PDF</span>
+        </button>
+        <button class="admin-nav-btn" type="button" data-admin-section="users">
+          <img class="owl-icon" src="assets/icons/owl-png/profil.png" alt="" aria-hidden="true" loading="lazy"><span>Joueurs</span>
+        </button>
+        <button class="admin-nav-btn" type="button" data-admin-section="family">
+          <img class="owl-icon" src="assets/icons/owl-png/famille.png" alt="" aria-hidden="true" loading="lazy"><span>Famille</span>
+        </button>
+      </nav>
+
+      <div class="admin-sidebar-footer">
+        <a class="ghost-btn admin-sidebar-action" href="app.html"><img class="owl-icon" src="assets/icons/owl-png/accueil.png" alt="" aria-hidden="true" loading="lazy"><span>Retour app</span></a>
+        <button class="ghost-btn admin-sidebar-action" id="refreshAdmin" type="button"><img class="owl-icon" src="assets/icons/owl-png/en-direct.png" alt="" aria-hidden="true" loading="lazy"><span>Rafraîchir</span></button>
+        <button class="danger-btn admin-sidebar-action" id="logoutBtn" type="button"><img class="owl-icon" src="assets/icons/owl-png/verrouille.png" alt="" aria-hidden="true" loading="lazy"><span>Déconnexion</span></button>
+      </div>
+    </aside>
+
+    <main class="admin-main-area">
+      <header class="admin-header admin-page-header">
+        <div>
+          <p class="eyebrow">Administration · v1.3.8</p>
+          <h1 id="adminPageTitle"><img class="owl-icon title-icon" src="assets/icons/owl-png/admin.png" alt="" aria-hidden="true" loading="lazy"> Saisie rapide des scores</h1>
+          <p class="muted" id="adminPageSubtitle">Prochains matchs en haut, scores manuels, classement recalculé automatiquement.</p>
+        </div>
+        <button class="mobile-menu-toggle admin-mobile-menu-toggle" id="adminMobileMenuToggle" type="button" aria-label="Ouvrir le menu admin" aria-controls="adminMobileMenuPanel" aria-expanded="false">
+          <span></span><span></span><span></span>
+        </button>
+      </header>
+
+      <div class="admin-container admin-container-narrow">
+        <section class="card admin-section active" data-section-panel="quick">
+          <div class="card-title-row">
+            <div>
+              <h2><img class="owl-icon title-icon" src="assets/icons/owl-png/admin.png" alt="" aria-hidden="true" loading="lazy"> Saisie rapide des scores</h2>
+              <p class="muted">Pensé pour mobile : prochains matchs en haut, matchs validés en bas, groupes par journée de poule / 16èmes / 8èmes / quarts / demies / finale.</p>
+            </div>
+            <div class="segmented-control" id="quickScoreFilters" aria-label="Filtrer les matchs">
+              <button class="chip-btn active" type="button" data-filter="work">À traiter</button>
+              <button class="chip-btn" type="button" data-filter="next">Prochains</button>
+              <button class="chip-btn" type="button" data-filter="today">Aujourd’hui</button>
+              <button class="chip-btn" type="button" data-filter="finished">Validés</button>
+              <button class="chip-btn" type="button" data-filter="all">Tous</button>
+            </div>
+          </div>
+          <div id="quickScoresAdmin" class="quick-score-grid"></div>
+        </section>
+
+        <section class="card admin-section" data-section-panel="teams">
+          <div class="card-title-row">
+            <div>
+              <h2>Gestion des équipes</h2>
+              <p class="muted">Création, renommage, changement de couleur et suppression des teams bureau.</p>
+            </div>
+          </div>
+          <div id="teamsAdmin"></div>
+          <form id="addOfficeTeamForm" class="inline-form">
+            <input type="text" name="name" placeholder="Nom de la team, ex : SNA" required>
+            <input type="color" name="color" value="#facc15" aria-label="Couleur de la team">
+            <button class="primary-btn" type="submit">Ajouter / mettre à jour</button>
+          </form>
+        </section>
+
+        <section class="card admin-section" data-section-panel="messages">
+          <div class="card-title-row">
+            <div>
+              <h2>Modération des messages</h2>
+              <p class="muted">Masque un message du chat global ou d’un chat de team. Il disparaît côté joueurs sans tout supprimer physiquement.</p>
+            </div>
+          </div>
+          <div id="chatModerationAdmin"></div>
+        </section>
+
+        <section class="card admin-section" data-section-panel="scores">
+          <div class="card-title-row">
+            <div>
+              <h2>Gestion complète des scores</h2>
+              <p class="muted">Vue complète des matchs, modification horaire / lieu / statut / scores / diffusion.</p>
+            </div>
+            <button class="primary-btn" id="recalcAllBtn">Recalculer tous les points</button>
+          </div>
+          <div id="matchesAdmin"></div>
+        </section>
+
+        <section class="card admin-section" data-section-panel="backups">
+          <div class="card-title-row">
+            <div>
+              <h2>Sauvegardes & remise à zéro</h2>
+              <p class="muted">Sauvegarde des pronos joueurs et des résultats de matchs. Une sauvegarde automatique est prévue tous les jours à midi via le patch SQL.</p>
+            </div>
+            <button class="primary-btn" id="createBackupBtn" type="button">Créer une sauvegarde maintenant</button>
+          </div>
+
+          <div class="backup-ux-guide">
+            <span><strong>1</strong> Sauvegarder</span>
+            <span><strong>2</strong> Tester sans risque</span>
+            <span><strong>3</strong> Couper les prévisualisations</span>
+            <span class="danger-step"><strong>!</strong> Reset = danger</span>
+          </div>
+
+          <div class="backup-panel-grid">
+            <section class="backup-box">
+              <h3>Charger une sauvegarde</h3>
+              <p class="muted">Choisis une sauvegarde, puis restaure les pronos et les résultats des matchs.</p>
+              <select id="backupSelect">
+                <option value="">Chargement des sauvegardes...</option>
+              </select>
+              <button class="ghost-btn" id="restoreBackupBtn" type="button">Charger la sauvegarde</button>
+            </section>
+
+            <section class="backup-box prep-reset-box prep-module-box">
+              <p class="backup-box-kicker">Réglages non destructifs</p>
+              <h3>Préparation & prévisualisations</h3>
+              <p class="muted">Ici, tu règles ce qui sert aux tests visuels. Ces boutons ne suppriment pas les pronos réels des joueurs.</p>
+              <p class="prep-module-status muted" id="prepModuleStatusText">Chargement du statut préparation...</p>
+              <div class="prep-module-actions">
+                <button class="ghost-btn" id="resetPreparationScoresBtn" type="button">Reset scores préparation</button>
+                <button class="danger-btn" id="togglePreparationModuleBtn" type="button">Désactiver le module préparation</button>
+              </div>
+              <div class="graph-preview-admin-box">
+                <h4>Prévisualisation des graphs</h4>
+                <p class="prep-module-status muted" id="graphPreviewStatusText">Chargement du statut graph...</p>
+                <div class="graph-preview-actions">
+                  <button class="ghost-btn" id="toggleGraphPreviewBtn" type="button">Graphs avec matchs test</button>
+                  <button class="ghost-btn" id="toggleGraphMockPreviewBtn" type="button">Maquette graph sans données</button>
+                </div>
+                <p class="prep-module-status muted" id="graphMockPreviewStatusText">Chargement du statut maquette...</p>
+                <div class="graph-preview-actions">
+                  <button class="ghost-btn" id="toggleHomeProgressTestMatchesBtn" type="button">Inclure les matchs test dans la progression</button>
+                </div>
+                <p class="prep-module-status muted" id="homeProgressTestMatchesStatusText">Chargement du statut progression accueil...</p>
+              </div>
+              <p class="muted tiny-note">Désactiver masque les matchs test, les règles et les classements liés. Les 2 badges préparation restent dans les exploits. La prévisualisation graphs ne sert qu’à vérifier l’affichage avant le premier match officiel.</p>
+            </section>
+
+            <section class="backup-box danger-zone launch-reset-box">
+              <p class="backup-box-kicker danger-kicker">Zone danger</p>
+              <h3>Reset lancement complet</h3>
+              <p class="real-pronos-warning">⚠️ Ne pas utiliser maintenant si des joueurs ont déjà posé des pronos réels.</p>
+              <p class="muted">Remet l’application à blanc sans supprimer les matchs : pronos, points, champion, scores/statuts, coupons, sauvegardes, messages, réactions, blocages et journal admin.</p>
+              <label>
+                Tape exactement <strong>LANCEMENT PROPRE</strong>
+                <input id="launchResetConfirmInput" type="text" placeholder="LANCEMENT PROPRE" autocomplete="off">
+              </label>
+              <button class="danger-btn" id="fullLaunchResetBtn" type="button">Reset complet lancement</button>
+              <p class="muted tiny-note">Ultra sécurisé : demande une phrase exacte + une confirmation. Les matchs, teams, comptes et réglages restent conservés. Les infos modifiées des matchs restent, seuls scores/statuts repartent à zéro.</p>
+            </section>
+
+            <section class="backup-box danger-zone">
+              <p class="backup-box-kicker danger-kicker">Zone danger</p>
+              <h3>Remise à zéro sécurisée</h3>
+              <p class="real-pronos-warning">⚠️ À éviter dès que la compétition a commencé ou que des pronos réels existent.</p>
+              <p class="muted">Supprime tous les pronostics joueurs, les pronos champion, les points/badges calculés et les messages du chat. Une sauvegarde est créée avant la remise à zéro.</p>
+              <label>
+                Tape exactement <strong>REMISE A ZERO</strong>
+                <input id="resetConfirmInput" type="text" placeholder="REMISE A ZERO" autocomplete="off">
+              </label>
+              <button class="danger-btn" id="resetPredictionsBtn" type="button">Remise à zéro pronos + messages</button>
+            </section>
+          </div>
+        </section>
+
+        <section class="card admin-section" data-section-panel="health">
+          <div class="card-title-row">
+            <div>
+              <h2><img class="owl-icon title-icon" src="assets/icons/owl-png/sante.png" alt="" aria-hidden="true" loading="lazy" onerror="this.onerror=null;this.src='assets/icons/owl-png/admin.png';"> Santé du Nid</h2>
+              <p class="muted">Contrôle rapide de l’état de l’application : données, sauvegardes, matchs, joueurs, coupons, chat et réglages.</p>
+            </div>
+            <button class="primary-btn" id="refreshHealthBtn" type="button">Rafraîchir le diagnostic</button>
+          </div>
+          <div id="healthAdmin"></div>
+        </section>
+
+        <section class="card admin-section" data-section-panel="audit">
+          <div class="card-title-row">
+            <div>
+              <h2><img class="owl-icon title-icon" src="assets/icons/owl-png/journal.png" alt="" aria-hidden="true" loading="lazy" onerror="this.onerror=null;this.src='assets/icons/owl-png/admin.png';"> Journal du Nid</h2>
+              <p class="muted">Historique des actions sensibles super admin : resets, sauvegardes, coupons, rôles, préparation et modération.</p>
+            </div>
+            <button class="ghost-btn" id="refreshAuditBtn" type="button">Rafraîchir le journal</button>
+          </div>
+          <div id="auditAdmin"></div>
+        </section>
+
+        <section class="card admin-section" data-section-panel="final-report">
+          <div class="card-title-row">
+            <div>
+              <h2><img class="owl-icon title-icon" src="assets/icons/owl-png/bilan.png" alt="" aria-hidden="true" loading="lazy" onerror="this.onerror=null;this.src='assets/icons/owl-png/admin.png';"> Bilan PDF final</h2>
+              <p class="muted">Aperçu en temps réel du carnet de vol joueur + diplôme. Le rendu est imprimable en PDF et prêt à recevoir les futurs fonds/images surprise.</p>
+            </div>
+          </div>
+          <div id="finalReportAdmin"></div>
+        </section>
+
+        <section class="card admin-section" data-section-panel="users">
+          <h2>Joueurs</h2>
+          <p class="muted">Association team, rôle, activation et droits particuliers.</p>
+          <div id="usersAdmin"></div>
+        </section>
+
+        <section class="card admin-section" data-section-panel="family">
+          <div class="card-title-row">
+            <div>
+              <h2>Mode Famille</h2>
+              <p class="muted">Activation des inscriptions Famille, invitations et dépannage super admin.</p>
+            </div>
+          </div>
+          <div id="familyAdmin"></div>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <div class="mobile-menu-backdrop" id="adminMobileMenuBackdrop" hidden></div>
+  <nav class="mobile-menu-panel admin-mobile-menu-panel" id="adminMobileMenuPanel" aria-label="Navigation admin mobile" hidden>
+    <div class="mobile-menu-head">
+      <strong>Menu admin</strong>
+      <button class="ghost-btn mobile-menu-close" id="adminMobileMenuClose" type="button">Fermer</button>
+    </div>
+    <button class="nav-btn active" type="button" data-admin-section="quick"><img class="owl-icon" src="assets/icons/owl-png/admin.png" alt="" aria-hidden="true" loading="lazy"><span>Saisie rapide</span></button>
+    <button class="nav-btn" type="button" data-admin-section="teams"><img class="owl-icon" src="assets/icons/owl-png/classements.png" alt="" aria-hidden="true" loading="lazy"><span>Équipes</span></button>
+    <button class="nav-btn" type="button" data-admin-section="messages"><img class="owl-icon" src="assets/icons/owl-png/diffusion.png" alt="" aria-hidden="true" loading="lazy"><span>Messages</span></button>
+    <button class="nav-btn" type="button" data-admin-section="scores"><img class="owl-icon" src="assets/icons/owl-png/score-exact.png" alt="" aria-hidden="true" loading="lazy"><span>Scores</span></button>
+    <button class="nav-btn" type="button" data-admin-section="backups"><img class="owl-icon" src="assets/icons/owl-png/verrouille.png" alt="" aria-hidden="true" loading="lazy"><span>Sauvegardes</span></button>
+    <button class="nav-btn" type="button" data-admin-section="health"><img class="owl-icon" src="assets/icons/owl-png/sante.png" alt="" aria-hidden="true" loading="lazy" onerror="this.onerror=null;this.src='assets/icons/owl-png/admin.png';"><span>Santé du Nid</span></button>
+    <button class="nav-btn" type="button" data-admin-section="audit"><img class="owl-icon" src="assets/icons/owl-png/journal.png" alt="" aria-hidden="true" loading="lazy" onerror="this.onerror=null;this.src='assets/icons/owl-png/admin.png';"><span>Journal</span></button>
+    <button class="nav-btn" type="button" data-admin-section="users"><img class="owl-icon" src="assets/icons/owl-png/profil.png" alt="" aria-hidden="true" loading="lazy"><span>Joueurs</span></button>
+    <button class="nav-btn" type="button" data-admin-section="family"><img class="owl-icon" src="assets/icons/owl-png/famille.png" alt="" aria-hidden="true" loading="lazy"><span>Famille</span></button>
+    <div class="admin-mobile-menu-actions">
+      <a class="ghost-btn" href="app.html">Retour app</a>
+      <button class="ghost-btn" id="refreshAdminMobile" type="button">Rafraîchir</button>
+      <button class="danger-btn" id="logoutBtnMobile" type="button">Déconnexion</button>
+    </div>
+  </nav>
+
+  <button class="mobile-scroll-top-owl admin-scroll-top-owl" id="adminScrollTopOwl" type="button" aria-label="Revenir en haut de la page admin">
+    <img src="assets/icons/owl-png/retour-haut-chouette.png" alt="" aria-hidden="true" loading="lazy" onerror="this.onerror=null;this.src='assets/icons/owl-png/accueil.png';">
+  </button>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="js/config.js?v=1.3.28"></script>
+  <script src="js/supabaseClient.js?v=1.3.28"></script>
+  <script src="js/auth.js?v=1.3.28"></script>
+  <script src="js/common.js?v=1.3.28"></script>
+  <script src="js/admin.js?v=1.3.28"></script>
+</body>
+</html>

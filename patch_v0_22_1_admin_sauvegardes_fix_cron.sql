@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Bilan PDF — Le Nid des Pronos</title>
+  <meta name="theme-color" content="#07111f">
+  <link rel="manifest" href="manifest.json?v=1.3.28">
+  <link rel="icon" href="assets/icons/icon-192.png">
+  <link rel="stylesheet" href="css/style.css?v=1.3.28">
+  <link rel="stylesheet" href="css/bilan.css?v=1.3.28">
+</head>
+<body class="bilan-body">
+  <div id="toast"></div>
+
+  <header class="bilan-toolbar no-print">
+    <a class="ghost-btn" href="admin.html">← Admin</a>
+    <div>
+      <p class="eyebrow">Surprise de fin · aperçu temps réel</p>
+      <h1><img class="owl-icon title-icon" src="assets/icons/owl-png/bilan.png" alt="" aria-hidden="true"> Bilan PDF joueur</h1>
+    </div>
+    <div class="bilan-toolbar-actions">
+      <button class="ghost-btn" id="refreshBilanBtn" type="button">Rafraîchir</button>
+      <button class="primary-btn" id="printBilanBtn" type="button">Imprimer / PDF</button>
+    </div>
+  </header>
+
+  <main id="bilanRoot" class="bilan-root">
+    <section class="bilan-loading">
+      <div class="loader-owl">🦉</div>
+      <h2>Le greffier du Nid rassemble les plumes...</h2>
+      <p class="muted">Chargement du bilan joueur en temps réel.</p>
+    </section>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="js/config.js?v=1.3.28"></script>
+  <script src="js/supabaseClient.js?v=1.3.28"></script>
+  <script src="js/auth.js?v=1.3.28"></script>
+  <script src="js/common.js?v=1.3.28"></script>
+  <script src="js/bilan.js?v=1.3.28"></script>
+</body>
+</html>

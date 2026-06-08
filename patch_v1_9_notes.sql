@@ -1,0 +1,14 @@
+-- ============================================================
+-- LE NID DES PRONOS — PATCH V1.9
+-- ============================================================
+-- Aucun patch SQL obligatoire.
+--
+-- Cette version corrige seulement les libellés côté interface :
+-- - round_of_32 est affiché comme "16èmes".
+--
+-- Les badges d'exploit sont calculés côté JS à partir :
+-- - public.v_visible_predictions
+-- - public.v_matches
+-- - public.v_leaderboard_overall
+--
+-- Tu peux donc remplacer les fichiers front sans modifier la base.
