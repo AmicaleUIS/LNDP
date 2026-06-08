@@ -1,69 +1,107 @@
 -- ============================================================
--- LE NID DES PRONOS — PATCH V1.0.17 corrigé
--- Mini-record Greffier du grimoire : date du trophée + égalités stables
+-- LE NID DES PRONOS — PATCH V1.2.3
+-- Super admin : coupons Famille bonus + réinitialisation
+-- À lancer après patch_v1_2_0_chat_du_nid.sql et patch_v1_2_1_reactions_whatsapp.sql.
 -- ============================================================
--- But : compter les pronos validés de tous les joueurs sans révéler les scores,
--- puis fournir la date à laquelle le joueur a atteint son total actuel.
--- En cas d'égalité, celui qui a atteint le total en premier conserve le trophée.
---
--- À lancer dans Supabase > SQL Editor.
 
-create or replace view public.v_mini_record_prediction_counts as
-with active_competition as (
-  select id
-  from public.competitions
-  where is_active = true
-  limit 1
-), filtered_predictions as (
-  select
-    pr.user_id,
-    m.competition_id,
-    coalesce(pr.locked_at, pr.updated_at, pr.created_at) as prediction_activity_at
-  from public.predictions pr
-  join public.matches m on m.id = pr.match_id
-  cross join active_competition ac
-  where m.competition_id = ac.id
-    and coalesce(m.status::text, '') not in ('cancelled', 'postponed')
-), user_counts as (
-  select
-    fp.user_id,
-    fp.competition_id,
-    count(*)::int as prediction_count,
-    min(fp.prediction_activity_at) as first_prediction_at,
-    max(fp.prediction_activity_at) as latest_prediction_at,
-    max(fp.prediction_activity_at) as record_unlocked_at
-  from filtered_predictions fp
-  group by fp.user_id, fp.competition_id
+-- Créer un coupon bonus pour un joueur UIS précis.
+-- Contrairement à create_family_invite(), cette fonction super admin ignore la limite normale de 3.
+create or replace function public.admin_create_bonus_family_invite(
+  p_inviter_id uuid,
+  p_office_team_id uuid default null,
+  p_valid_days int default 7
 )
-select
-  p.id as user_id,
-  p.pseudo,
-  p.office_team_id,
-  ot.name as office_team_name,
-  ac.id as competition_id,
-  coalesce(uc.prediction_count, 0)::int as prediction_count,
-  uc.first_prediction_at,
-  uc.latest_prediction_at,
-  uc.record_unlocked_at
-from public.profiles p
-cross join active_competition ac
-left join public.office_teams ot on ot.id = p.office_team_id
-left join user_counts uc on uc.user_id = p.id and uc.competition_id = ac.id
-where p.is_active = true;
+returns table(code text, expires_at timestamptz, office_team_id uuid, inviter_id uuid)
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  target_player public.profiles%rowtype;
+  target_team_id uuid;
+  valid_days int := greatest(1, least(coalesce(p_valid_days, 7), 30));
+  new_code text;
+  new_expires_at timestamptz;
+begin
+  if not public.is_super_admin() then
+    raise exception 'Réservé au super admin';
+  end if;
 
-grant select on public.v_mini_record_prediction_counts to authenticated;
+  select * into target_player
+  from public.profiles
+  where id = p_inviter_id;
 
--- Vérification rapide : top 10 du Greffier du grimoire.
--- À valeur égale, record_unlocked_at le plus ancien garde la place.
-select
-  row_number() over (
-    order by prediction_count desc, record_unlocked_at asc nulls last, lower(pseudo) asc
-  ) as rang,
-  pseudo,
-  office_team_name,
-  prediction_count,
-  record_unlocked_at
-from public.v_mini_record_prediction_counts
-where prediction_count > 0
-order by prediction_count desc, record_unlocked_at asc nulls last, lower(pseudo) asc
-limit 10;
+  if target_player.id is null then
+    raise exception 'Joueur introuvable';
+  end if;
+
+  if coalesce(target_player.player_scope, 'uis') = 'family' or target_player.role::text = 'family' then
+    raise exception 'Un compte Famille ne peut pas recevoir de coupons à inviter';
+  end if;
+
+  target_team_id := coalesce(p_office_team_id, target_player.office_team_id);
+
+  if target_team_id is null then
+    raise exception 'Choisis une team pour ce coupon';
+  end if;
+
+  if not exists (select 1 from public.office_teams where id = target_team_id) then
+    raise exception 'Team introuvable';
+  end if;
+
+  new_code := public.generate_family_invite_code();
+  new_expires_at := now() + make_interval(days => valid_days);
+
+  insert into public.family_invites (code, inviter_id, office_team_id, expires_at)
+  values (new_code, target_player.id, target_team_id, new_expires_at);
+
+  return query select new_code, new_expires_at, target_team_id, target_player.id;
+end;
+$$;
+
+grant execute on function public.admin_create_bonus_family_invite(uuid, uuid, int) to authenticated;
+
+-- Réinitialiser un coupon existant.
+-- Le coupon redevient disponible, avec une nouvelle date d'expiration.
+-- Important : le compte qui avait déjà utilisé le coupon n'est pas modifié automatiquement.
+create or replace function public.admin_reset_family_invite(
+  p_invite_id uuid,
+  p_valid_days int default 7
+)
+returns table(code text, expires_at timestamptz, office_team_id uuid)
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  invite_row public.family_invites%rowtype;
+  valid_days int := greatest(1, least(coalesce(p_valid_days, 7), 30));
+  new_expires_at timestamptz;
+begin
+  if not public.is_super_admin() then
+    raise exception 'Réservé au super admin';
+  end if;
+
+  select * into invite_row
+  from public.family_invites
+  where id = p_invite_id
+  for update;
+
+  if invite_row.id is null then
+    raise exception 'Coupon introuvable';
+  end if;
+
+  new_expires_at := now() + make_interval(days => valid_days);
+
+  return query
+  update public.family_invites fi
+  set used_by = null,
+      used_at = null,
+      revoked_at = null,
+      expires_at = new_expires_at
+  where fi.id = p_invite_id
+  returning fi.code, fi.expires_at, fi.office_team_id;
+end;
+$$;
+
+grant execute on function public.admin_reset_family_invite(uuid, int) to authenticated;

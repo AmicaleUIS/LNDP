@@ -1,69 +1,42 @@
 -- ============================================================
--- LE NID DES PRONOS — PATCH V1.1.0
--- Mini-record Greffier du grimoire : date du trophée + égalités stables
+-- LE NID DES PRONOS — PATCH V1.2.4
+-- Super admin : activation/désactivation du module préparation
+-- À lancer après patch_v1_2_3_coupons_famille_super_admin.sql.
 -- ============================================================
--- But : compter les pronos validés de tous les joueurs sans révéler les scores,
--- puis fournir la date à laquelle le joueur a atteint son total actuel.
--- En cas d'égalité, celui qui a atteint le total en premier conserve le trophée.
---
--- À lancer dans Supabase > SQL Editor.
 
-create or replace view public.v_mini_record_prediction_counts as
-with active_competition as (
-  select id
-  from public.competitions
-  where is_active = true
-  limit 1
-), filtered_predictions as (
-  select
-    pr.user_id,
-    m.competition_id,
-    coalesce(pr.locked_at, pr.updated_at, pr.created_at) as prediction_activity_at
-  from public.predictions pr
-  join public.matches m on m.id = pr.match_id
-  cross join active_competition ac
-  where m.competition_id = ac.id
-    and coalesce(m.status::text, '') not in ('cancelled', 'postponed')
-), user_counts as (
-  select
-    fp.user_id,
-    fp.competition_id,
-    count(*)::int as prediction_count,
-    min(fp.prediction_activity_at) as first_prediction_at,
-    max(fp.prediction_activity_at) as latest_prediction_at,
-    max(fp.prediction_activity_at) as record_unlocked_at
-  from filtered_predictions fp
-  group by fp.user_id, fp.competition_id
+-- Réglage global : true par défaut pour garder le comportement existant.
+insert into public.app_settings (key, value, updated_at)
+values ('preparation_module_enabled', 'true'::jsonb, now())
+on conflict (key) do nothing;
+
+-- Le super admin peut masquer/réactiver le module préparation côté interface.
+-- Cela ne supprime aucun match ni prono : on masque seulement l'affichage.
+create or replace function public.admin_set_preparation_module(p_enabled boolean)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if not public.is_super_admin() then
+    raise exception 'Réservé au super admin';
+  end if;
+
+  insert into public.app_settings (key, value, updated_at)
+  values ('preparation_module_enabled', to_jsonb(coalesce(p_enabled, true)), now())
+  on conflict (key) do update
+    set value = excluded.value,
+        updated_at = now();
+end;
+$$;
+
+grant execute on function public.admin_set_preparation_module(boolean) to authenticated;
+
+-- Historique technique visible si besoin depuis app_settings.
+insert into public.app_settings (key, value, updated_at)
+values (
+  'changelog_1_2_4',
+  '{"version":"1.2.4","title":"Module préparation masquable","changes":["Bouton super admin pour masquer ou réactiver les matchs de préparation","Les règles et classements par phase liés à la préparation sont masqués quand le module est désactivé","Les deux badges de préparation restent visibles dans les exploits","La barre admin desktop affiche les icônes Retour, Rafraîchir et Déconnexion"]}'::jsonb,
+  now()
 )
-select
-  p.id as user_id,
-  p.pseudo,
-  p.office_team_id,
-  ot.name as office_team_name,
-  ac.id as competition_id,
-  coalesce(uc.prediction_count, 0)::int as prediction_count,
-  uc.first_prediction_at,
-  uc.latest_prediction_at,
-  uc.record_unlocked_at
-from public.profiles p
-cross join active_competition ac
-left join public.office_teams ot on ot.id = p.office_team_id
-left join user_counts uc on uc.user_id = p.id and uc.competition_id = ac.id
-where p.is_active = true;
-
-grant select on public.v_mini_record_prediction_counts to authenticated;
-
--- Vérification rapide : top 10 du Greffier du grimoire.
--- À valeur égale, record_unlocked_at le plus ancien garde la place.
-select
-  row_number() over (
-    order by prediction_count desc, record_unlocked_at asc nulls last, lower(pseudo) asc
-  ) as rang,
-  pseudo,
-  office_team_name,
-  prediction_count,
-  record_unlocked_at
-from public.v_mini_record_prediction_counts
-where prediction_count > 0
-order by prediction_count desc, record_unlocked_at asc nulls last, lower(pseudo) asc
-limit 10;
+on conflict (key) do update set value = excluded.value, updated_at = now();

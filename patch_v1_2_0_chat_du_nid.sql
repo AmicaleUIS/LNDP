@@ -1,356 +1,414 @@
 -- ============================================================
--- LE NID DES PRONOS — PATCH V0.25.10
--- Reset des messages + sauvegarde/restauration du chat
--- À lancer après les patchs V0.22.4, V0.25.0 et V0.25.1
+-- LE NID DES PRONOS — PATCH V1.2.0
+-- Chat du Nid : salons Officiel/Famille, réactions PNG, historique.
+-- À lancer après les patchs V1.1.0 et V1.1.2.
 -- ============================================================
 
--- Sécurité : les colonnes de modération doivent exister si le chat existe.
+
+-- Helper super admin : utilisé pour la modération complète du tchat.
+create or replace function public.is_super_admin_profile(p_user_id uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1
+    from public.profiles p
+    where p.id = p_user_id
+      and p.role::text = 'super_admin'
+      and p.is_active = true
+      and coalesce(p.is_banned, false) = false
+  );
+$$;
+
+grant execute on function public.is_super_admin_profile(uuid) to authenticated;
+
+-- 1) Les scopes du chat évoluent :
+-- global       = général UIS
+-- team         = team UIS
+-- family_global= général Famille
+-- family_team  = team Famille
+alter table public.team_chat_messages
+  drop constraint if exists team_chat_messages_scope_check,
+  drop constraint if exists team_chat_messages_scope_team_check;
+
+alter table public.team_chat_messages
+  add constraint team_chat_messages_scope_check
+  check (scope in ('global', 'team', 'family_global', 'family_team'));
+
+alter table public.team_chat_messages
+  add constraint team_chat_messages_scope_team_check
+  check (
+    (scope in ('global', 'family_global') and office_team_id is null)
+    or
+    (scope in ('team', 'family_team') and office_team_id is not null)
+  );
+
+create index if not exists team_chat_messages_family_scope_created_idx
+  on public.team_chat_messages(scope, created_at desc)
+  where deleted_at is null;
+
+-- 2) Normalisation / droits d'écriture côté base.
+create or replace function public.normalize_team_chat_message()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_role text;
+  v_scope text;
+  v_show_family boolean;
+  v_team uuid;
+  v_can_chat boolean;
+  v_is_active boolean;
+  v_is_banned boolean;
+begin
+  new.body := trim(new.body);
+  new.user_id := auth.uid();
+
+  select
+    coalesce(p.role::text, 'user'),
+    coalesce(p.player_scope, 'uis'),
+    coalesce(p.show_family_players, false),
+    p.office_team_id,
+    coalesce(p.can_chat, true),
+    coalesce(p.is_active, false),
+    coalesce(p.is_banned, false)
+  into v_role, v_scope, v_show_family, v_team, v_can_chat, v_is_active, v_is_banned
+  from public.profiles p
+  where p.id = auth.uid();
+
+  if not coalesce(v_is_active, false) or coalesce(v_is_banned, false) then
+    raise exception 'Compte désactivé.';
+  end if;
+
+  if not coalesce(v_can_chat, true) then
+    raise exception 'Les messages sont désactivés sur ce compte.';
+  end if;
+
+  if new.scope not in ('global', 'team', 'family_global', 'family_team') then
+    new.scope := 'global';
+  end if;
+
+  if v_role = 'family' or v_scope = 'family' then
+    if new.scope not in ('family_global', 'family_team') then
+      raise exception 'Les comptes Famille écrivent dans les salons Famille uniquement.';
+    end if;
+  else
+    if new.scope in ('family_global', 'family_team') and not coalesce(v_show_family, false) then
+      raise exception 'Active le mode Famille dans ton profil pour écrire ici.';
+    end if;
+  end if;
+
+  if new.scope in ('team', 'family_team') then
+    if v_team is null then
+      raise exception 'Tu dois avoir une team pour écrire dans ce salon.';
+    end if;
+    new.office_team_id := v_team;
+  else
+    new.office_team_id := null;
+  end if;
+
+  return new;
+end;
+$$;
+
+
+-- RLS actualisées pour les nouveaux scopes. La vraie normalisation reste dans le trigger.
+drop policy if exists team_chat_messages_select on public.team_chat_messages;
+create policy team_chat_messages_select
+on public.team_chat_messages
+for select
+to authenticated
+using (public.is_active_profile(auth.uid()));
+
+drop policy if exists team_chat_messages_insert on public.team_chat_messages;
+create policy team_chat_messages_insert
+on public.team_chat_messages
+for insert
+to authenticated
+with check (
+  public.is_active_profile(auth.uid())
+  and user_id = auth.uid()
+  and scope in ('global', 'team', 'family_global', 'family_team')
+);
+
+drop policy if exists team_chat_messages_update_admin_only on public.team_chat_messages;
+drop policy if exists team_chat_messages_update_own_or_admin on public.team_chat_messages;
+drop policy if exists team_chat_messages_update_super_admin_only on public.team_chat_messages;
+create policy team_chat_messages_update_super_admin_only
+on public.team_chat_messages
+for update
+to authenticated
+using (public.is_active_profile(auth.uid()) and public.is_super_admin_profile(auth.uid()))
+with check (public.is_active_profile(auth.uid()) and public.is_super_admin_profile(auth.uid()));
+
+drop policy if exists team_chat_messages_delete_admin_only on public.team_chat_messages;
+drop policy if exists team_chat_messages_delete_own_or_admin on public.team_chat_messages;
+drop policy if exists team_chat_messages_delete_super_admin_only on public.team_chat_messages;
+create policy team_chat_messages_delete_super_admin_only
+on public.team_chat_messages
+for delete
+to authenticated
+using (public.is_active_profile(auth.uid()) and public.is_super_admin_profile(auth.uid()));
+
+grant select, insert, update, delete on public.team_chat_messages to authenticated;
+
+-- 3) Table des réactions : une seule réaction par joueur et par message.
+create table if not exists public.team_chat_reactions (
+  id uuid primary key default gen_random_uuid(),
+  message_id uuid not null references public.team_chat_messages(id) on delete cascade,
+  user_id uuid not null references public.profiles(id) on delete cascade,
+  reaction_key text not null,
+  created_at timestamptz not null default now(),
+  constraint team_chat_reactions_key_check check (reaction_key in ('owl','ball','laugh','fire','cry','eyes')),
+  constraint team_chat_reactions_one_per_user unique (message_id, user_id)
+);
+
+create index if not exists team_chat_reactions_message_idx
+  on public.team_chat_reactions(message_id);
+
+alter table public.team_chat_reactions enable row level security;
+
+drop policy if exists team_chat_reactions_select on public.team_chat_reactions;
+create policy team_chat_reactions_select
+on public.team_chat_reactions
+for select
+to authenticated
+using (public.is_active_profile(auth.uid()));
+
+drop policy if exists team_chat_reactions_insert on public.team_chat_reactions;
+create policy team_chat_reactions_insert
+on public.team_chat_reactions
+for insert
+to authenticated
+with check (public.is_active_profile(auth.uid()) and user_id = auth.uid());
+
+drop policy if exists team_chat_reactions_update_own on public.team_chat_reactions;
+create policy team_chat_reactions_update_own
+on public.team_chat_reactions
+for update
+to authenticated
+using (public.is_active_profile(auth.uid()) and user_id = auth.uid())
+with check (public.is_active_profile(auth.uid()) and user_id = auth.uid());
+
+drop policy if exists team_chat_reactions_delete_own on public.team_chat_reactions;
+create policy team_chat_reactions_delete_own
+on public.team_chat_reactions
+for delete
+to authenticated
+using (public.is_active_profile(auth.uid()) and user_id = auth.uid());
+
+grant select, insert, update, delete on public.team_chat_reactions to authenticated;
+
+-- 4) Visibilité des messages selon le profil courant.
+drop view if exists public.v_admin_team_chat_messages;
+drop view if exists public.v_team_chat_messages;
+
+create or replace view public.v_team_chat_messages
+as
+with current_profile as (
+  select
+    p.id,
+    coalesce(p.role::text, 'user') as role,
+    coalesce(p.player_scope, 'uis') as player_scope,
+    coalesce(p.show_family_players, false) as show_family_players,
+    p.office_team_id,
+    coalesce(p.is_active, false) as is_active,
+    coalesce(p.is_banned, false) as is_banned
+  from public.profiles p
+  where p.id = auth.uid()
+)
+select
+  m.id,
+  m.user_id,
+  m.scope,
+  m.office_team_id,
+  m.body,
+  m.created_at,
+  m.updated_at,
+  p.pseudo as author_pseudo,
+  p.role as author_role,
+  p.player_scope as author_player_scope,
+  p.office_team_id as author_office_team_id,
+  author_team.name as author_office_team_name,
+  author_team.slug as author_office_team_slug,
+  author_team.color as author_office_team_color,
+  p.avatar_key,
+  p.badge_shape,
+  p.badge_color,
+  target_team.name as office_team_name,
+  target_team.slug as office_team_slug,
+  target_team.color as office_team_color,
+  coalesce((
+    select jsonb_agg(jsonb_build_object('reaction_key', grouped.reaction_key, 'count', grouped.reaction_count) order by grouped.reaction_key)
+    from (
+      select r.reaction_key, count(*)::int as reaction_count
+      from public.team_chat_reactions r
+      join public.profiles rp on rp.id = r.user_id
+      where r.message_id = m.id
+        and rp.is_active = true
+        and coalesce(rp.is_banned, false) = false
+        and not exists (
+          select 1 from public.user_blocks b
+          where b.blocker_id = auth.uid()
+            and b.blocked_id = r.user_id
+        )
+      group by r.reaction_key
+    ) grouped
+  ), '[]'::jsonb) as reaction_counts,
+  (
+    select r.reaction_key
+    from public.team_chat_reactions r
+    where r.message_id = m.id and r.user_id = auth.uid()
+    limit 1
+  ) as my_reaction
+from public.team_chat_messages m
+join public.profiles p on p.id = m.user_id
+left join public.office_teams author_team on author_team.id = p.office_team_id
+left join public.office_teams target_team on target_team.id = m.office_team_id
+cross join current_profile cp
+where p.is_active = true
+  and coalesce(p.is_banned, false) = false
+  and m.deleted_at is null
+  and cp.is_active = true
+  and cp.is_banned = false
+  and not exists (
+    select 1 from public.user_blocks b
+    where b.blocker_id = auth.uid()
+      and b.blocked_id = m.user_id
+  )
+  and (
+    (m.scope = 'global' and cp.player_scope <> 'family' and cp.role <> 'family')
+    or (m.scope = 'team' and cp.player_scope <> 'family' and cp.role <> 'family' and m.office_team_id = cp.office_team_id)
+    or (m.scope = 'family_global' and (cp.player_scope = 'family' or cp.role = 'family' or cp.show_family_players = true))
+    or (m.scope = 'family_team' and (cp.player_scope = 'family' or cp.role = 'family' or cp.show_family_players = true) and m.office_team_id = cp.office_team_id)
+  );
+
+grant select on public.v_team_chat_messages to authenticated;
+
+create or replace view public.v_admin_team_chat_messages
+as
+select
+  m.id,
+  m.user_id,
+  m.scope,
+  m.office_team_id,
+  m.body,
+  m.created_at,
+  m.updated_at,
+  m.deleted_at,
+  m.deleted_by,
+  m.deleted_reason,
+  p.pseudo as author_pseudo,
+  p.email as author_email,
+  p.role as author_role,
+  p.player_scope as author_player_scope,
+  p.office_team_id as author_office_team_id,
+  author_team.name as author_office_team_name,
+  author_team.slug as author_office_team_slug,
+  author_team.color as author_office_team_color,
+  p.avatar_key,
+  p.badge_shape,
+  p.badge_color,
+  target_team.name as office_team_name,
+  target_team.slug as office_team_slug,
+  target_team.color as office_team_color,
+  moderator.pseudo as deleted_by_pseudo
+from public.team_chat_messages m
+join public.profiles p on p.id = m.user_id
+left join public.office_teams author_team on author_team.id = p.office_team_id
+left join public.office_teams target_team on target_team.id = m.office_team_id
+left join public.profiles moderator on moderator.id = m.deleted_by
+where public.is_super_admin_profile(auth.uid());
+
+grant select on public.v_admin_team_chat_messages to authenticated;
+
+-- 5) Fonction réaction : remplace l'ancienne réaction ou la retire si on reclique dessus.
+create or replace function public.toggle_team_chat_reaction(
+  p_message_id uuid,
+  p_reaction_key text
+)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_existing text;
+begin
+  if p_reaction_key not in ('owl','ball','laugh','fire','cry','eyes') then
+    raise exception 'Réaction inconnue.';
+  end if;
+
+  if not exists (select 1 from public.v_team_chat_messages where id = p_message_id) then
+    raise exception 'Message inaccessible.';
+  end if;
+
+  select reaction_key into v_existing
+  from public.team_chat_reactions
+  where message_id = p_message_id and user_id = auth.uid();
+
+  if v_existing = p_reaction_key then
+    delete from public.team_chat_reactions
+    where message_id = p_message_id and user_id = auth.uid();
+  else
+    insert into public.team_chat_reactions(message_id, user_id, reaction_key)
+    values (p_message_id, auth.uid(), p_reaction_key)
+    on conflict (message_id, user_id)
+    do update set reaction_key = excluded.reaction_key,
+                  created_at = now();
+  end if;
+end;
+$$;
+
+grant execute on function public.toggle_team_chat_reaction(uuid, text) to authenticated;
+
+-- 6) Suppression : l'auteur masque son message ; le super admin peut tout masquer.
+create or replace function public.delete_own_or_moderate_chat_message(
+  p_message_id uuid
+)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_author uuid;
+begin
+  select user_id into v_author
+  from public.team_chat_messages
+  where id = p_message_id;
+
+  if v_author is null then
+    raise exception 'Message introuvable.';
+  end if;
+
+  if v_author <> auth.uid() and not public.is_super_admin_profile(auth.uid()) then
+    raise exception 'Action non autorisée.';
+  end if;
+
+  update public.team_chat_messages
+     set deleted_at = coalesce(deleted_at, now()),
+         deleted_by = auth.uid(),
+         deleted_reason = case when v_author = auth.uid() then 'Message masqué par son auteur' else 'Message masqué par super admin' end,
+         updated_at = now()
+   where id = p_message_id;
+end;
+$$;
+
+grant execute on function public.delete_own_or_moderate_chat_message(uuid) to authenticated;
+
+-- 7) Realtime.
 do $$
 begin
-  if to_regclass('public.team_chat_messages') is not null then
-    alter table public.team_chat_messages
-      add column if not exists deleted_at timestamptz,
-      add column if not exists deleted_by uuid references public.profiles(id) on delete set null,
-      add column if not exists deleted_reason text;
-  end if;
-end $$;
-
--- ============================================================
--- 1. Sauvegarde : on inclut aussi les messages du chat
--- ============================================================
-
-create or replace function public.create_app_backup(
-  p_label text default null,
-  p_type text default 'manual'
-)
-returns uuid
-language plpgsql
-security definer
-set search_path = public
-as $$
-declare
-  v_id uuid;
-  v_payload jsonb;
-  v_label text;
-  v_winner_predictions jsonb := '[]'::jsonb;
-  v_team_chat_messages jsonb := '[]'::jsonb;
-begin
-  if auth.uid() is not null and not public.is_admin() then
-    raise exception 'Action réservée à l’admin.';
-  end if;
-
-  v_label := coalesce(nullif(trim(p_label), ''), 'Sauvegarde ' || to_char(now(), 'YYYY-MM-DD HH24:MI'));
-
-  if to_regclass('public.winner_predictions') is not null then
-    select coalesce(jsonb_agg(to_jsonb(w) order by w.created_at), '[]'::jsonb)
-    into v_winner_predictions
-    from (
-      select
-        id,
-        user_id,
-        competition_id,
-        predicted_team_id,
-        locked_at,
-        created_at,
-        updated_at
-      from public.winner_predictions
-    ) w;
-  end if;
-
-  if to_regclass('public.team_chat_messages') is not null then
-    select coalesce(jsonb_agg(to_jsonb(m) order by m.created_at), '[]'::jsonb)
-    into v_team_chat_messages
-    from (
-      select
-        id,
-        user_id,
-        scope,
-        office_team_id,
-        body,
-        created_at,
-        updated_at,
-        deleted_at,
-        deleted_by,
-        deleted_reason
-      from public.team_chat_messages
-    ) m;
-  end if;
-
-  v_payload := jsonb_build_object(
-    'created_at', now(),
-    'version', '0.25.10',
-    'matches', coalesce((
-      select jsonb_agg(to_jsonb(m) order by m.kickoff_at)
-      from (
-        select
-          id,
-          status,
-          home_score,
-          away_score,
-          winner_team_id,
-          tv_channel,
-          tv_channel_source,
-          kickoff_at,
-          match_day,
-          venue,
-          city,
-          venue_country_code,
-          venue_country_name,
-          venue_country_flag_url,
-          updated_at
-        from public.matches
-      ) m
-    ), '[]'::jsonb),
-    'predictions', coalesce((
-      select jsonb_agg(to_jsonb(p) order by p.created_at)
-      from (
-        select
-          id,
-          user_id,
-          match_id,
-          home_score_pred,
-          away_score_pred,
-          qualified_team_pred,
-          locked_at,
-          created_at,
-          updated_at
-        from public.predictions
-      ) p
-    ), '[]'::jsonb),
-    'winner_predictions', v_winner_predictions,
-    'team_chat_messages', v_team_chat_messages
-  );
-
-  insert into public.app_backups (label, backup_type, payload, created_by)
-  values (v_label, coalesce(nullif(trim(p_type), ''), 'manual'), v_payload, auth.uid())
-  returning id into v_id;
-
-  return v_id;
-end;
-$$;
-
--- ============================================================
--- 2. Restauration : si la sauvegarde contient le chat, on le restaure aussi
--- ============================================================
-
-create or replace function public.restore_app_backup(p_backup_id uuid)
-returns void
-language plpgsql
-security definer
-set search_path = public
-as $$
-declare
-  v_payload jsonb;
-begin
-  if not public.is_admin() then
-    raise exception 'Action réservée à l’admin.';
-  end if;
-
-  select payload into v_payload
-  from public.app_backups
-  where id = p_backup_id;
-
-  if v_payload is null then
-    raise exception 'Sauvegarde introuvable.';
-  end if;
-
-  perform public.create_app_backup('Avant restauration ' || to_char(now(), 'YYYY-MM-DD HH24:MI'), 'restore-before');
-
-  perform set_config('app.restore_mode', 'on', true);
-
-  delete from public.prediction_points where true;
-  delete from public.predictions where true;
-
-  insert into public.predictions (
-    id,
-    user_id,
-    match_id,
-    home_score_pred,
-    away_score_pred,
-    qualified_team_pred,
-    locked_at,
-    created_at,
-    updated_at
-  )
-  select
-    id,
-    user_id,
-    match_id,
-    home_score_pred,
-    away_score_pred,
-    qualified_team_pred,
-    locked_at,
-    created_at,
-    updated_at
-  from jsonb_to_recordset(coalesce(v_payload -> 'predictions', '[]'::jsonb)) as x(
-    id uuid,
-    user_id uuid,
-    match_id uuid,
-    home_score_pred integer,
-    away_score_pred integer,
-    qualified_team_pred uuid,
-    locked_at timestamptz,
-    created_at timestamptz,
-    updated_at timestamptz
-  );
-
-  if to_regclass('public.winner_predictions') is not null then
-    delete from public.winner_predictions where true;
-
-    insert into public.winner_predictions (
-      id,
-      user_id,
-      competition_id,
-      predicted_team_id,
-      locked_at,
-      created_at,
-      updated_at
-    )
-    select
-      id,
-      user_id,
-      competition_id,
-      predicted_team_id,
-      locked_at,
-      created_at,
-      updated_at
-    from jsonb_to_recordset(coalesce(v_payload -> 'winner_predictions', '[]'::jsonb)) as x(
-      id uuid,
-      user_id uuid,
-      competition_id uuid,
-      predicted_team_id uuid,
-      locked_at timestamptz,
-      created_at timestamptz,
-      updated_at timestamptz
-    );
-  end if;
-
-  update public.matches m
-  set
-    status = x.status,
-    home_score = x.home_score,
-    away_score = x.away_score,
-    winner_team_id = x.winner_team_id,
-    tv_channel = x.tv_channel,
-    tv_channel_source = coalesce(x.tv_channel_source, m.tv_channel_source),
-    kickoff_at = coalesce(x.kickoff_at, m.kickoff_at),
-    match_day = coalesce(x.match_day, m.match_day),
-    venue = x.venue,
-    city = x.city,
-    venue_country_code = coalesce(x.venue_country_code, m.venue_country_code),
-    venue_country_name = coalesce(x.venue_country_name, m.venue_country_name),
-    venue_country_flag_url = coalesce(x.venue_country_flag_url, m.venue_country_flag_url),
-    updated_at = now()
-  from jsonb_to_recordset(coalesce(v_payload -> 'matches', '[]'::jsonb)) as x(
-    id uuid,
-    status public.match_status,
-    home_score integer,
-    away_score integer,
-    winner_team_id uuid,
-    tv_channel text,
-    tv_channel_source public.tv_channel_source,
-    kickoff_at timestamptz,
-    match_day date,
-    venue text,
-    city text,
-    venue_country_code text,
-    venue_country_name text,
-    venue_country_flag_url text,
-    updated_at timestamptz
-  )
-  where m.id = x.id;
-
-  if to_regclass('public.team_chat_messages') is not null and v_payload ? 'team_chat_messages' then
-    delete from public.team_chat_messages where true;
-
-    insert into public.team_chat_messages (
-      id,
-      user_id,
-      scope,
-      office_team_id,
-      body,
-      created_at,
-      updated_at,
-      deleted_at,
-      deleted_by,
-      deleted_reason
-    )
-    select
-      id,
-      user_id,
-      scope,
-      office_team_id,
-      body,
-      created_at,
-      updated_at,
-      deleted_at,
-      deleted_by,
-      deleted_reason
-    from jsonb_to_recordset(coalesce(v_payload -> 'team_chat_messages', '[]'::jsonb)) as x(
-      id uuid,
-      user_id uuid,
-      scope text,
-      office_team_id uuid,
-      body text,
-      created_at timestamptz,
-      updated_at timestamptz,
-      deleted_at timestamptz,
-      deleted_by uuid,
-      deleted_reason text
-    );
-  end if;
-
-  perform set_config('app.restore_mode', 'off', true);
-  perform public.recalc_all_points();
-
   begin
-    perform public.recalc_winner_predictions();
-  exception when undefined_function then
-    null;
+    alter publication supabase_realtime add table public.team_chat_reactions;
+  exception
+    when duplicate_object then null;
+    when undefined_object then null;
   end;
-end;
-$$;
-
--- ============================================================
--- 3. Remise à zéro : pronos + choix champion + messages du chat
--- La sauvegarde est créée AVANT la suppression.
--- ============================================================
-
-create or replace function public.reset_all_predictions_secure(p_confirm text)
-returns void
-language plpgsql
-security definer
-set search_path = public
-as $$
-begin
-  if not public.is_admin() then
-    raise exception 'Action réservée à l’admin.';
-  end if;
-
-  if p_confirm <> 'REMISE A ZERO' then
-    raise exception 'Confirmation invalide.';
-  end if;
-
-  perform public.create_app_backup('Avant remise à zéro ' || to_char(now(), 'YYYY-MM-DD HH24:MI'), 'reset-before');
-
-  delete from public.prediction_points where true;
-  delete from public.predictions where true;
-
-  if to_regclass('public.winner_predictions') is not null then
-    delete from public.winner_predictions where true;
-  end if;
-
-  if to_regclass('public.team_chat_messages') is not null then
-    delete from public.team_chat_messages where true;
-  end if;
-end;
-$$;
-
-grant execute on function public.create_app_backup(text, text) to authenticated;
-grant execute on function public.restore_app_backup(uuid) to authenticated;
-grant execute on function public.reset_all_predictions_secure(text) to authenticated;
-
-select
-  'reset_messages_backup_ready_v0_25_10' as check_name,
-  (select count(*) from public.app_backups) as backups_count,
-  case when to_regclass('public.team_chat_messages') is null then null else (select count(*) from public.team_chat_messages) end as chat_messages_count;
+end $$;

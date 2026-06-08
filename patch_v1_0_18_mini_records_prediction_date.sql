@@ -1,106 +1,69 @@
 -- ============================================================
--- LE NID DES PRONOS — PATCH V0.24.2
--- Avatars joueurs dans les classements
+-- LE NID DES PRONOS — PATCH V1.1.0
+-- Mini-record Greffier du grimoire : date du trophée + égalités stables
 -- ============================================================
+-- But : compter les pronos validés de tous les joueurs sans révéler les scores,
+-- puis fournir la date à laquelle le joueur a atteint son total actuel.
+-- En cas d'égalité, celui qui a atteint le total en premier conserve le trophée.
+--
+-- À lancer dans Supabase > SQL Editor.
 
--- Objectif : exposer les infos d'avatar/badge dans le classement général,
--- sans afficher d'email ni de donnée sensible.
-
-create or replace view public.v_public_profiles as
+create or replace view public.v_mini_record_prediction_counts as
+with active_competition as (
+  select id
+  from public.competitions
+  where is_active = true
+  limit 1
+), filtered_predictions as (
+  select
+    pr.user_id,
+    m.competition_id,
+    coalesce(pr.locked_at, pr.updated_at, pr.created_at) as prediction_activity_at
+  from public.predictions pr
+  join public.matches m on m.id = pr.match_id
+  cross join active_competition ac
+  where m.competition_id = ac.id
+    and coalesce(m.status::text, '') not in ('cancelled', 'postponed')
+), user_counts as (
+  select
+    fp.user_id,
+    fp.competition_id,
+    count(*)::int as prediction_count,
+    min(fp.prediction_activity_at) as first_prediction_at,
+    max(fp.prediction_activity_at) as latest_prediction_at,
+    max(fp.prediction_activity_at) as record_unlocked_at
+  from filtered_predictions fp
+  group by fp.user_id, fp.competition_id
+)
 select
-  p.id,
+  p.id as user_id,
   p.pseudo,
   p.office_team_id,
   ot.name as office_team_name,
-  ot.slug as office_team_slug,
-  ot.color as office_team_color,
-  ot.avatar_url as office_team_avatar_url,
-  p.is_active,
-  p.created_at,
-  p.avatar_key,
-  p.badge_shape,
-  p.badge_color,
-  p.profile_setup_done
+  ac.id as competition_id,
+  coalesce(uc.prediction_count, 0)::int as prediction_count,
+  uc.first_prediction_at,
+  uc.latest_prediction_at,
+  uc.record_unlocked_at
 from public.profiles p
-left join public.office_teams ot on ot.id = p.office_team_id;
+cross join active_competition ac
+left join public.office_teams ot on ot.id = p.office_team_id
+left join user_counts uc on uc.user_id = p.id and uc.competition_id = ac.id
+where p.is_active = true;
 
-grant select on public.v_public_profiles to authenticated;
+grant select on public.v_mini_record_prediction_counts to authenticated;
 
--- Le classement général reçoit les 3 colonnes avatar/badge en fin de vue
--- pour éviter les erreurs PostgreSQL de changement d'ordre des colonnes.
-create or replace view public.v_leaderboard_overall as
-with match_points as (
-  select
-    p.id as user_id,
-    coalesce(sum(pp.points_total), 0)::int as match_points,
-    coalesce(sum(case when pp.is_exact_score then 1 else 0 end), 0)::int as exact_scores,
-    coalesce(sum(case when pp.is_good_result then 1 else 0 end), 0)::int as good_results,
-    coalesce(sum(case when pp.is_good_goal_diff then 1 else 0 end), 0)::int as good_goal_diffs,
-    coalesce(sum(case when pp.is_good_qualified then 1 else 0 end), 0)::int as good_qualified,
-    count(pp.id)::int as scored_matches
-  from public.profiles p
-  left join public.prediction_points pp on pp.user_id = p.id
-  where p.is_active = true
-  group by p.id
-),
-winner_points as (
-  select
-    user_id,
-    coalesce(sum(points_total), 0)::int as winner_points,
-    (array_agg(predicted_team_id) filter (where points_total = 100))[1] as winner_team_id,
-    max(predicted_team_name) filter (where points_total = 100) as winner_team_name
-  from public.v_winner_predictions
-  group by user_id
-),
-base as (
-  select
-    p.id as user_id,
-    p.pseudo,
-    p.office_team_id,
-    ot.name as office_team_name,
-    ot.slug as office_team_slug,
-    (coalesce(mp.match_points, 0) + coalesce(wp.winner_points, 0))::int as total_points,
-    coalesce(mp.exact_scores, 0)::int as exact_scores,
-    coalesce(mp.good_results, 0)::int as good_results,
-    coalesce(mp.good_goal_diffs, 0)::int as good_goal_diffs,
-    coalesce(mp.good_qualified, 0)::int as good_qualified,
-    coalesce(mp.scored_matches, 0)::int as scored_matches,
-    coalesce(mp.match_points, 0)::int as match_points,
-    coalesce(wp.winner_points, 0)::int as winner_points,
-    wp.winner_team_id,
-    wp.winner_team_name,
-    p.avatar_key,
-    p.badge_shape,
-    p.badge_color
-  from public.profiles p
-  left join public.office_teams ot on ot.id = p.office_team_id
-  left join match_points mp on mp.user_id = p.id
-  left join winner_points wp on wp.user_id = p.id
-  where p.is_active = true
-)
+-- Vérification rapide : top 10 du Greffier du grimoire.
+-- À valeur égale, record_unlocked_at le plus ancien garde la place.
 select
-  rank() over (
-    order by
-      total_points desc,
-      exact_scores desc,
-      good_results desc,
-      good_goal_diffs desc,
-      lower(pseudo) asc
-  )::int as rank,
-  *
-from base;
-
-grant select on public.v_leaderboard_overall to authenticated;
-
--- Vérification rapide.
-select
-  'leaderboard_avatars' as check_name,
-  rank,
+  row_number() over (
+    order by prediction_count desc, record_unlocked_at asc nulls last, lower(pseudo) asc
+  ) as rang,
   pseudo,
-  total_points,
-  avatar_key,
-  badge_shape,
-  badge_color
-from public.v_leaderboard_overall
-order by rank
-limit 20;
+  office_team_name,
+  prediction_count,
+  record_unlocked_at
+from public.v_mini_record_prediction_counts
+where prediction_count > 0
+order by prediction_count desc, record_unlocked_at asc nulls last, lower(pseudo) asc
+limit 10;

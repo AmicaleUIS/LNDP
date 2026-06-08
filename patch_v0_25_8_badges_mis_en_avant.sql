@@ -1,401 +1,131 @@
 -- ============================================================
--- LE NID DES PRONOS — PATCH V0.22.0
--- Admin par sections + sauvegardes + remise à zéro sécurisée
+-- LE NID DES PRONOS — PATCH V0.25.8
+-- Choix joueur des 3 badges d'exploit affichés dans les classements
 -- ============================================================
 
--- Ce patch ajoute :
--- - une table de sauvegardes app_backups ;
--- - une fonction de sauvegarde des pronos joueurs + résultats matchs ;
--- - une fonction de restauration ;
--- - une fonction de remise à zéro sécurisée des pronos / points / badges ;
--- - une tentative de planification automatique quotidienne à midi France pendant la coupe.
+-- 1) Chaque joueur peut stocker jusqu'à 3 identifiants de badges à mettre en avant.
+alter table public.profiles
+  add column if not exists featured_badge_ids text[];
 
--- ============================================================
--- 1. TABLE SAUVEGARDES
--- ============================================================
-
-create table if not exists public.app_backups (
-  id uuid primary key default gen_random_uuid(),
-  label text not null,
-  backup_type text not null default 'manual', -- manual / auto / reset-before
-  payload jsonb not null,
-  created_by uuid references public.profiles(id) on delete set null,
-  created_at timestamptz not null default now()
-);
-
-create index if not exists idx_app_backups_created_at on public.app_backups(created_at desc);
-create index if not exists idx_app_backups_type on public.app_backups(backup_type);
-
-alter table public.app_backups enable row level security;
-
-drop policy if exists "app_backups_admin_select" on public.app_backups;
-create policy "app_backups_admin_select"
-on public.app_backups
-for select
-to authenticated
-using (public.is_admin());
-
-drop policy if exists "app_backups_admin_insert" on public.app_backups;
-create policy "app_backups_admin_insert"
-on public.app_backups
-for insert
-to authenticated
-with check (public.is_admin());
-
--- ============================================================
--- 2. BYPASS RESTAURATION POUR LE TRIGGER DE PRONOS
--- ============================================================
-
-create or replace function public.enforce_prediction_deadline()
-returns trigger
-language plpgsql
-security definer
-set search_path = public
-as $$
-declare
-  match_kickoff timestamptz;
-  match_stage_value public.match_stage;
+do $$
 begin
-  -- Utilisé uniquement par restore_app_backup().
-  if current_setting('app.restore_mode', true) = 'on' then
-    return new;
+  if not exists (
+    select 1 from pg_constraint where conname = 'profiles_featured_badge_ids_max_3'
+  ) then
+    alter table public.profiles
+      add constraint profiles_featured_badge_ids_max_3
+      check (featured_badge_ids is null or cardinality(featured_badge_ids) <= 3);
   end if;
+end $$;
 
-  select kickoff_at, stage
-  into match_kickoff, match_stage_value
-  from public.matches
-  where id = new.match_id;
-
-  if match_kickoff is null then
-    raise exception 'Match introuvable.';
-  end if;
-
-  if TG_OP = 'UPDATE' then
-    if new.user_id is distinct from old.user_id then
-      raise exception 'Impossible de transférer un prono vers un autre utilisateur.';
-    end if;
-
-    if new.match_id is distinct from old.match_id then
-      raise exception 'Impossible de transférer un prono vers un autre match.';
-    end if;
-  end if;
-
-  if now() >= match_kickoff then
-    raise exception 'Prono verrouillé : le match a déjà commencé.';
-  end if;
-
-  if new.qualified_team_pred is not null and match_stage_value = 'group'::public.match_stage then
-    raise exception 'Le qualifié ne doit être renseigné que pour les matchs à élimination directe.';
-  end if;
-
-  return new;
-end;
-$$;
-
--- ============================================================
--- 3. CRÉER UNE SAUVEGARDE
--- ============================================================
-
-create or replace function public.create_app_backup(
-  p_label text default null,
-  p_type text default 'manual'
-)
-returns uuid
-language plpgsql
-security definer
-set search_path = public
-as $$
-declare
-  v_id uuid;
-  v_payload jsonb;
-  v_label text;
-begin
-  -- Appel utilisateur : admin obligatoire.
-  -- Appel cron : auth.uid() est null, accepté.
-  if auth.uid() is not null and not public.is_admin() then
-    raise exception 'Action réservée à l’admin.';
-  end if;
-
-  v_label := coalesce(nullif(trim(p_label), ''), 'Sauvegarde ' || to_char(now(), 'YYYY-MM-DD HH24:MI'));
-
-  v_payload := jsonb_build_object(
-    'created_at', now(),
-    'version', '0.22.0',
-    'matches', coalesce((
-      select jsonb_agg(to_jsonb(m) order by m.kickoff_at)
-      from (
-        select
-          id,
-          status,
-          home_score,
-          away_score,
-          winner_team_id,
-          tv_channel,
-          tv_channel_source,
-          kickoff_at,
-          match_day,
-          venue,
-          city,
-          updated_at
-        from public.matches
-      ) m
-    ), '[]'::jsonb),
-    'predictions', coalesce((
-      select jsonb_agg(to_jsonb(p) order by p.created_at)
-      from (
-        select
-          id,
-          user_id,
-          match_id,
-          home_score_pred,
-          away_score_pred,
-          qualified_team_pred,
-          locked_at,
-          created_at,
-          updated_at
-        from public.predictions
-      ) p
-    ), '[]'::jsonb),
-    'winner_predictions', coalesce((
-      select jsonb_agg(to_jsonb(w) order by w.created_at)
-      from (
-        select
-          id,
-          user_id,
-          competition_id,
-          predicted_team_id,
-          points_total,
-          locked_at,
-          created_at,
-          updated_at
-        from public.winner_predictions
-      ) w
-    ), '[]'::jsonb)
-  );
-
-  insert into public.app_backups (label, backup_type, payload, created_by)
-  values (v_label, coalesce(nullif(trim(p_type), ''), 'manual'), v_payload, auth.uid())
-  returning id into v_id;
-
-  return v_id;
-end;
-$$;
-
--- ============================================================
--- 4. RESTAURER UNE SAUVEGARDE
--- ============================================================
-
-create or replace function public.restore_app_backup(p_backup_id uuid)
-returns void
-language plpgsql
-security definer
-set search_path = public
-as $$
-declare
-  v_payload jsonb;
-begin
-  if not public.is_admin() then
-    raise exception 'Action réservée à l’admin.';
-  end if;
-
-  select payload into v_payload
-  from public.app_backups
-  where id = p_backup_id;
-
-  if v_payload is null then
-    raise exception 'Sauvegarde introuvable.';
-  end if;
-
-  -- Sauvegarde de sécurité avant restauration.
-  perform public.create_app_backup('Avant restauration ' || to_char(now(), 'YYYY-MM-DD HH24:MI'), 'restore-before');
-
-  perform set_config('app.restore_mode', 'on', true);
-
-  delete from public.prediction_points;
-  delete from public.predictions;
-
-  insert into public.predictions (
-    id,
-    user_id,
-    match_id,
-    home_score_pred,
-    away_score_pred,
-    qualified_team_pred,
-    locked_at,
-    created_at,
-    updated_at
-  )
-  select
-    id,
-    user_id,
-    match_id,
-    home_score_pred,
-    away_score_pred,
-    qualified_team_pred,
-    locked_at,
-    created_at,
-    updated_at
-  from jsonb_to_recordset(coalesce(v_payload -> 'predictions', '[]'::jsonb)) as x(
-    id uuid,
-    user_id uuid,
-    match_id uuid,
-    home_score_pred integer,
-    away_score_pred integer,
-    qualified_team_pred uuid,
-    locked_at timestamptz,
-    created_at timestamptz,
-    updated_at timestamptz
-  );
-
-  if to_regclass('public.winner_predictions') is not null then
-    delete from public.winner_predictions;
-
-    insert into public.winner_predictions (
-      id,
-      user_id,
-      competition_id,
-      predicted_team_id,
-      points_total,
-      locked_at,
-      created_at,
-      updated_at
-    )
-    select
-      id,
-      user_id,
-      competition_id,
-      predicted_team_id,
-      points_total,
-      locked_at,
-      created_at,
-      updated_at
-    from jsonb_to_recordset(coalesce(v_payload -> 'winner_predictions', '[]'::jsonb)) as x(
-      id uuid,
-      user_id uuid,
-      competition_id uuid,
-      predicted_team_id uuid,
-      points_total integer,
-      locked_at timestamptz,
-      created_at timestamptz,
-      updated_at timestamptz
-    );
-  end if;
-
-  update public.matches m
-  set
-    status = x.status,
-    home_score = x.home_score,
-    away_score = x.away_score,
-    winner_team_id = x.winner_team_id,
-    tv_channel = x.tv_channel,
-    tv_channel_source = coalesce(x.tv_channel_source, m.tv_channel_source),
-    kickoff_at = coalesce(x.kickoff_at, m.kickoff_at),
-    match_day = coalesce(x.match_day, m.match_day),
-    venue = x.venue,
-    city = x.city,
-    updated_at = now()
-  from jsonb_to_recordset(coalesce(v_payload -> 'matches', '[]'::jsonb)) as x(
-    id uuid,
-    status public.match_status,
-    home_score integer,
-    away_score integer,
-    winner_team_id uuid,
-    tv_channel text,
-    tv_channel_source public.tv_channel_source,
-    kickoff_at timestamptz,
-    match_day date,
-    venue text,
-    city text,
-    updated_at timestamptz
-  )
-  where m.id = x.id;
-
-  perform set_config('app.restore_mode', 'off', true);
-  perform public.recalc_all_points();
-
-  if to_regclass('public.winner_predictions') is not null then
-    -- Si la fonction champion existe, elle peut recalculer les +100 points.
-    begin
-      perform public.recalc_winner_predictions();
-    exception when undefined_function then
-      null;
-    end;
-  end if;
-end;
-$$;
-
--- ============================================================
--- 5. REMISE À ZÉRO SÉCURISÉE DES PRONOS
--- ============================================================
-
-create or replace function public.reset_all_predictions_secure(p_confirm text)
-returns void
-language plpgsql
-security definer
-set search_path = public
-as $$
-begin
-  if not public.is_admin() then
-    raise exception 'Action réservée à l’admin.';
-  end if;
-
-  if p_confirm <> 'REMISE A ZERO' then
-    raise exception 'Confirmation invalide.';
-  end if;
-
-  perform public.create_app_backup('Avant remise à zéro ' || to_char(now(), 'YYYY-MM-DD HH24:MI'), 'reset-before');
-
-  delete from public.prediction_points;
-  delete from public.predictions;
-
-  if to_regclass('public.winner_predictions') is not null then
-    delete from public.winner_predictions;
-  end if;
-end;
-$$;
-
-grant select on public.app_backups to authenticated;
-grant execute on function public.create_app_backup(text, text) to authenticated;
-grant execute on function public.restore_app_backup(uuid) to authenticated;
-grant execute on function public.reset_all_predictions_secure(text) to authenticated;
-
--- ============================================================
--- 6. SAUVEGARDE AUTOMATIQUE MIDI FRANCE
--- ============================================================
-
--- Supabase Cron / pg_cron doit être disponible sur le projet.
--- Pendant la Coupe du Monde, midi France = 10:00 UTC.
--- Si cron n’est pas actif, le patch continue sans erreur : tu pourras utiliser le bouton manuel.
-
-do $do$
-begin
-  -- Supprime l'ancien cron s'il existe déjà.
-  -- Si pg_cron n'est pas actif sur le projet, l'erreur est ignorée.
-  begin
-    perform cron.unschedule('le-nid-pronos-backup-midi');
-  exception when others then
-    null;
-  end;
-
-  -- Planifie une sauvegarde automatique tous les jours à 10:00 UTC.
-  -- En juin/juillet, cela correspond à midi en France métropolitaine.
-  -- Correction V0.22.1 : utilisation de $do$ / $cmd$ pour éviter le conflit de guillemets dollar.
-  begin
-    perform cron.schedule(
-      'le-nid-pronos-backup-midi',
-      '0 10 * * *',
-      $cmd$select public.create_app_backup('Sauvegarde automatique midi', 'auto');$cmd$
-    );
-  exception when others then
-    raise notice 'Planification cron non créée. Active Supabase Cron / pg_cron si tu veux la sauvegarde automatique. Détail : %', sqlerrm;
-  end;
-end $do$;
-
--- ============================================================
--- 7. VÉRIFICATION
--- ============================================================
-
+-- 2) Vue publique profils : on expose uniquement les ids des badges mis en avant,
+-- sans donnée sensible supplémentaire.
+create or replace view public.v_public_profiles as
 select
-  'app_backups_ready' as check_name,
-  count(*) as backups_count
-from public.app_backups;
+  p.id,
+  p.pseudo,
+  p.office_team_id,
+  ot.name as office_team_name,
+  ot.slug as office_team_slug,
+  ot.color as office_team_color,
+  ot.avatar_url as office_team_avatar_url,
+  p.is_active,
+  p.created_at,
+  p.avatar_key,
+  p.badge_shape,
+  p.badge_color,
+  p.profile_setup_done,
+  p.featured_badge_ids
+from public.profiles p
+left join public.office_teams ot on ot.id = p.office_team_id;
+
+grant select on public.v_public_profiles to authenticated;
+
+-- 3) Classement général : on ajoute les badges mis en avant en fin de vue.
+create or replace view public.v_leaderboard_overall as
+with match_points as (
+  select
+    p.id as user_id,
+    coalesce(sum(pp.points_total), 0)::int as match_points,
+    coalesce(sum(case when pp.is_exact_score then 1 else 0 end), 0)::int as exact_scores,
+    coalesce(sum(case when pp.is_good_result then 1 else 0 end), 0)::int as good_results,
+    coalesce(sum(case when pp.is_good_goal_diff then 1 else 0 end), 0)::int as good_goal_diffs,
+    coalesce(sum(case when pp.is_good_qualified then 1 else 0 end), 0)::int as good_qualified,
+    count(pp.id)::int as scored_matches
+  from public.profiles p
+  left join public.prediction_points pp on pp.user_id = p.id
+  where p.is_active = true
+  group by p.id
+),
+winner_points as (
+  select
+    user_id,
+    coalesce(sum(points_total), 0)::int as winner_points,
+    (array_agg(predicted_team_id) filter (where points_total = 100))[1] as winner_team_id,
+    max(predicted_team_name) filter (where points_total = 100) as winner_team_name
+  from public.v_winner_predictions
+  group by user_id
+),
+base as (
+  select
+    p.id as user_id,
+    p.pseudo,
+    p.office_team_id,
+    ot.name as office_team_name,
+    ot.slug as office_team_slug,
+    (coalesce(mp.match_points, 0) + coalesce(wp.winner_points, 0))::int as total_points,
+    coalesce(mp.exact_scores, 0)::int as exact_scores,
+    coalesce(mp.good_results, 0)::int as good_results,
+    coalesce(mp.good_goal_diffs, 0)::int as good_goal_diffs,
+    coalesce(mp.good_qualified, 0)::int as good_qualified,
+    coalesce(mp.scored_matches, 0)::int as scored_matches,
+    coalesce(mp.match_points, 0)::int as match_points,
+    coalesce(wp.winner_points, 0)::int as winner_points,
+    wp.winner_team_id,
+    wp.winner_team_name,
+    p.avatar_key,
+    p.badge_shape,
+    p.badge_color,
+    p.featured_badge_ids
+  from public.profiles p
+  left join public.office_teams ot on ot.id = p.office_team_id
+  left join match_points mp on mp.user_id = p.id
+  left join winner_points wp on wp.user_id = p.id
+  where p.is_active = true
+)
+select
+  rank() over (
+    order by
+      total_points desc,
+      exact_scores desc,
+      good_results desc,
+      good_goal_diffs desc,
+      lower(pseudo) asc
+  )::int as rank,
+  *
+from base;
+
+grant select on public.v_leaderboard_overall to authenticated;
+
+-- 4) Mémo version.
+insert into public.app_settings (key, value)
+values
+  ('changelog_0_25_8', '{
+    "version": "0.25.8",
+    "title": "Badges mis en avant",
+    "changes": [
+      "Ajout du choix joueur des 3 badges affichés dans les classements",
+      "Ajout de la colonne profiles.featured_badge_ids",
+      "Exposition des badges choisis dans v_public_profiles et v_leaderboard_overall"
+    ]
+  }'::jsonb)
+on conflict (key) do update set
+  value = excluded.value,
+  updated_at = now();
+
+-- 5) Vérification rapide.
+select
+  'featured_badges_ready' as check_name,
+  count(*) as profiles_count,
+  count(*) filter (where featured_badge_ids is not null and cardinality(featured_badge_ids) > 0) as profiles_with_featured_badges
+from public.profiles;

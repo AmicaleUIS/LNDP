@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>App — Le Nid des Pronos</title>
+  <meta name="theme-color" content="#07111f">
+  <link rel="manifest" href="manifest.json?v=1.3.28">
+  <link rel="icon" href="assets/icons/icon-192.png">
+  <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png">
+  <link rel="stylesheet" href="css/style.css?v=1.3.28">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <a class="brand-lockup" href="app.html">
+        <img src="assets/icons/icon-192.png" alt="Icône Le Nid des Pronos">
+        <div>
+          <h1>Le Nid<br>des Pronos</h1>
+          <p>Coupe du Monde</p>
+        </div>
+      </a>
+
+      <nav class="nav-list" aria-label="Navigation principale">
+        <button class="nav-btn active" data-view="home"><img class="owl-icon" src="assets/icons/owl-png/accueil.png" alt="" aria-hidden="true" loading="lazy"><span>Accueil</span></button>
+        <button class="nav-btn" data-view="matches"><img class="owl-icon" src="assets/icons/owl-png/matchs.png" alt="" aria-hidden="true" loading="lazy"><span>Matchs</span></button>
+        <button class="nav-btn" data-view="worldcup"><img class="owl-icon" src="assets/icons/owl-png/coupe-du-monde.png" alt="" aria-hidden="true" loading="lazy"><span>Coupe du monde</span></button>
+        <button class="nav-btn" data-view="leaderboard"><img class="owl-icon" src="assets/icons/owl-png/classements.png" alt="" aria-hidden="true" loading="lazy"><span>Classements</span></button>
+        <button class="nav-btn" data-view="teams"><img class="owl-icon" src="assets/icons/owl-png/profil.png" alt="" aria-hidden="true" loading="lazy"><span>Les teams du nid</span></button>
+        <button class="nav-btn" data-view="achievements"><img class="owl-icon" src="assets/icons/owl-png/exploits.png" alt="" aria-hidden="true" loading="lazy"><span>Exploits</span></button>
+      </nav>
+
+      <div class="sidebar-footer">
+        <button class="user-pill profile-shortcut" id="profileShortcut" type="button" data-view="profile" aria-label="Ouvrir mon profil">
+          <span class="avatar" id="userAvatar"><img class="owl-icon" src="assets/icons/owl-png/accueil.png" alt="" aria-hidden="true" loading="lazy"></span>
+          <span class="user-pill-text">
+            <strong id="userPseudo">...</strong>
+            <small id="userTeam">...</small>
+          </span>
+        </button>
+      </div>
+    </aside>
+
+    <main class="main-area">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Le Nid des Pronos</p>
+          <h1 id="pageTitle">Tableau de bord</h1>
+        </div>
+        <button class="mobile-menu-toggle" id="mobileMenuToggle" type="button" aria-label="Ouvrir le menu" aria-controls="mobileMenuPanel" aria-expanded="false">
+          <span></span><span></span><span></span>
+        </button>
+      </header>
+
+      <div id="viewRoot" class="view-root">
+        <section class="card">
+          <p class="muted">Chargement du nid...</p>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <div class="mobile-menu-backdrop" id="mobileMenuBackdrop" hidden></div>
+  <nav class="mobile-menu-panel" id="mobileMenuPanel" aria-label="Navigation mobile" hidden>
+    <div class="mobile-menu-head">
+      <strong>Menu du nid</strong>
+      <button class="ghost-btn mobile-menu-close" id="mobileMenuClose" type="button">Fermer</button>
+    </div>
+    <button class="nav-btn active" data-view="home"><img class="owl-icon" src="assets/icons/owl-png/accueil.png" alt="" aria-hidden="true" loading="lazy"><span>Accueil</span></button>
+    <button class="nav-btn" data-view="matches"><img class="owl-icon" src="assets/icons/owl-png/matchs.png" alt="" aria-hidden="true" loading="lazy"><span>Matchs</span></button>
+    <button class="nav-btn" data-view="worldcup"><img class="owl-icon" src="assets/icons/owl-png/coupe-du-monde.png" alt="" aria-hidden="true" loading="lazy"><span>Coupe du monde</span></button>
+    <button class="nav-btn" data-view="leaderboard"><img class="owl-icon" src="assets/icons/owl-png/classements.png" alt="" aria-hidden="true" loading="lazy"><span>Classements</span></button>
+    <button class="nav-btn" data-view="teams"><img class="owl-icon" src="assets/icons/owl-png/profil.png" alt="" aria-hidden="true" loading="lazy"><span>Les teams du nid</span></button>
+    <button class="nav-btn" data-view="achievements"><img class="owl-icon" src="assets/icons/owl-png/exploits.png" alt="" aria-hidden="true" loading="lazy"><span>Exploits</span></button>
+    <button class="nav-btn" data-view="profile"><img class="owl-icon" src="assets/icons/owl-png/profil.png" alt="" aria-hidden="true" loading="lazy"><span>Profil</span></button>
+    <a class="nav-btn mobile-admin-link" id="mobileAdminLink" href="admin.html" hidden><img class="owl-icon" src="assets/icons/owl-png/admin.png" alt="" aria-hidden="true" loading="lazy"><span>Admin</span></a>
+  </nav>
+
+  <button class="mobile-scroll-top-owl" id="mobileScrollTopOwl" type="button" aria-label="Revenir en haut de la page">
+    <img src="assets/icons/owl-png/retour-haut-chouette.png" alt="" aria-hidden="true" loading="lazy" onerror="this.onerror=null;this.src='assets/icons/owl-png/accueil.png';">
+  </button>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="js/config.js?v=1.3.28"></script>
+  <script src="js/supabaseClient.js?v=1.3.28"></script>
+  <script src="js/auth.js?v=1.3.28"></script>
+  <script src="js/common.js?v=1.3.28"></script>
+  <script src="js/app.js?v=1.3.28"></script>
+</body>
+</html>

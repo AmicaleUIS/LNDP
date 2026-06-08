@@ -1,401 +1,206 @@
 -- ============================================================
--- LE NID DES PRONOS — PATCH V0.22.0
--- Admin par sections + sauvegardes + remise à zéro sécurisée
+-- LE NID DES PRONOS — PATCH V0.25.1
+-- Fiches joueurs dans Les teams + modération du chat + chargement progressif
+-- À lancer après patch_v0_25_0_les_teams_chat.sql
 -- ============================================================
 
--- Ce patch ajoute :
--- - une table de sauvegardes app_backups ;
--- - une fonction de sauvegarde des pronos joueurs + résultats matchs ;
--- - une fonction de restauration ;
--- - une fonction de remise à zéro sécurisée des pronos / points / badges ;
--- - une tentative de planification automatique quotidienne à midi France pendant la coupe.
+-- 1) Colonnes de modération : on masque les messages au lieu de les supprimer physiquement.
+alter table public.team_chat_messages
+  add column if not exists deleted_at timestamptz,
+  add column if not exists deleted_by uuid references public.profiles(id) on delete set null,
+  add column if not exists deleted_reason text;
 
--- ============================================================
--- 1. TABLE SAUVEGARDES
--- ============================================================
+create index if not exists team_chat_messages_visible_scope_created_idx
+  on public.team_chat_messages(scope, created_at desc)
+  where deleted_at is null;
 
-create table if not exists public.app_backups (
-  id uuid primary key default gen_random_uuid(),
-  label text not null,
-  backup_type text not null default 'manual', -- manual / auto / reset-before
-  payload jsonb not null,
-  created_by uuid references public.profiles(id) on delete set null,
-  created_at timestamptz not null default now()
+create index if not exists team_chat_messages_deleted_at_idx
+  on public.team_chat_messages(deleted_at desc)
+  where deleted_at is not null;
+
+-- 2) Fonction admin : masquer un message.
+create or replace function public.moderate_team_chat_message(
+  p_message_id uuid,
+  p_reason text default null
+)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if not public.is_admin_profile(auth.uid()) then
+    raise exception 'Action réservée aux admins.';
+  end if;
+
+  update public.team_chat_messages
+     set deleted_at = coalesce(deleted_at, now()),
+         deleted_by = auth.uid(),
+         deleted_reason = left(coalesce(nullif(trim(p_reason), ''), 'Message masqué par admin'), 240),
+         updated_at = now()
+   where id = p_message_id;
+
+  if not found then
+    raise exception 'Message introuvable.';
+  end if;
+end;
+$$;
+
+grant execute on function public.moderate_team_chat_message(uuid, text) to authenticated;
+
+-- 3) RLS : seul un admin peut modifier/supprimer les messages.
+-- Les joueurs peuvent toujours insérer et lire selon les règles du patch V0.25.0.
+drop policy if exists team_chat_messages_update_own_or_admin on public.team_chat_messages;
+drop policy if exists team_chat_messages_delete_own_or_admin on public.team_chat_messages;
+
+drop policy if exists team_chat_messages_update_admin_only on public.team_chat_messages;
+create policy team_chat_messages_update_admin_only
+on public.team_chat_messages
+for update
+to authenticated
+using (
+  public.is_active_profile(auth.uid())
+  and public.is_admin_profile(auth.uid())
+)
+with check (
+  public.is_active_profile(auth.uid())
+  and public.is_admin_profile(auth.uid())
 );
 
-create index if not exists idx_app_backups_created_at on public.app_backups(created_at desc);
-create index if not exists idx_app_backups_type on public.app_backups(backup_type);
-
-alter table public.app_backups enable row level security;
-
-drop policy if exists "app_backups_admin_select" on public.app_backups;
-create policy "app_backups_admin_select"
-on public.app_backups
-for select
+drop policy if exists team_chat_messages_delete_admin_only on public.team_chat_messages;
+create policy team_chat_messages_delete_admin_only
+on public.team_chat_messages
+for delete
 to authenticated
-using (public.is_admin());
+using (
+  public.is_active_profile(auth.uid())
+  and public.is_admin_profile(auth.uid())
+);
 
-drop policy if exists "app_backups_admin_insert" on public.app_backups;
-create policy "app_backups_admin_insert"
-on public.app_backups
-for insert
-to authenticated
-with check (public.is_admin());
-
--- ============================================================
--- 2. BYPASS RESTAURATION POUR LE TRIGGER DE PRONOS
--- ============================================================
-
-create or replace function public.enforce_prediction_deadline()
-returns trigger
-language plpgsql
-security definer
-set search_path = public
-as $$
-declare
-  match_kickoff timestamptz;
-  match_stage_value public.match_stage;
-begin
-  -- Utilisé uniquement par restore_app_backup().
-  if current_setting('app.restore_mode', true) = 'on' then
-    return new;
-  end if;
-
-  select kickoff_at, stage
-  into match_kickoff, match_stage_value
-  from public.matches
-  where id = new.match_id;
-
-  if match_kickoff is null then
-    raise exception 'Match introuvable.';
-  end if;
-
-  if TG_OP = 'UPDATE' then
-    if new.user_id is distinct from old.user_id then
-      raise exception 'Impossible de transférer un prono vers un autre utilisateur.';
-    end if;
-
-    if new.match_id is distinct from old.match_id then
-      raise exception 'Impossible de transférer un prono vers un autre match.';
-    end if;
-  end if;
-
-  if now() >= match_kickoff then
-    raise exception 'Prono verrouillé : le match a déjà commencé.';
-  end if;
-
-  if new.qualified_team_pred is not null and match_stage_value = 'group'::public.match_stage then
-    raise exception 'Le qualifié ne doit être renseigné que pour les matchs à élimination directe.';
-  end if;
-
-  return new;
-end;
-$$;
-
--- ============================================================
--- 3. CRÉER UNE SAUVEGARDE
--- ============================================================
-
-create or replace function public.create_app_backup(
-  p_label text default null,
-  p_type text default 'manual'
-)
-returns uuid
-language plpgsql
-security definer
-set search_path = public
-as $$
-declare
-  v_id uuid;
-  v_payload jsonb;
-  v_label text;
-begin
-  -- Appel utilisateur : admin obligatoire.
-  -- Appel cron : auth.uid() est null, accepté.
-  if auth.uid() is not null and not public.is_admin() then
-    raise exception 'Action réservée à l’admin.';
-  end if;
-
-  v_label := coalesce(nullif(trim(p_label), ''), 'Sauvegarde ' || to_char(now(), 'YYYY-MM-DD HH24:MI'));
-
-  v_payload := jsonb_build_object(
-    'created_at', now(),
-    'version', '0.22.0',
-    'matches', coalesce((
-      select jsonb_agg(to_jsonb(m) order by m.kickoff_at)
-      from (
-        select
-          id,
-          status,
-          home_score,
-          away_score,
-          winner_team_id,
-          tv_channel,
-          tv_channel_source,
-          kickoff_at,
-          match_day,
-          venue,
-          city,
-          updated_at
-        from public.matches
-      ) m
-    ), '[]'::jsonb),
-    'predictions', coalesce((
-      select jsonb_agg(to_jsonb(p) order by p.created_at)
-      from (
-        select
-          id,
-          user_id,
-          match_id,
-          home_score_pred,
-          away_score_pred,
-          qualified_team_pred,
-          locked_at,
-          created_at,
-          updated_at
-        from public.predictions
-      ) p
-    ), '[]'::jsonb),
-    'winner_predictions', coalesce((
-      select jsonb_agg(to_jsonb(w) order by w.created_at)
-      from (
-        select
-          id,
-          user_id,
-          competition_id,
-          predicted_team_id,
-          points_total,
-          locked_at,
-          created_at,
-          updated_at
-        from public.winner_predictions
-      ) w
-    ), '[]'::jsonb)
-  );
-
-  insert into public.app_backups (label, backup_type, payload, created_by)
-  values (v_label, coalesce(nullif(trim(p_type), ''), 'manual'), v_payload, auth.uid())
-  returning id into v_id;
-
-  return v_id;
-end;
-$$;
-
--- ============================================================
--- 4. RESTAURER UNE SAUVEGARDE
--- ============================================================
-
-create or replace function public.restore_app_backup(p_backup_id uuid)
-returns void
-language plpgsql
-security definer
-set search_path = public
-as $$
-declare
-  v_payload jsonb;
-begin
-  if not public.is_admin() then
-    raise exception 'Action réservée à l’admin.';
-  end if;
-
-  select payload into v_payload
-  from public.app_backups
-  where id = p_backup_id;
-
-  if v_payload is null then
-    raise exception 'Sauvegarde introuvable.';
-  end if;
-
-  -- Sauvegarde de sécurité avant restauration.
-  perform public.create_app_backup('Avant restauration ' || to_char(now(), 'YYYY-MM-DD HH24:MI'), 'restore-before');
-
-  perform set_config('app.restore_mode', 'on', true);
-
-  delete from public.prediction_points;
-  delete from public.predictions;
-
-  insert into public.predictions (
-    id,
-    user_id,
-    match_id,
-    home_score_pred,
-    away_score_pred,
-    qualified_team_pred,
-    locked_at,
-    created_at,
-    updated_at
-  )
-  select
-    id,
-    user_id,
-    match_id,
-    home_score_pred,
-    away_score_pred,
-    qualified_team_pred,
-    locked_at,
-    created_at,
-    updated_at
-  from jsonb_to_recordset(coalesce(v_payload -> 'predictions', '[]'::jsonb)) as x(
-    id uuid,
-    user_id uuid,
-    match_id uuid,
-    home_score_pred integer,
-    away_score_pred integer,
-    qualified_team_pred uuid,
-    locked_at timestamptz,
-    created_at timestamptz,
-    updated_at timestamptz
-  );
-
-  if to_regclass('public.winner_predictions') is not null then
-    delete from public.winner_predictions;
-
-    insert into public.winner_predictions (
-      id,
-      user_id,
-      competition_id,
-      predicted_team_id,
-      points_total,
-      locked_at,
-      created_at,
-      updated_at
-    )
-    select
-      id,
-      user_id,
-      competition_id,
-      predicted_team_id,
-      points_total,
-      locked_at,
-      created_at,
-      updated_at
-    from jsonb_to_recordset(coalesce(v_payload -> 'winner_predictions', '[]'::jsonb)) as x(
-      id uuid,
-      user_id uuid,
-      competition_id uuid,
-      predicted_team_id uuid,
-      points_total integer,
-      locked_at timestamptz,
-      created_at timestamptz,
-      updated_at timestamptz
-    );
-  end if;
-
-  update public.matches m
-  set
-    status = x.status,
-    home_score = x.home_score,
-    away_score = x.away_score,
-    winner_team_id = x.winner_team_id,
-    tv_channel = x.tv_channel,
-    tv_channel_source = coalesce(x.tv_channel_source, m.tv_channel_source),
-    kickoff_at = coalesce(x.kickoff_at, m.kickoff_at),
-    match_day = coalesce(x.match_day, m.match_day),
-    venue = x.venue,
-    city = x.city,
-    updated_at = now()
-  from jsonb_to_recordset(coalesce(v_payload -> 'matches', '[]'::jsonb)) as x(
-    id uuid,
-    status public.match_status,
-    home_score integer,
-    away_score integer,
-    winner_team_id uuid,
-    tv_channel text,
-    tv_channel_source public.tv_channel_source,
-    kickoff_at timestamptz,
-    match_day date,
-    venue text,
-    city text,
-    updated_at timestamptz
-  )
-  where m.id = x.id;
-
-  perform set_config('app.restore_mode', 'off', true);
-  perform public.recalc_all_points();
-
-  if to_regclass('public.winner_predictions') is not null then
-    -- Si la fonction champion existe, elle peut recalculer les +100 points.
-    begin
-      perform public.recalc_winner_predictions();
-    exception when undefined_function then
-      null;
-    end;
-  end if;
-end;
-$$;
-
--- ============================================================
--- 5. REMISE À ZÉRO SÉCURISÉE DES PRONOS
--- ============================================================
-
-create or replace function public.reset_all_predictions_secure(p_confirm text)
-returns void
-language plpgsql
-security definer
-set search_path = public
-as $$
-begin
-  if not public.is_admin() then
-    raise exception 'Action réservée à l’admin.';
-  end if;
-
-  if p_confirm <> 'REMISE A ZERO' then
-    raise exception 'Confirmation invalide.';
-  end if;
-
-  perform public.create_app_backup('Avant remise à zéro ' || to_char(now(), 'YYYY-MM-DD HH24:MI'), 'reset-before');
-
-  delete from public.prediction_points;
-  delete from public.predictions;
-
-  if to_regclass('public.winner_predictions') is not null then
-    delete from public.winner_predictions;
-  end if;
-end;
-$$;
-
-grant select on public.app_backups to authenticated;
-grant execute on function public.create_app_backup(text, text) to authenticated;
-grant execute on function public.restore_app_backup(uuid) to authenticated;
-grant execute on function public.reset_all_predictions_secure(text) to authenticated;
-
--- ============================================================
--- 6. SAUVEGARDE AUTOMATIQUE MIDI FRANCE
--- ============================================================
-
--- Supabase Cron / pg_cron doit être disponible sur le projet.
--- Pendant la Coupe du Monde, midi France = 10:00 UTC.
--- Si cron n’est pas actif, le patch continue sans erreur : tu pourras utiliser le bouton manuel.
-
-do $do$
-begin
-  -- Supprime l'ancien cron s'il existe déjà.
-  -- Si pg_cron n'est pas actif sur le projet, l'erreur est ignorée.
-  begin
-    perform cron.unschedule('le-nid-pronos-backup-midi');
-  exception when others then
-    null;
-  end;
-
-  -- Planifie une sauvegarde automatique tous les jours à 10:00 UTC.
-  -- En juin/juillet, cela correspond à midi en France métropolitaine.
-  -- Correction V0.22.1 : utilisation de $do$ / $cmd$ pour éviter le conflit de guillemets dollar.
-  begin
-    perform cron.schedule(
-      'le-nid-pronos-backup-midi',
-      '0 10 * * *',
-      $cmd$select public.create_app_backup('Sauvegarde automatique midi', 'auto');$cmd$
-    );
-  exception when others then
-    raise notice 'Planification cron non créée. Active Supabase Cron / pg_cron si tu veux la sauvegarde automatique. Détail : %', sqlerrm;
-  end;
-end $do$;
-
--- ============================================================
--- 7. VÉRIFICATION
--- ============================================================
-
+-- 4) Vue publique du chat : les messages modérés disparaissent côté joueurs.
+create or replace view public.v_team_chat_messages
+as
 select
-  'app_backups_ready' as check_name,
-  count(*) as backups_count
-from public.app_backups;
+  m.id,
+  m.user_id,
+  m.scope,
+  m.office_team_id,
+  m.body,
+  m.created_at,
+  m.updated_at,
+  p.pseudo as author_pseudo,
+  p.office_team_id as author_office_team_id,
+  author_team.name as author_office_team_name,
+  author_team.slug as author_office_team_slug,
+  author_team.color as author_office_team_color,
+  p.avatar_key,
+  p.badge_shape,
+  p.badge_color,
+  target_team.name as office_team_name,
+  target_team.slug as office_team_slug,
+  target_team.color as office_team_color
+from public.team_chat_messages m
+join public.profiles p on p.id = m.user_id
+left join public.office_teams author_team on author_team.id = p.office_team_id
+left join public.office_teams target_team on target_team.id = m.office_team_id
+where p.is_active = true
+  and m.deleted_at is null
+  and public.is_active_profile(auth.uid())
+  and (
+    m.scope = 'global'
+    or m.office_team_id = public.current_office_team_id()
+    or public.is_admin_profile(auth.uid())
+  );
+
+grant select on public.v_team_chat_messages to authenticated;
+
+-- 5) Vue admin : voir les derniers messages, y compris ceux déjà masqués.
+create or replace view public.v_admin_team_chat_messages
+as
+select
+  m.id,
+  m.user_id,
+  m.scope,
+  m.office_team_id,
+  m.body,
+  m.created_at,
+  m.updated_at,
+  m.deleted_at,
+  m.deleted_by,
+  m.deleted_reason,
+  p.pseudo as author_pseudo,
+  p.email as author_email,
+  p.office_team_id as author_office_team_id,
+  author_team.name as author_office_team_name,
+  author_team.slug as author_office_team_slug,
+  author_team.color as author_office_team_color,
+  p.avatar_key,
+  p.badge_shape,
+  p.badge_color,
+  target_team.name as office_team_name,
+  target_team.slug as office_team_slug,
+  target_team.color as office_team_color,
+  moderator.pseudo as deleted_by_pseudo
+from public.team_chat_messages m
+join public.profiles p on p.id = m.user_id
+left join public.office_teams author_team on author_team.id = p.office_team_id
+left join public.office_teams target_team on target_team.id = m.office_team_id
+left join public.profiles moderator on moderator.id = m.deleted_by
+where public.is_admin_profile(auth.uid());
+
+grant select on public.v_admin_team_chat_messages to authenticated;
+
+-- 6) Vue publique des choix champions pour les fiches joueurs de l'onglet Les teams.
+-- Contrairement à v_winner_predictions, cette vue expose volontairement le choix champion
+-- de tous les joueurs actifs, car l'onglet Les teams sert d'annuaire/fiche joueur.
+create or replace view public.v_team_public_winner_predictions
+as
+with final_winner as (
+  select distinct on (m.competition_id)
+    m.competition_id,
+    m.winner_team_id as actual_winner_team_id
+  from public.matches m
+  where m.stage = 'final'::public.match_stage
+    and m.status = 'finished'::public.match_status
+    and m.winner_team_id is not null
+  order by m.competition_id, m.kickoff_at desc
+)
+select
+  wp.id,
+  wp.user_id,
+  p.pseudo,
+  wp.competition_id,
+  c.name as competition_name,
+  public.competition_start_at(wp.competition_id) as competition_start_at,
+  not public.is_winner_prediction_open(wp.competition_id) as is_locked,
+  wp.predicted_team_id,
+  ft.name as predicted_team_name,
+  ft.short_name as predicted_team_short_name,
+  ft.country_code as predicted_team_country_code,
+  ft.flag_url as predicted_team_flag_url,
+  fw.actual_winner_team_id,
+  actual.name as actual_winner_team_name,
+  case
+    when fw.actual_winner_team_id is not null
+      and fw.actual_winner_team_id = wp.predicted_team_id
+    then 100
+    else 0
+  end::int as points_total,
+  wp.created_at,
+  wp.updated_at
+from public.winner_predictions wp
+join public.profiles p on p.id = wp.user_id
+join public.competitions c on c.id = wp.competition_id
+join public.football_teams ft on ft.id = wp.predicted_team_id
+left join final_winner fw on fw.competition_id = wp.competition_id
+left join public.football_teams actual on actual.id = fw.actual_winner_team_id
+where p.is_active = true
+  and public.is_active_profile(auth.uid());
+
+grant select on public.v_team_public_winner_predictions to authenticated;
+
+-- 7) Vérification rapide.
+select
+  'teams_details_moderation_ready' as check_name,
+  (select count(*) from public.team_chat_messages where deleted_at is null) as visible_messages,
+  (select count(*) from public.team_chat_messages where deleted_at is not null) as moderated_messages;
