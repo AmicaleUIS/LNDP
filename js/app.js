@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — APP PRINCIPALE V1.3.27
+// LE NID DES PRONOS — APP PRINCIPALE V1.3.28
 // ============================================================
 
 const H = window.Helpers;
@@ -431,7 +431,7 @@ const App = {
           <div>
             <p class="eyebrow">Crédits cachés</p>
             <h2 id="creditsTitle">Le Nid des Pronos</h2>
-            <p class="muted">Version publique <strong>1.3.27</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
+            <p class="muted">Version publique <strong>1.3.28</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
           </div>
         </div>
         <div class="credits-grid">
@@ -448,7 +448,7 @@ const App = {
             <p><strong>1.0.5</strong> — dashboard mobile/desktop stabilisé, sans chevauchement des cartes.</p>
           </section>
           <section>
-            <h3>Évolutions V1.3.27</h3>
+            <h3>Évolutions V1.3.28</h3>
             <ul class="changelog-list">
               <li>Le super admin peut désactiver ou réactiver l’affichage du module préparation.</li>
               <li>Quand la préparation est désactivée, les matchs test disparaissent des matchs/pronos, classements par phase et règles.</li>
@@ -1232,6 +1232,36 @@ const App = {
     return prediction;
   },
 
+  liveProjectionCountForMatchIds(matchIds = null, { includeTest = false, userIds = null } = {}) {
+    const idSet = matchIds ? new Set(matchIds.map(String)) : null;
+    const userSet = userIds ? new Set(userIds.map(String)) : null;
+
+    return this.state.visiblePredictions
+      .filter((prediction) => !userSet || userSet.has(String(prediction.user_id)))
+      .map((prediction) => {
+        const match = this.state.matches.find((item) => item.id === prediction.match_id);
+        const display = this.predictionForDisplay(prediction, match);
+        return { prediction: display, match };
+      })
+      .filter(({ prediction, match }) => match
+        && match.status === "live"
+        && prediction?.is_live_projection
+        && (!idSet || idSet.has(String(match.id)))
+        && (includeTest || !match.is_test_match)
+      ).length;
+  },
+
+  homeVisiblePredictionsMatch() {
+    const live = this.liveMatches();
+    if (live.length) return live[0];
+
+    const visiblePast = this.displayMatches()
+      .filter((match) => H.isKickoffPassed(match.kickoff_at))
+      .sort((a, b) => new Date(b.kickoff_at || 0) - new Date(a.kickoff_at || 0));
+
+    return visiblePast[0] || this.nextMatch();
+  },
+
   liveOfficialProjectionRows() {
     const liveOfficialMatches = this.state.matches.filter((match) =>
       match.status === "live"
@@ -1460,7 +1490,10 @@ const App = {
               <button class="primary-btn compact-continue-btn" type="button" data-action="continue-predictions">${missing.length ? "Continuer mes pronos" : "Voir le prochain match"}</button>
               <small class="home-prono-progress-note">${this.homeProgressIncludeTestMatches() ? "Matchs test inclus dans cette progression" : "Matchs officiels uniquement"}</small>
             </div>
-            <button class="ghost-btn rules-home-btn" id="rulesHomeBtn" type="button">${H.icon("list")} Règles & points</button>
+            <div class="home-hero-actions">
+              <button class="ghost-btn rules-home-btn" id="rulesHomeBtn" type="button">${H.icon("list")} Règles & points</button>
+              <button class="ghost-btn home-see-predictions-btn" id="homeSeePredictionsBtn" type="button">${H.icon("score")} Voir les pronos du Nid</button>
+            </div>
           </div>
         </section>
 
@@ -1516,6 +1549,7 @@ const App = {
     `;
 
     H.$("#rulesHomeBtn")?.addEventListener("click", () => this.openRulesModal());
+    H.$("#homeSeePredictionsBtn")?.addEventListener("click", async () => this.goToVisiblePredictionsFromHome());
     H.$('[data-action="continue-predictions"]', root)?.addEventListener("click", async () => {
       if (missing.length) {
         await this.goToNearestMissingPrediction();
@@ -1821,7 +1855,8 @@ const App = {
       return;
     }
 
-    const finishedCount = group.matches.filter((m) => m.status === "finished").length;
+    const finishedCount = group.matches.filter((m) => ["finished", "live"].includes(m.status)).length;
+    const liveProjectionCount = this.liveProjectionCountForMatchIds(matchIds);
     const pager = this.phaseNavigatorHtml(groups, activeIndex, "matchPhaseIndex");
 
     root.innerHTML = `
@@ -2004,11 +2039,14 @@ const App = {
     this.state.homeCountdownTimer = window.setInterval(updateAll, 30000);
   },
 
-  async goToMatchPrediction(matchId) {
+  async goToMatchPrediction(matchId, options = {}) {
     const match = this.state.matches.find((item) => item.id === matchId);
     if (!match) {
       await this.loadView("matches");
-      setTimeout(() => this.scrollToMatch(matchId), 150);
+      setTimeout(() => {
+        this.scrollToMatch(matchId);
+        if (options.openPredictions) this.openPredictionsForMatch(matchId);
+      }, 150);
       return;
     }
 
@@ -2022,7 +2060,10 @@ const App = {
       await this.renderMatches();
     }
 
-    setTimeout(() => this.scrollToMatch(match.id), 120);
+    setTimeout(() => {
+      this.scrollToMatch(match.id);
+      if (options.openPredictions) this.openPredictionsForMatch(match.id);
+    }, 120);
   },
 
   bindCombinedPredictionSummaryActions() {
@@ -4962,8 +5003,9 @@ const App = {
       ${pager}
       <div class="leaderboard-inner-title">
         <strong>${H.escapeHtml(group.key)}</strong>
-        <small>${finishedCount}/${group.matches.length} match${group.matches.length > 1 ? "s" : ""} terminé${finishedCount > 1 ? "s" : ""} · ${H.matchDateRangeLabel(group.matches)}</small>
+        <small>${finishedCount}/${group.matches.length} match${group.matches.length > 1 ? "s" : ""} terminé/en direct · ${H.matchDateRangeLabel(group.matches)}</small>
       </div>
+      ${liveProjectionCount ? `<div class="live-ranking-note">${H.icon("info")} Classement joueurs par phase provisoire : ${liveProjectionCount} projection${liveProjectionCount > 1 ? "s" : ""} live incluse${liveProjectionCount > 1 ? "s" : ""}.</div>` : ""}
       ${this.leaderboardRowsHtml(rows, { filters: { matchIds } })}
       ${pager}
     `;
@@ -5247,6 +5289,7 @@ const App = {
     const finishedCount = group.matches.filter((match) => ["finished", "live"].includes(match.status)).length;
     const pager = this.phaseNavigatorHtml(groups, activeIndex, "teamLeaderboardPhaseIndex");
     const rows = this.teamPhaseRows(matchIds, teamTab);
+    const liveProjectionCount = this.liveProjectionCountForMatchIds(matchIds);
 
     root.innerHTML = `
       <section class="card team-leaderboard-card">
@@ -5255,8 +5298,9 @@ const App = {
         ${pager}
         <div class="team-phase-head">
           <strong>${H.escapeHtml(group.key)}</strong>
-          <small>${finishedCount}/${group.matches.length} match${group.matches.length > 1 ? "s" : ""} terminé${finishedCount > 1 ? "s" : ""} · ${H.matchDateRangeLabel(group.matches)}</small>
+          <small>${finishedCount}/${group.matches.length} match${group.matches.length > 1 ? "s" : ""} terminé/en direct · ${H.matchDateRangeLabel(group.matches)}</small>
         </div>
+        ${liveProjectionCount ? `<div class="live-ranking-note">${H.icon("info")} Classement teams par phase provisoire : ${liveProjectionCount} projection${liveProjectionCount > 1 ? "s" : ""} live incluse${liveProjectionCount > 1 ? "s" : ""}.</div>` : ""}
         ${this.teamLeaderboardRowsHtml(rows, { mode: teamTab })}
         ${pager}
       </section>
@@ -5607,15 +5651,18 @@ const App = {
       const groups = this.groupMatchesByPouleRound(this.phaseLeaderboardMatches());
       const activeIndex = this.clampPhaseIndex("familyTeamLeaderboardPhaseIndex", groups);
       const group = groups[activeIndex];
-      const rows = group ? this.familyTeamRows(group.matches.map((match) => match.id), teamTab) : [];
-      const finishedCount = group ? group.matches.filter((match) => match.status === "finished").length : 0;
+      const matchIds = group ? group.matches.map((match) => match.id) : [];
+      const rows = group ? this.familyTeamRows(matchIds, teamTab) : [];
+      const finishedCount = group ? group.matches.filter((match) => ["finished", "live"].includes(match.status)).length : 0;
+      const liveProjectionCount = group ? this.liveProjectionCountForMatchIds(matchIds, { userIds: this.familyProfileIds() }) : 0;
       const pager = group ? this.phaseNavigatorHtml(groups, activeIndex, "familyTeamLeaderboardPhaseIndex") : "";
       root.innerHTML = `
         <section class="card team-leaderboard-card family-leaderboard-card">
           <div class="card-title-row leaderboard-compact-title"><h3>Famille · par équipe · phase</h3></div>
           <div class="team-leaderboard-control-stack">${paneControls}${scopeControls}${modeControls}</div>
           ${pager}
-          ${group ? `<div class="team-phase-head"><strong>${H.escapeHtml(group.key)}</strong><small>${finishedCount}/${group.matches.length} match${group.matches.length > 1 ? "s" : ""} terminé${finishedCount > 1 ? "s" : ""} · ${H.matchDateRangeLabel(group.matches)}</small></div>` : `<p class="muted">Aucune phase à afficher pour le moment.</p>`}
+          ${group ? `<div class="team-phase-head"><strong>${H.escapeHtml(group.key)}</strong><small>${finishedCount}/${group.matches.length} match${group.matches.length > 1 ? "s" : ""} terminé/en direct · ${H.matchDateRangeLabel(group.matches)}</small></div>` : `<p class="muted">Aucune phase à afficher pour le moment.</p>`}
+          ${liveProjectionCount ? `<div class="live-ranking-note">${H.icon("info")} Classement Famille par équipe provisoire : ${liveProjectionCount} projection${liveProjectionCount > 1 ? "s" : ""} live incluse${liveProjectionCount > 1 ? "s" : ""}.</div>` : ""}
           ${this.teamLeaderboardRowsHtml(rows, { mode: teamTab })}
           ${pager}
         </section>`;
@@ -5657,15 +5704,18 @@ const App = {
       const groups = this.groupMatchesByPouleRound(this.phaseLeaderboardMatches());
       const activeIndex = this.clampPhaseIndex("familyLeaderboardPhaseIndex", groups);
       const group = groups[activeIndex];
-      const rows = group ? this.familyPlayerRows(group.matches.map((match) => match.id)) : [];
-      const finishedCount = group ? group.matches.filter((match) => match.status === "finished").length : 0;
+      const matchIds = group ? group.matches.map((match) => match.id) : [];
+      const rows = group ? this.familyPlayerRows(matchIds) : [];
+      const finishedCount = group ? group.matches.filter((match) => ["finished", "live"].includes(match.status)).length : 0;
+      const liveProjectionCount = group ? this.liveProjectionCountForMatchIds(matchIds, { userIds: this.familyProfileIds() }) : 0;
       const pager = group ? this.phaseNavigatorHtml(groups, activeIndex, "familyLeaderboardPhaseIndex") : "";
       root.innerHTML = `
         <section class="card player-leaderboard-card family-leaderboard-card">
           <div class="card-title-row leaderboard-compact-title"><h3>Famille · joueurs · phase</h3></div>
           <div class="team-leaderboard-control-stack">${paneControls}${modeControls}</div>
           ${pager}
-          ${group ? `<div class="team-phase-head"><strong>${H.escapeHtml(group.key)}</strong><small>${finishedCount}/${group.matches.length} match${group.matches.length > 1 ? "s" : ""} terminé${finishedCount > 1 ? "s" : ""} · ${H.matchDateRangeLabel(group.matches)}</small></div>` : `<p class="muted">Aucune phase à afficher pour le moment.</p>`}
+          ${group ? `<div class="team-phase-head"><strong>${H.escapeHtml(group.key)}</strong><small>${finishedCount}/${group.matches.length} match${group.matches.length > 1 ? "s" : ""} terminé/en direct · ${H.matchDateRangeLabel(group.matches)}</small></div>` : `<p class="muted">Aucune phase à afficher pour le moment.</p>`}
+          ${liveProjectionCount ? `<div class="live-ranking-note">${H.icon("info")} Classement Famille joueurs provisoire : ${liveProjectionCount} projection${liveProjectionCount > 1 ? "s" : ""} live incluse${liveProjectionCount > 1 ? "s" : ""}.</div>` : ""}
           ${this.leaderboardRowsHtml(rows)}
           ${pager}
         </section>`;
@@ -5682,6 +5732,7 @@ const App = {
           <div><h3>Famille · joueurs</h3><p class="muted">Joueurs Famille, invités via coupon + joueurs UIS ayant activé le mode Famille. Hors classement officiel et hors mini-records.</p></div>
         </div>
         <div class="team-leaderboard-control-stack">${paneControls}${modeControls}</div>
+        ${this.liveProjectionCountForMatchIds(null, { userIds: this.familyProfileIds() }) ? `<div class="live-ranking-note">${H.icon("info")} Classement Famille joueurs provisoire : projections live incluses.</div>` : ""}
         ${this.leaderboardRowsHtml(rows)}
       </section>
     `;
@@ -7796,7 +7847,7 @@ const App = {
           </div>
           <div class="profile-account-actions">
             <button class="ghost-btn" id="profileInstallAppBtn" type="button">Installer l’app</button>
-            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.3.27</button>
+            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.3.28</button>
             <button class="danger-btn" id="profileLogoutBtn" type="button">Déconnexion</button>
           </div>
         </div>

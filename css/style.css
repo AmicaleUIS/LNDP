@@ -17002,3 +17002,38 @@ body.forced-password-lock {
 .family-leaderboard-card .live-ranking-note {
   margin: 10px 0 14px;
 }
+
+
+/* ============================================================
+   V1.3.28 — Tous les classements live + bouton pronos accueil
+   ============================================================ */
+
+.home-hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: .7rem;
+  margin-top: .9rem;
+}
+
+.home-see-predictions-btn {
+  border-color: rgba(56, 189, 248, .26);
+  color: #bae6fd;
+}
+
+.home-see-predictions-btn:hover,
+.home-see-predictions-btn:focus-visible {
+  background: rgba(56, 189, 248, .10);
+  border-color: rgba(56, 189, 248, .44);
+}
+
+.live-ranking-note {
+  margin: 10px 0 14px;
+}
+
+@media (max-width: 700px) {
+  .home-hero-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+}
