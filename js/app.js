@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — APP PRINCIPALE V1.3.30
+// LE NID DES PRONOS — APP PRINCIPALE V1.3.31
 // ============================================================
 
 const H = window.Helpers;
@@ -431,7 +431,7 @@ const App = {
           <div>
             <p class="eyebrow">Crédits cachés</p>
             <h2 id="creditsTitle">Le Nid des Pronos</h2>
-            <p class="muted">Version publique <strong>1.3.30</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
+            <p class="muted">Version publique <strong>1.3.31</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
           </div>
         </div>
         <div class="credits-grid">
@@ -448,7 +448,7 @@ const App = {
             <p><strong>1.0.5</strong> — dashboard mobile/desktop stabilisé, sans chevauchement des cartes.</p>
           </section>
           <section>
-            <h3>Évolutions V1.3.30</h3>
+            <h3>Évolutions V1.3.31</h3>
             <ul class="changelog-list">
               <li>Le super admin peut désactiver ou réactiver l’affichage du module préparation.</li>
               <li>Quand la préparation est désactivée, les matchs test disparaissent des matchs/pronos, classements par phase et règles.</li>
@@ -3058,7 +3058,8 @@ const App = {
         date: null,
         dateLabel: "Classement actuel",
         icon: "trophy",
-        profile: leaderProfile
+        profile: leaderProfile,
+        teamColor: this.teamColorForProfile(leaderProfile)
       });
     }
 
@@ -3214,8 +3215,9 @@ const App = {
   homeStorySlideHtml(item, index) {
     if (item.kind === "record") {
       const { record, best, bestProfile, detail, date } = item;
+      const recordTeamColor = this.teamColorForProfile(bestProfile);
       return `
-        <article class="home-record-slide home-record-slide-record ${index === 0 ? "active" : ""}" data-home-record-slide data-record-popup-id="${H.escapeHtml(record.id)}" role="button" tabindex="0" title="Voir le détail du mini-record">
+        <article class="home-record-slide home-record-slide-record team-tinted-perchoir ${index === 0 ? "active" : ""}" style="--perchoir-team-color:${H.escapeHtml(recordTeamColor)};--story-team-color:${H.escapeHtml(recordTeamColor)}" data-home-record-slide data-record-popup-id="${H.escapeHtml(record.id)}" role="button" tabindex="0" title="Voir le détail du mini-record">
           <div class="home-record-art">${this.recordArtHtml(record)}</div>
           <div class="home-record-main">
             <small class="home-record-label">${H.escapeHtml(record.title)}</small>
@@ -3231,9 +3233,10 @@ const App = {
       `;
     }
 
+    const storyTeamColor = item.teamColor || this.teamColorForProfile(item.profile || {});
     return `
-      <article class="home-record-slide home-story-slide story-${H.escapeHtml(item.theme || "default")} ${index === 0 ? "active" : ""}" data-home-record-slide>
-        <div class="home-record-art story-art" ${item.teamColor ? `style="--story-team-color:${H.escapeHtml(item.teamColor)}"` : ""}>${item.profile ? H.profileBadgeHtml(item.profile, "profile-badge leaderboard-badge") : H.icon(item.icon || "badges")}</div>
+      <article class="home-record-slide home-story-slide team-tinted-perchoir story-${H.escapeHtml(item.theme || "default")} ${index === 0 ? "active" : ""}" style="--perchoir-team-color:${H.escapeHtml(storyTeamColor)};--story-team-color:${H.escapeHtml(storyTeamColor)}" data-home-record-slide>
+        <div class="home-record-art story-art">${item.profile ? H.profileBadgeHtml(item.profile, "profile-badge leaderboard-badge") : H.icon(item.icon || "badges")}</div>
         <div class="home-record-main">
           <small class="home-record-label">${H.escapeHtml(item.label)}</small>
           <strong>${H.escapeHtml(item.title)}</strong>
@@ -7895,7 +7898,7 @@ const App = {
           </div>
           <div class="profile-account-actions">
             <button class="ghost-btn" id="profileInstallAppBtn" type="button">Installer l’app</button>
-            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.3.30</button>
+            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.3.31</button>
             <button class="danger-btn" id="profileLogoutBtn" type="button">Déconnexion</button>
           </div>
         </div>

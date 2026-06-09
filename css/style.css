@@ -17080,3 +17080,40 @@ body.forced-password-lock {
   color: #fecaca;
   border-color: rgba(239, 68, 68, .32);
 }
+
+
+/* ============================================================
+   V1.3.31 — Perchoir teinté par couleur de team
+   ============================================================ */
+
+.home-record-slide.team-tinted-perchoir {
+  border-color: color-mix(in srgb, var(--perchoir-team-color, #facc15) 42%, rgba(255,255,255,.14));
+  background:
+    radial-gradient(circle at 8% 12%, color-mix(in srgb, var(--perchoir-team-color, #facc15) 26%, transparent), transparent 38%),
+    radial-gradient(circle at 86% 78%, color-mix(in srgb, var(--perchoir-team-color, #facc15) 16%, transparent), transparent 34%),
+    linear-gradient(135deg, color-mix(in srgb, var(--perchoir-team-color, #facc15) 10%, rgba(15,23,42,.82)), rgba(15,23,42,.66));
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.06),
+    0 18px 44px color-mix(in srgb, var(--perchoir-team-color, #facc15) 15%, transparent);
+}
+
+.home-record-slide.team-tinted-perchoir:hover,
+.home-record-slide.team-tinted-perchoir:focus-visible {
+  border-color: color-mix(in srgb, var(--perchoir-team-color, #facc15) 68%, rgba(255,255,255,.18));
+}
+
+.home-record-slide.team-tinted-perchoir .home-record-label {
+  color: color-mix(in srgb, var(--perchoir-team-color, #facc15) 72%, #fff);
+}
+
+.home-record-slide.team-tinted-perchoir .home-record-art .record-icon,
+.home-record-slide.team-tinted-perchoir .home-record-art .record-art,
+.home-record-slide.team-tinted-perchoir .story-art,
+.home-record-slide.team-tinted-perchoir .story-art > .owl-icon {
+  border-color: color-mix(in srgb, var(--perchoir-team-color, #facc15) 50%, rgba(255,255,255,.12));
+  background: color-mix(in srgb, var(--perchoir-team-color, #facc15) 17%, rgba(2,6,23,.48));
+}
+
+.home-record-slide.team-tinted-perchoir .profile-badge {
+  filter: drop-shadow(0 12px 22px color-mix(in srgb, var(--perchoir-team-color, #facc15) 18%, transparent));
+}

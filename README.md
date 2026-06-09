@@ -1,4 +1,11 @@
-# Le Nid des Pronos — V1.3.30
+# Le Nid des Pronos — V1.3.31
+
+## V1.3.31 — Perchoir teinté par team
+
+- Accueil : les cartes du carrousel “Les chouettes qui font parler le perchoir” prennent la teinte de la team liée au joueur affiché.
+- Les cartes de mini-records utilisent la couleur de la team du joueur concerné.
+- Les cartes “1er du classement” et “1re équipe” utilisent la couleur de la team correspondante.
+- Aucun patch SQL obligatoire.
 
 ## V1.3.30 — Labo live + classements propres
 
