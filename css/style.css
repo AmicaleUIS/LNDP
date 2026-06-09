@@ -17228,3 +17228,12 @@ body.forced-password-lock {
 body[data-current-view] {
   scroll-behavior: smooth;
 }
+
+
+/* ============================================================
+   V1.3.38 — Exploits uniquement sur matchs terminés
+   ============================================================ */
+
+.achievement-hero-card p strong.finished-only-note {
+  color: #fde68a;
+}

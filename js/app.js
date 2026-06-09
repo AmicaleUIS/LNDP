@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — APP PRINCIPALE V1.3.37
+// LE NID DES PRONOS — APP PRINCIPALE V1.3.38
 // ============================================================
 
 const H = window.Helpers;
@@ -463,7 +463,7 @@ const App = {
           <div>
             <p class="eyebrow">Crédits cachés</p>
             <h2 id="creditsTitle">Le Nid des Pronos</h2>
-            <p class="muted">Version publique <strong>1.3.37</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
+            <p class="muted">Version publique <strong>1.3.38</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
           </div>
         </div>
         <div class="credits-grid">
@@ -480,7 +480,7 @@ const App = {
             <p><strong>1.0.5</strong> — dashboard mobile/desktop stabilisé, sans chevauchement des cartes.</p>
           </section>
           <section>
-            <h3>Évolutions V1.3.37</h3>
+            <h3>Évolutions V1.3.38</h3>
             <ul class="changelog-list">
               <li>Le super admin peut désactiver ou réactiver l’affichage du module préparation.</li>
               <li>Quand la préparation est désactivée, les matchs test disparaissent des matchs/pronos, classements par phase et règles.</li>
@@ -1175,7 +1175,12 @@ const App = {
     };
 
     const includeTest = Boolean(options.includeTest);
-    const keepPrediction = (p) => includeTest || !this.isPreparationMatch(p.match_id);
+    const includeLiveDemo = Boolean(options.includeLiveDemo);
+    const keepPrediction = (p) => {
+      const match = this.state.matches.find((m) => m.id === p.match_id);
+      if (this.isLiveDemoMatch(match) && !includeLiveDemo) return false;
+      return includeTest || !this.isPreparationMatch(p.match_id);
+    };
 
     this.state.visiblePredictions
       .filter((p) => p.user_id === userId && keepPrediction(p))
@@ -2858,7 +2863,7 @@ const App = {
   },
 
   playerRecordStats(userId) {
-    const rows = this.scoreDetailRowsForUser(userId);
+    const rows = this.scoreDetailRowsForUser(userId, { finishedOnly: true });
     const predictionRows = this.predictionRowsForUser(userId);
     const countRow = this.miniRecordPredictionCountRow(userId);
     const publicPredictionCount = Number(countRow?.prediction_count ?? NaN);
@@ -2995,7 +3000,7 @@ const App = {
   },
 
   recordDateForUser(userId, record, stats = {}, value = 0) {
-    const rows = this.scoreDetailRowsForUser(userId);
+    const rows = this.scoreDetailRowsForUser(userId, { finishedOnly: true });
 
     // Greffier du grimoire : la date du trophée vient de Supabase.
     // Elle correspond au moment où le joueur a atteint son total actuel de pronos.
@@ -3861,6 +3866,8 @@ const App = {
 
   scoreDetailRowsForUser(userId, filters = {}) {
     const includeTest = Boolean(filters.includeTest || (filters.matchIds && filters.matchIds.length));
+    const includeLiveDemo = Boolean(filters.includeLiveDemo);
+    const finishedOnly = Boolean(filters.finishedOnly);
     return this.state.visiblePredictions
       .filter((p) => p.user_id === userId)
       .map((p) => {
@@ -3869,7 +3876,7 @@ const App = {
         return { prediction, match };
       })
       .filter(({ match, prediction }) => match
-        && ["finished", "live"].includes(match.status)
+        && (finishedOnly ? match.status === "finished" : ["finished", "live"].includes(match.status))
         && prediction.points_total !== null
         && prediction.points_total !== undefined
         && (
@@ -3877,6 +3884,7 @@ const App = {
           || !match.is_test_match
           || (this.isLiveDemoMatch(match) && this.liveDemoMatchEnabled())
         )
+        && (!this.isLiveDemoMatch(match) || includeLiveDemo)
         && (!filters.matchDay || match.match_day === filters.matchDay)
         && (!filters.poolRound || Number(match.pool_round || 0) === Number(filters.poolRound))
         && (!filters.matchIds || filters.matchIds.includes(match.id))
@@ -4163,8 +4171,13 @@ const App = {
     return this.badgeCatalog().find((badge) => badge.id === id);
   },
 
+  achievementsFinishedOnlyGuard() {
+    // Les classements peuvent bouger en live, mais les exploits de score restent figés aux matchs terminés.
+    return true;
+  },
+
   computeBadgesForUser(userId) {
-    const rows = this.scoreDetailRowsForUser(userId);
+    const rows = this.scoreDetailRowsForUser(userId, { finishedOnly: true });
     const predictionRows = this.predictionRowsForUser(userId);
     const prepMatches = this.preparationMatches();
     const prepPredictionRows = this.predictionRowsForUser(userId, { includeTest: true })
@@ -7949,7 +7962,7 @@ const App = {
           </div>
           <div class="profile-account-actions">
             <button class="ghost-btn" id="profileInstallAppBtn" type="button">Installer l’app</button>
-            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.3.37</button>
+            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.3.38</button>
             <button class="danger-btn" id="profileLogoutBtn" type="button">Déconnexion</button>
           </div>
         </div>

@@ -1,4 +1,12 @@
-# Le Nid des Pronos — V1.3.37
+# Le Nid des Pronos — V1.3.38
+
+## V1.3.38 — Exploits uniquement après match terminé
+
+- Les classements restent live : meilleur joueur actuel, meilleure team actuelle et classements provisoires bougent pendant le match.
+- Les exploits/badges liés aux scores ne se valident plus sur un score live provisoire.
+- Les exploits de score, mini-records de score et séries sont calculés uniquement sur les matchs terminés.
+- Les pronos du match labo ne déclenchent pas d’exploits et ne polluent pas les compteurs d’exploits.
+- Aucun patch SQL obligatoire.
 
 ## V1.3.37 — Reprise après actualisation
 
