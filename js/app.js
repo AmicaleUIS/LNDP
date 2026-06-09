@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — APP PRINCIPALE V1.3.35
+// LE NID DES PRONOS — APP PRINCIPALE V1.3.37
 // ============================================================
 
 const H = window.Helpers;
@@ -74,6 +74,40 @@ const App = {
     predictionAutoSaveTimers: new Map()
   },
 
+
+  appStoragePrefix() {
+    return `nid-pronos:${this.state.session?.user?.id || "anonymous"}`;
+  },
+
+  lastViewStorageKey() {
+    return `${this.appStoragePrefix()}:last-view`;
+  },
+
+  readLastView() {
+    try {
+      return localStorage.getItem(this.lastViewStorageKey()) || "";
+    } catch (error) {
+      return "";
+    }
+  },
+
+  rememberLastView(viewName) {
+    try {
+      if (viewName && viewName !== "mypredictions") localStorage.setItem(this.lastViewStorageKey(), viewName);
+    } catch (error) {
+      // LocalStorage peut être indisponible en navigation privée stricte.
+    }
+  },
+
+  initialRequestedView() {
+    const allowedViews = ["home", "matches", "worldcup", "leaderboard", "teams", "achievements", "profile"];
+    const params = new URLSearchParams(window.location.search);
+    const fromQuery = params.get("view");
+    const raw = fromQuery || this.readLastView() || "home";
+    const normalized = raw === "mypredictions" ? "matches" : raw;
+    return allowedViews.includes(normalized) ? normalized : "home";
+  },
+
   async init() {
     this.state.session = await Auth.requireSession();
     if (!this.state.session) return;
@@ -87,13 +121,11 @@ const App = {
       await Auth.logout();
       return;
     }
-    const rawRequestedView = new URLSearchParams(window.location.search).get("view") || "home";
-    const requestedView = rawRequestedView === "mypredictions" ? "matches" : rawRequestedView;
-    const allowedViews = ["home", "matches", "worldcup", "leaderboard", "teams", "achievements", "profile"];
+    const requestedView = this.initialRequestedView();
     const mustChangePassword = this.passwordChangeRequired();
     const mustCompleteProfile = !this.profileSetupComplete();
     this.syncAchievementNotifications({ silent: !this.hasAchievementNotificationStore() });
-    await this.loadView((mustChangePassword || mustCompleteProfile) ? "profile" : (allowedViews.includes(requestedView) ? requestedView : "home"));
+    await this.loadView((mustChangePassword || mustCompleteProfile) ? "profile" : requestedView);
     await this.refreshTeamChatUnreadIndicator();
     if (mustChangePassword) {
       H.toast("Mot de passe temporaire : choisis ton nouveau mot de passe.", "info");
@@ -431,7 +463,7 @@ const App = {
           <div>
             <p class="eyebrow">Crédits cachés</p>
             <h2 id="creditsTitle">Le Nid des Pronos</h2>
-            <p class="muted">Version publique <strong>1.3.35</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
+            <p class="muted">Version publique <strong>1.3.37</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
           </div>
         </div>
         <div class="credits-grid">
@@ -448,7 +480,7 @@ const App = {
             <p><strong>1.0.5</strong> — dashboard mobile/desktop stabilisé, sans chevauchement des cartes.</p>
           </section>
           <section>
-            <h3>Évolutions V1.3.35</h3>
+            <h3>Évolutions V1.3.37</h3>
             <ul class="changelog-list">
               <li>Le super admin peut désactiver ou réactiver l’affichage du module préparation.</li>
               <li>Quand la préparation est désactivée, les matchs test disparaissent des matchs/pronos, classements par phase et règles.</li>
@@ -1062,6 +1094,7 @@ const App = {
     this.stopTeamChatAutoRefresh();
     this.state.currentView = viewName;
     document.body.dataset.currentView = viewName;
+    this.rememberLastView(viewName);
     this.setActiveNav(viewName);
 
     const titleMap = {
@@ -1124,7 +1157,7 @@ const App = {
   },
 
   phaseLeaderboardMatches() {
-    return this.displayMatches().filter((m) => !this.isLiveDemoMatch(m) && !["cancelled", "postponed"].includes(m.status));
+    return this.displayMatches().filter((m) => !["cancelled", "postponed"].includes(m.status));
   },
 
   predictionRowsForUser(userId, options = {}) {
@@ -1277,10 +1310,13 @@ const App = {
       })
       .filter(({ prediction, match }) => match
         && match.status === "live"
-        && !this.isLiveDemoMatch(match)
         && prediction?.is_live_projection
         && (!idSet || idSet.has(String(match.id)))
-        && (includeTest || !match.is_test_match)
+        && (
+          includeTest
+          || !match.is_test_match
+          || (this.isLiveDemoMatch(match) && this.liveDemoMatchEnabled())
+        )
       ).length;
   },
 
@@ -1298,8 +1334,8 @@ const App = {
   liveOfficialProjectionRows() {
     const liveOfficialMatches = this.state.matches.filter((match) =>
       match.status === "live"
-      && !match.is_test_match
       && this.hasLiveScore(match)
+      && (!match.is_test_match || (this.isLiveDemoMatch(match) && this.liveDemoMatchEnabled()))
     );
 
     if (!liveOfficialMatches.length) return [];
@@ -1794,7 +1830,7 @@ const App = {
           <span>vs</span>
           <strong>${H.matchFlagHtml(match, "away")} ${H.escapeHtml(match.away_team_name)}</strong>
         </div>
-        ${this.isLiveDemoMatch(match) ? `<p class="test-match-mini-label">LABO LIVE · fictif · hors stats</p>` : match.is_test_match ? `<p class="test-match-mini-label">MATCH TEST · hors classement Coupe du monde</p>` : ""}
+        ${this.isLiveDemoMatch(match) ? `<p class="test-match-mini-label">LABO LIVE · test classement</p>` : match.is_test_match ? `<p class="test-match-mini-label">MATCH TEST · hors classement Coupe du monde</p>` : ""}
         <p class="muted mini-location-line">${H.matchLocationHtml(match, true)}</p>
         <p class="muted mini-tv-line">${H.formatDateTime(match.kickoff_at)} · ${H.tvChannelLogosHtml(this.matchTvChannel(match))}</p>
       </div>
@@ -2316,7 +2352,7 @@ const App = {
           <span class="match-tv-meta">${H.icon("tv")} ${H.tvChannelLogosHtml(this.matchTvChannel(match))}</span>
         </div>
 
-        ${this.isLiveDemoMatch(match) ? `<div class="test-match-notice live-demo-notice">${H.icon("info")} Labo live fictif : tu peux tester le direct et les scores. Il ne compte dans aucun classement, aucune stat et aucun exploit. À retirer avant validation Coupe du monde.</div>` : match.is_test_match ? `<div class="test-match-notice">${H.icon("info")} Match de préparation : il sert à tester le site. Il ne compte pas dans le classement Coupe du monde ni dans les exploits normaux.</div>` : ""}
+        ${this.isLiveDemoMatch(match) ? `<div class="test-match-notice live-demo-notice">${H.icon("info")} Labo live fictif : il compte temporairement dans les classements pour tester les variations en direct. Quand tu le retires, le match et ses pronos disparaissent. À retirer avant validation Coupe du monde.</div>` : match.is_test_match ? `<div class="test-match-notice">${H.icon("info")} Match de préparation : il sert à tester le site. Il ne compte pas dans le classement Coupe du monde ni dans les exploits normaux.</div>` : ""}
 
         <form class="prediction-form" data-match-id="${match.id}" data-final-phase="${isFinalPhase}">
           <div class="prediction-inputs">
@@ -3833,11 +3869,14 @@ const App = {
         return { prediction, match };
       })
       .filter(({ match, prediction }) => match
-        && !this.isLiveDemoMatch(match)
         && ["finished", "live"].includes(match.status)
         && prediction.points_total !== null
         && prediction.points_total !== undefined
-        && (includeTest || !match.is_test_match)
+        && (
+          includeTest
+          || !match.is_test_match
+          || (this.isLiveDemoMatch(match) && this.liveDemoMatchEnabled())
+        )
         && (!filters.matchDay || match.match_day === filters.matchDay)
         && (!filters.poolRound || Number(match.pool_round || 0) === Number(filters.poolRound))
         && (!filters.matchIds || filters.matchIds.includes(match.id))
@@ -7910,7 +7949,7 @@ const App = {
           </div>
           <div class="profile-account-actions">
             <button class="ghost-btn" id="profileInstallAppBtn" type="button">Installer l’app</button>
-            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.3.35</button>
+            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.3.37</button>
             <button class="danger-btn" id="profileLogoutBtn" type="button">Déconnexion</button>
           </div>
         </div>

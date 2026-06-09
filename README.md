@@ -1,4 +1,21 @@
-# Le Nid des Pronos — V1.3.35
+# Le Nid des Pronos — V1.3.37
+
+## V1.3.37 — Reprise après actualisation
+
+- L’application mémorise la dernière page ouverte : accueil, matchs, classements, teams, exploits, profil, etc.
+- Après actualisation du navigateur, le joueur revient sur cette même page au lieu de retomber sur l’accueil.
+- L’administration mémorise aussi la dernière section ouverte : scores, sauvegardes, santé, joueurs, famille, etc.
+- Les paramètres URL restent prioritaires : `app.html?view=matches` ou `admin.html?section=health` forcent toujours une page précise.
+- Aucun patch SQL obligatoire.
+
+## V1.3.36 — Labo compté temporairement dans les classements
+
+- Le match labo est maintenant pris en compte temporairement dans les classements pendant qu’il est actif.
+- Objectif : tester en live que les classements bougent quand tu changes le score du match labo.
+- Classements concernés : joueurs, teams, famille, général et par phase, selon les pronos labo injectés.
+- Quand tu retires le match labo, le match et les pronos labo sont supprimés : plus aucune trace dans les vrais classements.
+- Santé du Nid garde le voyant “Labo live retiré” pour ne pas oublier de le couper avant validation Coupe du monde.
+- Aucun nouveau patch SQL si `patch_v1_3_35_labo_score_status.sql` et `patch_v1_3_34_labo_inject_predictions.sql` sont déjà lancés.
 
 ## V1.3.35 — Labo live sans verrou
 

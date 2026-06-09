@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — ADMIN V1.3.35
+// LE NID DES PRONOS — ADMIN V1.3.37
 // ============================================================
 
 const H = window.Helpers;
@@ -33,6 +33,38 @@ const Admin = {
     finalReportSelectedUserId: null
   },
 
+
+  adminStoragePrefix() {
+    return `nid-pronos-admin:${this.state.session?.user?.id || "anonymous"}`;
+  },
+
+  lastAdminSectionStorageKey() {
+    return `${this.adminStoragePrefix()}:last-section`;
+  },
+
+  readLastAdminSection() {
+    try {
+      return localStorage.getItem(this.lastAdminSectionStorageKey()) || "";
+    } catch (error) {
+      return "";
+    }
+  },
+
+  rememberLastAdminSection(section) {
+    try {
+      if (section) localStorage.setItem(this.lastAdminSectionStorageKey(), section);
+    } catch (error) {
+      // LocalStorage peut être indisponible en navigation privée stricte.
+    }
+  },
+
+  initialAdminSection() {
+    const allowedSections = ["quick", "teams", "messages", "scores", "backups", "health", "audit", "final-report", "users", "family"];
+    const params = new URLSearchParams(window.location.search);
+    const requested = params.get("section") || this.readLastAdminSection() || "quick";
+    return allowedSections.includes(requested) ? requested : "quick";
+  },
+
   isSuperAdmin() {
     return this.state.profile?.role === "super_admin";
   },
@@ -49,7 +81,7 @@ const Admin = {
       p_category: category,
       p_details: details || {},
       p_metadata: {
-        app_version: "1.3.35",
+        app_version: "1.3.37",
         source: "admin_front"
       }
     });
@@ -97,6 +129,7 @@ const Admin = {
 
     this.bindActions();
     await this.reloadAll();
+    this.setAdminSection(this.initialAdminSection());
     this.setupRealtime();
   },
 
@@ -192,6 +225,7 @@ const Admin = {
   setAdminSection(section = "quick") {
     this.closeMobileMenu();
     this.state.adminSection = section;
+    this.rememberLastAdminSection(section);
     const titles = {
       quick: ["Saisie rapide des scores", "Prochains matchs en haut, validation rapide et scores manuels."],
       teams: ["Gestion des équipes", "Créer, renommer, recolorer ou supprimer les teams bureau."],
@@ -2248,7 +2282,7 @@ const Admin = {
         <button class="ghost-btn" id="toggleLiveDemoMatchBtn" type="button">Activer le match fictif live</button>
       </div>
       <div class="live-demo-score-inject" id="liveDemoScoreInjectBox"></div>
-      <p class="muted tiny-note">Match 100% fictif : sert à tester l’affichage live et les scores. Il ne compte dans aucun classement, aucune stat, aucun exploit. À retirer avant validation Coupe du monde.</p>
+      <p class="muted tiny-note">Match 100% fictif : sert à tester l’affichage live, les scores et les classements. Il est compté temporairement tant qu’il est actif, puis supprimé avec ses pronos quand tu le retires. À retirer avant validation Coupe du monde.</p>
     `;
 
     prepBox.appendChild(box);
@@ -2548,7 +2582,7 @@ const Admin = {
       <div class="live-demo-inject-panel">
         <div>
           <strong>${H.escapeHtml(match.home_team_name || "Hiboux du Nid")} ${H.scoreText(match.home_score ?? 0, match.away_score ?? 0)} ${H.escapeHtml(match.away_team_name || "Chouettes du Live")}</strong>
-          <small>Injection labo : visible pour tous les joueurs, jamais comptée quand le labo est retiré.</small>
+          <small>Injection labo : visible pour tous les joueurs et comptée temporairement dans les classements tant que le labo est actif. Tout disparaît quand tu retires le labo.</small>
         </div>
         <div class="live-demo-inject-actions">
           <button class="ghost-btn" id="injectLiveDemoPredictionsBtn" type="button">Injecter des pronos pour tous</button>

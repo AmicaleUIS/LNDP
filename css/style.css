@@ -17206,3 +17206,25 @@ body.forced-password-lock {
 .worldcup-ready-row.warning strong {
   color: #fde68a;
 }
+
+
+/* ============================================================
+   V1.3.36 — Labo compté temporairement dans les classements
+   ============================================================ */
+
+.live-demo-notice {
+  border-color: rgba(251, 191, 36, .34);
+}
+
+.live-demo-inject-panel small {
+  color: rgba(254, 243, 199, .82);
+}
+
+
+/* ============================================================
+   V1.3.37 — Reprise de page après actualisation
+   ============================================================ */
+
+body[data-current-view] {
+  scroll-behavior: smooth;
+}
