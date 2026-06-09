@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — APP PRINCIPALE V1.3.39
+// LE NID DES PRONOS — APP PRINCIPALE V1.3.40
 // ============================================================
 
 const H = window.Helpers;
@@ -463,7 +463,7 @@ const App = {
           <div>
             <p class="eyebrow">Crédits cachés</p>
             <h2 id="creditsTitle">Le Nid des Pronos</h2>
-            <p class="muted">Version publique <strong>1.3.39</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
+            <p class="muted">Version publique <strong>1.3.40</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
           </div>
         </div>
         <div class="credits-grid">
@@ -480,7 +480,7 @@ const App = {
             <p><strong>1.0.5</strong> — dashboard mobile/desktop stabilisé, sans chevauchement des cartes.</p>
           </section>
           <section>
-            <h3>Évolutions V1.3.39</h3>
+            <h3>Évolutions V1.3.40</h3>
             <ul class="changelog-list">
               <li>Le super admin peut désactiver ou réactiver l’affichage du module préparation.</li>
               <li>Quand la préparation est désactivée, les matchs test disparaissent des matchs/pronos, classements par phase et règles.</li>
@@ -3323,15 +3323,16 @@ const App = {
   },
 
   homeRecordCarouselHtml(leaderboardRows = this.state.playerScoreRows, teamRows = this.overallTeamAverageRows()) {
-    const hasActivity = this.hasLeaderboardScoreActivity(leaderboardRows, teamRows);
-    const rows = hasActivity ? this.achievementRecordRows() : [];
-    const recordHighlights = hasActivity
-      ? this.achievementRecordDefinitions()
-        .map((record) => this.recordWinner(record, rows))
-        .filter((item) => item.best && item.bestProfile)
-      : [];
+    const hasScoreActivity = this.hasLeaderboardScoreActivity(leaderboardRows, teamRows);
+    const rows = this.achievementRecordRows();
+    const availableRecords = this.achievementRecordDefinitions()
+      .filter((record) => hasScoreActivity || record.id === "record-predictions");
 
-    const highlights = hasActivity ? this.homeStoryHighlights(recordHighlights, leaderboardRows, teamRows) : [];
+    const recordHighlights = availableRecords
+      .map((record) => this.recordWinner(record, rows))
+      .filter((item) => item.best && item.bestProfile);
+
+    const highlights = this.homeStoryHighlights(recordHighlights, leaderboardRows, teamRows);
 
     if (!highlights.length) {
       return `
@@ -3340,7 +3341,7 @@ const App = {
             <div>
               <p class="eyebrow">${H.icon("badges")} Actus du nid</p>
               <h3>Le tableau des petits exploits arrive</h3>
-              <p class="muted">Dès que les premiers points seront comptabilisés, les records, casseroles et hiboux en feu défileront ici.</p>
+              <p class="muted">Dès que les premiers pronos ou points seront comptabilisés, les records, casseroles et hiboux en feu défileront ici.</p>
             </div>
           </div>
         </section>
@@ -7983,7 +7984,7 @@ const App = {
           </div>
           <div class="profile-account-actions">
             <button class="ghost-btn" id="profileInstallAppBtn" type="button">Installer l’app</button>
-            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.3.39</button>
+            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.3.40</button>
             <button class="danger-btn" id="profileLogoutBtn" type="button">Déconnexion</button>
           </div>
         </div>

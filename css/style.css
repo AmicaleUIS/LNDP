@@ -17253,3 +17253,12 @@ body[data-current-view] {
 .clean-start-box .backup-box-kicker {
   color: #bbf7d0;
 }
+
+
+/* ============================================================
+   V1.3.40 — Mini-records de pronos visibles dès le départ
+   ============================================================ */
+
+.home-record-slide-record[data-record-popup-id="record-predictions"] .home-record-label {
+  color: #facc15;
+}

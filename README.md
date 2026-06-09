@@ -1,4 +1,11 @@
-# Le Nid des Pronos — V1.3.39
+# Le Nid des Pronos — V1.3.40
+
+## V1.3.40 — Mini-records de pronos sur l’accueil
+
+- Après le reset départ compétition, l’accueil ne montre toujours pas de faux “1er du classement” ni de “1re équipe” à zéro point.
+- Le mini-record “Greffier du grimoire” apparaît dès qu’il existe des pronos validés, même avant le premier point marqué.
+- Les autres mini-records liés aux scores restent masqués tant qu’aucun point réel n’est comptabilisé.
+- Aucun patch SQL obligatoire.
 
 ## V1.3.39 — Départ compétition propre
 
