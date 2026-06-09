@@ -1,4 +1,12 @@
-# Le Nid des Pronos — V1.3.34
+# Le Nid des Pronos — V1.3.35
+
+## V1.3.35 — Labo live sans verrou
+
+- Admin > Labo score en direct : ajout des boutons “Remettre à venir” et “Passer en direct”.
+- Les boutons de score labo passent par une fonction SQL spéciale qui contourne le verrou de date uniquement pour le match fictif.
+- Le match labo peut donc être remis à venir, passé en live et scorer sans être bloqué par “match déjà commencé”.
+- Santé du Nid > État Coupe du monde : ajout du voyant “Labo live retiré”, à mettre au vert avant validation Coupe du monde.
+- Patch SQL obligatoire : `patch_v1_3_35_labo_score_status.sql`.
 
 ## V1.3.34 — Famille général + injection labo
 

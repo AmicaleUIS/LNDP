@@ -17187,3 +17187,22 @@ body.forced-password-lock {
     flex: 1;
   }
 }
+
+
+/* ============================================================
+   V1.3.35 — Labo live sans verrou de date + Santé du Nid
+   ============================================================ */
+
+.live-demo-status-btn {
+  border-color: rgba(125, 211, 252, .28);
+  color: #bae6fd;
+}
+
+.live-demo-status-btn:hover,
+.live-demo-status-btn:focus-visible {
+  background: rgba(125, 211, 252, .12);
+}
+
+.worldcup-ready-row.warning strong {
+  color: #fde68a;
+}
