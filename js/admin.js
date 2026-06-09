@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — ADMIN V1.3.30
+// LE NID DES PRONOS — ADMIN V1.3.33
 // ============================================================
 
 const H = window.Helpers;
@@ -49,7 +49,7 @@ const Admin = {
       p_category: category,
       p_details: details || {},
       p_metadata: {
-        app_version: "1.3.4",
+        app_version: "1.3.33",
         source: "admin_front"
       }
     });
@@ -118,6 +118,7 @@ const Admin = {
     H.$("#toggleGraphMockPreviewBtn")?.addEventListener("click", () => this.toggleGraphMockPreview());
     H.$("#toggleHomeProgressTestMatchesBtn")?.addEventListener("click", () => this.toggleHomeProgressTestMatches());
     H.$("#toggleLiveDemoMatchBtn")?.addEventListener("click", () => this.toggleLiveDemoMatch());
+    this.ensureLiveDemoControls();
     H.$("#fullLaunchResetBtn")?.addEventListener("click", () => this.fullLaunchReset());
     H.$("#refreshHealthBtn")?.addEventListener("click", async () => { await this.loadHealthSnapshot(); this.renderHealth(); });
     H.$("#refreshAuditBtn")?.addEventListener("click", async () => { await this.loadAuditLogs(); this.renderAudit(); });
@@ -2226,7 +2227,30 @@ const Admin = {
     this.renderAudit();
   },
 
+
+  ensureLiveDemoControls() {
+    if (H.$("#toggleLiveDemoMatchBtn")) return;
+
+    const prepBox = H.$(".prep-module-box") || H.$(".backup-panel-grid") || H.$("#backupsSection") || H.$("main");
+    if (!prepBox) return;
+
+    const box = document.createElement("div");
+    box.className = "graph-preview-admin-box live-demo-admin-box injected-live-demo-box";
+    box.innerHTML = `
+      <h4>Labo score en direct</h4>
+      <p class="prep-module-status muted" id="liveDemoMatchStatusText">Chargement du labo live...</p>
+      <div class="graph-preview-actions">
+        <button class="ghost-btn" id="toggleLiveDemoMatchBtn" type="button">Activer le match fictif live</button>
+      </div>
+      <p class="muted tiny-note">Match 100% fictif : sert à tester l’affichage live et les scores. Il ne compte dans aucun classement, aucune stat, aucun exploit. À retirer avant validation Coupe du monde.</p>
+    `;
+
+    prepBox.appendChild(box);
+    H.$("#toggleLiveDemoMatchBtn")?.addEventListener("click", () => this.toggleLiveDemoMatch());
+  },
+
   renderBackups() {
+    this.ensureLiveDemoControls();
     const select = H.$("#backupSelect");
     const list = H.$("#backupListAdmin");
     const prepEnabled = this.state.preparationModuleEnabled !== false;
@@ -2486,7 +2510,7 @@ const Admin = {
 
     const { error } = await window.sb.rpc("admin_set_live_demo_match", { p_enabled: nextEnabled });
     if (error) {
-      H.toast(error.message || "Impossible de modifier le match fictif live. Lance le patch SQL V1.3.30.", "error");
+      H.toast(error.message || "Impossible de modifier le match fictif live. Lance le patch SQL V1.3.30 inclus dans le zip V1.3.32.", "error");
       return;
     }
 

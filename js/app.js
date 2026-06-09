@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — APP PRINCIPALE V1.3.31
+// LE NID DES PRONOS — APP PRINCIPALE V1.3.33
 // ============================================================
 
 const H = window.Helpers;
@@ -431,7 +431,7 @@ const App = {
           <div>
             <p class="eyebrow">Crédits cachés</p>
             <h2 id="creditsTitle">Le Nid des Pronos</h2>
-            <p class="muted">Version publique <strong>1.3.31</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
+            <p class="muted">Version publique <strong>1.3.33</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
           </div>
         </div>
         <div class="credits-grid">
@@ -448,7 +448,7 @@ const App = {
             <p><strong>1.0.5</strong> — dashboard mobile/desktop stabilisé, sans chevauchement des cartes.</p>
           </section>
           <section>
-            <h3>Évolutions V1.3.31</h3>
+            <h3>Évolutions V1.3.33</h3>
             <ul class="changelog-list">
               <li>Le super admin peut désactiver ou réactiver l’affichage du module préparation.</li>
               <li>Quand la préparation est désactivée, les matchs test disparaissent des matchs/pronos, classements par phase et règles.</li>
@@ -1252,9 +1252,21 @@ const App = {
     return prediction;
   },
 
-  liveProjectionCountForMatchIds(matchIds = null, { includeTest = false, userIds = null } = {}) {
-    const idSet = matchIds ? new Set(matchIds.map(String)) : null;
-    const userSet = userIds ? new Set(userIds.map(String)) : null;
+  liveProjectionCountForMatchIds(matchIds = null, options = {}) {
+    const normalizedOptions = options && typeof options === "object" && !Array.isArray(options) ? options : {};
+    const includeTest = Boolean(normalizedOptions.includeTest);
+    const userIds = normalizedOptions.userIds ?? null;
+    const toArray = (value) => {
+      if (!value) return null;
+      if (Array.isArray(value)) return value;
+      if (value instanceof Set) return [...value];
+      if (typeof value?.values === "function") return [...value.values()];
+      return [value];
+    };
+    const matchIdArray = toArray(matchIds);
+    const userIdArray = toArray(userIds);
+    const idSet = matchIdArray ? new Set(matchIdArray.map(String)) : null;
+    const userSet = userIdArray ? new Set(userIdArray.map(String)) : null;
 
     return this.state.visiblePredictions
       .filter((prediction) => !userSet || userSet.has(String(prediction.user_id)))
@@ -7898,7 +7910,7 @@ const App = {
           </div>
           <div class="profile-account-actions">
             <button class="ghost-btn" id="profileInstallAppBtn" type="button">Installer l’app</button>
-            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.3.31</button>
+            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.3.33</button>
             <button class="danger-btn" id="profileLogoutBtn" type="button">Déconnexion</button>
           </div>
         </div>

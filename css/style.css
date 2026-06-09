@@ -17117,3 +17117,25 @@ body.forced-password-lock {
 .home-record-slide.team-tinted-perchoir .profile-badge {
   filter: drop-shadow(0 12px 22px color-mix(in srgb, var(--perchoir-team-color, #facc15) 18%, transparent));
 }
+
+
+/* ============================================================
+   V1.3.32 — Admin labo live visible + version corrigée
+   ============================================================ */
+
+.injected-live-demo-box {
+  margin-top: 14px;
+}
+
+.live-demo-admin-box {
+  display: block;
+}
+
+
+/* ============================================================
+   V1.3.33 — Hotfix classement Famille live
+   ============================================================ */
+
+.family-leaderboard-card .live-ranking-note {
+  overflow-wrap: anywhere;
+}

@@ -1,4 +1,18 @@
-# Le Nid des Pronos — V1.3.31
+# Le Nid des Pronos — V1.3.33
+
+## V1.3.33 — Hotfix classement Famille
+
+- Corrige l’erreur `TypeError: userIds.map is not a function` quand on clique sur Famille dans les classements.
+- La fonction de projection live accepte maintenant un tableau, un `Set`, un itérable ou une valeur simple.
+- Conserve les corrections V1.3.32 : admin versionné correctement et bloc “Labo score en direct” injecté si l’HTML admin est ancien.
+- Aucun patch SQL supplémentaire obligatoire si le patch V1.3.30 du labo live a déjà été lancé.
+
+## V1.3.32 — Hotfix admin labo visible
+
+- Corrige la version affichée dans `admin.html` qui restait bloquée en `v1.3.8`.
+- Force les références cache admin/app/service-worker en `1.3.32`.
+- Sécurise le bloc “Labo score en direct” : si l’HTML admin chargé est ancien, le bloc est injecté par `admin.js`.
+- Le patch SQL du labo reste `patch_v1_3_30_labo_live_match.sql` et doit être lancé pour activer le bouton côté Supabase.
 
 ## V1.3.31 — Perchoir teinté par team
 
