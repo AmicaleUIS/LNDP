@@ -1,4 +1,13 @@
-# Le Nid des Pronos — V1.3.33
+# Le Nid des Pronos — V1.3.34
+
+## V1.3.34 — Famille général + injection labo
+
+- Corrige le classement Famille général : joueurs et par équipe prennent maintenant en compte les projections live, comme le par phase.
+- Les matchs de préparation visibles peuvent être inclus dans le général Famille ; le match labo reste toujours exclu des stats/classements.
+- Admin > Labo score en direct : ajout de boutons pour injecter rapidement un score live `0-0`, `1-0`, `1-1`, etc.
+- Admin > Labo score en direct : ajout du bouton “Injecter des pronos pour tous” pour remplir le match labo avec des pronos fictifs pour tous les joueurs actifs.
+- Les pronos labo sont supprimés quand le match labo est retiré via le bouton admin.
+- Patch SQL obligatoire pour l’injection : `patch_v1_3_34_labo_inject_predictions.sql`.
 
 ## V1.3.33 — Hotfix classement Famille
 

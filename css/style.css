@@ -17139,3 +17139,51 @@ body.forced-password-lock {
 .family-leaderboard-card .live-ranking-note {
   overflow-wrap: anywhere;
 }
+
+
+/* ============================================================
+   V1.3.34 — Famille général live + injection labo joueurs
+   ============================================================ */
+
+.live-demo-score-inject {
+  margin-top: 12px;
+}
+
+.live-demo-inject-panel {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 18px;
+  border: 1px solid rgba(250, 204, 21, .18);
+  background: rgba(2, 6, 23, .28);
+}
+
+.live-demo-inject-panel strong {
+  display: block;
+  color: #f8fafc;
+}
+
+.live-demo-inject-panel small,
+.live-demo-inject-empty {
+  display: block;
+  color: rgba(226, 232, 240, .74);
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.live-demo-inject-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.live-demo-inject-actions .live-demo-score-btn {
+  min-width: 58px;
+}
+
+@media (max-width: 700px) {
+  .live-demo-inject-actions button {
+    flex: 1;
+  }
+}

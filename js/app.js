@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — APP PRINCIPALE V1.3.33
+// LE NID DES PRONOS — APP PRINCIPALE V1.3.34
 // ============================================================
 
 const H = window.Helpers;
@@ -431,7 +431,7 @@ const App = {
           <div>
             <p class="eyebrow">Crédits cachés</p>
             <h2 id="creditsTitle">Le Nid des Pronos</h2>
-            <p class="muted">Version publique <strong>1.3.33</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
+            <p class="muted">Version publique <strong>1.3.34</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
           </div>
         </div>
         <div class="credits-grid">
@@ -448,7 +448,7 @@ const App = {
             <p><strong>1.0.5</strong> — dashboard mobile/desktop stabilisé, sans chevauchement des cartes.</p>
           </section>
           <section>
-            <h3>Évolutions V1.3.33</h3>
+            <h3>Évolutions V1.3.34</h3>
             <ul class="changelog-list">
               <li>Le super admin peut désactiver ou réactiver l’affichage du module préparation.</li>
               <li>Quand la préparation est désactivée, les matchs test disparaissent des matchs/pronos, classements par phase et règles.</li>
@@ -5493,7 +5493,7 @@ const App = {
       .filter((player) => this.isFamily(player) || player.profile_setup_done !== false);
     const rows = participants.map((player) => {
       const userId = player.id || player.user_id;
-      const details = this.scoreDetailRowsForUser(userId, matchIds ? { matchIds } : {});
+      const details = this.scoreDetailRowsForUser(userId, matchIds ? { matchIds, includeTest: true } : { includeTest: true });
       const total = details.reduce((sum, { prediction }) => sum + Number(prediction.points_total || 0), 0);
       const exact = details.filter(({ prediction }) => prediction.is_exact_score).length;
       const goodResults = details.filter(({ prediction }) => prediction.is_good_result).length;
@@ -5527,7 +5527,7 @@ const App = {
       if (!player.office_team_id) return;
       const team = this.state.officeTeams.find((item) => item.id === player.office_team_id) || {};
       const userId = player.id || player.user_id;
-      const details = this.scoreDetailRowsForUser(userId, matchIds ? { matchIds } : {});
+      const details = this.scoreDetailRowsForUser(userId, matchIds ? { matchIds, includeTest: true } : { includeTest: true });
       const row = byTeam.get(player.office_team_id) || {
         office_team_id: player.office_team_id,
         office_team_name: player.office_team_name || team.name || "Team",
@@ -5716,7 +5716,7 @@ const App = {
       const matchIds = group ? group.matches.map((match) => match.id) : [];
       const rows = group ? this.familyTeamRows(matchIds, teamTab) : [];
       const finishedCount = group ? group.matches.filter((match) => ["finished", "live"].includes(match.status)).length : 0;
-      const liveProjectionCount = group ? this.liveProjectionCountForMatchIds(matchIds, { userIds: this.familyProfileIds() }) : 0;
+      const liveProjectionCount = group ? this.liveProjectionCountForMatchIds(matchIds, { includeTest: true, userIds: this.familyProfileIds() }) : 0;
       const pager = group ? this.phaseNavigatorHtml(groups, activeIndex, "familyTeamLeaderboardPhaseIndex") : "";
       root.innerHTML = `
         <section class="card team-leaderboard-card family-leaderboard-card">
@@ -5769,7 +5769,7 @@ const App = {
       const matchIds = group ? group.matches.map((match) => match.id) : [];
       const rows = group ? this.familyPlayerRows(matchIds) : [];
       const finishedCount = group ? group.matches.filter((match) => ["finished", "live"].includes(match.status)).length : 0;
-      const liveProjectionCount = group ? this.liveProjectionCountForMatchIds(matchIds, { userIds: this.familyProfileIds() }) : 0;
+      const liveProjectionCount = group ? this.liveProjectionCountForMatchIds(matchIds, { includeTest: true, userIds: this.familyProfileIds() }) : 0;
       const pager = group ? this.phaseNavigatorHtml(groups, activeIndex, "familyLeaderboardPhaseIndex") : "";
       root.innerHTML = `
         <section class="card player-leaderboard-card family-leaderboard-card">
@@ -5794,7 +5794,7 @@ const App = {
           <div><h3>Famille · joueurs</h3><p class="muted">Joueurs Famille, invités via coupon + joueurs UIS ayant activé le mode Famille. Hors classement officiel et hors mini-records.</p></div>
         </div>
         <div class="team-leaderboard-control-stack">${paneControls}${modeControls}</div>
-        ${this.liveProjectionCountForMatchIds(null, { userIds: this.familyProfileIds() }) ? `<div class="live-ranking-note">${H.icon("info")} Classement Famille joueurs provisoire : projections live incluses.</div>` : ""}
+        ${this.liveProjectionCountForMatchIds(null, { includeTest: true, userIds: this.familyProfileIds() }) ? `<div class="live-ranking-note">${H.icon("info")} Classement Famille joueurs provisoire : projections live incluses.</div>` : ""}
         ${this.leaderboardRowsHtml(rows)}
       </section>
     `;
@@ -7910,7 +7910,7 @@ const App = {
           </div>
           <div class="profile-account-actions">
             <button class="ghost-btn" id="profileInstallAppBtn" type="button">Installer l’app</button>
-            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.3.33</button>
+            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.3.34</button>
             <button class="danger-btn" id="profileLogoutBtn" type="button">Déconnexion</button>
           </div>
         </div>

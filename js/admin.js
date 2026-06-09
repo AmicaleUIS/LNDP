@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — ADMIN V1.3.33
+// LE NID DES PRONOS — ADMIN V1.3.34
 // ============================================================
 
 const H = window.Helpers;
@@ -49,7 +49,7 @@ const Admin = {
       p_category: category,
       p_details: details || {},
       p_metadata: {
-        app_version: "1.3.33",
+        app_version: "1.3.34",
         source: "admin_front"
       }
     });
@@ -2242,6 +2242,7 @@ const Admin = {
       <div class="graph-preview-actions">
         <button class="ghost-btn" id="toggleLiveDemoMatchBtn" type="button">Activer le match fictif live</button>
       </div>
+      <div class="live-demo-score-inject" id="liveDemoScoreInjectBox"></div>
       <p class="muted tiny-note">Match 100% fictif : sert à tester l’affichage live et les scores. Il ne compte dans aucun classement, aucune stat, aucun exploit. À retirer avant validation Coupe du monde.</p>
     `;
 
@@ -2328,6 +2329,8 @@ const Admin = {
       liveDemoToggle.classList.toggle("danger-btn", liveDemoMatchEnabled);
       liveDemoToggle.classList.toggle("ghost-btn", !liveDemoMatchEnabled);
     }
+
+    this.renderLiveDemoScoreInjectBox();
 
     if (!select) return;
 
@@ -2498,6 +2501,110 @@ const Admin = {
     H.toast(nextEnabled ? "Prévisualisation graphs activée" : "Prévisualisation graphs désactivée", "success");
   },
 
+
+
+  liveDemoMatch() {
+    return (this.state.matches || []).find((match) => this.isLiveDemoMatch(match)) || null;
+  },
+
+  renderLiveDemoScoreInjectBox() {
+    const box = H.$("#liveDemoScoreInjectBox");
+    if (!box) return;
+
+    const match = this.liveDemoMatch();
+    const enabled = this.state.liveDemoMatchEnabled === true;
+
+    if (!enabled) {
+      box.innerHTML = "";
+      return;
+    }
+
+    if (!match) {
+      box.innerHTML = `
+        <div class="live-demo-inject-empty">
+          Active le match fictif live, puis reviens ici pour injecter des scores et des pronos.
+        </div>
+      `;
+      return;
+    }
+
+    const scoreButtons = [
+      [0, 0],
+      [1, 0],
+      [0, 1],
+      [1, 1],
+      [2, 1],
+      [1, 2],
+      [2, 2],
+      [3, 1]
+    ];
+
+    box.innerHTML = `
+      <div class="live-demo-inject-panel">
+        <div>
+          <strong>${H.escapeHtml(match.home_team_name || "Hiboux du Nid")} ${H.scoreText(match.home_score ?? 0, match.away_score ?? 0)} ${H.escapeHtml(match.away_team_name || "Chouettes du Live")}</strong>
+          <small>Injection labo : visible pour tous les joueurs, jamais comptée quand le labo est retiré.</small>
+        </div>
+        <div class="live-demo-inject-actions">
+          <button class="ghost-btn" id="injectLiveDemoPredictionsBtn" type="button">Injecter des pronos pour tous</button>
+          ${scoreButtons.map(([home, away]) => `<button class="ghost-btn live-demo-score-btn" type="button" data-home="${home}" data-away="${away}">${home}-${away}</button>`).join("")}
+        </div>
+      </div>
+    `;
+
+    H.$("#injectLiveDemoPredictionsBtn", box)?.addEventListener("click", () => this.injectLiveDemoPredictionsForAll());
+    H.$$(".live-demo-score-btn", box).forEach((button) => {
+      button.addEventListener("click", () => this.setLiveDemoScore(Number(button.dataset.home), Number(button.dataset.away)));
+    });
+  },
+
+  async injectLiveDemoPredictionsForAll() {
+    if (!confirm("Injecter des pronos de labo pour tous les joueurs actifs ? Ils seront supprimés quand tu retires le match labo.")) return;
+
+    const { data, error } = await window.sb.rpc("admin_inject_live_demo_predictions");
+    if (error) {
+      H.toast(error.message || "Injection impossible. Lance le patch SQL V1.3.34.", "error");
+      return;
+    }
+
+    const count = Array.isArray(data) ? data[0]?.inserted_count : data;
+    await this.logAdminAction("inject_live_demo_predictions", "preparation", { count });
+    H.toast(`${count ?? "Les"} prono(s) labo injecté(s)`, "success");
+    await this.loadMatches();
+    this.renderBackups();
+    this.renderQuickScores();
+  },
+
+  async setLiveDemoScore(home, away) {
+    const match = this.liveDemoMatch();
+    if (!match) {
+      H.toast("Match labo introuvable. Active-le d’abord.", "error");
+      return;
+    }
+
+    const payload = {
+      status: "live",
+      home_score: home,
+      away_score: away,
+      winner_team_id: home > away ? match.home_team_id : away > home ? match.away_team_id : null
+    };
+
+    const { error } = await window.sb
+      .from("matches")
+      .update(payload)
+      .eq("id", match.id);
+
+    if (error) {
+      H.toast(error.message || "Impossible d’injecter ce score labo.", "error");
+      return;
+    }
+
+    await this.logAdminAction("set_live_demo_score", "score", { match_id: match.id, home_score: home, away_score: away });
+    H.toast(`Score labo injecté : ${home}-${away}`, "success");
+    await this.loadMatches();
+    this.renderBackups();
+    this.renderQuickScores();
+  },
 
   async toggleLiveDemoMatch() {
     const enabledNow = this.state.liveDemoMatchEnabled === true;
