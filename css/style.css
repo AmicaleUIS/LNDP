@@ -17262,3 +17262,33 @@ body[data-current-view] {
 .home-record-slide-record[data-record-popup-id="record-predictions"] .home-record-label {
   color: #facc15;
 }
+
+
+/* ============================================================
+   V1.3.41 — Badges souvenir manuels
+   ============================================================ */
+
+.manual-badge-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  padding: 6px;
+  border-radius: 14px;
+  border: 1px solid rgba(250, 204, 21, .16);
+  background: rgba(250, 204, 21, .06);
+}
+
+.manual-badge-label {
+  font-size: .72rem;
+  font-weight: 900;
+  color: rgba(226, 232, 240, .72);
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+
+.manual-badge-btn.is-granted {
+  border-color: rgba(34, 197, 94, .38);
+  color: #bbf7d0;
+  background: rgba(34, 197, 94, .12);
+}

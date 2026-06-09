@@ -1,4 +1,12 @@
-# Le Nid des Pronos — V1.3.40
+# Le Nid des Pronos — V1.3.41
+
+## V1.3.41 — Badges souvenir manuels
+
+- Ajout d’une table `manual_user_badges` pour conserver des badges souvenir indépendamment des scores de préparation.
+- Super admin > Joueurs : boutons pour ajouter/retirer manuellement “Préparation du nid” et “Test concluant” à n’importe quel joueur.
+- Les badges manuels apparaissent dans Mes exploits, le Hall du Nid, les aperçus de profil et les fiches joueur.
+- Utile après nettoyage des scores de préparation : on peut restaurer “Test concluant” aux joueurs qui l’avaient réellement gagné.
+- Patch SQL obligatoire : `patch_v1_3_41_badges_souvenir_manuels.sql`.
 
 ## V1.3.40 — Mini-records de pronos sur l’accueil
 

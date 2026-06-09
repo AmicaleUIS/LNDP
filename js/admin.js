@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — ADMIN V1.3.40
+// LE NID DES PRONOS — ADMIN V1.3.41
 // ============================================================
 
 const H = window.Helpers;
@@ -20,6 +20,7 @@ const Admin = {
     adminSection: "quick",
     backups: [],
     familyInvites: [],
+    manualBadges: [],
     appSettings: {},
     familyModeEnabled: false,
     preparationModuleEnabled: true,
@@ -81,7 +82,7 @@ const Admin = {
       p_category: category,
       p_details: details || {},
       p_metadata: {
-        app_version: "1.3.40",
+        app_version: "1.3.41",
         source: "admin_front"
       }
     });
@@ -423,6 +424,7 @@ const Admin = {
         this.loadBackups(),
         this.loadChatMessages(),
         this.loadFamilyInvites(),
+        this.loadManualBadges(),
         this.loadFamilyModeSetting(),
         this.loadAuditLogs(),
         this.loadHealthSnapshot()
@@ -453,6 +455,27 @@ const Admin = {
     this.applyRolePermissions();
     this.setAdminSection(this.state.adminSection || "quick");
     H.toast("Admin rafraîchi", "success");
+  },
+
+
+  async loadManualBadges() {
+    const { data, error } = await window.sb
+      .from("manual_user_badges")
+      .select("user_id,badge_id,granted_at,reason");
+
+    if (error) {
+      console.warn("manual_user_badges indisponible", error);
+      this.state.manualBadges = [];
+      return;
+    }
+
+    this.state.manualBadges = data || [];
+  },
+
+  manualBadgeGranted(userId, badgeId) {
+    return (this.state.manualBadges || []).some((row) =>
+      String(row.user_id) === String(userId) && row.badge_id === badgeId
+    );
   },
 
   async loadUsers() {
@@ -1087,6 +1110,11 @@ const Admin = {
                 <label class="mini-check danger"><input class="user-is-banned" type="checkbox" ${user.is_banned ? "checked" : ""}> Ban</label>
                 ${this.isFamilyAccount(user) || ["admin", "super_admin"].includes(role) ? "" : `<button class="ghost-btn user-family-mode-toggle-btn" data-enabled="${user.show_family_players ? "false" : "true"}">${user.show_family_players ? "Masquer famille" : "Afficher famille"}</button>`}
                 <button class="ghost-btn admin-password-reset-btn">Mot de passe</button>
+                <div class="manual-badge-controls">
+                  <span class="manual-badge-label">Badges souvenir</span>
+                  <button class="ghost-btn tiny-btn manual-badge-btn ${this.manualBadgeGranted(user.id, "preparation-two-picks") ? "is-granted" : ""}" type="button" data-badge-id="preparation-two-picks" data-action="${this.manualBadgeGranted(user.id, "preparation-two-picks") ? "revoke" : "grant"}">${this.manualBadgeGranted(user.id, "preparation-two-picks") ? "Retirer Prépa" : "Ajouter Prépa"}</button>
+                  <button class="ghost-btn tiny-btn manual-badge-btn ${this.manualBadgeGranted(user.id, "prep-good-pick") ? "is-granted" : ""}" type="button" data-badge-id="prep-good-pick" data-action="${this.manualBadgeGranted(user.id, "prep-good-pick") ? "revoke" : "grant"}">${this.manualBadgeGranted(user.id, "prep-good-pick") ? "Retirer Test concluant" : "Ajouter Test concluant"}</button>
+                </div>
                 <button class="ghost-btn save-user-btn">Sauver</button>
                 ${user.is_active
                   ? `<button class="danger-btn toggle-active-btn" data-active="false">Désactiver</button>`
@@ -1114,6 +1142,37 @@ const Admin = {
     H.$$(".admin-password-reset-btn", root).forEach((btn) => {
       btn.addEventListener("click", (event) => this.openPasswordResetModal(event.currentTarget.closest(".admin-row")));
     });
+
+    H.$$(".manual-badge-btn", root).forEach((btn) => {
+      btn.addEventListener("click", (event) => this.toggleManualBadge(event.currentTarget.closest(".admin-row"), event.currentTarget.dataset.badgeId, event.currentTarget.dataset.action));
+    });
+  },
+
+  async toggleManualBadge(row, badgeId, action = "grant") {
+    const userId = row?.dataset?.userId;
+    if (!userId || !badgeId) return;
+    const fn = action === "revoke" ? "admin_revoke_manual_badge" : "admin_grant_manual_badge";
+    const label = badgeId === "prep-good-pick" ? "Test concluant" : "Préparation du nid";
+    const confirmText = action === "revoke"
+      ? `Retirer le badge “${label}” à ce joueur ?`
+      : `Ajouter manuellement le badge “${label}” à ce joueur ?`;
+    if (!confirm(confirmText)) return;
+
+    const { error } = await window.sb.rpc(fn, {
+      p_user_id: userId,
+      p_badge_id: badgeId,
+      p_reason: "Ajout manuel super admin"
+    });
+
+    if (error) {
+      H.toast(error.message || "Impossible de modifier le badge manuel. Lance le patch SQL V1.3.41.", "error");
+      return;
+    }
+
+    await this.loadManualBadges();
+    await this.logAdminAction(action === "revoke" ? "manual_badge_revoke" : "manual_badge_grant", "badges", { user_id: userId, badge_id: badgeId });
+    this.renderUsers();
+    H.toast(action === "revoke" ? "Badge retiré" : "Badge ajouté", "success");
   },
 
   async saveUser(row) {

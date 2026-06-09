@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — APP PRINCIPALE V1.3.40
+// LE NID DES PRONOS — APP PRINCIPALE V1.3.41
 // ============================================================
 
 const H = window.Helpers;
@@ -17,6 +17,7 @@ const App = {
     myPredictions: [],
     visiblePredictions: [],
     miniRecordPredictionCounts: [],
+    manualBadges: [],
     familyInvites: [],
     blockedUserIds: new Set(),
     appSettings: {},
@@ -463,7 +464,7 @@ const App = {
           <div>
             <p class="eyebrow">Crédits cachés</p>
             <h2 id="creditsTitle">Le Nid des Pronos</h2>
-            <p class="muted">Version publique <strong>1.3.40</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
+            <p class="muted">Version publique <strong>1.3.41</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
           </div>
         </div>
         <div class="credits-grid">
@@ -480,7 +481,7 @@ const App = {
             <p><strong>1.0.5</strong> — dashboard mobile/desktop stabilisé, sans chevauchement des cartes.</p>
           </section>
           <section>
-            <h3>Évolutions V1.3.40</h3>
+            <h3>Évolutions V1.3.41</h3>
             <ul class="changelog-list">
               <li>Le super admin peut désactiver ou réactiver l’affichage du module préparation.</li>
               <li>Quand la préparation est désactivée, les matchs test disparaissent des matchs/pronos, classements par phase et règles.</li>
@@ -649,6 +650,7 @@ const App = {
       this.loadPublicProfiles(),
       this.loadWinnerPrediction(),
       this.loadMiniRecordPredictionCounts(),
+      this.loadManualBadges(),
       this.loadMyFamilyInvites()
     ]);
     this.renderShell();
@@ -966,6 +968,21 @@ const App = {
       return;
     }
     this.state.visiblePredictions = data || [];
+  },
+
+
+  async loadManualBadges() {
+    const { data, error } = await window.sb
+      .from("manual_user_badges")
+      .select("user_id,badge_id,granted_at,reason");
+
+    if (error) {
+      console.warn("manual_user_badges indisponible pour le moment", error);
+      this.state.manualBadges = [];
+      return;
+    }
+
+    this.state.manualBadges = data || [];
   },
 
   async loadPublicProfiles() {
@@ -4192,6 +4209,27 @@ const App = {
   badgeById(id) {
     return this.badgeCatalog().find((badge) => badge.id === id);
   },
+  manualBadgesForUser(userId) {
+    return (this.state.manualBadges || [])
+      .filter((row) => String(row.user_id) === String(userId))
+      .map((row) => {
+        const badge = this.badgeById(row.badge_id);
+        if (!badge) return null;
+        return {
+          ...badge,
+          manual: true,
+          unlockedAt: this.safeDate(row.granted_at),
+          manualReason: row.reason || null
+        };
+      })
+      .filter(Boolean);
+  },
+
+  preparationBadgeIds() {
+    return ["preparation-two-picks", "prep-good-pick"];
+  },
+
+
 
   achievementsFinishedOnlyGuard() {
     // Les classements peuvent bouger en live, mais les exploits de score restent figés aux matchs terminés.
@@ -4218,8 +4256,9 @@ const App = {
       return pred === real;
     });
     const earlyWinnerPick = this.winnerPredictionForUser(userId);
+    const manualBadges = this.manualBadgesForUser(userId);
 
-    if (!rows.length && !predictionRows.length && !prepPredictionRows.length && !earlyWinnerPick?.predicted_team_id) return [];
+    if (!rows.length && !predictionRows.length && !prepPredictionRows.length && !earlyWinnerPick?.predicted_team_id && !manualBadges.length) return [];
 
     const exact = rows.filter(({ prediction }) => prediction.is_exact_score).length;
     const goodResults = rows.filter(({ prediction }) => prediction.is_good_result).length;
@@ -4474,7 +4513,15 @@ const App = {
     if (bigWrongWay >= 1) unlock("big-owch", firstDateFromRows(bigWrongWayRows));
     if (rows.length >= 5 && zeros >= 3) unlock("wet-feathers", dateWhenCountReached(zeroRows, 3));
 
-    return [...badges, ...this.miniRecordBadgesForUser(userId)];
+    const merged = [...badges, ...manualBadges];
+    const seen = new Set();
+    const uniqueBadges = merged.filter((badge) => {
+      if (!badge?.id || seen.has(badge.id)) return false;
+      seen.add(badge.id);
+      return true;
+    });
+
+    return [...uniqueBadges, ...this.miniRecordBadgesForUser(userId)];
   },
 
   badgeIconName(badge) {
@@ -7984,7 +8031,7 @@ const App = {
           </div>
           <div class="profile-account-actions">
             <button class="ghost-btn" id="profileInstallAppBtn" type="button">Installer l’app</button>
-            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.3.40</button>
+            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.3.41</button>
             <button class="danger-btn" id="profileLogoutBtn" type="button">Déconnexion</button>
           </div>
         </div>
@@ -8307,6 +8354,10 @@ const App = {
       .channel("app-realtime-v0-26-1")
       .on("postgres_changes", { event: "*", schema: "public", table: "matches" }, async () => {
         await this.refreshCurrentViewFromRealtime("matches");
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "manual_user_badges" }, async () => {
+        await this.loadManualBadges();
+        if (["achievements", "teams", "leaderboard", "home"].includes(this.state.currentView)) await this.loadView(this.state.currentView);
       })
       .on("postgres_changes", { event: "*", schema: "public", table: "prediction_points" }, async () => {
         await this.refreshCurrentViewFromRealtime("points");
