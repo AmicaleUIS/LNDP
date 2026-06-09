@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — ADMIN V1.3.25
+// LE NID DES PRONOS — ADMIN V1.3.30
 // ============================================================
 
 const H = window.Helpers;
@@ -26,6 +26,7 @@ const Admin = {
     graphPreviewTestMatchesEnabled: false,
     graphMockPreviewEnabled: false,
     homeProgressIncludeTestMatches: false,
+    liveDemoMatchEnabled: false,
     auditLogs: [],
     healthSnapshot: null,
     healthError: null,
@@ -116,6 +117,7 @@ const Admin = {
     H.$("#toggleGraphPreviewBtn")?.addEventListener("click", () => this.toggleGraphPreviewTestMatches());
     H.$("#toggleGraphMockPreviewBtn")?.addEventListener("click", () => this.toggleGraphMockPreview());
     H.$("#toggleHomeProgressTestMatchesBtn")?.addEventListener("click", () => this.toggleHomeProgressTestMatches());
+    H.$("#toggleLiveDemoMatchBtn")?.addEventListener("click", () => this.toggleLiveDemoMatch());
     H.$("#fullLaunchResetBtn")?.addEventListener("click", () => this.fullLaunchReset());
     H.$("#refreshHealthBtn")?.addEventListener("click", async () => { await this.loadHealthSnapshot(); this.renderHealth(); });
     H.$("#refreshAuditBtn")?.addEventListener("click", async () => { await this.loadAuditLogs(); this.renderAudit(); });
@@ -582,7 +584,7 @@ const Admin = {
     const { data, error } = await window.sb
       .from("app_settings")
       .select("key,value")
-      .in("key", ["family_mode_enabled", "preparation_module_enabled", "graph_preview_test_matches_enabled", "graph_mock_preview_enabled", "home_progress_include_test_matches"]);
+      .in("key", ["family_mode_enabled", "preparation_module_enabled", "graph_preview_test_matches_enabled", "graph_mock_preview_enabled", "home_progress_include_test_matches", "live_demo_match_enabled"]);
 
     if (error) {
       console.warn("Paramètres app indisponibles", error);
@@ -591,6 +593,7 @@ const Admin = {
       this.state.graphPreviewTestMatchesEnabled = false;
       this.state.graphMockPreviewEnabled = false;
       this.state.homeProgressIncludeTestMatches = false;
+      this.state.liveDemoMatchEnabled = false;
       return;
     }
 
@@ -601,6 +604,7 @@ const Admin = {
     this.state.graphPreviewTestMatchesEnabled = this.settingBoolean(settings.graph_preview_test_matches_enabled, false);
     this.state.graphMockPreviewEnabled = this.settingBoolean(settings.graph_mock_preview_enabled, false);
     this.state.homeProgressIncludeTestMatches = this.settingBoolean(settings.home_progress_include_test_matches, false);
+    this.state.liveDemoMatchEnabled = this.settingBoolean(settings.live_demo_match_enabled, false);
   },
 
   async loadAuditLogs() {
@@ -642,10 +646,20 @@ const Admin = {
     this.state.healthSnapshot = Array.isArray(data) ? data[0] : data;
   },
 
+  isLiveDemoMatch(match = null) {
+    if (!match) return false;
+    return Number(match.api_match_id) === -133000
+      || String(match.test_match_label || "").toLowerCase().includes("labo live")
+      || String(match.test_match_label || "").toLowerCase().includes("live demo")
+      || String(match.group_name || "").toLowerCase().includes("labo live");
+  },
+
   adminVisibleMatches(matches = this.state.matches) {
-    return this.state.preparationModuleEnabled === false
-      ? matches.filter((match) => !match.is_test_match)
-      : matches;
+    return matches.filter((match) => {
+      if (this.isLiveDemoMatch(match)) return this.state.preparationModuleEnabled !== false && this.state.liveDemoMatchEnabled === true;
+      if (this.state.preparationModuleEnabled === false && match.is_test_match) return false;
+      return true;
+    });
   },
 
   applyRolePermissions() {
@@ -1928,7 +1942,7 @@ const Admin = {
             <small class="quick-location-line">${H.matchLocationHtml(match, true)}</small>
           </div>
           <div class="quick-score-pills">
-            ${match.is_test_match ? `<span class="pill warning">TEST</span>` : ""}
+            ${this.isLiveDemoMatch(match) ? `<span class="pill danger">LABO LIVE</span>` : match.is_test_match ? `<span class="pill warning">TEST</span>` : ""}
             <span class="pill ${match.status === "finished" ? "success" : match.status === "live" ? "warning" : ""}">${H.statusLabel(match.status)}</span>
           </div>
         </div>
@@ -2219,6 +2233,7 @@ const Admin = {
     const graphPreviewEnabled = this.state.graphPreviewTestMatchesEnabled === true;
     const graphMockPreviewEnabled = this.state.graphMockPreviewEnabled === true;
     const homeProgressIncludeTestMatches = this.state.homeProgressIncludeTestMatches === true;
+    const liveDemoMatchEnabled = this.state.liveDemoMatchEnabled === true;
     const prepStatus = H.$("#prepModuleStatusText");
     const prepToggle = H.$("#togglePreparationModuleBtn");
     const graphPreviewStatus = H.$("#graphPreviewStatusText");
@@ -2227,6 +2242,8 @@ const Admin = {
     const graphMockToggle = H.$("#toggleGraphMockPreviewBtn");
     const homeProgressStatus = H.$("#homeProgressTestMatchesStatusText");
     const homeProgressToggle = H.$("#toggleHomeProgressTestMatchesBtn");
+    const liveDemoStatus = H.$("#liveDemoMatchStatusText");
+    const liveDemoToggle = H.$("#toggleLiveDemoMatchBtn");
 
     if (prepStatus) {
       prepStatus.innerHTML = prepEnabled
@@ -2274,6 +2291,18 @@ const Admin = {
       homeProgressToggle.textContent = homeProgressIncludeTestMatches ? "Exclure les matchs test de la progression" : "Inclure les matchs test dans la progression";
       homeProgressToggle.classList.toggle("danger-btn", homeProgressIncludeTestMatches);
       homeProgressToggle.classList.toggle("ghost-btn", !homeProgressIncludeTestMatches);
+    }
+
+    if (liveDemoStatus) {
+      liveDemoStatus.innerHTML = liveDemoMatchEnabled
+        ? `<strong>Actif</strong> · le match fictif Labo live est visible dans l’admin et l’app. À retirer avant validation Coupe du monde.`
+        : `<strong>Désactivé</strong> · aucun match fictif live n’est injecté.`;
+    }
+
+    if (liveDemoToggle) {
+      liveDemoToggle.textContent = liveDemoMatchEnabled ? "Retirer le match fictif live" : "Activer le match fictif live";
+      liveDemoToggle.classList.toggle("danger-btn", liveDemoMatchEnabled);
+      liveDemoToggle.classList.toggle("ghost-btn", !liveDemoMatchEnabled);
     }
 
     if (!select) return;
@@ -2443,6 +2472,34 @@ const Admin = {
     this.renderBackups();
     this.renderAudit();
     H.toast(nextEnabled ? "Prévisualisation graphs activée" : "Prévisualisation graphs désactivée", "success");
+  },
+
+
+  async toggleLiveDemoMatch() {
+    const enabledNow = this.state.liveDemoMatchEnabled === true;
+    const nextEnabled = !enabledNow;
+    const message = enabledNow
+      ? "Retirer le match fictif live ? Il sera supprimé avec ses pronos/points éventuels. À faire avant validation Coupe du monde."
+      : "Activer le match fictif live ? Il apparaîtra dans l’admin et l’app pour tester les scores en direct. Il ne compte dans aucun classement.";
+
+    if (!confirm(message)) return;
+
+    const { error } = await window.sb.rpc("admin_set_live_demo_match", { p_enabled: nextEnabled });
+    if (error) {
+      H.toast(error.message || "Impossible de modifier le match fictif live. Lance le patch SQL V1.3.30.", "error");
+      return;
+    }
+
+    await this.loadFamilyModeSetting();
+    await this.loadMatches();
+    await this.loadHealthSnapshot();
+    await this.loadAuditLogs();
+    this.renderBackups();
+    this.renderQuickScores();
+    this.renderMatches();
+    this.renderHealth();
+    this.renderAudit();
+    H.toast(nextEnabled ? "Match fictif live activé" : "Match fictif live retiré", "success");
   },
 
   async togglePreparationModule() {

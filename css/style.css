@@ -17056,3 +17056,27 @@ body.forced-password-lock {
   background: rgba(250, 204, 21, .12);
   border-color: rgba(250, 204, 21, .48);
 }
+
+
+/* ============================================================
+   V1.3.30 — Labo live + évolutions isolées
+   ============================================================ */
+
+.live-demo-admin-box {
+  border-color: rgba(239, 68, 68, .24);
+  background:
+    radial-gradient(circle at 0 0, rgba(239, 68, 68, .12), transparent 44%),
+    rgba(15, 23, 42, .58);
+}
+
+.live-demo-notice {
+  border-color: rgba(239, 68, 68, .28);
+  background: rgba(239, 68, 68, .10);
+  color: #fecaca;
+}
+
+.quick-score-card .pill.danger {
+  background: rgba(239, 68, 68, .16);
+  color: #fecaca;
+  border-color: rgba(239, 68, 68, .32);
+}

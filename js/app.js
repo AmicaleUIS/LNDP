@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — APP PRINCIPALE V1.3.29
+// LE NID DES PRONOS — APP PRINCIPALE V1.3.30
 // ============================================================
 
 const H = window.Helpers;
@@ -431,7 +431,7 @@ const App = {
           <div>
             <p class="eyebrow">Crédits cachés</p>
             <h2 id="creditsTitle">Le Nid des Pronos</h2>
-            <p class="muted">Version publique <strong>1.3.29</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
+            <p class="muted">Version publique <strong>1.3.30</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
           </div>
         </div>
         <div class="credits-grid">
@@ -448,7 +448,7 @@ const App = {
             <p><strong>1.0.5</strong> — dashboard mobile/desktop stabilisé, sans chevauchement des cartes.</p>
           </section>
           <section>
-            <h3>Évolutions V1.3.29</h3>
+            <h3>Évolutions V1.3.30</h3>
             <ul class="changelog-list">
               <li>Le super admin peut désactiver ou réactiver l’affichage du module préparation.</li>
               <li>Quand la préparation est désactivée, les matchs test disparaissent des matchs/pronos, classements par phase et règles.</li>
@@ -721,7 +721,7 @@ const App = {
     const { data, error } = await window.sb
       .from("app_settings")
       .select("key,value")
-      .in("key", ["family_mode_enabled", "preparation_module_enabled", "graph_preview_test_matches_enabled", "graph_mock_preview_enabled", "home_progress_include_test_matches"]);
+      .in("key", ["family_mode_enabled", "preparation_module_enabled", "graph_preview_test_matches_enabled", "graph_mock_preview_enabled", "home_progress_include_test_matches", "live_demo_match_enabled"]);
 
     if (error) {
       console.warn("Paramètres app indisponibles", error);
@@ -776,9 +776,27 @@ const App = {
     return Boolean(value);
   },
 
+  liveDemoMatchEnabled() {
+    const value = this.state.appSettings?.live_demo_match_enabled;
+    if (value === undefined || value === null) return false;
+    if (typeof value === "boolean") return value;
+    if (typeof value === "string") return value === "true";
+    if (value && typeof value === "object" && "enabled" in value) return Boolean(value.enabled);
+    return Boolean(value);
+  },
+
+  isLiveDemoMatch(match = null) {
+    if (!match) return false;
+    return Number(match.api_match_id) === -133000
+      || String(match.test_match_label || "").toLowerCase().includes("labo live")
+      || String(match.test_match_label || "").toLowerCase().includes("live demo")
+      || String(match.group_name || "").toLowerCase().includes("labo live");
+  },
+
   homeProgressMatches() {
     return this.state.matches.filter((m) =>
-      !["cancelled", "postponed"].includes(m.status)
+      !this.isLiveDemoMatch(m)
+      && !["cancelled", "postponed"].includes(m.status)
       && (!m.is_test_match || this.homeProgressIncludeTestMatches())
     );
   },
@@ -788,9 +806,11 @@ const App = {
   },
 
   displayMatches() {
-    return this.preparationModuleEnabled()
-      ? this.state.matches
-      : this.state.matches.filter((match) => !match.is_test_match);
+    return this.state.matches.filter((match) => {
+      if (this.isLiveDemoMatch(match)) return this.preparationModuleEnabled() && this.liveDemoMatchEnabled();
+      if (!this.preparationModuleEnabled() && match.is_test_match) return false;
+      return true;
+    });
   },
 
   async loadMyFamilyInvites() {
@@ -1085,11 +1105,11 @@ const App = {
   },
 
   availablePredictionMatches() {
-    return this.state.matches.filter((m) => !m.is_test_match && !["cancelled", "postponed"].includes(m.status));
+    return this.state.matches.filter((m) => !this.isLiveDemoMatch(m) && !m.is_test_match && !["cancelled", "postponed"].includes(m.status));
   },
 
   preparationMatches() {
-    return this.state.matches.filter((m) => m.is_test_match);
+    return this.state.matches.filter((m) => m.is_test_match && !this.isLiveDemoMatch(m));
   },
 
   isPreparationMatch(matchOrId) {
@@ -1100,11 +1120,11 @@ const App = {
   },
 
   competitionMatches() {
-    return this.state.matches.filter((m) => !m.is_test_match);
+    return this.state.matches.filter((m) => !this.isLiveDemoMatch(m) && !m.is_test_match);
   },
 
   phaseLeaderboardMatches() {
-    return this.displayMatches().filter((m) => !["cancelled", "postponed"].includes(m.status));
+    return this.displayMatches().filter((m) => !this.isLiveDemoMatch(m) && !["cancelled", "postponed"].includes(m.status));
   },
 
   predictionRowsForUser(userId, options = {}) {
@@ -1245,6 +1265,7 @@ const App = {
       })
       .filter(({ prediction, match }) => match
         && match.status === "live"
+        && !this.isLiveDemoMatch(match)
         && prediction?.is_live_projection
         && (!idSet || idSet.has(String(match.id)))
         && (includeTest || !match.is_test_match)
@@ -1288,7 +1309,7 @@ const App = {
 
     const byUser = new Map();
 
-    this.state.publicProfiles.forEach((profile) => {
+    this.officialProfiles(this.state.publicProfiles).forEach((profile) => {
       const userId = profile.id || profile.user_id;
       if (!userId) return;
       byUser.set(String(userId), {
@@ -1761,7 +1782,7 @@ const App = {
           <span>vs</span>
           <strong>${H.matchFlagHtml(match, "away")} ${H.escapeHtml(match.away_team_name)}</strong>
         </div>
-        ${match.is_test_match ? `<p class="test-match-mini-label">MATCH TEST · hors classement Coupe du monde</p>` : ""}
+        ${this.isLiveDemoMatch(match) ? `<p class="test-match-mini-label">LABO LIVE · fictif · hors stats</p>` : match.is_test_match ? `<p class="test-match-mini-label">MATCH TEST · hors classement Coupe du monde</p>` : ""}
         <p class="muted mini-location-line">${H.matchLocationHtml(match, true)}</p>
         <p class="muted mini-tv-line">${H.formatDateTime(match.kickoff_at)} · ${H.tvChannelLogosHtml(this.matchTvChannel(match))}</p>
       </div>
@@ -2283,7 +2304,7 @@ const App = {
           <span class="match-tv-meta">${H.icon("tv")} ${H.tvChannelLogosHtml(this.matchTvChannel(match))}</span>
         </div>
 
-        ${match.is_test_match ? `<div class="test-match-notice">${H.icon("info")} Match de préparation : il sert à tester le site. Il ne compte pas dans le classement Coupe du monde ni dans les exploits normaux.</div>` : ""}
+        ${this.isLiveDemoMatch(match) ? `<div class="test-match-notice live-demo-notice">${H.icon("info")} Labo live fictif : tu peux tester le direct et les scores. Il ne compte dans aucun classement, aucune stat et aucun exploit. À retirer avant validation Coupe du monde.</div>` : match.is_test_match ? `<div class="test-match-notice">${H.icon("info")} Match de préparation : il sert à tester le site. Il ne compte pas dans le classement Coupe du monde ni dans les exploits normaux.</div>` : ""}
 
         <form class="prediction-form" data-match-id="${match.id}" data-final-phase="${isFinalPhase}">
           <div class="prediction-inputs">
@@ -3797,6 +3818,7 @@ const App = {
         return { prediction, match };
       })
       .filter(({ match, prediction }) => match
+        && !this.isLiveDemoMatch(match)
         && ["finished", "live"].includes(match.status)
         && prediction.points_total !== null
         && prediction.points_total !== undefined
@@ -4958,7 +4980,7 @@ const App = {
     }
 
     const byUser = new Map();
-    this.state.publicProfiles.forEach((profile) => {
+    this.officialProfiles(this.state.publicProfiles).forEach((profile) => {
       const userId = profile.id || profile.user_id;
       if (!userId) return;
       byUser.set(userId, {
@@ -4978,11 +5000,14 @@ const App = {
     });
     (data || []).forEach((row) => {
       if (!row.user_id) return;
+      const profile = this.profileForUser(row.user_id, row);
+      if (this.isFamily(profile)) return;
       byUser.set(row.user_id, { ...(byUser.get(row.user_id) || {}), ...row });
     });
 
     const matchIds = group.matches.map((m) => m.id);
-    const finishedCount = group.matches.filter((m) => m.status === "finished").length;
+    const finishedCount = group.matches.filter((m) => ["finished", "live"].includes(m.status)).length;
+    const liveProjectionCount = this.liveProjectionCountForMatchIds(matchIds);
     const rows = [...byUser.values()].map((player) => {
       const details = this.scoreDetailRowsForUser(player.user_id, { matchIds });
       const total = details.reduce((sum, { prediction }) => sum + Number(prediction.points_total || 0), 0);
@@ -5338,10 +5363,20 @@ const App = {
     });
   },
 
-  playerEvolutionSeries(mode = "day") {
+  playerEvolutionSeries(mode = "day", options = {}) {
+    const allowedOfficialIds = options.officialOnly === false
+      ? null
+      : new Set(this.officialProfiles(this.state.publicProfiles).map((profile) => String(profile.id || profile.user_id)));
     const finishedRows = this.state.visiblePredictions
       .map((prediction) => ({ prediction, match: this.state.matches.find((m) => m.id === prediction.match_id) }))
-      .filter(({ prediction, match }) => match?.status === "finished" && this.graphEvolutionCanUseMatch(match) && prediction.points_total !== null && prediction.points_total !== undefined)
+      .filter(({ prediction, match }) =>
+        match?.status === "finished"
+        && !this.isLiveDemoMatch(match)
+        && (!allowedOfficialIds || allowedOfficialIds.has(String(prediction.user_id)))
+        && this.graphEvolutionCanUseMatch(match)
+        && prediction.points_total !== null
+        && prediction.points_total !== undefined
+      )
       .sort((a, b) => new Date(a.match.kickoff_at || 0) - new Date(b.match.kickoff_at || 0));
 
     const periodKey = (date) => {
@@ -5519,7 +5554,7 @@ const App = {
     const allowedIds = this.familyProfileIds();
     const finishedRows = this.state.visiblePredictions
       .map((prediction) => ({ prediction, match: this.state.matches.find((m) => m.id === prediction.match_id) }))
-      .filter(({ prediction, match }) => allowedIds.has(String(prediction.user_id)) && match?.status === "finished" && this.graphEvolutionCanUseMatch(match) && prediction.points_total !== null && prediction.points_total !== undefined)
+      .filter(({ prediction, match }) => allowedIds.has(String(prediction.user_id)) && match?.status === "finished" && !this.isLiveDemoMatch(match) && this.graphEvolutionCanUseMatch(match) && prediction.points_total !== null && prediction.points_total !== undefined)
       .sort((a, b) => new Date(a.match.kickoff_at || 0) - new Date(b.match.kickoff_at || 0));
 
     const periodKey = (date) => {
@@ -5889,7 +5924,7 @@ const App = {
 
   teamEvolutionSeries(mode = "day", familyOnly = false, valueMode = "points") {
     const allowedFamilyIds = familyOnly ? this.familyProfileIds() : null;
-    const eligibleProfiles = (this.state.publicProfiles || [])
+    const eligibleProfiles = (familyOnly ? this.familyProfiles(this.state.publicProfiles) : this.officialProfiles(this.state.publicProfiles))
       .filter((profile) => profile.office_team_id)
       .filter((profile) => !familyOnly || allowedFamilyIds.has(String(profile.id || profile.user_id)));
 
@@ -5903,11 +5938,12 @@ const App = {
       .map((prediction) => ({ prediction, match: this.state.matches.find((m) => m.id === prediction.match_id), profile: this.profileForUser(prediction.user_id) }))
       .filter(({ prediction, match, profile }) =>
         match?.status === "finished"
+        && !this.isLiveDemoMatch(match)
         && this.graphEvolutionCanUseMatch(match)
         && prediction.points_total !== null
         && prediction.points_total !== undefined
         && profile.office_team_name
-        && (!familyOnly || allowedFamilyIds.has(String(prediction.user_id)))
+        && (familyOnly ? allowedFamilyIds.has(String(prediction.user_id)) : !this.isFamily(profile))
       )
       .sort((a, b) => new Date(a.match.kickoff_at || 0) - new Date(b.match.kickoff_at || 0));
 
@@ -7859,7 +7895,7 @@ const App = {
           </div>
           <div class="profile-account-actions">
             <button class="ghost-btn" id="profileInstallAppBtn" type="button">Installer l’app</button>
-            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.3.29</button>
+            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.3.30</button>
             <button class="danger-btn" id="profileLogoutBtn" type="button">Déconnexion</button>
           </div>
         </div>

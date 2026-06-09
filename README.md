@@ -1,4 +1,14 @@
-# Le Nid des Pronos — V1.3.29
+# Le Nid des Pronos — V1.3.30
+
+## V1.3.30 — Labo live + classements propres
+
+- Ajout d’un match fictif “Labo live” activable/désactivable depuis Admin > Sauvegardes > Préparation & prévisualisations.
+- Le match fictif sert à tester le direct, les scores et l’affichage live.
+- Il est exclu de tous les classements, stats, progressions, graphiques et exploits.
+- Le bouton admin “Retirer le match fictif live” supprime le match et ses éventuels pronos/points de test.
+- Correction du classement joueur par phase qui pouvait ne plus s’afficher.
+- Les évolutions sont isolées par univers : joueur officiel sans Famille, teams bureau sans Famille, Famille seulement dans les onglets Famille.
+- Patch SQL obligatoire : `patch_v1_3_30_labo_live_match.sql`.
 
 ## V1.3.29 — Hotfix match live accueil
 
