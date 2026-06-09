@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Admin — Le Nid des Pronos</title>
   <meta name="theme-color" content="#07111f">
-  <link rel="manifest" href="manifest.json?v=1.3.38">
+  <link rel="manifest" href="manifest.json?v=1.3.39">
   <link rel="icon" href="assets/icons/icon-192.png">
   <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png">
-  <link rel="stylesheet" href="css/style.css?v=1.3.38">
+  <link rel="stylesheet" href="css/style.css?v=1.3.39">
 </head>
 <body>
   <div class="admin-shell">
@@ -64,7 +64,7 @@
     <main class="admin-main-area">
       <header class="admin-header admin-page-header">
         <div>
-          <p class="eyebrow">Administration · v1.3.38</p>
+          <p class="eyebrow">Administration · v1.3.39</p>
           <h1 id="adminPageTitle"><img class="owl-icon title-icon" src="assets/icons/owl-png/admin.png" alt="" aria-hidden="true" loading="lazy"> Saisie rapide des scores</h1>
           <p class="muted" id="adminPageSubtitle">Prochains matchs en haut, scores manuels, classement recalculé automatiquement.</p>
         </div>
@@ -188,6 +188,19 @@
               <p class="muted tiny-note">Désactiver masque les matchs test, les règles et les classements liés. Les 2 badges préparation restent dans les exploits. La prévisualisation graphs ne sert qu’à vérifier l’affichage avant le premier match officiel.</p>
             </section>
 
+            <section class="backup-box clean-start-box">
+              <p class="backup-box-kicker">Départ compétition</p>
+              <h3>Remettre les classements à zéro</h3>
+              <p class="real-pronos-warning">✅ À utiliser maintenant : les pronos déjà posés sont conservés.</p>
+              <p class="muted">Supprime les points et les scores de test/labo, remet les matchs à venir, coupe le labo et les prévisualisations, mais ne supprime pas les pronostics joueurs ni les choix champion.</p>
+              <label>
+                Tape exactement <strong>DEPART PROPRE</strong>
+                <input id="cleanStartConfirmInput" type="text" placeholder="DEPART PROPRE" autocomplete="off">
+              </label>
+              <button class="primary-btn" id="cleanStartPreservePredictionsBtn" type="button">Reset classements — garder les pronos</button>
+              <p class="muted tiny-note">Après ce reset, l’accueil ne montrera plus de 1er joueur/1re team tant qu’aucun vrai point n’est marqué.</p>
+            </section>
+
             <section class="backup-box danger-zone launch-reset-box">
               <p class="backup-box-kicker danger-kicker">Zone danger</p>
               <h3>Reset lancement complet</h3>
@@ -293,10 +306,10 @@
   </button>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="js/config.js?v=1.3.38"></script>
-  <script src="js/supabaseClient.js?v=1.3.38"></script>
-  <script src="js/auth.js?v=1.3.38"></script>
-  <script src="js/common.js?v=1.3.38"></script>
-  <script src="js/admin.js?v=1.3.38"></script>
+  <script src="js/config.js?v=1.3.39"></script>
+  <script src="js/supabaseClient.js?v=1.3.39"></script>
+  <script src="js/auth.js?v=1.3.39"></script>
+  <script src="js/common.js?v=1.3.39"></script>
+  <script src="js/admin.js?v=1.3.39"></script>
 </body>
 </html>

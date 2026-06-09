@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — APP PRINCIPALE V1.3.38
+// LE NID DES PRONOS — APP PRINCIPALE V1.3.39
 // ============================================================
 
 const H = window.Helpers;
@@ -463,7 +463,7 @@ const App = {
           <div>
             <p class="eyebrow">Crédits cachés</p>
             <h2 id="creditsTitle">Le Nid des Pronos</h2>
-            <p class="muted">Version publique <strong>1.3.38</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
+            <p class="muted">Version publique <strong>1.3.39</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
           </div>
         </div>
         <div class="credits-grid">
@@ -480,7 +480,7 @@ const App = {
             <p><strong>1.0.5</strong> — dashboard mobile/desktop stabilisé, sans chevauchement des cartes.</p>
           </section>
           <section>
-            <h3>Évolutions V1.3.38</h3>
+            <h3>Évolutions V1.3.39</h3>
             <ul class="changelog-list">
               <li>Le super admin peut désactiver ou réactiver l’affichage du module préparation.</li>
               <li>Quand la préparation est désactivée, les matchs test disparaissent des matchs/pronos, classements par phase et règles.</li>
@@ -3092,13 +3092,31 @@ const App = {
   },
 
 
+
+  hasLeaderboardScoreActivity(leaderboardRows = this.state.playerScoreRows, teamRows = this.overallTeamAverageRows()) {
+    const playerHasPoints = (leaderboardRows || []).some((row) =>
+      Number(row.total_points || 0) > 0
+      || Number(row.live_points || 0) > 0
+      || Number(row.exact_scores || 0) > 0
+      || Number(row.good_results || 0) > 0
+      || Number(row.good_goal_diffs || 0) > 0
+    );
+    const teamHasPoints = (teamRows || []).some((row) =>
+      Number(row.total_points || 0) > 0
+      || Number(row.average_points || 0) > 0
+      || Number(row.live_points || 0) > 0
+    );
+    return playerHasPoints || teamHasPoints;
+  },
+
   homeStoryHighlights(recordHighlights = [], leaderboardRows = [], teamRows = []) {
     const slides = [];
     const profileName = (profile) => profile?.pseudo || "Le Nid";
     const teamName = (profile) => profile?.office_team_name || "Sans team";
 
+    const leaderboardHasActivity = this.hasLeaderboardScoreActivity(leaderboardRows, teamRows);
     const leaderPlayerRow = (leaderboardRows || [])[0];
-    if (leaderPlayerRow) {
+    if (leaderboardHasActivity && leaderPlayerRow && (Number(leaderPlayerRow.total_points || 0) > 0 || Number(leaderPlayerRow.live_points || 0) > 0)) {
       const leaderProfile = this.profileForUser(leaderPlayerRow.user_id || leaderPlayerRow.id, leaderPlayerRow);
       slides.push({
         kind: "story",
@@ -3117,7 +3135,7 @@ const App = {
     }
 
     const leaderTeamRow = (teamRows || [])[0];
-    if (leaderTeamRow) {
+    if (leaderboardHasActivity && leaderTeamRow && (Number(leaderTeamRow.total_points || 0) > 0 || Number(leaderTeamRow.average_points || 0) > 0 || Number(leaderTeamRow.live_points || 0) > 0)) {
       slides.push({
         kind: "story",
         theme: "team-leader",
@@ -3305,12 +3323,15 @@ const App = {
   },
 
   homeRecordCarouselHtml(leaderboardRows = this.state.playerScoreRows, teamRows = this.overallTeamAverageRows()) {
-    const rows = this.achievementRecordRows();
-    const recordHighlights = this.achievementRecordDefinitions()
-      .map((record) => this.recordWinner(record, rows))
-      .filter((item) => item.best && item.bestProfile);
+    const hasActivity = this.hasLeaderboardScoreActivity(leaderboardRows, teamRows);
+    const rows = hasActivity ? this.achievementRecordRows() : [];
+    const recordHighlights = hasActivity
+      ? this.achievementRecordDefinitions()
+        .map((record) => this.recordWinner(record, rows))
+        .filter((item) => item.best && item.bestProfile)
+      : [];
 
-    const highlights = this.homeStoryHighlights(recordHighlights, leaderboardRows, teamRows);
+    const highlights = hasActivity ? this.homeStoryHighlights(recordHighlights, leaderboardRows, teamRows) : [];
 
     if (!highlights.length) {
       return `
@@ -3319,7 +3340,7 @@ const App = {
             <div>
               <p class="eyebrow">${H.icon("badges")} Actus du nid</p>
               <h3>Le tableau des petits exploits arrive</h3>
-              <p class="muted">Dès que les premiers matchs seront comptabilisés, les records, casseroles et hiboux en feu défileront ici.</p>
+              <p class="muted">Dès que les premiers points seront comptabilisés, les records, casseroles et hiboux en feu défileront ici.</p>
             </div>
           </div>
         </section>
@@ -7962,7 +7983,7 @@ const App = {
           </div>
           <div class="profile-account-actions">
             <button class="ghost-btn" id="profileInstallAppBtn" type="button">Installer l’app</button>
-            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.3.38</button>
+            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.3.39</button>
             <button class="danger-btn" id="profileLogoutBtn" type="button">Déconnexion</button>
           </div>
         </div>

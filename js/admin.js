@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — ADMIN V1.3.38
+// LE NID DES PRONOS — ADMIN V1.3.39
 // ============================================================
 
 const H = window.Helpers;
@@ -81,7 +81,7 @@ const Admin = {
       p_category: category,
       p_details: details || {},
       p_metadata: {
-        app_version: "1.3.38",
+        app_version: "1.3.39",
         source: "admin_front"
       }
     });
@@ -153,6 +153,7 @@ const Admin = {
     H.$("#toggleLiveDemoMatchBtn")?.addEventListener("click", () => this.toggleLiveDemoMatch());
     this.ensureLiveDemoControls();
     H.$("#fullLaunchResetBtn")?.addEventListener("click", () => this.fullLaunchReset());
+    H.$("#cleanStartPreservePredictionsBtn")?.addEventListener("click", () => this.cleanStartPreservePredictions());
     H.$("#refreshHealthBtn")?.addEventListener("click", async () => { await this.loadHealthSnapshot(); this.renderHealth(); });
     H.$("#refreshAuditBtn")?.addEventListener("click", async () => { await this.loadAuditLogs(); this.renderAudit(); });
 
@@ -2423,6 +2424,33 @@ const Admin = {
     await this.reloadAll();
   },
 
+
+
+  async cleanStartPreservePredictions() {
+    const typed = H.$("#cleanStartConfirmInput")?.value || "";
+    if (typed !== "DEPART PROPRE") {
+      H.toast("Tape exactement : DEPART PROPRE", "error");
+      return;
+    }
+
+    const first = confirm("Reset départ compétition : garder les pronostics déjà posés, mais remettre à zéro points, classements, scores/statuts, leaders accueil et labo. Continuer ?");
+    if (!first) return;
+
+    const second = confirm("Dernière sécurité : les pronos restent, mais les points actuels et scores de test seront effacés. Continuer ?");
+    if (!second) return;
+
+    const { data, error } = await window.sb.rpc("admin_clean_start_preserve_predictions", { p_confirm: "DEPART PROPRE" });
+    if (error) {
+      H.toast(error.message || "Reset classements impossible. Lance le patch SQL V1.3.39.", "error");
+      return;
+    }
+
+    const summary = Array.isArray(data) ? data[0] : data;
+    H.$("#cleanStartConfirmInput").value = "";
+    await this.logAdminAction("clean_start_preserve_predictions", "reset", summary || {});
+    H.toast(summary?.message || "Classements remis à zéro, pronos conservés", "success");
+    await this.reloadAll();
+  },
 
   async fullLaunchReset() {
     const typed = H.$("#launchResetConfirmInput")?.value || "";

@@ -1,4 +1,13 @@
-# Le Nid des Pronos — V1.3.38
+# Le Nid des Pronos — V1.3.39
+
+## V1.3.39 — Départ compétition propre
+
+- Ajout d’un reset spécial “Départ compétition” dans Admin > Sauvegardes.
+- Ce reset remet à zéro les points, classements, scores/statuts et leaders d’accueil, sans supprimer les pronostics joueurs ni les choix champion.
+- Le match labo et ses pronos sont supprimés.
+- Les modules de test/prévisualisation sont coupés : préparation, graph test, graph mock, progression test, labo live.
+- L’accueil n’affiche plus “1er du classement”, “1re équipe” ou mini-records tant qu’aucun vrai point n’est marqué.
+- Patch SQL obligatoire : `patch_v1_3_39_clean_start_preserve_predictions.sql`.
 
 ## V1.3.38 — Exploits uniquement après match terminé
 
