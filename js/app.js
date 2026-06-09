@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — APP PRINCIPALE V1.3.28
+// LE NID DES PRONOS — APP PRINCIPALE V1.3.29
 // ============================================================
 
 const H = window.Helpers;
@@ -431,7 +431,7 @@ const App = {
           <div>
             <p class="eyebrow">Crédits cachés</p>
             <h2 id="creditsTitle">Le Nid des Pronos</h2>
-            <p class="muted">Version publique <strong>1.3.28</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
+            <p class="muted">Version publique <strong>1.3.29</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
           </div>
         </div>
         <div class="credits-grid">
@@ -448,7 +448,7 @@ const App = {
             <p><strong>1.0.5</strong> — dashboard mobile/desktop stabilisé, sans chevauchement des cartes.</p>
           </section>
           <section>
-            <h3>Évolutions V1.3.28</h3>
+            <h3>Évolutions V1.3.29</h3>
             <ul class="changelog-list">
               <li>Le super admin peut désactiver ou réactiver l’affichage du module préparation.</li>
               <li>Quand la préparation est désactivée, les matchs test disparaissent des matchs/pronos, classements par phase et règles.</li>
@@ -1492,7 +1492,6 @@ const App = {
             </div>
             <div class="home-hero-actions">
               <button class="ghost-btn rules-home-btn" id="rulesHomeBtn" type="button">${H.icon("list")} Règles & points</button>
-              <button class="ghost-btn home-see-predictions-btn" id="homeSeePredictionsBtn" type="button">${H.icon("score")} Voir les pronos du Nid</button>
             </div>
           </div>
         </section>
@@ -1549,7 +1548,6 @@ const App = {
     `;
 
     H.$("#rulesHomeBtn")?.addEventListener("click", () => this.openRulesModal());
-    H.$("#homeSeePredictionsBtn")?.addEventListener("click", async () => this.goToVisiblePredictionsFromHome());
     H.$('[data-action="continue-predictions"]', root)?.addEventListener("click", async () => {
       if (missing.length) {
         await this.goToNearestMissingPrediction();
@@ -1793,6 +1791,9 @@ const App = {
             <strong>${H.scoreText(match?.home_score ?? 0, match?.away_score ?? 0)}</strong>
             <span>Match en cours</span>
           </div>
+          <button class="ghost-btn home-live-predictions-btn" type="button" data-home-live-predictions-id="${H.escapeHtml(match?.id || "")}">
+            ${H.icon("score")} Voir les pronos du Nid
+          </button>
         </article>
       `;
     }
@@ -1818,6 +1819,9 @@ const App = {
           ${livePoints !== null && !match.is_test_match ? `<b>${livePoints} pt${livePoints > 1 ? "s" : ""} live</b>` : ""}
           ${match.is_test_match ? `<b>Match test</b>` : ""}
         </div>
+        <button class="ghost-btn home-live-predictions-btn" type="button" data-home-live-predictions-id="${H.escapeHtml(match.id)}">
+          ${H.icon("score")} Voir les pronos du Nid
+        </button>
       </article>
     `;
   },
@@ -1855,6 +1859,7 @@ const App = {
       return;
     }
 
+    const matchIds = group.matches.map((match) => match.id);
     const finishedCount = group.matches.filter((m) => ["finished", "live"].includes(m.status)).length;
     const liveProjectionCount = this.liveProjectionCountForMatchIds(matchIds);
     const pager = this.phaseNavigatorHtml(groups, activeIndex, "matchPhaseIndex");
@@ -1921,6 +1926,13 @@ const App = {
 
 
   bindHomeClickableCards(root = document) {
+    H.$$("[data-home-live-predictions-id]", root).forEach((button) => {
+      button.addEventListener("click", async (event) => {
+        event.stopPropagation();
+        await this.goToMatchPrediction(button.dataset.homeLivePredictionsId, { openPredictions: true });
+      });
+    });
+
     H.$$("[data-home-live-match-id]", root).forEach((card) => {
       card.addEventListener("click", () => this.goToMatchPrediction(card.dataset.homeLiveMatchId));
       card.addEventListener("keydown", (event) => {
@@ -7847,7 +7859,7 @@ const App = {
           </div>
           <div class="profile-account-actions">
             <button class="ghost-btn" id="profileInstallAppBtn" type="button">Installer l’app</button>
-            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.3.28</button>
+            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.3.29</button>
             <button class="danger-btn" id="profileLogoutBtn" type="button">Déconnexion</button>
           </div>
         </div>

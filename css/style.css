@@ -17037,3 +17037,22 @@ body.forced-password-lock {
     grid-template-columns: 1fr;
   }
 }
+
+
+/* ============================================================
+   V1.3.29 — Hotfix bouton pronos live accueil
+   ============================================================ */
+
+.home-live-predictions-btn {
+  width: 100%;
+  margin-top: 10px;
+  justify-content: center;
+  border-color: rgba(250, 204, 21, .28);
+  color: #facc15;
+}
+
+.home-live-predictions-btn:hover,
+.home-live-predictions-btn:focus-visible {
+  background: rgba(250, 204, 21, .12);
+  border-color: rgba(250, 204, 21, .48);
+}

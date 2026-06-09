@@ -1,4 +1,12 @@
-# Le Nid des Pronos — V1.3.28
+# Le Nid des Pronos — V1.3.29
+
+## V1.3.29 — Hotfix match live accueil
+
+- Le bouton “Voir les pronos du Nid” n’apparaît plus dans le bloc principal de l’accueil.
+- Il apparaît uniquement sur les fiches de matchs en direct.
+- Le clic ouvre l’onglet Matchs, centre le bon match et ouvre la zone des pronos visibles quand elle existe.
+- Corrige l’erreur `ReferenceError: matchIds is not defined` dans l’onglet Matchs.
+- Aucun patch SQL obligatoire.
 
 ## V1.3.28 — Tous les classements live
 
