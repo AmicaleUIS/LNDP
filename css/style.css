@@ -17292,3 +17292,12 @@ body[data-current-view] {
   color: #bbf7d0;
   background: rgba(34, 197, 94, .12);
 }
+
+
+/* ============================================================
+   V1.3.42 — Perchoir complet toutes les 5 secondes
+   ============================================================ */
+
+.home-record-carousel-card .compact-title-row .muted {
+  max-width: 780px;
+}

@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — APP PRINCIPALE V1.3.41
+// LE NID DES PRONOS — APP PRINCIPALE V1.3.42
 // ============================================================
 
 const H = window.Helpers;
@@ -464,7 +464,7 @@ const App = {
           <div>
             <p class="eyebrow">Crédits cachés</p>
             <h2 id="creditsTitle">Le Nid des Pronos</h2>
-            <p class="muted">Version publique <strong>1.3.41</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
+            <p class="muted">Version publique <strong>1.3.42</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
           </div>
         </div>
         <div class="credits-grid">
@@ -481,7 +481,7 @@ const App = {
             <p><strong>1.0.5</strong> — dashboard mobile/desktop stabilisé, sans chevauchement des cartes.</p>
           </section>
           <section>
-            <h3>Évolutions V1.3.41</h3>
+            <h3>Évolutions V1.3.42</h3>
             <ul class="changelog-list">
               <li>Le super admin peut désactiver ou réactiver l’affichage du module préparation.</li>
               <li>Quand la préparation est désactivée, les matchs test disparaissent des matchs/pronos, classements par phase et règles.</li>
@@ -3293,11 +3293,10 @@ const App = {
       });
     }
 
-    // On complète avec des records vivants pour garder l’esprit mini-record.
-    const remainingSlots = Math.max(0, 6 - slides.length);
-    recordHighlights.slice(0, remainingSlots).forEach((item) => slides.push({ kind: "record", ...item }));
+    // On ajoute tous les records du Hall qui ont déjà des données.
+    recordHighlights.forEach((item) => slides.push({ kind: "record", ...item }));
 
-    return slides.slice(0, 6);
+    return slides;
   },
 
   homeStorySlideHtml(item, index) {
@@ -3371,7 +3370,7 @@ const App = {
           <div>
             <p class="eyebrow">${H.icon("badges")} Actus du nid</p>
             <h3>Les chouettes qui font parler le perchoir</h3>
-            <p class="muted">Records uniques, forme du moment, casseroles et coups parfaits défilent ici toutes les 10 secondes.</p>
+            <p class="muted">Records uniques, forme du moment, casseroles et coups parfaits défilent ici toutes les 5 secondes.</p>
           </div>
           <button class="ghost-btn" id="homeRecordsBtn" type="button">Voir les records</button>
         </div>
@@ -3407,7 +3406,7 @@ const App = {
     });
 
     if (slides.length > 1) {
-      this.state.homeRecordCarouselTimer = window.setInterval(() => show(index + 1), 10000);
+      this.state.homeRecordCarouselTimer = window.setInterval(() => show(index + 1), 5000);
     }
   },
 
@@ -8031,7 +8030,7 @@ const App = {
           </div>
           <div class="profile-account-actions">
             <button class="ghost-btn" id="profileInstallAppBtn" type="button">Installer l’app</button>
-            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.3.41</button>
+            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.3.42</button>
             <button class="danger-btn" id="profileLogoutBtn" type="button">Déconnexion</button>
           </div>
         </div>

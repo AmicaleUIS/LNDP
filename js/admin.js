@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — ADMIN V1.3.41
+// LE NID DES PRONOS — ADMIN V1.3.42
 // ============================================================
 
 const H = window.Helpers;
@@ -82,7 +82,7 @@ const Admin = {
       p_category: category,
       p_details: details || {},
       p_metadata: {
-        app_version: "1.3.41",
+        app_version: "1.3.42",
         source: "admin_front"
       }
     });

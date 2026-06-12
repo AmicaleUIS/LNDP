@@ -1,4 +1,12 @@
-# Le Nid des Pronos — V1.3.41
+# Le Nid des Pronos — V1.3.42
+
+## V1.3.42 — Perchoir complet sur l’accueil
+
+- Le carrousel d’accueil “Les chouettes qui font parler le perchoir” inclut maintenant tous les records du Hall qui ont des données.
+- Il n’est plus limité à 6 cartes.
+- Le défilement passe de 10 secondes à 5 secondes.
+- Les leaders live restent affichables en plus quand ils sont pertinents.
+- Aucun patch SQL obligatoire.
 
 ## V1.3.41 — Badges souvenir manuels
 
