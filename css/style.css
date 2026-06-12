@@ -17301,3 +17301,49 @@ body[data-current-view] {
 .home-record-carousel-card .compact-title-row .muted {
   max-width: 780px;
 }
+
+
+/* ============================================================
+   V1.3.43 — Hotfix onglets classement/toggle famille
+   ============================================================ */
+
+.leaderboard-inner-title {
+  min-height: 1px;
+}
+
+
+
+
+/* ============================================================
+   V1.3.45 — Accueil stories cohérentes
+   ============================================================ */
+
+.home-story-slide.story-casserole,
+.home-story-slide.story-hot,
+.home-story-slide.story-perfect,
+.home-story-slide.story-gold {
+  display: grid;
+}
+
+.home-story-slide.story-casserole .home-record-label {
+  color: #fb923c;
+}
+
+.home-story-slide.story-hot .home-record-label {
+  color: #fde047;
+}
+
+
+/* ============================================================
+   V1.3.46 — Prono visible immédiatement après sauvegarde
+   ============================================================ */
+
+.match-card.prediction-saved-pulse {
+  animation: predictionSavedPulse .75s ease;
+}
+
+@keyframes predictionSavedPulse {
+  0% { box-shadow: 0 0 0 rgba(250, 204, 21, 0); }
+  38% { box-shadow: 0 0 0 4px rgba(250, 204, 21, .22), 0 18px 50px rgba(250, 204, 21, .10); }
+  100% { box-shadow: 0 0 0 rgba(250, 204, 21, 0); }
+}

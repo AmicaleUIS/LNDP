@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — APP PRINCIPALE V1.3.42
+// LE NID DES PRONOS — APP PRINCIPALE V1.3.46
 // ============================================================
 
 const H = window.Helpers;
@@ -464,7 +464,7 @@ const App = {
           <div>
             <p class="eyebrow">Crédits cachés</p>
             <h2 id="creditsTitle">Le Nid des Pronos</h2>
-            <p class="muted">Version publique <strong>1.3.42</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
+            <p class="muted">Version publique <strong>1.3.46</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
           </div>
         </div>
         <div class="credits-grid">
@@ -481,7 +481,7 @@ const App = {
             <p><strong>1.0.5</strong> — dashboard mobile/desktop stabilisé, sans chevauchement des cartes.</p>
           </section>
           <section>
-            <h3>Évolutions V1.3.42</h3>
+            <h3>Évolutions V1.3.46</h3>
             <ul class="changelog-list">
               <li>Le super admin peut désactiver ou réactiver l’affichage du module préparation.</li>
               <li>Quand la préparation est désactivée, les matchs test disparaissent des matchs/pronos, classements par phase et règles.</li>
@@ -2404,7 +2404,7 @@ const App = {
             ${locked ? `<span class="locked-label">${H.icon("lock")} Prono verrouillé</span>` : ``}
             ${myPrediction ? this.myPredictionInlineHtml(myPrediction) : `<span class="muted">Aucun prono posé</span>`}
           </div>
-          ${this.myPredictionResultHtml(match, myPrediction)}
+          <div class="my-prono-result-slot">${this.myPredictionResultHtml(match, myPrediction)}</div>
         </form>
 
         <details class="others-predictions" ${canSeeOthers ? "" : "hidden"}>
@@ -2426,6 +2426,56 @@ const App = {
         </details>
       </article>
     `;
+  },
+
+
+  upsertLocalPrediction(savedPrediction = {}) {
+    if (!savedPrediction?.match_id) return;
+    const userId = savedPrediction.user_id || this.state.session?.user?.id;
+    const normalized = {
+      ...savedPrediction,
+      user_id: userId,
+      pseudo: this.state.profile?.pseudo,
+      office_team_name: this.state.profile?.office_team_name
+    };
+
+    const mergeInto = (rows = []) => {
+      const index = rows.findIndex((row) =>
+        String(row.match_id) === String(normalized.match_id)
+        && String(row.user_id) === String(userId)
+      );
+      if (index >= 0) {
+        rows[index] = { ...rows[index], ...normalized };
+        return rows;
+      }
+      return [...rows, normalized];
+    };
+
+    this.state.myPredictions = mergeInto(this.state.myPredictions);
+    this.state.visiblePredictions = mergeInto(this.state.visiblePredictions);
+  },
+
+  refreshPredictionFormDisplay(form, savedPrediction = {}) {
+    if (!form || !savedPrediction?.match_id) return;
+    const match = this.state.matches.find((item) => String(item.id) === String(savedPrediction.match_id));
+    const prediction = this.getMyPrediction(savedPrediction.match_id) || savedPrediction;
+    const actions = form.querySelector(".prediction-actions");
+    if (actions) {
+      const locked = match ? H.isKickoffPassed(match.kickoff_at) : false;
+      actions.innerHTML = `
+        ${locked ? `<span class="locked-label">${H.icon("lock")} Prono verrouillé</span>` : ``}
+        ${this.myPredictionInlineHtml(prediction)}
+      `;
+    }
+
+    const resultSlot = form.querySelector(".my-prono-result-slot");
+    if (resultSlot && match) {
+      resultSlot.innerHTML = this.myPredictionResultHtml(match, prediction);
+    }
+
+    const article = form.closest(".match-card");
+    if (article) article.classList.add("prediction-saved-pulse");
+    window.setTimeout(() => article?.classList.remove("prediction-saved-pulse"), 900);
   },
 
   bindPredictionForms() {
@@ -2561,13 +2611,20 @@ const App = {
       return;
     }
 
+    this.upsertLocalPrediction(payload);
+    this.refreshPredictionFormDisplay(form, payload);
+
     await this.loadMyPredictions();
+    this.upsertLocalPrediction(payload);
+    this.refreshPredictionFormDisplay(form, payload);
     await this.loadMiniRecordPredictionCounts().catch((refreshError) => {
       console.warn("Impossible de rafraîchir les compteurs mini-records", refreshError);
     });
     await this.loadVisiblePredictions().catch((refreshError) => {
       console.warn("Impossible de rafraîchir les pronos visibles avant l’annonce d’exploit", refreshError);
     });
+    this.upsertLocalPrediction(payload);
+    this.refreshPredictionFormDisplay(form, payload);
     this.queueAchievementDiffFromSnapshot(achievementIdsBeforeSave);
     this.syncAchievementNotifications();
     this.scheduleAchievementResync([120, 700, 1800]);
@@ -2582,8 +2639,12 @@ const App = {
     }
 
     this.setPredictionAutoSaveStatus(form, source === "auto" ? "Enregistré automatiquement" : "Enregistré", "success");
+    this.refreshPredictionFormDisplay(form, payload);
     if (!silent) H.toast("Prono enregistré", "success");
-    if (reloadView) await this.loadView(this.state.currentView);
+    if (reloadView) {
+      if (this.state.currentView === "matches") await this.renderMatches();
+      else await this.loadView(this.state.currentView);
+    }
     this.syncAchievementNotifications();
     this.scheduleAchievementResync([300, 1200, 3500]);
   },
@@ -2956,9 +3017,15 @@ const App = {
       ? this.state.playerScoreRows
       : this.state.publicProfiles.map((profile) => ({ ...profile, user_id: profile.id }));
 
+    const officialIds = this.officialUserIdSetForHome();
+
     return source
-      .filter((row) => (row.player_scope || row.role || "uis") !== "family" && row.role !== "family")
       .filter((row) => row.user_id || row.id)
+      .filter((row) => {
+        const userId = String(row.user_id || row.id);
+        if (officialIds.size && !officialIds.has(userId)) return false;
+        return (row.player_scope || row.role || "uis") !== "family" && row.role !== "family";
+      })
       .map((row) => {
         const userId = row.user_id || row.id;
         return { row, userId, stats: this.playerRecordStats(userId) };
@@ -3110,6 +3177,37 @@ const App = {
 
 
 
+
+  officialUserIdSetForHome() {
+    return new Set(this.officialProfiles(this.state.publicProfiles)
+      .map((profile) => String(profile.id || profile.user_id))
+      .filter(Boolean));
+  },
+
+  filterOfficialRowsForHome(rows = []) {
+    const officialIds = this.officialUserIdSetForHome();
+    if (!officialIds.size) return [];
+    return (rows || []).filter((row) => officialIds.has(String(row.user_id || row.id)));
+  },
+
+
+  homeStoryEligibleUserIds() {
+    // Le perchoir d’accueil reste dans le classement normal : pas de joueurs Famille
+    // tant que l’espace Famille n’est pas explicitement séparé dans sa propre vue.
+    return this.officialUserIdSetForHome();
+  },
+
+  isOppositeResultPrediction(prediction, match) {
+    const pred = this.outcomeFromScores(Number(prediction.home_score_pred), Number(prediction.away_score_pred));
+    const real = this.outcomeFromScores(Number(match.home_score), Number(match.away_score));
+    return (pred === "home" && real === "away") || (pred === "away" && real === "home");
+  },
+
+  scoreMissDistance(prediction, match) {
+    return Math.abs(Number(prediction.home_score_pred) - Number(match.home_score))
+      + Math.abs(Number(prediction.away_score_pred) - Number(match.away_score));
+  },
+
   hasLeaderboardScoreActivity(leaderboardRows = this.state.playerScoreRows, teamRows = this.overallTeamAverageRows()) {
     const playerHasPoints = (leaderboardRows || []).some((row) =>
       Number(row.total_points || 0) > 0
@@ -3128,27 +3226,32 @@ const App = {
 
   homeStoryHighlights(recordHighlights = [], leaderboardRows = [], teamRows = []) {
     const slides = [];
-    const profileName = (profile) => profile?.pseudo || "Le Nid";
+    const eligibleIds = this.homeStoryEligibleUserIds();
+    const officialRows = this.filterOfficialRowsForHome(leaderboardRows);
+    const profileName = (profile) => profile?.pseudo || "";
     const teamName = (profile) => profile?.office_team_name || "Sans team";
+    const profileIsUsable = (profile) => Boolean(profile?.pseudo && profile.pseudo !== "Joueur");
 
-    const leaderboardHasActivity = this.hasLeaderboardScoreActivity(leaderboardRows, teamRows);
-    const leaderPlayerRow = (leaderboardRows || [])[0];
+    const leaderboardHasActivity = this.hasLeaderboardScoreActivity(officialRows, teamRows);
+    const leaderPlayerRow = (officialRows || [])[0];
     if (leaderboardHasActivity && leaderPlayerRow && (Number(leaderPlayerRow.total_points || 0) > 0 || Number(leaderPlayerRow.live_points || 0) > 0)) {
       const leaderProfile = this.profileForUser(leaderPlayerRow.user_id || leaderPlayerRow.id, leaderPlayerRow);
-      slides.push({
-        kind: "story",
-        theme: "leader",
-        label: "1er du classement",
-        title: profileName(leaderProfile),
-        subtitle: teamName(leaderProfile),
-        value: `${Number(leaderPlayerRow.total_points || 0)} pts`,
-        detail: leaderPlayerRow.live_points ? `+${Number(leaderPlayerRow.live_points || 0)} pt${Number(leaderPlayerRow.live_points || 0) > 1 ? "s" : ""} live` : "Classement général",
-        date: null,
-        dateLabel: "Classement actuel",
-        icon: "trophy",
-        profile: leaderProfile,
-        teamColor: this.teamColorForProfile(leaderProfile)
-      });
+      if (profileIsUsable(leaderProfile)) {
+        slides.push({
+          kind: "story",
+          theme: "leader",
+          label: "1er du classement",
+          title: profileName(leaderProfile),
+          subtitle: teamName(leaderProfile),
+          value: `${Number(leaderPlayerRow.total_points || 0)} pts`,
+          detail: leaderPlayerRow.live_points ? `+${Number(leaderPlayerRow.live_points || 0)} pt${Number(leaderPlayerRow.live_points || 0) > 1 ? "s" : ""} live` : "Classement général",
+          date: null,
+          dateLabel: "Classement actuel",
+          icon: "trophy",
+          profile: leaderProfile,
+          teamColor: this.teamColorForProfile(leaderProfile)
+        });
+      }
     }
 
     const leaderTeamRow = (teamRows || [])[0];
@@ -3168,6 +3271,7 @@ const App = {
         teamColor: leaderTeamRow.office_team_color || "#facc15"
       });
     }
+
     const finishedMatches = this.state.matches
       .filter((match) => match.status === "finished" && !match.is_test_match)
       .sort((a, b) => new Date(b.kickoff_at || 0) - new Date(a.kickoff_at || 0));
@@ -3176,11 +3280,12 @@ const App = {
       .map((prediction) => ({ prediction, match: this.state.matches.find((match) => match.id === prediction.match_id) }))
       .filter(({ prediction, match }) => match?.status === "finished"
         && !match.is_test_match
+        && eligibleIds.has(String(prediction.user_id))
         && prediction.points_total !== null
         && prediction.points_total !== undefined
       );
 
-    // 1) Forme du moment : meilleur score sur les 5 derniers matchs officiels terminés.
+    // Hibou en feu : meilleur joueur officiel sur les 5 derniers matchs terminés.
     const lastFiveMatchIds = new Set(finishedMatches.slice(0, 5).map((match) => match.id));
     if (lastFiveMatchIds.size) {
       const totals = new Map();
@@ -3196,7 +3301,7 @@ const App = {
 
       const best = [...totals.entries()]
         .map(([userId, stats]) => ({ userId, ...stats, profile: this.profileForUser(userId) }))
-        .filter((item) => item.points > 0)
+        .filter((item) => item.points > 0 && profileIsUsable(item.profile))
         .sort((a, b) => b.points - a.points || b.exact - a.exact || profileName(a.profile).localeCompare(profileName(b.profile), "fr"))[0];
 
       if (best) {
@@ -3215,19 +3320,24 @@ const App = {
       }
     }
 
-    // 2) Casserole du jour : un zéro pointé sur le dernier match terminé.
+    // Casserole du jour : score vraiment inversé sur le dernier match terminé.
     const latestFinished = finishedMatches[0];
     if (latestFinished) {
-      const zeroRows = predictionRows
-        .filter(({ match, prediction }) => match.id === latestFinished.id && Number(prediction.points_total || 0) === 0)
+      const casserole = predictionRows
+        .filter(({ match, prediction }) =>
+          match.id === latestFinished.id
+          && Number(prediction.points_total || 0) === 0
+          && this.isOppositeResultPrediction(prediction, latestFinished)
+        )
         .map(({ prediction, match }) => ({
           prediction,
           match,
+          missDistance: this.scoreMissDistance(prediction, match),
           profile: this.profileForUser(prediction.user_id)
         }))
-        .sort((a, b) => profileName(a.profile).localeCompare(profileName(b.profile), "fr"));
+        .filter((item) => profileIsUsable(item.profile))
+        .sort((a, b) => b.missDistance - a.missDistance || profileName(a.profile).localeCompare(profileName(b.profile), "fr"))[0];
 
-      const casserole = zeroRows[0];
       if (casserole) {
         slides.push({
           kind: "story",
@@ -3236,7 +3346,7 @@ const App = {
           title: profileName(casserole.profile),
           subtitle: teamName(casserole.profile),
           value: `${casserole.prediction.home_score_pred}-${casserole.prediction.away_score_pred} au lieu de ${H.scoreText(latestFinished.home_score, latestFinished.away_score)}`,
-          detail: `${latestFinished.home_team_short_name || latestFinished.home_team_name} - ${latestFinished.away_team_short_name || latestFinished.away_team_name}`,
+          detail: "Résultat inversé",
           date: latestFinished.kickoff_at,
           icon: "badges",
           profile: casserole.profile
@@ -3244,28 +3354,29 @@ const App = {
       }
     }
 
-    // 3) Score exact récent : le dernier joueur qui a mis dans le mille.
+    // Dans le mille : dernier score exact officiel.
     const latestExact = predictionRows
       .filter(({ prediction }) => prediction.is_exact_score)
+      .map((row) => ({ ...row, profile: this.profileForUser(row.prediction.user_id) }))
+      .filter((row) => profileIsUsable(row.profile))
       .sort((a, b) => new Date(b.match.kickoff_at || 0) - new Date(a.match.kickoff_at || 0))[0];
 
     if (latestExact) {
-      const exactProfile = this.profileForUser(latestExact.prediction.user_id);
       slides.push({
         kind: "story",
         theme: "perfect",
         label: "Dans le mille",
-        title: profileName(exactProfile),
-        subtitle: teamName(exactProfile),
+        title: profileName(latestExact.profile),
+        subtitle: teamName(latestExact.profile),
         value: `Score exact ${latestExact.prediction.home_score_pred}-${latestExact.prediction.away_score_pred}`,
         detail: `${latestExact.match.home_team_short_name || latestExact.match.home_team_name} - ${latestExact.match.away_team_short_name || latestExact.match.away_team_name}`,
         date: latestExact.match.kickoff_at,
         icon: "target",
-        profile: exactProfile
+        profile: latestExact.profile
       });
     }
 
-    // 4) Match rentable : le match qui a distribué le plus de points au Nid.
+    // Match qui a gavé le Nid : uniquement sur pronos officiels visibles.
     const matchTotals = new Map();
     predictionRows.forEach(({ prediction, match }) => {
       const current = matchTotals.get(match.id) || { match, points: 0, count: 0 };
@@ -3293,9 +3404,7 @@ const App = {
       });
     }
 
-    // On ajoute tous les records du Hall qui ont déjà des données.
     recordHighlights.forEach((item) => slides.push({ kind: "record", ...item }));
-
     return slides;
   },
 
@@ -3348,7 +3457,7 @@ const App = {
       .map((record) => this.recordWinner(record, rows))
       .filter((item) => item.best && item.bestProfile);
 
-    const highlights = this.homeStoryHighlights(recordHighlights, leaderboardRows, teamRows);
+    const highlights = this.homeStoryHighlights(recordHighlights, this.filterOfficialRowsForHome(leaderboardRows), teamRows);
 
     if (!highlights.length) {
       return `
@@ -3370,7 +3479,7 @@ const App = {
           <div>
             <p class="eyebrow">${H.icon("badges")} Actus du nid</p>
             <h3>Les chouettes qui font parler le perchoir</h3>
-            <p class="muted">Records uniques, forme du moment, casseroles et coups parfaits défilent ici toutes les 5 secondes.</p>
+            <p class="muted">Records, coups chauds et casseroles cohérentes défilent ici toutes les 5 secondes.</p>
           </div>
           <button class="ghost-btn" id="homeRecordsBtn" type="button">Voir les records</button>
         </div>
@@ -3853,6 +3962,7 @@ const App = {
 
   async renderPlayerLeaderboard() {
     const root = H.$("#leaderboardContent");
+    if (!root) return;
     const mode = ["overall", "phase", "evolution"].includes(this.state.playerLeaderboardMode) ? this.state.playerLeaderboardMode : "overall";
     this.state.playerLeaderboardMode = mode;
 
@@ -3880,6 +3990,7 @@ const App = {
     });
 
     const target = H.$("#playerLeaderboardRows", root);
+    if (!target) return;
     if (mode === "evolution") {
       const evolutionMode = this.state.leaderboardEvolutionMode === "week" ? "week" : "day";
       const useMockGraph = this.graphMockPreviewEnabled();
@@ -5029,6 +5140,7 @@ const App = {
       .order("rank");
 
     const root = H.$(targetSelector);
+    if (!root) return;
     if (error) {
       root.innerHTML = `<p class="error-text">${H.escapeHtml(error.message)}</p>`;
       return;
@@ -8030,7 +8142,7 @@ const App = {
           </div>
           <div class="profile-account-actions">
             <button class="ghost-btn" id="profileInstallAppBtn" type="button">Installer l’app</button>
-            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.3.42</button>
+            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.3.46</button>
             <button class="danger-btn" id="profileLogoutBtn" type="button">Déconnexion</button>
           </div>
         </div>
@@ -8261,11 +8373,12 @@ const App = {
     H.$("#familyHelpBtn")?.addEventListener("click", () => this.openFamilyHelpModal());
 
     H.$("#showFamilyPlayersToggle")?.addEventListener("change", async (event) => {
-      const { error } = await window.sb.rpc("set_show_family_players", { p_enabled: event.currentTarget.checked });
+      const enabled = event.currentTarget?.checked === true;
+      const { error } = await window.sb.rpc("set_show_family_players", { p_enabled: enabled });
       if (error) return H.toast(error.message, "error");
       await this.loadProfile();
       await this.loadPublicProfiles();
-      H.toast(event.currentTarget.checked ? "Mode Famille affiché" : "Mode Famille masqué", "success");
+      H.toast(enabled ? "Mode Famille affiché" : "Mode Famille masqué", "success");
       await this.renderProfile();
     });
 

@@ -1,4 +1,36 @@
-# Le Nid des Pronos — V1.3.42
+# Le Nid des Pronos — V1.3.46
+
+## V1.3.46 — Prono visible immédiatement
+
+- Quand un joueur saisit ou modifie un score sur la page Matchs & pronos, le bloc “Ton prono” se met à jour immédiatement.
+- La mise à jour fonctionne aussi avec la sauvegarde automatique, sans devoir quitter la page puis revenir.
+- Après sauvegarde manuelle, la page Matchs est rafraîchie directement sans repasser par l’accueil.
+- Ajout d’un léger effet visuel sur la carte du match sauvegardé.
+- Aucun patch SQL obligatoire.
+
+## V1.3.45 — Accueil stories cohérentes
+
+- Retour des cartes d’ambiance sur l’accueil : Hibou en feu, Casserole du jour, Dans le mille et Match qui a gavé le Nid.
+- Hibou en feu est filtré sur les joueurs du classement normal : pas de joueur Famille quand le mode Famille n’est pas concerné.
+- Casserole du jour n’affiche plus un zéro au hasard : elle cherche un vrai score inversé sur le dernier match terminé, par exemple 2-1 pronostiqué alors que le réel est 0-3.
+- Les cartes ignorent les profils génériques “Joueur / Sans team”.
+- Les vrais records du Hall continuent de défiler avec les cartes d’ambiance.
+- Aucun patch SQL obligatoire.
+
+## V1.3.44 — Accueil perchoir Hall uniquement
+
+- Le carrousel d’accueil n’affiche plus les cartes ambiguës “Hibou en feu”, “Casserole du jour”, “Dans le mille” et “Match qui a gavé le Nid”.
+- Il affiche uniquement les leaders actuels pertinents et les vrais records du Hall qui ont des données.
+- Quand le mode Famille est désactivé, les records et leaders d’accueil sont filtrés sur les joueurs officiels visibles.
+- Évite les cartes “Joueur / Sans team” issues de profils non visibles.
+- Aucun patch SQL obligatoire.
+
+## V1.3.43 — Hotfix onglets classement
+
+- Corrige le plantage `Cannot set properties of null (setting 'innerHTML')` dans le classement général quand on change d’onglet rapidement.
+- Corrige le plantage `Cannot read properties of null (reading 'checked')` sur le toggle Mode Famille.
+- Ajoute des gardes pour éviter d’écrire dans un bloc qui n’existe plus après un changement de vue.
+- Aucun patch SQL obligatoire.
 
 ## V1.3.42 — Perchoir complet sur l’accueil
 
