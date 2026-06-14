@@ -1,6 +1,6 @@
 
 /* ============================================================
-   LE NID DES PRONOS — BILAN PDF V1.5.1
+   LE NID DES PRONOS — BILAN PDF V1.5.2
    Aperçu temps réel + impression PDF
    ============================================================ */
 
@@ -686,3 +686,6 @@
     grid-template-columns: 1fr;
   }
 }
+
+
+/* V1.5.2 — Bilan collector : badges acquis chargés depuis les tables */

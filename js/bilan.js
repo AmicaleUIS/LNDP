@@ -1,6 +1,6 @@
 
 // ============================================================
-// LE NID DES PRONOS — BILAN PDF V1.5.1
+// LE NID DES PRONOS — BILAN PDF V1.5.2
 // ============================================================
 
 const H = window.Helpers;
@@ -14,7 +14,9 @@ const BilanPDF = {
       leaderboard: [],
       predictions: [],
       profiles: [],
-      matches: []
+      matches: [],
+      manualBadges: [],
+      userBadges: []
     },
     playerId: null,
     refreshTimer: null,
@@ -321,7 +323,7 @@ const BilanPDF = {
 
 
   emptyCompetitionSnapshot() {
-    return { leaderboard: [], predictions: [], profiles: [], matches: [] };
+    return { leaderboard: [], predictions: [], profiles: [], matches: [], manualBadges: [], userBadges: [] };
   },
 
   competitionSnapshot() {
@@ -330,7 +332,9 @@ const BilanPDF = {
       leaderboard: Array.isArray(competition.leaderboard) ? competition.leaderboard : [],
       predictions: Array.isArray(competition.predictions) ? competition.predictions : [],
       profiles: Array.isArray(competition.profiles) ? competition.profiles : [],
-      matches: Array.isArray(competition.matches) ? competition.matches : []
+      matches: Array.isArray(competition.matches) ? competition.matches : [],
+      manualBadges: Array.isArray(competition.manualBadges) ? competition.manualBadges : [],
+      userBadges: Array.isArray(competition.userBadges) ? competition.userBadges : []
     };
   },
 
@@ -354,14 +358,16 @@ const BilanPDF = {
       }
     };
 
-    const [leaderboard, predictions, profiles, matches] = await Promise.all([
+    const [leaderboard, predictions, profiles, matches, manualBadges, userBadges] = await Promise.all([
       safe(window.sb.from("v_leaderboard_overall").select("*").order("rank")),
       safe(window.sb.from("v_visible_predictions").select("*")),
       safe(window.sb.from("v_public_profiles").select("*")),
-      safe(window.sb.from("v_matches").select("*"))
+      safe(window.sb.from("v_matches").select("*")),
+      safe(window.sb.from("manual_user_badges").select("*").eq("user_id", this.state.playerId)),
+      safe(window.sb.from("user_badges").select("*").eq("user_id", this.state.playerId))
     ]);
 
-    this.state.competition = { leaderboard, predictions, profiles, matches };
+    this.state.competition = { leaderboard, predictions, profiles, matches, manualBadges, userBadges };
   },
 
   officialPredictions() {
@@ -468,6 +474,29 @@ const BilanPDF = {
     return best;
   },
 
+
+  acquiredBadgeCandidates() {
+    const competition = this.competitionSnapshot();
+    const rows = [
+      ...(competition.manualBadges || []),
+      ...(competition.userBadges || [])
+    ];
+    const catalog = this.badgeCatalogLite();
+    return rows.map((row) => {
+      const id = row.badge_id || row.badge || row.achievement_id || row.id || row.key || row.code;
+      if (!id) return null;
+      const found = catalog[id] || {};
+      return {
+        id,
+        emoji: row.emoji || found.emoji || "🏅",
+        title: row.title || found.title || id,
+        text: row.reason || row.description || found.text || "Badge acquis dans le Nid.",
+        file: row.file || row.icon || row.asset || found.file || this.badgeAsset(id),
+        acquired_at: row.granted_at || row.unlocked_at || row.created_at || row.updated_at || null
+      };
+    }).filter(Boolean);
+  },
+
   unlockedBadges(stats, champion = null) {
     const badges = [];
     const used = new Set();
@@ -486,7 +515,7 @@ const BilanPDF = {
       used.add(id);
     };
 
-    this.reportBadgeCandidates().forEach((badge) => {
+    [...this.reportBadgeCandidates(), ...this.acquiredBadgeCandidates()].forEach((badge) => {
       const id = badge.id || badge.title;
       if (!id || used.has(id)) return;
       badges.push(badge);

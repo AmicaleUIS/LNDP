@@ -1,4 +1,12 @@
-# Le Nid des Pronos — V1.5.1
+# Le Nid des Pronos — V1.5.2
+
+## V1.5.2 — Classements propres
+
+- Classement Famille : les matchs de préparation ne sont plus comptés dans la moyenne par match.
+- Classements : les ex æquo partagent maintenant le même rang. Deux joueurs à 15 points peuvent être tous les deux 3es.
+- Même logique pour les équipes : une égalité de points ou de moyenne donne le même rang.
+- Bilan PDF : récupère aussi les badges réellement acquis depuis `manual_user_badges` et `user_badges` quand les tables existent.
+- Aucun patch SQL obligatoire.
 
 ## V1.5.1 — Hotfix bilan collector
 
