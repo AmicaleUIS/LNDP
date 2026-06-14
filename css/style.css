@@ -17831,3 +17831,12 @@ body[data-current-view] {
 .matches-upcoming-note {
   margin: 10px 0 14px;
 }
+
+
+/* ============================================================
+   V1.5.5 — Classement Famille points live visibles
+   ============================================================ */
+
+.family-leaderboard-card .points small {
+  white-space: nowrap;
+}

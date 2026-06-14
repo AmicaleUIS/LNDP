@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — APP PRINCIPALE V1.5.4
+// LE NID DES PRONOS — APP PRINCIPALE V1.5.5
 // ============================================================
 
 const H = window.Helpers;
@@ -465,7 +465,7 @@ const App = {
           <div>
             <p class="eyebrow">Crédits cachés</p>
             <h2 id="creditsTitle">Le Nid des Pronos</h2>
-            <p class="muted">Version publique <strong>1.5.4</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
+            <p class="muted">Version publique <strong>1.5.5</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
           </div>
         </div>
         <div class="credits-grid">
@@ -482,7 +482,7 @@ const App = {
             <p><strong>1.0.5</strong> — dashboard mobile/desktop stabilisé, sans chevauchement des cartes.</p>
           </section>
           <section>
-            <h3>Évolutions V1.5.4</h3>
+            <h3>Évolutions V1.5.5</h3>
             <ul class="changelog-list">
               <li>Le super admin peut désactiver ou réactiver l’affichage du module préparation.</li>
               <li>Quand la préparation est désactivée, les matchs test disparaissent des matchs/pronos, classements par phase et règles.</li>
@@ -5686,7 +5686,7 @@ const App = {
         ${rows.map((r) => {
           const color = this.safeColor(r.office_team_color || r.color, "#facc15");
           const mainValue = mode === "average" ? Number(r.average_points || 0).toFixed(2) : Number(r.total_points || 0);
-          const mainLabel = mode === "average" ? "pts/match" : "pts";
+          const mainLabel = mode === "average" ? "pts/match" : `pts${r.live_points ? ` · +${r.live_points} live` : ""}`;
           return `
             <div class="leader-row team-row nest-team-row" style="--team-color:${color}">
               <div class="rank">#${r.rank}</div>
@@ -5990,6 +5990,10 @@ const App = {
       const userId = player.id || player.user_id;
       const details = this.scoreDetailRowsForUser(userId, matchIds ? { matchIds } : {});
       const total = details.reduce((sum, { prediction }) => sum + Number(prediction.points_total || 0), 0);
+      const livePoints = details
+        .filter(({ prediction }) => prediction.is_live_projection)
+        .reduce((sum, { prediction }) => sum + Number(prediction.points_total || 0), 0);
+      const liveMatchCount = details.filter(({ prediction }) => prediction.is_live_projection).length;
       const exact = details.filter(({ prediction }) => prediction.is_exact_score).length;
       const goodResults = details.filter(({ prediction }) => prediction.is_good_result).length;
       const goodDiffs = details.filter(({ prediction }) => prediction.is_good_goal_diff).length;
@@ -6000,7 +6004,10 @@ const App = {
         exact_scores: exact,
         good_results: goodResults,
         good_goal_diffs: goodDiffs,
-        scored_matches: details.length
+        scored_matches: details.length,
+        live_points: livePoints,
+        live_match_count: liveMatchCount,
+        has_live_projection: liveMatchCount > 0
       });
     });
     return this.sortPlayerRows(rows, mode);
@@ -6025,11 +6032,17 @@ const App = {
         exact_scores: 0,
         good_results: 0,
         good_goal_diffs: 0,
-        scored_matches: 0
+        scored_matches: 0,
+        live_points: 0,
+        live_match_count: 0
       };
       row.active_players += 1;
       details.forEach(({ prediction }) => {
         row.total_points += Number(prediction.points_total || 0);
+        if (prediction.is_live_projection) {
+          row.live_points += Number(prediction.points_total || 0);
+          row.live_match_count += 1;
+        }
         row.exact_scores += prediction.is_exact_score ? 1 : 0;
         row.good_results += prediction.is_good_result ? 1 : 0;
         row.good_goal_diffs += prediction.is_good_goal_diff ? 1 : 0;
@@ -8436,7 +8449,7 @@ const App = {
           </div>
           <div class="profile-account-actions">
             <button class="ghost-btn" id="profileInstallAppBtn" type="button">Installer l’app</button>
-            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.5.4</button>
+            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.5.5</button>
             <button class="danger-btn" id="profileLogoutBtn" type="button">Déconnexion</button>
           </div>
         </div>

@@ -1,4 +1,11 @@
-# Le Nid des Pronos — V1.5.4
+# Le Nid des Pronos — V1.5.5
+
+## V1.5.5 — Famille live visible
+
+- Le classement Famille joueurs affiche maintenant les points live dans le résumé, comme le classement général.
+- Le classement Famille équipes expose aussi les points live quand la vue affiche les points.
+- Les points live étaient déjà pris en compte dans le total ; ils sont maintenant visibles avec le libellé `+X live`.
+- Aucun patch SQL obligatoire.
 
 ## V1.5.4 — Matchs terminés rangés
 
