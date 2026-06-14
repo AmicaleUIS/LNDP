@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — APP PRINCIPALE V1.5.2
+// LE NID DES PRONOS — APP PRINCIPALE V1.5.3
 // ============================================================
 
 const H = window.Helpers;
@@ -465,7 +465,7 @@ const App = {
           <div>
             <p class="eyebrow">Crédits cachés</p>
             <h2 id="creditsTitle">Le Nid des Pronos</h2>
-            <p class="muted">Version publique <strong>1.5.2</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
+            <p class="muted">Version publique <strong>1.5.3</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
           </div>
         </div>
         <div class="credits-grid">
@@ -482,7 +482,7 @@ const App = {
             <p><strong>1.0.5</strong> — dashboard mobile/desktop stabilisé, sans chevauchement des cartes.</p>
           </section>
           <section>
-            <h3>Évolutions V1.5.2</h3>
+            <h3>Évolutions V1.5.3</h3>
             <ul class="changelog-list">
               <li>Le super admin peut désactiver ou réactiver l’affichage du module préparation.</li>
               <li>Quand la préparation est désactivée, les matchs test disparaissent des matchs/pronos, classements par phase et règles.</li>
@@ -1560,9 +1560,11 @@ const App = {
     const predictionProgress = availablePredictionCount ? Math.round((donePredictionCount / availablePredictionCount) * 100) : 0;
     const liveAdjustedRows = this.liveAdjustedLeaderboardRows(this.state.playerScoreRows);
     const myRank = (typeof this.myRankFromRows === "function" ? this.myRankFromRows(liveAdjustedRows) : null) || await this.fetchMyRank();
+    const myRankTieCount = myRank ? this.tieCountForRank(liveAdjustedRows, myRank.rank) : 0;
     const teamAverageRows = this.overallTeamAverageRows(liveAdjustedRows);
     const familyRows = this.canSeeFamily() ? this.familyPlayerRows() : [];
     const myFamilyRank = familyRows.find((row) => String(row.user_id || row.id) === String(this.state.session.user.id));
+    const myFamilyRankTieCount = myFamilyRank ? this.tieCountForRank(familyRows, myFamilyRank.rank) : 0;
     const familyTeamRows = this.canSeeFamily() ? this.familyTeamRows(null, "average") : [];
 
     root.innerHTML = `
@@ -1626,12 +1628,12 @@ const App = {
 
           <aside class="home-dashboard-right" aria-label="Classements rapides et pronos">
             <section class="home-standing-stack" aria-label="Classements rapides">
-              ${this.homeRankCardHtml(myRank)}
+              ${this.homeRankCardHtml(myRank, myRankTieCount)}
               ${this.homeTeamAverageCardHtml(teamAverageRows)}
             </section>
             ${this.canSeeFamily() ? `
               <section class="home-standing-stack home-family-stack" aria-label="Classements Famille rapides">
-                ${this.homeFamilyRankCardHtml(myFamilyRank)}
+                ${this.homeFamilyRankCardHtml(myFamilyRank, myFamilyRankTieCount)}
                 ${this.homeFamilyTeamAverageCardHtml(familyTeamRows)}
               </section>
             ` : ""}
@@ -1686,7 +1688,7 @@ const App = {
   },
 
 
-  homeRankCardHtml(myRank) {
+  homeRankCardHtml(myRank, tieCount = 0) {
     if (!myRank) {
       return `
         <article class="card home-rank-card home-clickable-card" data-home-leaderboard-action="go-overall-leaderboard" role="button" tabindex="0">
@@ -1710,7 +1712,7 @@ const App = {
           <h3>Classement général</h3>
         </div>
         <div class="home-rank-main">
-          <span class="home-rank-number">#${myRank.rank}</span>
+          <span class="home-rank-number">#${myRank.rank}</span>${tieCount > 1 ? `<small class="rank-tie-label">ex æquo</small>` : ""}
           <div>
             <strong>${Number(myRank.total_points || 0)} pts</strong>
             <small>Ton rang joueur</small>
@@ -1795,27 +1797,27 @@ const App = {
           <h3>Moyenne team</h3>
         </div>
         <div class="home-team-average-main">
-          <span class="home-team-rank">#${myRow.rank}</span>
+          <span class="home-team-rank">#${myRow.rank}</span>${this.tieCountForRank(rows, myRow.rank) > 1 ? `<small class="rank-tie-label">ex æquo</small>` : ""}
           <div>
             <strong>${H.escapeHtml(myRow.office_team_name)}</strong>
             <small>${Number(myRow.average_points || 0).toFixed(2)} pts/match · ${myRow.scored_matches || 0} prono${Number(myRow.scored_matches || 0) > 1 ? "s" : ""} compté${Number(myRow.scored_matches || 0) > 1 ? "s" : ""}</small>
           </div>
         </div>
-        ${leader && leader.office_team_id !== myRow.office_team_id ? `
+        ${leader && leader.office_team_id !== myRow.office_team_id && Number(leader.rank) !== Number(myRow.rank) ? `
           <p class="home-team-average-leader">Leader : <strong>${H.escapeHtml(leader.office_team_name)}</strong> · ${Number(leader.average_points || 0).toFixed(2)} pts/match</p>
-        ` : `<p class="home-team-average-leader is-first">Ta team mène le nid à la moyenne 🦉</p>`}
+        ` : Number(myRow.rank) === 1 && this.tieCountForRank(rows, myRow.rank) > 1 ? `<p class="home-team-average-leader is-first">Ta team est ex æquo en tête du nid 🦉</p>` : `<p class="home-team-average-leader is-first">Ta team mène le nid à la moyenne 🦉</p>`}
       </article>
     `;
   },
 
-  homeFamilyRankCardHtml(myRank) {
+  homeFamilyRankCardHtml(myRank, tieCount = 0) {
     return `
       <article class="card home-rank-card home-family-rank-card home-clickable-card" data-home-leaderboard-action="go-family-player-leaderboard" role="button" tabindex="0">
         <div class="card-title-row">
           <h3>Classement Famille</h3>
         </div>
         <div class="home-rank-main ${myRank ? "" : "empty"}">
-          <span class="home-rank-number">${myRank ? `#${myRank.rank}` : "—"}</span>
+          <span class="home-rank-number">${myRank ? `#${myRank.rank}` : "—"}</span>${myRank && tieCount > 1 ? `<small class="rank-tie-label">ex æquo</small>` : ""}
           <div>
             <strong>${myRank ? `${Math.round(Number(myRank.total_points || 0) * 10) / 10} pts` : "Pas encore classé"}</strong>
             <small>Famille · hors classement officiel</small>
@@ -1834,7 +1836,7 @@ const App = {
           <h3>Team Famille</h3>
         </div>
         <div class="home-team-average-main ${myRow ? "" : "empty"}">
-          <span class="home-team-rank">${myRow ? `#${myRow.rank}` : "—"}</span>
+          <span class="home-team-rank">${myRow ? `#${myRow.rank}` : "—"}</span>${myRow && this.tieCountForRank(rows, myRow.rank) > 1 ? `<small class="rank-tie-label">ex æquo</small>` : ""}
           <div>
             <strong>${myRow ? H.escapeHtml(myRow.office_team_name || "Team") : "Pas classée"}</strong>
             <small>${myRow ? `${Number(myRow.average_points || 0).toFixed(1)} pts/match · ${myRow.active_players || 0} joueur${(myRow.active_players || 0) > 1 ? "s" : ""}` : "Aucun joueur Famille actif"}</small>
@@ -1871,6 +1873,17 @@ const App = {
     return (rows || []).find((row) =>
       String(row.user_id || row.id) === String(this.state.session?.user?.id)
     ) || null;
+  },
+
+
+  tieCountForRank(rows = [], rank) {
+    const r = Number(rank);
+    if (!Number.isFinite(r)) return 0;
+    return (rows || []).filter((row) => Number(row.rank) === r).length;
+  },
+
+  rankSuffixHtml(rows = [], rank) {
+    return this.tieCountForRank(rows, rank) > 1 ? `<small class="rank-tie-label">ex æquo</small>` : "";
   },
 
   safeHomeLiveMatchCardHtml(match) {
@@ -3374,7 +3387,7 @@ const App = {
         slides.push({
           kind: "story",
           theme: "leader",
-          label: "1er du classement",
+          label: this.tieCountForRank(officialRows, leaderPlayerRow.rank || 1) > 1 ? "1er ex æquo du classement" : "1er du classement",
           title: profileName(leaderProfile),
           subtitle: teamName(leaderProfile),
           value: `${Number(leaderPlayerRow.total_points || 0)} pts`,
@@ -3393,7 +3406,7 @@ const App = {
       slides.push({
         kind: "story",
         theme: "team-leader",
-        label: "1re équipe",
+        label: this.tieCountForRank(teamRows, leaderTeamRow.rank || 1) > 1 ? "1re équipe · ex æquo" : "1re équipe",
         title: leaderTeamRow.office_team_name || "Team en tête",
         subtitle: `${leaderTeamRow.active_players || 0} joueur${Number(leaderTeamRow.active_players || 0) > 1 ? "s" : ""}`,
         value: `${Math.round(Number(leaderTeamRow.average_points || 0) * 10) / 10} pts/match`,
@@ -8409,7 +8422,7 @@ const App = {
           </div>
           <div class="profile-account-actions">
             <button class="ghost-btn" id="profileInstallAppBtn" type="button">Installer l’app</button>
-            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.5.2</button>
+            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.5.3</button>
             <button class="danger-btn" id="profileLogoutBtn" type="button">Déconnexion</button>
           </div>
         </div>

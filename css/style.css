@@ -17791,3 +17791,34 @@ body[data-current-view] {
 
 
 /* V1.5.2 — Famille hors préparation + rangs ex æquo */
+
+
+/* ============================================================
+   V1.5.3 — Accueil ex æquo
+   ============================================================ */
+
+.rank-tie-label {
+  display: inline-flex;
+  width: fit-content;
+  margin-top: 3px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(250, 204, 21, .28);
+  background: rgba(250, 204, 21, .12);
+  color: #fde68a;
+  font-size: .68rem;
+  font-weight: 1000;
+  letter-spacing: .03em;
+  text-transform: uppercase;
+}
+
+.home-rank-main,
+.home-team-average-main {
+  align-items: center;
+}
+
+.home-rank-main .rank-tie-label,
+.home-team-average-main .rank-tie-label {
+  grid-column: 1 / 2;
+  justify-self: center;
+}

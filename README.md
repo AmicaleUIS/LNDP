@@ -1,4 +1,11 @@
-# Le Nid des Pronos — V1.5.2
+# Le Nid des Pronos — V1.5.3
+
+## V1.5.3 — Accueil ex æquo
+
+- Les cartes de classement de la page Accueil affichent aussi les ex æquo.
+- Si la team du joueur est ex æquo en tête, l’accueil l’indique au lieu d’afficher une autre team comme seule leader.
+- Les stories du carrousel indiquent aussi les ex æquo quand le premier rang est partagé.
+- Aucun patch SQL obligatoire.
 
 ## V1.5.2 — Classements propres
 
