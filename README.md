@@ -1,4 +1,10 @@
-# Le Nid des Pronos — V1.4.5
+# Le Nid des Pronos — V1.4.6
+
+## V1.4.6 — Hotfix Matchs joués points
+
+- L’onglet Matchs joués utilise maintenant la prédiction enrichie du joueur connecté depuis `v_visible_predictions`.
+- Les points affichés sur la carte compacte et dans le détail correspondent donc aux points calculés, et non plus au prono brut sans score.
+- Aucun patch SQL obligatoire.
 
 ## V1.4.5 — UX Matchs joués + détails points
 

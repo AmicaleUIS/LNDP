@@ -17779,3 +17779,12 @@ body[data-current-view] {
     grid-template-columns: 1fr;
   }
 }
+
+
+/* ============================================================
+   V1.4.6 — Matchs joués points du joueur connecté
+   ============================================================ */
+
+.played-summary-points strong {
+  white-space: nowrap;
+}

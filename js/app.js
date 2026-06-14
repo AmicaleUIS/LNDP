@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — APP PRINCIPALE V1.4.5
+// LE NID DES PRONOS — APP PRINCIPALE V1.4.6
 // ============================================================
 
 const H = window.Helpers;
@@ -465,7 +465,7 @@ const App = {
           <div>
             <p class="eyebrow">Crédits cachés</p>
             <h2 id="creditsTitle">Le Nid des Pronos</h2>
-            <p class="muted">Version publique <strong>1.4.5</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
+            <p class="muted">Version publique <strong>1.4.6</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
           </div>
         </div>
         <div class="credits-grid">
@@ -482,7 +482,7 @@ const App = {
             <p><strong>1.0.5</strong> — dashboard mobile/desktop stabilisé, sans chevauchement des cartes.</p>
           </section>
           <section>
-            <h3>Évolutions V1.4.5</h3>
+            <h3>Évolutions V1.4.6</h3>
             <ul class="changelog-list">
               <li>Le super admin peut désactiver ou réactiver l’affichage du module préparation.</li>
               <li>Quand la préparation est désactivée, les matchs test disparaissent des matchs/pronos, classements par phase et règles.</li>
@@ -2409,9 +2409,12 @@ const App = {
         || String(a.pseudo || "").localeCompare(String(b.pseudo || ""), "fr")
       );
 
-    const myDisplay = myPrediction ? (this.predictionForDisplay(myPrediction, match) || myPrediction) : null;
+    const myVisiblePrediction = visiblePreds.find((p) => String(p.user_id) === String(this.state.session?.user?.id));
+    const myDisplay = myVisiblePrediction || (myPrediction ? (this.predictionForDisplay(myPrediction, match) || myPrediction) : null);
     const myPoints = myDisplay?.points_total ?? "—";
-    const myPointsLabel = `${myPoints} pt${Number(myPoints || 0) > 1 ? "s" : ""}${myDisplay?.is_live_projection ? " live" : ""}`;
+    const myPointsLabel = myPoints === "—"
+      ? "— pt"
+      : `${myPoints} pt${Number(myPoints || 0) > 1 ? "s" : ""}${myDisplay?.is_live_projection ? " live" : ""}`;
     const myPronoLabel = myDisplay ? `${myDisplay.home_score_pred} - ${myDisplay.away_score_pred}` : "—";
     const officialScore = ["finished", "live"].includes(match.status) ? H.scoreText(match.home_score, match.away_score) : "vs";
     const matchLabel = `${match.home_team_short_name || match.home_team_name} - ${match.away_team_short_name || match.away_team_name}`;
@@ -8389,7 +8392,7 @@ const App = {
           </div>
           <div class="profile-account-actions">
             <button class="ghost-btn" id="profileInstallAppBtn" type="button">Installer l’app</button>
-            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.4.5</button>
+            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.4.6</button>
             <button class="danger-btn" id="profileLogoutBtn" type="button">Déconnexion</button>
           </div>
         </div>
