@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — APP PRINCIPALE V1.4.2
+// LE NID DES PRONOS — APP PRINCIPALE V1.4.3
 // ============================================================
 
 const H = window.Helpers;
@@ -465,7 +465,7 @@ const App = {
           <div>
             <p class="eyebrow">Crédits cachés</p>
             <h2 id="creditsTitle">Le Nid des Pronos</h2>
-            <p class="muted">Version publique <strong>1.4.2</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
+            <p class="muted">Version publique <strong>1.4.3</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
           </div>
         </div>
         <div class="credits-grid">
@@ -482,7 +482,7 @@ const App = {
             <p><strong>1.0.5</strong> — dashboard mobile/desktop stabilisé, sans chevauchement des cartes.</p>
           </section>
           <section>
-            <h3>Évolutions V1.4.2</h3>
+            <h3>Évolutions V1.4.3</h3>
             <ul class="changelog-list">
               <li>Le super admin peut désactiver ou réactiver l’affichage du module préparation.</li>
               <li>Quand la préparation est désactivée, les matchs test disparaissent des matchs/pronos, classements par phase et règles.</li>
@@ -2394,6 +2394,61 @@ const App = {
           <strong>${pointsText}</strong>
         </div>
       </div>
+    `;
+  },
+
+  playedMatchCardHtml(match) {
+    const myPrediction = this.getMyPrediction(match.id);
+    const visiblePreds = this.predictionsForMatch(match.id)
+      .map((prediction) => this.predictionForDisplay(prediction, match) || prediction)
+      .sort((a, b) =>
+        Number(b.points_total ?? -1) - Number(a.points_total ?? -1)
+        || String(a.pseudo || "").localeCompare(String(b.pseudo || ""), "fr")
+      );
+
+    const myDisplay = myPrediction ? (this.predictionForDisplay(myPrediction, match) || myPrediction) : null;
+
+    return `
+      <article class="played-match-card ${match.status === "live" ? "live" : "finished"}" id="played-match-${H.escapeHtml(match.id)}">
+        <div class="played-match-head">
+          <div>
+            <span class="pill ${match.status}">${H.statusLabel(match.status)}</span>
+            <strong>${H.matchFlagHtml(match, "home")} ${H.escapeHtml(match.home_team_short_name || match.home_team_name)} - ${H.matchFlagHtml(match, "away")} ${H.escapeHtml(match.away_team_short_name || match.away_team_name)}</strong>
+            <small>${H.formatDateTime(match.kickoff_at)} · ${H.stageLabel(match.stage)}${match.stage === "group" && match.pool_round ? ` · J. poule ${match.pool_round}` : ""}</small>
+          </div>
+          <div class="played-official-score">
+            <span>Score officiel</span>
+            <strong>${["finished", "live"].includes(match.status) ? H.scoreText(match.home_score, match.away_score) : "vs"}</strong>
+          </div>
+        </div>
+
+        <div class="played-match-grid">
+          <section class="played-my-prono">
+            <h4>Mon prono</h4>
+            ${myDisplay ? `
+              <div class="played-prono-big">
+                <strong>${myDisplay.home_score_pred} - ${myDisplay.away_score_pred}</strong>
+                <span>${myDisplay.points_total ?? "—"} pt${Number(myDisplay.points_total || 0) > 1 ? "s" : ""}${myDisplay.is_live_projection ? " live" : ""} · ${H.escapeHtml(this.predictionReasonLabel(myDisplay))}</span>
+              </div>
+            ` : `<p class="muted">Tu n’avais pas posé de prono sur ce match.</p>`}
+          </section>
+
+          <section class="played-others-pronos">
+            <h4>Pronos du Nid</h4>
+            ${visiblePreds.length ? `
+              <div class="played-pred-list">
+                ${visiblePreds.map((p) => `
+                  <div class="played-pred-row ${p.user_id === this.state.session.user.id ? "me" : ""}">
+                    <span>${H.escapeHtml(p.pseudo || "Joueur")} ${H.resultIcon(p)}</span>
+                    <strong>${p.home_score_pred} - ${p.away_score_pred}</strong>
+                    <em>${p.points_total ?? "—"} pt${Number(p.points_total || 0) > 1 ? "s" : ""}${p.is_live_projection ? " live" : ""}</em>
+                  </div>
+                `).join("")}
+              </div>
+            ` : `<p class="muted">Aucun prono visible pour ce match.</p>`}
+          </section>
+        </div>
+      </article>
     `;
   },
 
@@ -5790,6 +5845,16 @@ const App = {
     return { playerIds, snapshots, totalsByUser: finalTotalsByUser, valueMode };
   },
 
+
+  evolutionColor(index = 0) {
+    const palette = [
+      "#facc15", "#38bdf8", "#a78bfa", "#fb7185",
+      "#34d399", "#fb923c", "#f472b6", "#22c55e",
+      "#60a5fa", "#e879f9", "#f87171", "#2dd4bf"
+    ];
+    return palette[Math.abs(Number(index || 0)) % palette.length];
+  },
+
   evolutionChartSvg(series) {
     const { playerIds, snapshots } = series;
     if (!playerIds.length || !snapshots.length) return "";
@@ -5807,7 +5872,7 @@ const App = {
     const lines = playerIds.map((userId, index) => {
       const source = series.mockProfiles?.get(userId) || this.state.playerScoreRows.find((row) => row.user_id === userId || row.id === userId);
       const profile = this.profileForUser(userId, source);
-      const color = this.safeColor(profile.badge_color || profile.office_team_color, ["#facc15", "#38bdf8", "#a78bfa", "#fb7185", "#34d399", "#fb923c", "#f472b6", "#c4b5fd"][index % 8]);
+      const color = this.evolutionColor(index);
       const points = snapshots.map((snapshot, i) => `${x(i).toFixed(1)},${y(snapshot.totals.get(userId) || 0).toFixed(1)}`).join(" ");
       const last = snapshots[snapshots.length - 1];
       const lastX = x(snapshots.length - 1);
@@ -6291,7 +6356,7 @@ const App = {
               ${series.playerIds.map((userId, index) => {
                 const source = series.mockProfiles?.get(userId) || this.state.playerScoreRows.find((row) => row.user_id === userId || row.id === userId);
                 const profile = this.profileForUser(userId, source);
-                const color = this.safeColor(profile.badge_color || profile.office_team_color, ["#facc15", "#38bdf8", "#a78bfa", "#fb7185", "#34d399", "#fb923c", "#f472b6", "#c4b5fd"][index % 8]);
+                const color = this.evolutionColor(index);
                 const total = latestSnapshot?.totals.get(userId) || 0;
                 return `
                   <div class="evolution-player" style="--player-color:${color}">
@@ -6473,7 +6538,7 @@ const App = {
               ${series.playerIds.map((userId, index) => {
                 const source = series.mockProfiles?.get(userId) || this.state.playerScoreRows.find((row) => row.user_id === userId);
                 const profile = this.profileForUser(userId, source);
-                const color = this.safeColor(profile.badge_color || profile.office_team_color, ["#facc15", "#38bdf8", "#a78bfa", "#fb7185", "#34d399", "#fb923c", "#f472b6", "#c4b5fd"][index % 8]);
+                const color = this.evolutionColor(index);
                 const total = latestSnapshot?.totals.get(userId) || 0;
                 return `
                   <div class="evolution-player" style="--player-color:${color}">
@@ -8290,7 +8355,7 @@ const App = {
           </div>
           <div class="profile-account-actions">
             <button class="ghost-btn" id="profileInstallAppBtn" type="button">Installer l’app</button>
-            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.4.2</button>
+            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.4.3</button>
             <button class="danger-btn" id="profileLogoutBtn" type="button">Déconnexion</button>
           </div>
         </div>

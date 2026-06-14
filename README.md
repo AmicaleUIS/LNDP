@@ -1,4 +1,11 @@
-# Le Nid des Pronos — V1.4.2
+# Le Nid des Pronos — V1.4.3
+
+## V1.4.3 — Hotfix Matchs joués + couleurs graphes
+
+- Corrige définitivement `this.playedMatchCardHtml is not a function` en réintégrant la méthode dans l’objet App.
+- Les graphes d’évolution utilisent maintenant une palette distincte par joueur au lieu de reprendre la couleur de team.
+- Les points du graphe ont un léger contour pour être plus lisibles.
+- Aucun patch SQL obligatoire.
 
 ## V1.4.2 — Hotfix classement Famille
 

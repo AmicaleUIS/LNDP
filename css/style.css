@@ -17506,3 +17506,144 @@ body[data-current-view] {
 }
 
 /* V1.4.2 — Hotfix Matchs joués : fonction playedMatchCardHtml restaurée */
+
+
+/* ============================================================
+   V1.4.3 — Matchs joués + couleurs graphes distinctes
+   ============================================================ */
+
+.evolution-line {
+  filter: drop-shadow(0 0 4px rgba(255,255,255,.18));
+}
+
+.evolution-dot {
+  stroke: rgba(2, 6, 23, .85);
+  stroke-width: 2;
+}
+
+.evolution-player {
+  border-left-color: var(--player-color, #facc15);
+}
+
+.played-matches-board {
+  display: grid;
+  gap: 14px;
+}
+
+.played-match-card {
+  border: 1px solid rgba(148, 163, 184, .18);
+  border-radius: 24px;
+  padding: 16px;
+  background:
+    radial-gradient(circle at 0 0, rgba(250,204,21,.08), transparent 36%),
+    rgba(15, 23, 42, .62);
+  box-shadow: 0 18px 48px rgba(0,0,0,.18);
+}
+
+.played-match-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+  margin-bottom: 14px;
+}
+
+.played-match-head strong {
+  display: block;
+  margin-top: 6px;
+  color: #f8fafc;
+}
+
+.played-official-score {
+  min-width: 128px;
+  text-align: right;
+}
+
+.played-official-score span,
+.played-match-head small,
+.played-prono-big span {
+  display: block;
+  color: rgba(203, 213, 225, .78);
+  font-weight: 800;
+}
+
+.played-official-score strong {
+  font-size: 1.6rem;
+  color: #facc15;
+}
+
+.played-match-grid {
+  display: grid;
+  grid-template-columns: minmax(180px, .8fr) minmax(240px, 1.2fr);
+  gap: 14px;
+}
+
+.played-my-prono,
+.played-others-pronos {
+  border-radius: 18px;
+  padding: 12px;
+  background: rgba(2, 6, 23, .28);
+  border: 1px solid rgba(255,255,255,.08);
+}
+
+.played-my-prono h4,
+.played-others-pronos h4 {
+  margin: 0 0 8px;
+}
+
+.played-prono-big strong {
+  display: block;
+  font-size: 1.9rem;
+  color: #fff;
+}
+
+.played-pred-list {
+  display: grid;
+  gap: 8px;
+}
+
+.played-pred-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 10px;
+  align-items: center;
+  padding: 8px 10px;
+  border-radius: 14px;
+  background: rgba(15, 23, 42, .68);
+}
+
+.played-pred-row.me {
+  outline: 1px solid rgba(250, 204, 21, .38);
+}
+
+.played-pred-row span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.played-pred-row em {
+  color: #facc15;
+  font-style: normal;
+  font-weight: 900;
+}
+
+@media (max-width: 760px) {
+  .played-match-head,
+  .played-match-grid {
+    grid-template-columns: 1fr;
+    display: grid;
+  }
+
+  .played-official-score {
+    text-align: left;
+  }
+
+  .played-pred-row {
+    grid-template-columns: 1fr auto;
+  }
+
+  .played-pred-row em {
+    grid-column: 1 / -1;
+  }
+}
