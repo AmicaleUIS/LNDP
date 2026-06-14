@@ -1,4 +1,11 @@
-# Le Nid des Pronos — V1.5.0
+# Le Nid des Pronos — V1.5.1
+
+## V1.5.1 — Hotfix bilan collector
+
+- Corrige le crash `Cannot read properties of undefined (reading 'matches')` dans le bilan PDF collector.
+- Ajoute un snapshot compétition vide par défaut.
+- Sécurise toutes les lectures de `competition.matches`, `competition.predictions`, `competition.profiles` et `competition.leaderboard`.
+- Aucun patch SQL obligatoire.
 
 ## V1.5.0 — Bilan PDF collector
 

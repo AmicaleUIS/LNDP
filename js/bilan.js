@@ -1,6 +1,6 @@
 
 // ============================================================
-// LE NID DES PRONOS — BILAN PDF V1.5.0
+// LE NID DES PRONOS — BILAN PDF V1.5.1
 // ============================================================
 
 const H = window.Helpers;
@@ -10,6 +10,12 @@ const BilanPDF = {
     session: null,
     adminProfile: null,
     report: null,
+    competition: {
+      leaderboard: [],
+      predictions: [],
+      profiles: [],
+      matches: []
+    },
     playerId: null,
     refreshTimer: null,
     realtimeChannel: null
@@ -67,6 +73,7 @@ const BilanPDF = {
 
     this.state.report = data || {};
     await this.enrichReportWithChampionFallback();
+    await this.loadCompetitionSnapshot();
     this.render();
     if (root) root.classList.remove("is-loading");
   },
@@ -312,8 +319,54 @@ const BilanPDF = {
     return Number.isFinite(number) ? number : fallback;
   },
 
+
+  emptyCompetitionSnapshot() {
+    return { leaderboard: [], predictions: [], profiles: [], matches: [] };
+  },
+
+  competitionSnapshot() {
+    const competition = this.state.competition || this.emptyCompetitionSnapshot();
+    return {
+      leaderboard: Array.isArray(competition.leaderboard) ? competition.leaderboard : [],
+      predictions: Array.isArray(competition.predictions) ? competition.predictions : [],
+      profiles: Array.isArray(competition.profiles) ? competition.profiles : [],
+      matches: Array.isArray(competition.matches) ? competition.matches : []
+    };
+  },
+
+  async loadCompetitionSnapshot() {
+    if (!this.isSuperAdmin()) {
+      this.state.competition = this.emptyCompetitionSnapshot();
+      return;
+    }
+
+    const safe = async (promise, fallback = []) => {
+      try {
+        const { data, error } = await promise;
+        if (error) {
+          console.warn("Bilan collector · donnée compétition indisponible", error);
+          return fallback;
+        }
+        return data || fallback;
+      } catch (error) {
+        console.warn("Bilan collector · chargement compétition interrompu", error);
+        return fallback;
+      }
+    };
+
+    const [leaderboard, predictions, profiles, matches] = await Promise.all([
+      safe(window.sb.from("v_leaderboard_overall").select("*").order("rank")),
+      safe(window.sb.from("v_visible_predictions").select("*")),
+      safe(window.sb.from("v_public_profiles").select("*")),
+      safe(window.sb.from("v_matches").select("*"))
+    ]);
+
+    this.state.competition = { leaderboard, predictions, profiles, matches };
+  },
+
   officialPredictions() {
-    const matchesById = new Map((this.state.competition.matches || []).map((match) => [match.id, match]));
+    const competition = this.competitionSnapshot();
+    const matchesById = new Map(competition.matches.map((match) => [match.id, match]));
     return (this.state.report.predictions || []).filter((row) => !row.is_test_match).map((row) => {
       const match = matchesById.get(row.match_id) || {};
       return { ...match, ...row };
@@ -519,8 +572,9 @@ const BilanPDF = {
 
 
   competitionPredictionRows() {
-    const matchesById = new Map((this.state.competition.matches || []).map((match) => [match.id, match]));
-    return (this.state.competition.predictions || [])
+    const competition = this.competitionSnapshot();
+    const matchesById = new Map(competition.matches.map((match) => [match.id, match]));
+    return competition.predictions
       .map((prediction) => {
         const match = matchesById.get(prediction.match_id) || {};
         return { ...match, ...prediction, match };
@@ -529,14 +583,16 @@ const BilanPDF = {
   },
 
   profileForUser(userId, fallback = {}) {
-    const profile = (this.state.competition.profiles || []).find((p) => String(p.id || p.user_id) === String(userId));
+    const competition = this.competitionSnapshot();
+    const profile = competition.profiles.find((p) => String(p.id || p.user_id) === String(userId));
     return profile || fallback || {};
   },
 
   competitionMetrics() {
     const rows = this.competitionPredictionRows();
     const uniquePlayers = new Set(rows.map((row) => row.user_id).filter(Boolean));
-    const matches = (this.state.competition.matches || []).filter((match) => !match.is_test_match);
+    const competition = this.competitionSnapshot();
+    const matches = competition.matches.filter((match) => !match.is_test_match);
     const finishedMatches = matches.filter((match) => match.status === "finished");
     const totalPoints = rows.reduce((sum, row) => sum + this.n(row.points_total), 0);
     const exacts = rows.filter((row) => row.is_exact_score).length;
@@ -572,7 +628,8 @@ const BilanPDF = {
 
   playerRaceSeries(stats) {
     const rows = this.competitionPredictionRows();
-    const leaderboard = this.state.competition.leaderboard || [];
+    const competition = this.competitionSnapshot();
+    const leaderboard = competition.leaderboard || [];
     const playerId = this.state.playerId;
     const topIds = leaderboard.slice(0, 5).map((row) => row.user_id || row.id).filter(Boolean);
     if (playerId && !topIds.map(String).includes(String(playerId))) topIds.push(playerId);
@@ -625,7 +682,8 @@ const BilanPDF = {
   raceLegendHtml(series) {
     const colors = ["#facc15", "#38bdf8", "#a78bfa", "#fb7185", "#34d399", "#fb923c"];
     return `<div class="race-legend">${(series.playerIds || []).map((id, index) => {
-      const profile = this.profileForUser(id, (this.state.competition.leaderboard || []).find((row) => String(row.user_id || row.id) === String(id)) || {});
+      const competition = this.competitionSnapshot();
+      const profile = this.profileForUser(id, (competition.leaderboard || []).find((row) => String(row.user_id || row.id) === String(id)) || {});
       const total = series.totalsByUser?.get(String(id)) || 0;
       return `<div class="race-player ${String(id) === String(this.state.playerId) ? "is-player" : ""}" style="--race-color:${colors[index % colors.length]}"><span></span><strong>${this.e(profile.pseudo || "Joueur")}</strong><em>${total} pts</em></div>`;
     }).join("")}</div>`;
