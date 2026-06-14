@@ -1,4 +1,16 @@
-# Le Nid des Pronos — V1.4.6
+# Le Nid des Pronos — V1.5.0
+
+## V1.5.0 — Bilan PDF collector
+
+- Refonte majeure du bilan PDF super admin en souvenir de compétition.
+- Mur des exploits avec vrais PNG de badges quand disponibles.
+- Ajout d’une carte d’identité du pronostiqueur avec rang unique et radar de plumes.
+- Ajout des chiffres de compétition : points distribués, joueurs, matchs terminés, scores exacts collectifs, zéros, match jackpot et match casserole.
+- Ajout d’une course aux points comparant le joueur aux meilleurs du Nid.
+- Ajout d’une page casseroles avec les pires matchs du joueur.
+- Historique complet des pronos rangé par phase/journée, avec drapeaux pays quand les données sont disponibles.
+- Pagination automatique de l’historique.
+- Aucun patch SQL obligatoire.
 
 ## V1.4.6 — Hotfix Matchs joués points
 
