@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — APP PRINCIPALE V1.5.3
+// LE NID DES PRONOS — APP PRINCIPALE V1.5.4
 // ============================================================
 
 const H = window.Helpers;
@@ -465,7 +465,7 @@ const App = {
           <div>
             <p class="eyebrow">Crédits cachés</p>
             <h2 id="creditsTitle">Le Nid des Pronos</h2>
-            <p class="muted">Version publique <strong>1.5.3</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
+            <p class="muted">Version publique <strong>1.5.4</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
           </div>
         </div>
         <div class="credits-grid">
@@ -482,7 +482,7 @@ const App = {
             <p><strong>1.0.5</strong> — dashboard mobile/desktop stabilisé, sans chevauchement des cartes.</p>
           </section>
           <section>
-            <h3>Évolutions V1.5.3</h3>
+            <h3>Évolutions V1.5.4</h3>
             <ul class="changelog-list">
               <li>Le super admin peut désactiver ou réactiver l’affichage du module préparation.</li>
               <li>Quand la préparation est désactivée, les matchs test disparaissent des matchs/pronos, classements par phase et règles.</li>
@@ -1948,6 +1948,17 @@ const App = {
     return data;
   },
 
+
+  upcomingPredictionMatches() {
+    return this.displayMatches()
+      .filter((match) => !["finished", "cancelled"].includes(match.status))
+      .sort((a, b) => {
+        const statusWeight = (match) => match.status === "live" ? 0 : match.status === "scheduled" ? 1 : 2;
+        return statusWeight(a) - statusWeight(b)
+          || new Date(a.kickoff_at || 0) - new Date(b.kickoff_at || 0);
+      });
+  },
+
   async renderMatches() {
     await Promise.all([this.loadMatches(), this.loadGroupStandings(), this.loadMyPredictions(), this.loadVisiblePredictions()]);
 
@@ -1963,7 +1974,7 @@ const App = {
     `;
 
     const playedMatches = this.displayMatches()
-      .filter((match) => ["finished", "live"].includes(match.status))
+      .filter((match) => match.status === "finished")
       .sort((a, b) => new Date(b.kickoff_at || 0) - new Date(a.kickoff_at || 0));
 
     if (matchesTab === "played") {
@@ -1989,7 +2000,8 @@ const App = {
       return;
     }
 
-    const groups = this.groupMatchesByPouleRound(this.displayMatches());
+    const upcomingMatches = this.upcomingPredictionMatches();
+    const groups = this.groupMatchesByPouleRound(upcomingMatches);
     const activeIndex = this.clampPhaseIndex("matchPhaseIndex", groups);
     const group = groups[activeIndex];
 
@@ -1998,7 +2010,7 @@ const App = {
         <section class="toolbar-card">
           <div>
             <h2>Matchs & pronos</h2>
-            <p class="muted">Aucun match à afficher pour le moment.</p>
+            <p class="muted">Aucun match à venir à afficher pour le moment. Les matchs terminés sont dans l’onglet Matchs joués.</p>
           </div>
           <button class="ghost-btn" id="refreshMatchesBtn">Rafraîchir</button>
         </section>
@@ -2018,12 +2030,14 @@ const App = {
       <section class="toolbar-card">
         <div>
           <h2>Matchs & pronos</h2>
-          <p class="muted">Tous les matchs et la saisie de tes scores sont réunis ici.</p>
+          <p class="muted">Les prochains matchs et la saisie de tes scores sont ici. Les matchs terminés sont rangés dans Matchs joués.</p>
         </div>
         <button class="ghost-btn" id="refreshMatchesBtn">Rafraîchir</button>
       </section>
 
       ${tabs}
+
+      <div class="live-ranking-note matches-upcoming-note">${H.icon("info")} Les matchs terminés ne sont plus affichés ici : retrouve-les dans l’onglet <strong>Matchs joués</strong>.</div>
 
       ${this.predictionPhaseSummaryHtml(group)}
 
@@ -3406,7 +3420,7 @@ const App = {
       slides.push({
         kind: "story",
         theme: "team-leader",
-        label: this.tieCountForRank(teamRows, leaderTeamRow.rank || 1) > 1 ? "1re équipe · ex æquo" : "1re équipe",
+        label: "1re équipe",
         title: leaderTeamRow.office_team_name || "Team en tête",
         subtitle: `${leaderTeamRow.active_players || 0} joueur${Number(leaderTeamRow.active_players || 0) > 1 ? "s" : ""}`,
         value: `${Math.round(Number(leaderTeamRow.average_points || 0) * 10) / 10} pts/match`,
@@ -8422,7 +8436,7 @@ const App = {
           </div>
           <div class="profile-account-actions">
             <button class="ghost-btn" id="profileInstallAppBtn" type="button">Installer l’app</button>
-            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.5.3</button>
+            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.5.4</button>
             <button class="danger-btn" id="profileLogoutBtn" type="button">Déconnexion</button>
           </div>
         </div>

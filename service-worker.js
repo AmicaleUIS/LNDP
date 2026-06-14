@@ -1,9 +1,9 @@
 // ============================================================
-// LE NID DES PRONOS — SERVICE WORKER V1.5.3
-// Cache public V1.5.3 : bilan PDF final temps réel.
+// LE NID DES PRONOS — SERVICE WORKER V1.5.4
+// Cache public V1.5.4 : bilan PDF final temps réel.
 // ============================================================
 
-const CACHE_NAME = "le-nid-des-pronos-v1-5-3";
+const CACHE_NAME = "le-nid-des-pronos-v1-5-4";
 
 // Les avatars ne sont pas précachés : ils peuvent aller de owl-01.png à owl-90.png et être ajoutés/remplacés librement.
 const ASSETS = [
@@ -14,15 +14,15 @@ const ASSETS = [
   "./app.html",
   "./admin.html",
   "./bilan.html",
-  "./css/style.css?v=1.5.3",
-  "./css/bilan.css?v=1.5.3",
-  "./js/supabaseClient.js?v=1.5.3",
-  "./js/auth.js?v=1.5.3",
-  "./js/common.js?v=1.5.3",
-  "./js/app.js?v=1.5.3",
-  "./js/admin.js?v=1.5.3",
-  "./js/bilan.js?v=1.5.3",
-  "./manifest.json?v=1.5.3",
+  "./css/style.css?v=1.5.4",
+  "./css/bilan.css?v=1.5.4",
+  "./js/supabaseClient.js?v=1.5.4",
+  "./js/auth.js?v=1.5.4",
+  "./js/common.js?v=1.5.4",
+  "./js/app.js?v=1.5.4",
+  "./js/admin.js?v=1.5.4",
+  "./js/bilan.js?v=1.5.4",
+  "./manifest.json?v=1.5.4",
   "./assets/icons/icon-192.png",
   "./assets/icons/icon-512.png",
   "./assets/icons/icon-maskable-192.png",

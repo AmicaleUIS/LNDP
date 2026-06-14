@@ -1,4 +1,11 @@
-# Le Nid des Pronos — V1.5.3
+# Le Nid des Pronos — V1.5.4
+
+## V1.5.4 — Matchs terminés rangés
+
+- L’onglet `À venir & pronos` n’affiche plus les matchs terminés.
+- Les matchs terminés restent disponibles dans l’onglet `Matchs joués`, triés du plus récent au plus ancien.
+- Les matchs en direct restent visibles côté `À venir & pronos`.
+- Aucun patch SQL obligatoire.
 
 ## V1.5.3 — Accueil ex æquo
 

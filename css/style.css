@@ -17822,3 +17822,12 @@ body[data-current-view] {
   grid-column: 1 / 2;
   justify-self: center;
 }
+
+
+/* ============================================================
+   V1.5.4 — Matchs terminés retirés de À venir & pronos
+   ============================================================ */
+
+.matches-upcoming-note {
+  margin: 10px 0 14px;
+}
