@@ -1,4 +1,22 @@
-# Le Nid des Pronos — V1.3.46
+# Le Nid des Pronos — V1.4.1
+
+## V1.4.1 — Rôles Famille réels
+
+- Super admin : passer un joueur en Famille change désormais réellement `role = family` et `player_scope = family`.
+- Repasser un compte Famille en normal remet `role = user` et `player_scope = uis`.
+- Le bouton Admin n’est plus un simple affichage Famille : il change la catégorie réelle.
+- Le classement général filtre en sécurité les comptes Famille côté app, même si une vue SQL les retourne encore.
+- Patch SQL obligatoire : `patch_v1_4_1_roles_famille_reels.sql`.
+
+## V1.4.0 — Classements moyenne + matchs joués
+
+- Classement joueurs : ajout d’une vue Moyenne = points / matchs pronostiqués comptés.
+- Classement joueurs : ajout des courbes Évolution points et Évolution moyenne.
+- Teams bureau : la vue par défaut reste Moyenne, calculée par match pronostiqué, pour ne pas pénaliser une team quand un joueur oublie un match.
+- Teams bureau : évolution points et moyenne conservées.
+- Famille : ajout de la moyenne pour joueurs et équipes, avec évolution moyenne.
+- Matchs : ajout d’un onglet “Matchs joués” pour consulter facilement les anciens pronos, les scores officiels et les pronos des autres.
+- Aucun patch SQL obligatoire.
 
 ## V1.3.46 — Prono visible immédiatement
 

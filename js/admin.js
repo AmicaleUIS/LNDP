@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — ADMIN V1.3.46
+// LE NID DES PRONOS — ADMIN V1.4.1
 // ============================================================
 
 const H = window.Helpers;
@@ -82,7 +82,7 @@ const Admin = {
       p_category: category,
       p_details: details || {},
       p_metadata: {
-        app_version: "1.3.46",
+        app_version: "1.4.1",
         source: "admin_front"
       }
     });
@@ -115,7 +115,7 @@ const Admin = {
 
   userFamilyModeLabel(user, inviteUserIds = this.familyInviteUserIds()) {
     if (this.isFamilyAccount(user, inviteUserIds)) return "Compte Famille";
-    return user?.show_family_players ? "Mode affiché" : "Mode masqué";
+    return "Joueur normal";
   },
 
   async init() {
@@ -785,9 +785,9 @@ const Admin = {
           </div>
         </div>
         <div class="worldcup-ready-list">
-          ${item(prepOff, "Matchs test masqués", prepOff ? "Le module préparation est désactivé." : "Désactive le module préparation dans Sauvegardes > Préparation.")}
+          ${item(prepOff, "Matchs test normals", prepOff ? "Le module préparation est désactivé." : "Désactive le module préparation dans Sauvegardes > Préparation.")}
           ${item(graphTestOff, "Graph avec matchs test désactivé", graphTestOff ? "Les graphs ignorent les matchs test." : "Désactive la prévisualisation graphs avec matchs test.")}
-          ${item(graphMockOff, "Maquette graph désactivée", graphMockOff ? "Aucune courbe fictive n’est affichée." : "Désactive la maquette graph avant lancement.")}
+          ${item(graphMockOff, "Maquette graph désactivée", graphMockOff ? "Aucune courbe fictive n’est Famillee." : "Désactive la maquette graph avant lancement.")}
           ${item(homeProgressOfficialOnly, "Progression accueil officielle", homeProgressOfficialOnly ? "La progression de l’accueil ignore les matchs test." : "La progression de l’accueil inclut les matchs test. À couper pour le vrai lancement.")}
           ${item(liveDemoOff, "Labo live retiré", liveDemoOff ? "Aucun match fictif labo n’est actif." : "Retire le match fictif live avant validation Coupe du monde.")}
           ${item(noFinishedWithoutScore, "Scores terminés cohérents", noFinishedWithoutScore ? "Aucun match terminé sans score complet." : `${Number(summary.finished_without_score || 0)} match(s) terminé(s) sans score complet.`)}
@@ -847,7 +847,7 @@ const Admin = {
         ${metric("Joueurs actifs", summary.active_users)}
         ${metric("Comptes Famille", summary.family_users)}
         ${metric("Matchs officiels", summary.official_matches)}
-        ${metric("Matchs préparation", summary.preparation_matches, summary.preparation_module_enabled === false ? "masqués" : "visibles")}
+        ${metric("Matchs préparation", summary.preparation_matches, summary.preparation_module_enabled === false ? "normals" : "visibles")}
         ${metric("Coupons disponibles", summary.available_family_invites)}
         ${metric("Sauvegardes", summary.backups_count)}
         ${metric("Badges attribués", summary.badges_count)}
@@ -907,7 +907,7 @@ const Admin = {
       reset_family_invite: "Coupon réinitialisé",
       update_profile_controls: "Profil modifié",
       set_profile_active: "Activation joueur modifiée",
-      hide_chat_message: "Message masqué",
+      hide_chat_message: "Message normal",
       recalc_all_points: "Recalcul global",
       recalc_match_points: "Recalcul match",
       save_match: "Match modifié",
@@ -1088,7 +1088,7 @@ const Admin = {
                 ${user.is_banned ? `<span class="pill danger">Banni</span>` : (!user.is_active ? `<span class="pill danger">Inactif</span>` : `<span class="pill success">Actif</span>`)}
                 ${!user.profile_setup_done ? `<span class="pill neutral">Profil à compléter</span>` : ""}
                 ${user.force_password_change ? `<span class="pill warning">MDP à changer</span>` : ""}
-                ${this.isFamilyAccount(user) ? `<span class="pill neutral">Compte Famille</span>` : (user.show_family_players ? `<span class="pill success">Mode Famille affiché</span>` : `<span class="pill neutral">Mode Famille masqué</span>`)}
+                ${this.isFamilyAccount(user) ? `<span class="pill success">Compte Famille réel</span>` : `<span class="pill neutral">Joueur normal</span>`}
                 </div>
               </div>
 
@@ -1108,7 +1108,7 @@ const Admin = {
                 <label class="mini-check"><input class="user-can-avatar" type="checkbox" ${user.can_change_avatar !== false ? "checked" : ""}> Avatar</label>
                 <label class="mini-check"><input class="user-can-pseudo" type="checkbox" ${user.can_change_pseudo !== false ? "checked" : ""}> Pseudo</label>
                 <label class="mini-check danger"><input class="user-is-banned" type="checkbox" ${user.is_banned ? "checked" : ""}> Ban</label>
-                ${this.isFamilyAccount(user) || ["admin", "super_admin"].includes(role) ? "" : `<button class="ghost-btn user-family-mode-toggle-btn" data-enabled="${user.show_family_players ? "false" : "true"}">${user.show_family_players ? "Masquer famille" : "Afficher famille"}</button>`}
+                ${["admin", "super_admin"].includes(role) ? "" : `<button class="ghost-btn user-family-mode-toggle-btn ${role === "family" ? "danger-soft" : ""}" data-enabled="${role === "family" ? "false" : "true"}">${role === "family" ? "Repasser normal" : "Passer famille"}</button>`}
                 <button class="ghost-btn admin-password-reset-btn">Mot de passe</button>
                 <div class="manual-badge-controls">
                   <span class="manual-badge-label">Badges souvenir</span>
@@ -1204,7 +1204,7 @@ const Admin = {
       office_team_id: teamId,
       banned: payload.p_is_banned
     });
-    H.toast("Utilisateur mis à jour", "success");
+    H.toast(role === "family" ? "Utilisateur mis à jour : vrai compte Famille" : "Utilisateur mis à jour", "success");
     await this.reloadAll();
   },
 
@@ -1252,18 +1252,23 @@ const Admin = {
     const userId = row?.dataset?.userId;
     if (!userId) return;
 
+    const message = enabled
+      ? "Passer ce compte en vraie catégorie Famille ? Il sortira du classement général normal."
+      : "Repasser ce compte en joueur normal ? Il reviendra dans le classement général.";
+    if (!confirm(message)) return;
+
     const { error } = await window.sb.rpc("admin_set_user_family_mode", {
       p_user_id: userId,
       p_enabled: enabled
     });
 
     if (error) {
-      H.toast(error.message || "Impossible de modifier le mode Famille.", "error");
+      H.toast(error.message || "Impossible de modifier la catégorie réelle du joueur.", "error");
       return;
     }
 
-    await this.logAdminAction("set_user_family_mode", "family", { user_id: userId, enabled });
-    H.toast(enabled ? "Mode Famille affiché pour ce joueur" : "Mode Famille masqué pour ce joueur", "success");
+    await this.logAdminAction("set_user_family_role", "family", { user_id: userId, enabled });
+    H.toast(enabled ? "Compte passé en Famille" : "Compte repassé en joueur normal", "success");
     await this.reloadAll();
   },
 
@@ -1387,8 +1392,8 @@ const Admin = {
         || Number(this.isFamilyAccount(b, inviteUserIds)) - Number(this.isFamilyAccount(a, inviteUserIds))
         || String(a.pseudo || a.email || "").localeCompare(String(b.pseudo || b.email || ""), "fr")
       );
-    const familyVisibleCount = familyVisibilityUsers.filter((user) => !this.isFamilyAccount(user, inviteUserIds) && user.show_family_players).length;
-    const familyHiddenCount = familyVisibilityUsers.filter((user) => !this.isFamilyAccount(user, inviteUserIds) && !user.show_family_players).length;
+    const familyVisibleCount = familyVisibilityUsers.filter((user) => this.isFamilyAccount(user, inviteUserIds)).length;
+    const familyHiddenCount = familyVisibilityUsers.filter((user) => !this.isFamilyAccount(user, inviteUserIds)).length;
     const teamOptions = this.state.teams.map((team) => `<option value="${H.escapeHtml(team.id)}">${H.escapeHtml(team.name)}</option>`).join("");
     const inviterOptions = inviterCandidates.map((user) => {
       const teamName = this.teamName(user.office_team_id);
@@ -1475,8 +1480,8 @@ const Admin = {
             <p class="muted">Vue de contrôle : qui a activé les classements/messages Famille dans son profil.</p>
           </div>
           <div class="family-visibility-counters">
-            <span class="pill success">${familyVisibleCount} affiché${familyVisibleCount > 1 ? "s" : ""}</span>
-            <span class="pill neutral">${familyHiddenCount} masqué${familyHiddenCount > 1 ? "s" : ""}</span>
+            <span class="pill success">${familyVisibleCount} Famille${familyVisibleCount > 1 ? "s" : ""}</span>
+            <span class="pill neutral">${familyHiddenCount} normal${familyHiddenCount > 1 ? "s" : ""}</span>
           </div>
         </div>
         <div class="admin-list compact family-visibility-list">
@@ -1496,8 +1501,8 @@ const Admin = {
                   </div>
                 </div>
                 <div class="family-visibility-actions">
-                  <span class="pill ${isFam || user.show_family_players ? "success" : "neutral"}">${H.escapeHtml(this.userFamilyModeLabel(user, inviteUserIds))}</span>
-                  ${isFam ? "" : `<button class="ghost-btn small-btn family-visibility-toggle-btn" data-user-id="${H.escapeHtml(user.id)}" data-enabled="${user.show_family_players ? "false" : "true"}">${user.show_family_players ? "Masquer" : "Activer"}</button>`}
+                  <span class="pill ${isFam ? "success" : "neutral"}">${H.escapeHtml(this.userFamilyModeLabel(user, inviteUserIds))}</span>
+                  <button class="ghost-btn small-btn family-visibility-toggle-btn ${isFam ? "danger-soft" : ""}" data-user-id="${H.escapeHtml(user.id)}" data-enabled="${isFam ? "false" : "true"}">${isFam ? "Repasser normal" : "Passer famille"}</button>
                 </div>
               </article>
             `;
@@ -1777,7 +1782,7 @@ const Admin = {
               }, "profile-badge mini")}
               <div>
                 <strong>${H.escapeHtml(message.author_pseudo || "Joueur")}</strong>
-                <small>${H.escapeHtml(this.chatScopeLabel(message))} · ${H.formatDateTime(message.created_at)}${message.deleted_at ? ` · masqué le ${H.formatDateTime(message.deleted_at)}` : ""}</small>
+                <small>${H.escapeHtml(this.chatScopeLabel(message))} · ${H.formatDateTime(message.created_at)}${message.deleted_at ? ` · normal le ${H.formatDateTime(message.deleted_at)}` : ""}</small>
                 <p>${H.escapeHtml(message.body)}</p>
                 ${message.deleted_reason ? `<small class="moderation-reason">Raison : ${H.escapeHtml(message.deleted_reason)}</small>` : ""}
               </div>
@@ -1822,7 +1827,7 @@ const Admin = {
     const messageId = row?.dataset.messageId;
     if (!messageId) return;
 
-    const reason = prompt("Raison de modération ?", "Message masqué par admin") || "Message masqué par admin";
+    const reason = prompt("Raison de modération ?", "Message normal par admin") || "Message normal par admin";
     if (!confirm("Masquer ce message ? Il ne sera plus visible côté joueurs.")) return;
 
     const { error } = await window.sb.rpc("moderate_team_chat_message", {
@@ -1839,7 +1844,7 @@ const Admin = {
       message_id: messageId,
       reason
     });
-    H.toast("Message masqué", "success");
+    H.toast("Message normal", "success");
     await this.loadChatMessages();
     await this.loadAuditLogs();
     this.renderChatModeration();
@@ -2372,7 +2377,7 @@ const Admin = {
     if (prepStatus) {
       prepStatus.innerHTML = prepEnabled
         ? `<strong>Actif</strong> · les matchs test restent visibles dans les écrans joueurs/admin.`
-        : `<strong>Désactivé</strong> · les matchs test, règles et classements de préparation sont masqués.`;
+        : `<strong>Désactivé</strong> · les matchs test, règles et classements de préparation sont normals.`;
     }
 
     if (prepToggle) {
@@ -2780,7 +2785,7 @@ const Admin = {
     const enabledNow = this.state.preparationModuleEnabled !== false;
     const nextEnabled = !enabledNow;
     const message = enabledNow
-      ? "Désactiver le module préparation ? Les matchs test, leurs règles et leurs classements par phase seront masqués. Les 2 badges de préparation restent visibles dans les exploits."
+      ? "Désactiver le module préparation ? Les matchs test, leurs règles et leurs classements par phase seront normals. Les 2 badges de préparation restent visibles dans les exploits."
       : "Réactiver le module préparation ? Les matchs test redeviendront visibles dans les écrans joueurs et admin.";
 
     if (!confirm(message)) return;

@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — APP PRINCIPALE V1.3.46
+// LE NID DES PRONOS — APP PRINCIPALE V1.4.1
 // ============================================================
 
 const H = window.Helpers;
@@ -47,6 +47,7 @@ const App = {
     ],
     hasUnreadTeamMessages: false,
     currentView: "home",
+    matchesTab: "upcoming",
     leaderboardTab: "players",
     playerLeaderboardMode: "overall",
     teamTab: "average",
@@ -464,7 +465,7 @@ const App = {
           <div>
             <p class="eyebrow">Crédits cachés</p>
             <h2 id="creditsTitle">Le Nid des Pronos</h2>
-            <p class="muted">Version publique <strong>1.3.46</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
+            <p class="muted">Version publique <strong>1.4.1</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
           </div>
         </div>
         <div class="credits-grid">
@@ -481,7 +482,7 @@ const App = {
             <p><strong>1.0.5</strong> — dashboard mobile/desktop stabilisé, sans chevauchement des cartes.</p>
           </section>
           <section>
-            <h3>Évolutions V1.3.46</h3>
+            <h3>Évolutions V1.4.1</h3>
             <ul class="changelog-list">
               <li>Le super admin peut désactiver ou réactiver l’affichage du module préparation.</li>
               <li>Quand la préparation est désactivée, les matchs test disparaissent des matchs/pronos, classements par phase et règles.</li>
@@ -1791,11 +1792,11 @@ const App = {
           <span class="home-team-rank">#${myRow.rank}</span>
           <div>
             <strong>${H.escapeHtml(myRow.office_team_name)}</strong>
-            <small>${Number(myRow.average_points || 0).toFixed(1)} pts/joueur · ${myRow.active_players} joueur${myRow.active_players > 1 ? "s" : ""}</small>
+            <small>${Number(myRow.average_points || 0).toFixed(1)} pts/match · ${myRow.active_players} joueur${myRow.active_players > 1 ? "s" : ""}</small>
           </div>
         </div>
         ${leader && leader.office_team_id !== myRow.office_team_id ? `
-          <p class="home-team-average-leader">Leader : <strong>${H.escapeHtml(leader.office_team_name)}</strong> · ${Number(leader.average_points || 0).toFixed(1)} pts/j</p>
+          <p class="home-team-average-leader">Leader : <strong>${H.escapeHtml(leader.office_team_name)}</strong> · ${Number(leader.average_points || 0).toFixed(1)} pts/match</p>
         ` : `<p class="home-team-average-leader is-first">Ta team mène le nid à la moyenne 🦉</p>`}
       </article>
     `;
@@ -1830,7 +1831,7 @@ const App = {
           <span class="home-team-rank">${myRow ? `#${myRow.rank}` : "—"}</span>
           <div>
             <strong>${myRow ? H.escapeHtml(myRow.office_team_name || "Team") : "Pas classée"}</strong>
-            <small>${myRow ? `${Number(myRow.average_points || 0).toFixed(1)} pts/joueur · ${myRow.active_players || 0} joueur${(myRow.active_players || 0) > 1 ? "s" : ""}` : "Aucun joueur Famille actif"}</small>
+            <small>${myRow ? `${Number(myRow.average_points || 0).toFixed(1)} pts/match · ${myRow.active_players || 0} joueur${(myRow.active_players || 0) > 1 ? "s" : ""}` : "Aucun joueur Famille actif"}</small>
           </div>
         </div>
       </article>
@@ -1932,6 +1933,43 @@ const App = {
     await Promise.all([this.loadMatches(), this.loadGroupStandings(), this.loadMyPredictions(), this.loadVisiblePredictions()]);
 
     const root = H.$("#viewRoot");
+    const matchesTab = ["upcoming", "played"].includes(this.state.matchesTab) ? this.state.matchesTab : "upcoming";
+    this.state.matchesTab = matchesTab;
+
+    const tabs = `
+      <div class="segmented match-view-tabs">
+        <button class="${matchesTab === "upcoming" ? "active" : ""}" type="button" data-matches-tab="upcoming">À venir & pronos</button>
+        <button class="${matchesTab === "played" ? "active" : ""}" type="button" data-matches-tab="played">Matchs joués</button>
+      </div>
+    `;
+
+    const playedMatches = this.displayMatches()
+      .filter((match) => ["finished", "live"].includes(match.status))
+      .sort((a, b) => new Date(b.kickoff_at || 0) - new Date(a.kickoff_at || 0));
+
+    if (matchesTab === "played") {
+      root.innerHTML = `
+        <section class="toolbar-card">
+          <div>
+            <h2>Matchs joués</h2>
+            <p class="muted">Retrouve tes anciens pronos, les scores officiels et les pronos du Nid.</p>
+          </div>
+          <button class="ghost-btn" id="refreshMatchesBtn">Rafraîchir</button>
+        </section>
+        ${tabs}
+        <section class="played-matches-board">
+          ${playedMatches.length ? playedMatches.map((match) => this.playedMatchCardHtml(match)).join("") : `<section class="card"><p class="muted">Aucun match joué pour le moment.</p></section>`}
+        </section>
+      `;
+
+      H.$("#refreshMatchesBtn")?.addEventListener("click", async () => {
+        await this.renderMatches();
+        H.toast("Matchs rafraîchis", "success");
+      });
+      this.bindMatchViewTabs(root);
+      return;
+    }
+
     const groups = this.groupMatchesByPouleRound(this.displayMatches());
     const activeIndex = this.clampPhaseIndex("matchPhaseIndex", groups);
     const group = groups[activeIndex];
@@ -1945,8 +1983,10 @@ const App = {
           </div>
           <button class="ghost-btn" id="refreshMatchesBtn">Rafraîchir</button>
         </section>
+        ${tabs}
       `;
       H.$("#refreshMatchesBtn")?.addEventListener("click", async () => this.renderMatches());
+      this.bindMatchViewTabs(root);
       return;
     }
 
@@ -1963,6 +2003,8 @@ const App = {
         </div>
         <button class="ghost-btn" id="refreshMatchesBtn">Rafraîchir</button>
       </section>
+
+      ${tabs}
 
       ${this.predictionPhaseSummaryHtml(group)}
 
@@ -1991,9 +2033,19 @@ const App = {
       H.toast("Matchs rafraîchis", "success");
     });
 
+    this.bindMatchViewTabs(root);
     this.bindPhaseNavigation("matchPhaseIndex", () => this.renderMatches());
     this.bindPredictionForms();
     this.bindGoToNearestMissingActions();
+  },
+
+  bindMatchViewTabs(root = document) {
+    H.$$("[data-matches-tab]", root).forEach((button) => {
+      button.addEventListener("click", async () => {
+        this.state.matchesTab = button.dataset.matchesTab;
+        await this.renderMatches();
+      });
+    });
   },
 
   predictionPhaseSummaryHtml(group) {
@@ -3262,7 +3314,7 @@ const App = {
         label: "1re équipe",
         title: leaderTeamRow.office_team_name || "Team en tête",
         subtitle: `${leaderTeamRow.active_players || 0} joueur${Number(leaderTeamRow.active_players || 0) > 1 ? "s" : ""}`,
-        value: `${Math.round(Number(leaderTeamRow.average_points || 0) * 10) / 10} pts/joueur`,
+        value: `${Math.round(Number(leaderTeamRow.average_points || 0) * 10) / 10} pts/match`,
         detail: `${Math.round(Number(leaderTeamRow.total_points || 0) * 10) / 10} pts au total`,
         date: null,
         dateLabel: "Classement actuel",
@@ -3963,20 +4015,22 @@ const App = {
   async renderPlayerLeaderboard() {
     const root = H.$("#leaderboardContent");
     if (!root) return;
-    const mode = ["overall", "phase", "evolution"].includes(this.state.playerLeaderboardMode) ? this.state.playerLeaderboardMode : "overall";
+    const mode = ["overall", "average", "phase", "evolution_points", "evolution_average"].includes(this.state.playerLeaderboardMode) ? this.state.playerLeaderboardMode : "overall";
     this.state.playerLeaderboardMode = mode;
 
     root.innerHTML = `
       <section class="card player-leaderboard-card">
         <div class="card-title-row leaderboard-compact-title">
           <div>
-            <h3>${mode === "evolution" ? "Évolution joueurs" : "Classement joueurs"}</h3>
+            <h3>${mode.startsWith("evolution") ? "Évolution joueurs" : mode === "average" ? "Classement joueurs · moyenne" : "Classement joueurs"}</h3>
           </div>
         </div>
-        <div class="segmented small player-leaderboard-mode leaderboard-view-switch">
+        <div class="segmented small player-leaderboard-mode leaderboard-view-switch wide-switch">
           <button class="${mode === "overall" ? "active" : ""}" type="button" data-player-leaderboard-mode="overall">Général</button>
+          <button class="${mode === "average" ? "active" : ""}" type="button" data-player-leaderboard-mode="average">Moyenne</button>
           <button class="${mode === "phase" ? "active" : ""}" type="button" data-player-leaderboard-mode="phase">Par phase</button>
-          <button class="${mode === "evolution" ? "active" : ""}" type="button" data-player-leaderboard-mode="evolution">Évolution</button>
+          <button class="${mode === "evolution_points" ? "active" : ""}" type="button" data-player-leaderboard-mode="evolution_points">Évolution points</button>
+          <button class="${mode === "evolution_average" ? "active" : ""}" type="button" data-player-leaderboard-mode="evolution_average">Évolution moyenne</button>
         </div>
         <div id="playerLeaderboardRows"></div>
       </section>
@@ -3991,13 +4045,14 @@ const App = {
 
     const target = H.$("#playerLeaderboardRows", root);
     if (!target) return;
-    if (mode === "evolution") {
+    if (mode.startsWith("evolution")) {
       const evolutionMode = this.state.leaderboardEvolutionMode === "week" ? "week" : "day";
+      const valueMode = mode === "evolution_average" ? "average" : "points";
       const useMockGraph = this.graphMockPreviewEnabled();
-      const series = useMockGraph ? this.mockEvolutionSeries(evolutionMode) : this.playerEvolutionSeries(evolutionMode);
+      const series = useMockGraph ? this.mockEvolutionSeries(evolutionMode, valueMode) : this.playerEvolutionSeries(evolutionMode, { valueMode });
       target.innerHTML = this.evolutionBlockHtml(series, {
-        title: "Évolution · classement général",
-        description: "Points cumulés des meilleurs joueurs.",
+        title: valueMode === "average" ? "Évolution · moyenne par match" : "Évolution · classement général",
+        description: valueMode === "average" ? "Moyenne cumulée : points ÷ matchs pronostiqués." : "Points cumulés des meilleurs joueurs.",
         mode: evolutionMode,
         attrName: "data-player-evolution-mode",
         emptyText: "Pas encore assez de matchs terminés pour dessiner l’évolution générale."
@@ -4009,7 +4064,7 @@ const App = {
     if (mode === "phase") {
       await this.renderPoolRoundLeaderboard("#playerLeaderboardRows");
     } else {
-      await this.renderOverallLeaderboard("#playerLeaderboardRows");
+      await this.renderOverallLeaderboard("#playerLeaderboardRows", mode === "average" ? "average" : "points");
     }
   },
 
@@ -5127,7 +5182,41 @@ const App = {
     `;
   },
 
-  async renderOverallLeaderboard(targetSelector = "#leaderboardContent") {
+
+  averagePoints(row = {}) {
+    const played = Number(row.scored_matches || row.matches_played || 0);
+    return played ? Number(row.total_points || 0) / played : 0;
+  },
+
+  withAveragePoints(row = {}) {
+    return {
+      ...row,
+      average_points: Number.isFinite(Number(row.average_points)) && Number(row.average_points) > 0
+        ? Number(row.average_points)
+        : this.averagePoints(row)
+    };
+  },
+
+  sortPlayerRows(rows = [], mode = "points") {
+    const byAverage = mode === "average";
+    return (rows || [])
+      .map((row) => this.withAveragePoints(row))
+      .sort((a, b) =>
+        byAverage
+          ? Number(b.average_points || 0) - Number(a.average_points || 0)
+            || Number(b.total_points || 0) - Number(a.total_points || 0)
+            || Number(b.scored_matches || 0) - Number(a.scored_matches || 0)
+            || String(a.pseudo || "").localeCompare(String(b.pseudo || ""), "fr")
+          : Number(b.total_points || 0) - Number(a.total_points || 0)
+            || Number(b.average_points || 0) - Number(a.average_points || 0)
+            || Number(b.exact_scores || 0) - Number(a.exact_scores || 0)
+            || Number(b.good_results || 0) - Number(a.good_results || 0)
+            || String(a.pseudo || "").localeCompare(String(b.pseudo || ""), "fr")
+      )
+      .map((row, index) => ({ ...row, rank: index + 1 }));
+  },
+
+  async renderOverallLeaderboard(targetSelector = "#leaderboardContent", valueMode = "points") {
     await Promise.all([
       this.loadMatches(),
       this.loadVisiblePredictions(),
@@ -5146,16 +5235,19 @@ const App = {
       return;
     }
 
-    const rows = this.liveAdjustedLeaderboardRows(data || []);
+    const officialIds = new Set(this.officialProfiles(this.state.publicProfiles).map((profile) => String(profile.id || profile.user_id)));
+    const officialRows = this.liveAdjustedLeaderboardRows(data || [])
+      .filter((row) => !officialIds.size || officialIds.has(String(row.user_id || row.id)));
+    const rows = this.sortPlayerRows(officialRows, valueMode);
     const liveCount = this.liveOfficialProjectionRows().length;
 
     root.innerHTML = `
       <div class="leaderboard-inner-title">
-        <strong>Général</strong>
-        <small>Classement Coupe du monde, hors matchs test${liveCount ? " · projections live incluses" : ""}</small>
+        <strong>${valueMode === "average" ? "Moyenne par match pronostiqué" : "Général"}</strong>
+        <small>${valueMode === "average" ? "Points ÷ matchs comptés" : "Classement Coupe du monde, hors matchs test"}${liveCount ? " · projections live incluses" : ""}</small>
       </div>
       ${liveCount ? `<div class="live-ranking-note">${H.icon("info")} Classement provisoire pendant le live : il suit le score actuel et se recalera au coup de sifflet final.</div>` : ""}
-      ${this.leaderboardRowsHtml(rows)}
+      ${this.leaderboardRowsHtml(rows, { valueMode })}
     `;
     this.bindAchievementReplay(root);
   },
@@ -5372,7 +5464,7 @@ const App = {
         office_team_color: team.color,
         active_players: players.length,
         total_points: total,
-        average_points: players.length ? total / players.length : 0,
+        average_points: details.length ? total / details.length : 0,
         exact_scores: exact,
         good_results: goodResults,
         scored_matches: details.length
@@ -5423,7 +5515,7 @@ const App = {
         office_team_name: team.name,
         office_team_color: team.color,
         active_players: players.length,
-        average_points: players.length ? totals.total_points / players.length : 0,
+        average_points: totals.scored_matches ? totals.total_points / totals.scored_matches : 0,
         ...totals
       };
     }).filter((row) => row.active_players > 0);
@@ -5449,8 +5541,8 @@ const App = {
       <div class="leaderboard-list team-leaderboard-list">
         ${rows.map((r) => {
           const color = this.safeColor(r.office_team_color || r.color, "#facc15");
-          const mainValue = mode === "average" ? Number(r.average_points || 0).toFixed(1) : Number(r.total_points || 0);
-          const mainLabel = mode === "average" ? "pts/j" : "pts";
+          const mainValue = mode === "average" ? Number(r.average_points || 0).toFixed(2) : Number(r.total_points || 0);
+          const mainLabel = mode === "average" ? "pts/match" : "pts";
           return `
             <div class="leader-row team-row nest-team-row" style="--team-color:${color}">
               <div class="rank">#${r.rank}</div>
@@ -5462,7 +5554,7 @@ const App = {
                   <span title="Scores exacts">${H.icon("target")} ${r.exact_scores || 0}</span>
                   <span title="Bons résultats">${H.icon("check")} ${r.good_results || 0}</span>
                   ${r.scored_matches !== undefined ? `<span title="Pronos comptabilisés">${H.icon("list")} ${r.scored_matches || 0}</span>` : ""}
-                  ${mode !== "average" ? `<span title="Moyenne par joueur">${H.icon("trend")} ${Number(r.average_points || 0).toFixed(1)} pts/j</span>` : ""}
+                  ${mode !== "average" ? `<span title="Moyenne par match pronostiqué">${H.icon("trend")} ${Number(r.average_points || 0).toFixed(2)} pts/match</span>` : ""}
                 </div>
               </div>
               <div class="points">${mainValue}<small>${mainLabel}</small></div>
@@ -5523,7 +5615,7 @@ const App = {
           <div class="team-leaderboard-control-stack">${scopeControls}${modeControls}</div>
           ${this.evolutionBlockHtml(series, {
             title: evolutionValueMode === "average" ? "Évolution moyenne · teams bureau" : "Évolution points · teams bureau",
-            description: evolutionValueMode === "average" ? "Moyenne cumulée par joueur dans chaque team." : "Points cumulés par team.",
+            description: evolutionValueMode === "average" ? "Moyenne cumulée par match pronostiqué dans chaque team." : "Points cumulés par team.",
             mode: evolutionMode,
             attrName: "data-team-evolution-mode",
             emptyText: "Pas encore assez de matchs terminés pour dessiner l’évolution des teams."
@@ -5611,6 +5703,7 @@ const App = {
   },
 
   playerEvolutionSeries(mode = "day", options = {}) {
+    const valueMode = options.valueMode || "points";
     const allowedOfficialIds = options.officialOnly === false
       ? null
       : new Set(this.officialProfiles(this.state.publicProfiles).map((profile) => String(profile.id || profile.user_id)));
@@ -5641,37 +5734,52 @@ const App = {
 
     const periods = [...new Set(finishedRows.map(({ match }) => periodKey(match.kickoff_at)))].sort();
     const totalsByUser = new Map();
+    const countsByUser = new Map();
     const pointsByPeriod = new Map(periods.map((key) => [key, new Map()]));
+    const countsByPeriod = new Map(periods.map((key) => [key, new Map()]));
 
     finishedRows.forEach(({ prediction, match }) => {
       const key = periodKey(match.kickoff_at);
       const map = pointsByPeriod.get(key);
+      const countMap = countsByPeriod.get(key);
       map.set(prediction.user_id, (map.get(prediction.user_id) || 0) + Number(prediction.points_total || 0));
+      countMap.set(prediction.user_id, (countMap.get(prediction.user_id) || 0) + 1);
     });
 
     periods.forEach((key) => {
       const map = pointsByPeriod.get(key);
+      const countMap = countsByPeriod.get(key) || new Map();
       map.forEach((points, userId) => {
         totalsByUser.set(userId, (totalsByUser.get(userId) || 0) + points);
+        countsByUser.set(userId, (countsByUser.get(userId) || 0) + (countMap.get(userId) || 0));
       });
     });
 
+    const valueForUser = (userId, points, count = countsByUser.get(userId) || 0) =>
+      valueMode === "average" ? Math.round((points / Math.max(1, count)) * 100) / 100 : points;
+
     const playerIds = [...totalsByUser.keys()]
-      .sort((a, b) => (totalsByUser.get(b) || 0) - (totalsByUser.get(a) || 0))
+      .sort((a, b) => valueForUser(b, totalsByUser.get(b) || 0) - valueForUser(a, totalsByUser.get(a) || 0))
       .slice(0, 8);
 
     const cumulative = new Map(playerIds.map((userId) => [userId, 0]));
+    const cumulativeCounts = new Map(playerIds.map((userId) => [userId, 0]));
     const snapshots = periods.map((key) => {
       const periodPoints = pointsByPeriod.get(key) || new Map();
-      playerIds.forEach((userId) => cumulative.set(userId, (cumulative.get(userId) || 0) + (periodPoints.get(userId) || 0)));
+      const periodCounts = countsByPeriod.get(key) || new Map();
+      playerIds.forEach((userId) => {
+        cumulative.set(userId, (cumulative.get(userId) || 0) + (periodPoints.get(userId) || 0));
+        cumulativeCounts.set(userId, (cumulativeCounts.get(userId) || 0) + (periodCounts.get(userId) || 0));
+      });
       return {
         key,
         label: periodLabel(key),
-        totals: new Map(playerIds.map((userId) => [userId, cumulative.get(userId) || 0]))
+        totals: new Map(playerIds.map((userId) => [userId, valueForUser(userId, cumulative.get(userId) || 0, cumulativeCounts.get(userId) || 0)]))
       };
     });
 
-    return { playerIds, snapshots, totalsByUser };
+    const finalTotalsByUser = new Map(playerIds.map((userId) => [userId, snapshots[snapshots.length - 1]?.totals.get(userId) || 0]));
+    return { playerIds, snapshots, totalsByUser: finalTotalsByUser, valueMode };
   },
 
   evolutionChartSvg(series) {
@@ -5686,6 +5794,7 @@ const App = {
     const x = (index) => pad.left + (snapshots.length === 1 ? graphW / 2 : (index / (snapshots.length - 1)) * graphW);
     const y = (value) => pad.top + graphH - (Number(value || 0) / maxPoints) * graphH;
     const yTicks = [0, Math.ceil(maxPoints / 2), maxPoints];
+    const unitLabel = series.valueMode === "average" ? " pts/match" : " pts";
 
     const lines = playerIds.map((userId, index) => {
       const source = series.mockProfiles?.get(userId) || this.state.playerScoreRows.find((row) => row.user_id === userId || row.id === userId);
@@ -5720,7 +5829,7 @@ const App = {
     `;
   },
 
-  familyPlayerRows(matchIds = null) {
+  familyPlayerRows(matchIds = null, mode = "points") {
     const participants = this.familyProfiles(this.state.publicProfiles)
       .filter((player) => this.isFamily(player) || player.profile_setup_done !== false);
     const rows = participants.map((player) => {
@@ -5730,7 +5839,7 @@ const App = {
       const exact = details.filter(({ prediction }) => prediction.is_exact_score).length;
       const goodResults = details.filter(({ prediction }) => prediction.is_good_result).length;
       const goodDiffs = details.filter(({ prediction }) => prediction.is_good_goal_diff).length;
-      return {
+      return this.withAveragePoints({
         ...player,
         user_id: userId,
         total_points: total,
@@ -5738,16 +5847,9 @@ const App = {
         good_results: goodResults,
         good_goal_diffs: goodDiffs,
         scored_matches: details.length
-      };
+      });
     });
-    return rows
-      .sort((a, b) =>
-        Number(b.total_points || 0) - Number(a.total_points || 0)
-        || Number(b.exact_scores || 0) - Number(a.exact_scores || 0)
-        || Number(b.good_results || 0) - Number(a.good_results || 0)
-        || String(a.pseudo || "").localeCompare(String(b.pseudo || ""), "fr")
-      )
-      .map((row, index) => ({ ...row, rank: index + 1 }));
+    return this.sortPlayerRows(rows, mode);
   },
 
   familyTeamRows(matchIds = null, mode = "average") {
@@ -5784,7 +5886,7 @@ const App = {
 
     const byAverage = mode === "average";
     return [...byTeam.values()]
-      .map((row) => ({ ...row, average_points: row.active_players ? row.total_points / row.active_players : 0 }))
+      .map((row) => ({ ...row, average_points: row.scored_matches ? row.total_points / row.scored_matches : 0 }))
       .sort((a, b) =>
         byAverage
           ? (b.average_points || 0) - (a.average_points || 0)
@@ -5797,7 +5899,7 @@ const App = {
       .map((row, index) => ({ ...row, rank: index + 1 }));
   },
 
-  familyEvolutionSeries(mode = "day") {
+  familyEvolutionSeries(mode = "day", valueMode = "points") {
     const allowedIds = this.familyProfileIds();
     const finishedRows = this.state.visiblePredictions
       .map((prediction) => ({ prediction, match: this.state.matches.find((m) => m.id === prediction.match_id) }))
@@ -5818,26 +5920,46 @@ const App = {
     const periodLabel = (key) => mode === "week" ? `Semaine du ${H.formatShortDate(key)}` : H.formatShortDate(key);
     const periods = [...new Set(finishedRows.map(({ match }) => periodKey(match.kickoff_at)))].sort();
     const totalsByUser = new Map();
+    const countsByUser = new Map();
     const pointsByPeriod = new Map(periods.map((key) => [key, new Map()]));
+    const countsByPeriod = new Map(periods.map((key) => [key, new Map()]));
+
     finishedRows.forEach(({ prediction, match }) => {
       const key = periodKey(match.kickoff_at);
       const map = pointsByPeriod.get(key);
+      const countMap = countsByPeriod.get(key);
       map.set(prediction.user_id, (map.get(prediction.user_id) || 0) + Number(prediction.points_total || 0));
+      countMap.set(prediction.user_id, (countMap.get(prediction.user_id) || 0) + 1);
     });
+
     periods.forEach((key) => {
       const map = pointsByPeriod.get(key);
-      map.forEach((points, userId) => totalsByUser.set(userId, (totalsByUser.get(userId) || 0) + points));
+      const countMap = countsByPeriod.get(key) || new Map();
+      map.forEach((points, userId) => {
+        totalsByUser.set(userId, (totalsByUser.get(userId) || 0) + points);
+        countsByUser.set(userId, (countsByUser.get(userId) || 0) + (countMap.get(userId) || 0));
+      });
     });
+
+    const valueForUser = (userId, points, count = countsByUser.get(userId) || 0) =>
+      valueMode === "average" ? Math.round((points / Math.max(1, count)) * 100) / 100 : points;
+
     const playerIds = [...totalsByUser.keys()]
-      .sort((a, b) => (totalsByUser.get(b) || 0) - (totalsByUser.get(a) || 0))
+      .sort((a, b) => valueForUser(b, totalsByUser.get(b) || 0) - valueForUser(a, totalsByUser.get(a) || 0))
       .slice(0, 8);
     const cumulative = new Map(playerIds.map((userId) => [userId, 0]));
+    const cumulativeCounts = new Map(playerIds.map((userId) => [userId, 0]));
     const snapshots = periods.map((key) => {
       const periodPoints = pointsByPeriod.get(key) || new Map();
-      playerIds.forEach((userId) => cumulative.set(userId, (cumulative.get(userId) || 0) + (periodPoints.get(userId) || 0)));
-      return { key, label: periodLabel(key), totals: new Map(playerIds.map((userId) => [userId, cumulative.get(userId) || 0])) };
+      const periodCounts = countsByPeriod.get(key) || new Map();
+      playerIds.forEach((userId) => {
+        cumulative.set(userId, (cumulative.get(userId) || 0) + (periodPoints.get(userId) || 0));
+        cumulativeCounts.set(userId, (cumulativeCounts.get(userId) || 0) + (periodCounts.get(userId) || 0));
+      });
+      return { key, label: periodLabel(key), totals: new Map(playerIds.map((userId) => [userId, valueForUser(userId, cumulative.get(userId) || 0, cumulativeCounts.get(userId) || 0)])) };
     });
-    return { playerIds, snapshots, totalsByUser };
+    const finalTotals = new Map(playerIds.map((userId) => [userId, snapshots[snapshots.length - 1]?.totals.get(userId) || 0]));
+    return { playerIds, snapshots, totalsByUser: finalTotals, valueMode };
   },
 
   bindFamilyLeaderboardControls(root) {
@@ -5918,7 +6040,7 @@ const App = {
             <div class="team-leaderboard-control-stack">${paneControls}${scopeControls}${modeControls}</div>
             ${this.evolutionBlockHtml(series, {
               title: evolutionValueMode === "average" ? "Évolution moyenne · team Famille" : "Évolution points · team Famille",
-              description: evolutionValueMode === "average" ? "Moyenne cumulée par joueur dans chaque team Famille." : "Points cumulés par team dans le classement Famille.",
+              description: evolutionValueMode === "average" ? "Moyenne cumulée par match pronostiqué dans chaque team Famille." : "Points cumulés par team dans le classement Famille.",
               mode: evolutionMode,
               attrName: "data-family-team-evolution-mode",
               emptyText: "Pas encore assez de matchs terminés pour dessiner l’évolution des teams Famille."
@@ -5965,25 +6087,28 @@ const App = {
       return;
     }
 
-    const mode = ["overall", "phase", "evolution"].includes(this.state.familyPlayerLeaderboardMode) ? this.state.familyPlayerLeaderboardMode : "overall";
+    const mode = ["overall", "average", "phase", "evolution_points", "evolution_average"].includes(this.state.familyPlayerLeaderboardMode) ? this.state.familyPlayerLeaderboardMode : "overall";
     this.state.familyPlayerLeaderboardMode = mode;
     const modeControls = `
       <div class="segmented small player-leaderboard-mode leaderboard-view-switch">
         <button class="${mode === "overall" ? "active" : ""}" data-family-player-mode="overall">Général</button>
+        <button class="${mode === "average" ? "active" : ""}" data-family-player-mode="average">Moyenne</button>
         <button class="${mode === "phase" ? "active" : ""}" data-family-player-mode="phase">Par phase</button>
-        <button class="${mode === "evolution" ? "active" : ""}" data-family-player-mode="evolution">Évolution général</button>
+        <button class="${mode === "evolution_points" ? "active" : ""}" data-family-player-mode="evolution_points">Évolution points</button>
+        <button class="${mode === "evolution_average" ? "active" : ""}" data-family-player-mode="evolution_average">Évolution moyenne</button>
       </div>`;
 
-    if (mode === "evolution") {
+    if (mode.startsWith("evolution")) {
       const evolutionMode = this.state.familyLeaderboardEvolutionMode === "week" ? "week" : "day";
-      const series = this.graphMockPreviewEnabled() ? this.mockEvolutionSeries(evolutionMode) : this.familyEvolutionSeries(evolutionMode);
+      const valueMode = mode === "evolution_average" ? "average" : "points";
+      const series = this.graphMockPreviewEnabled() ? this.mockEvolutionSeries(evolutionMode, valueMode) : this.familyEvolutionSeries(evolutionMode, valueMode);
       root.innerHTML = `
         <section class="card player-leaderboard-card family-leaderboard-card">
-          <div class="card-title-row leaderboard-compact-title"><div><h3>Famille · évolution joueurs</h3><p class="muted">Joueurs Famille + joueurs UIS ayant activé le mode Famille.</p></div></div>
+          <div class="card-title-row leaderboard-compact-title"><div><h3>${valueMode === "average" ? "Famille · évolution moyenne" : "Famille · évolution joueurs"}</h3><p class="muted">Joueurs Famille + joueurs UIS ayant activé le mode Famille.</p></div></div>
           <div class="team-leaderboard-control-stack">${paneControls}${modeControls}</div>
           ${this.evolutionBlockHtml(series, {
-            title: "Évolution général · Famille",
-            description: "Points cumulés des meilleurs joueurs Famille.",
+            title: valueMode === "average" ? "Évolution moyenne · Famille" : "Évolution général · Famille",
+            description: valueMode === "average" ? "Moyenne cumulée : points ÷ matchs pronostiqués." : "Points cumulés des meilleurs joueurs Famille.",
             mode: evolutionMode,
             attrName: "data-family-evolution-mode",
             emptyText: "Pas encore assez de matchs terminés pour dessiner l’évolution Famille."
@@ -5999,7 +6124,7 @@ const App = {
       const activeIndex = this.clampPhaseIndex("familyLeaderboardPhaseIndex", groups);
       const group = groups[activeIndex];
       const matchIds = group ? group.matches.map((match) => match.id) : [];
-      const rows = group ? this.familyPlayerRows(matchIds) : [];
+      const rows = group ? this.familyPlayerRows(matchIds, "points") : [];
       const finishedCount = group ? group.matches.filter((match) => ["finished", "live"].includes(match.status)).length : 0;
       const liveProjectionCount = group ? this.liveProjectionCountForMatchIds(matchIds, { includeTest: true, userIds: this.familyProfileIds() }) : 0;
       const pager = group ? this.phaseNavigatorHtml(groups, activeIndex, "familyLeaderboardPhaseIndex") : "";
@@ -6019,7 +6144,7 @@ const App = {
       return;
     }
 
-    const rows = this.familyPlayerRows();
+    const rows = this.familyPlayerRows(null, mode === "average" ? "average" : "points");
     root.innerHTML = `
       <section class="card player-leaderboard-card family-leaderboard-card">
         <div class="card-title-row leaderboard-compact-title">
@@ -6027,7 +6152,7 @@ const App = {
         </div>
         <div class="team-leaderboard-control-stack">${paneControls}${modeControls}</div>
         ${this.liveProjectionCountForMatchIds(null, { includeTest: true, userIds: this.familyProfileIds() }) ? `<div class="live-ranking-note">${H.icon("info")} Classement Famille joueurs provisoire : projections live incluses.</div>` : ""}
-        ${this.leaderboardRowsHtml(rows)}
+        ${this.leaderboardRowsHtml(rows, { valueMode })}
       </section>
     `;
     this.bindFamilyLeaderboardControls(root);
@@ -6035,7 +6160,7 @@ const App = {
   },
 
 
-  mockEvolutionSeries(mode = "day") {
+  mockEvolutionSeries(mode = "day", valueMode = "points") {
     const names = ["Parkaf", "Sol141381", "Mimi du Nid", "Coach Hibou", "La Casserole", "Madame Exact", "Le Renard", "Grand Duc"];
     const teams = ["Les SNA", "Les Rapaces", "Les Chouettes", "Les Aiglons"];
     const colors = ["#facc15", "#38bdf8", "#a78bfa", "#fb7185", "#34d399", "#fb923c", "#f472b6", "#c4b5fd"];
@@ -6081,8 +6206,13 @@ const App = {
       badge_shape: "rounded"
     }]));
 
+    if (valueMode === "average") {
+      snapshots.forEach((snapshot, idx) => {
+        snapshot.totals = new Map(playerIds.map((id) => [id, Math.round(((snapshot.totals.get(id) || 0) / (idx + 1)) * 100) / 100]));
+      });
+    }
     const totalsByUser = new Map(playerIds.map((id) => [id, snapshots[snapshots.length - 1].totals.get(id) || 0]));
-    return { playerIds, snapshots, totalsByUser, mockProfiles, isMock: true };
+    return { playerIds, snapshots, totalsByUser, mockProfiles, isMock: true, valueMode };
   },
 
 
@@ -6159,7 +6289,7 @@ const App = {
                   <div class="evolution-player" style="--player-color:${color}">
                     ${H.profileBadgeHtml(profile, "profile-badge mini")}
                     <div><strong>${H.escapeHtml(profile.pseudo)}</strong><small>${H.escapeHtml(profile.office_team_name || "Sans team")}</small></div>
-                    <span>${total} pts</span>
+                    <span>${Number(total || 0).toFixed(series.valueMode === "average" ? 2 : 0)}${series.valueMode === "average" ? " pts/match" : " pts"}</span>
                   </div>`;
               }).join("")}
             </div>
@@ -6210,7 +6340,9 @@ const App = {
     const periods = [...new Set(rows.map(({ match }) => periodKey(match.kickoff_at)))].sort();
     const teamMeta = new Map();
     const totalsByTeamRaw = new Map();
+    const countsByTeamRaw = new Map();
     const pointsByPeriod = new Map(periods.map((key) => [key, new Map()]));
+    const countsByPeriod = new Map(periods.map((key) => [key, new Map()]));
 
     rows.forEach(({ prediction, match, profile }) => {
       const teamId = profile.office_team_id || profile.office_team_name || "sans-team";
@@ -6227,13 +6359,16 @@ const App = {
       if (!teamSizes.has(teamId)) teamSizes.set(teamId, 1);
       const key = periodKey(match.kickoff_at);
       const map = pointsByPeriod.get(key);
+      const countMap = countsByPeriod.get(key);
       const points = Number(prediction.points_total || 0);
       map.set(teamId, (map.get(teamId) || 0) + points);
+      countMap.set(teamId, (countMap.get(teamId) || 0) + 1);
       totalsByTeamRaw.set(teamId, (totalsByTeamRaw.get(teamId) || 0) + points);
+      countsByTeamRaw.set(teamId, (countsByTeamRaw.get(teamId) || 0) + 1);
     });
 
-    const valueForTeam = (teamId, rawValue) => valueMode === "average"
-      ? Math.round((rawValue / Math.max(1, teamSizes.get(teamId) || 1)) * 10) / 10
+    const valueForTeam = (teamId, rawValue, count = countsByTeamRaw.get(teamId) || 0) => valueMode === "average"
+      ? Math.round((rawValue / Math.max(1, count)) * 100) / 100
       : rawValue;
 
     const playerIds = [...totalsByTeamRaw.keys()]
@@ -6241,10 +6376,15 @@ const App = {
       .slice(0, 8);
 
     const cumulative = new Map(playerIds.map((id) => [id, 0]));
+    const cumulativeCounts = new Map(playerIds.map((id) => [id, 0]));
     const snapshots = periods.map((key) => {
       const periodPoints = pointsByPeriod.get(key) || new Map();
-      playerIds.forEach((id) => cumulative.set(id, (cumulative.get(id) || 0) + (periodPoints.get(id) || 0)));
-      return { key, label: periodLabel(key), totals: new Map(playerIds.map((id) => [id, valueForTeam(id, cumulative.get(id) || 0)])) };
+      const periodCounts = countsByPeriod.get(key) || new Map();
+      playerIds.forEach((id) => {
+        cumulative.set(id, (cumulative.get(id) || 0) + (periodPoints.get(id) || 0));
+        cumulativeCounts.set(id, (cumulativeCounts.get(id) || 0) + (periodCounts.get(id) || 0));
+      });
+      return { key, label: periodLabel(key), totals: new Map(playerIds.map((id) => [id, valueForTeam(id, cumulative.get(id) || 0, cumulativeCounts.get(id) || 0)])) };
     });
 
     const totalsByUser = new Map(playerIds.map((id) => [id, snapshots[snapshots.length - 1]?.totals.get(id) || 0]));
@@ -6301,7 +6441,7 @@ const App = {
     const root = H.$("#leaderboardContent");
     const mode = this.state.leaderboardEvolutionMode === "week" ? "week" : "day";
     const useMockGraph = this.graphMockPreviewEnabled();
-    const series = useMockGraph ? this.mockEvolutionSeries(mode) : this.playerEvolutionSeries(mode);
+    const series = useMockGraph ? this.mockEvolutionSeries(mode, "points") : this.playerEvolutionSeries(mode, { valueMode: "points" });
     const latestSnapshot = series.snapshots[series.snapshots.length - 1];
 
     root.innerHTML = `
@@ -8142,7 +8282,7 @@ const App = {
           </div>
           <div class="profile-account-actions">
             <button class="ghost-btn" id="profileInstallAppBtn" type="button">Installer l’app</button>
-            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.3.46</button>
+            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.4.1</button>
             <button class="danger-btn" id="profileLogoutBtn" type="button">Déconnexion</button>
           </div>
         </div>
