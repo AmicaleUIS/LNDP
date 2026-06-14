@@ -17647,3 +17647,135 @@ body[data-current-view] {
     grid-column: 1 / -1;
   }
 }
+
+
+/* ============================================================
+   V1.4.4 — Moyenne team corrigée + doublon matchs posés
+   ============================================================ */
+
+.average-breakdown {
+  margin-top: 4px;
+}
+
+
+/* ============================================================
+   V1.4.5 — Matchs joués compacts + 5 derniers détails
+   ============================================================ */
+
+.played-match-card.compact {
+  padding: 0;
+  overflow: hidden;
+}
+
+.played-match-card.compact summary {
+  list-style: none;
+}
+
+.played-match-card.compact summary::-webkit-details-marker {
+  display: none;
+}
+
+.played-match-summary {
+  display: grid;
+  grid-template-columns: minmax(220px, 1.4fr) auto auto auto auto;
+  gap: 14px;
+  align-items: center;
+  padding: 14px 16px;
+  cursor: pointer;
+}
+
+.played-summary-main strong,
+.played-summary-score strong,
+.played-summary-prono strong,
+.played-summary-points strong {
+  display: block;
+  color: #f8fafc;
+}
+
+.played-summary-main small,
+.played-summary-score span,
+.played-summary-prono span,
+.played-summary-points span {
+  display: block;
+  color: rgba(203, 213, 225, .72);
+  font-size: .78rem;
+  font-weight: 900;
+}
+
+.played-summary-score,
+.played-summary-prono,
+.played-summary-points {
+  min-width: 96px;
+  text-align: right;
+}
+
+.played-summary-score strong {
+  font-size: 1.35rem;
+  color: #facc15;
+}
+
+.played-summary-points strong {
+  color: #facc15;
+}
+
+.played-summary-open {
+  justify-self: end;
+  border-radius: 999px;
+  padding: 8px 10px;
+  font-size: .78rem;
+  font-weight: 900;
+  color: #cbd5e1;
+  background: rgba(148, 163, 184, .12);
+  border: 1px solid rgba(148, 163, 184, .18);
+}
+
+.played-match-card[open] .played-summary-open {
+  color: #facc15;
+  border-color: rgba(250, 204, 21, .28);
+}
+
+.played-match-expanded {
+  display: grid;
+  grid-template-columns: minmax(180px, .8fr) minmax(240px, 1.2fr);
+  gap: 14px;
+  padding: 0 16px 16px;
+}
+
+.score-detail-more {
+  margin-top: 10px;
+}
+
+.score-detail-more summary {
+  width: fit-content;
+  cursor: pointer;
+  list-style: none;
+}
+
+.score-detail-more summary::-webkit-details-marker {
+  display: none;
+}
+
+.score-detail-list-extra {
+  margin-top: 10px;
+}
+
+@media (max-width: 860px) {
+  .played-match-summary {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .played-summary-main,
+  .played-summary-open {
+    grid-column: 1 / -1;
+  }
+
+  .played-summary-score,
+  .played-summary-prono,
+  .played-summary-points {
+    text-align: left;
+  }
+
+  .played-match-expanded {
+    grid-template-columns: 1fr;
+  }
+}

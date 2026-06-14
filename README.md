@@ -1,4 +1,21 @@
-# Le Nid des Pronos — V1.4.3
+# Le Nid des Pronos — V1.4.5
+
+## V1.4.5 — UX Matchs joués + détails points
+
+- L’onglet Matchs joués affiche maintenant des cartes compactes par défaut : score officiel, date/heure, ton prono et tes points.
+- Au clic, la carte s’ouvre et affiche les pronos du Nid.
+- Les matchs joués restent triés du plus récent au plus ancien.
+- Dans le détail des points d’un joueur, seuls les 5 derniers matchs sont affichés au départ.
+- Un bouton permet d’ouvrir les autres matchs.
+- Chaque ligne de détail affiche désormais la date et l’heure du match.
+- Aucun patch SQL obligatoire.
+
+## V1.4.4 — Moyenne team corrigée
+
+- La moyenne team affichée sur l’accueil/carrousel utilise maintenant bien `points de la team / nombre total de pronos comptés`.
+- La carte affiche le nombre de pronos comptés, pas seulement le nombre de joueurs actifs.
+- Dans les classements joueurs, “matchs comptés” n’apparaît plus deux fois : il reste dans les icônes principales, la ligne du dessous ne garde que la moyenne.
+- Aucun patch SQL obligatoire.
 
 ## V1.4.3 — Hotfix Matchs joués + couleurs graphes
 

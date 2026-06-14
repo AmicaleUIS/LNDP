@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — APP PRINCIPALE V1.4.3
+// LE NID DES PRONOS — APP PRINCIPALE V1.4.5
 // ============================================================
 
 const H = window.Helpers;
@@ -465,7 +465,7 @@ const App = {
           <div>
             <p class="eyebrow">Crédits cachés</p>
             <h2 id="creditsTitle">Le Nid des Pronos</h2>
-            <p class="muted">Version publique <strong>1.4.3</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
+            <p class="muted">Version publique <strong>1.4.5</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
           </div>
         </div>
         <div class="credits-grid">
@@ -482,7 +482,7 @@ const App = {
             <p><strong>1.0.5</strong> — dashboard mobile/desktop stabilisé, sans chevauchement des cartes.</p>
           </section>
           <section>
-            <h3>Évolutions V1.4.3</h3>
+            <h3>Évolutions V1.4.5</h3>
             <ul class="changelog-list">
               <li>Le super admin peut désactiver ou réactiver l’affichage du module préparation.</li>
               <li>Quand la préparation est désactivée, les matchs test disparaissent des matchs/pronos, classements par phase et règles.</li>
@@ -1721,24 +1721,27 @@ const App = {
 
   overallTeamAverageRows(scoreRows = this.state.playerScoreRows) {
     const scoreByUser = new Map(
-      scoreRows.map((row) => [row.user_id || row.id, row])
+      scoreRows.map((row) => [String(row.user_id || row.id), row])
     );
 
     return this.state.officeTeams
       .map((team) => {
         const players = this.teamPlayers(team.id, { officialOnly: true }).filter((player) => player.profile_setup_done !== false);
-        const total = players.reduce((sum, player) => {
-          const score = scoreByUser.get(player.id) || scoreByUser.get(player.user_id);
-          return sum + Number(score?.total_points || 0);
-        }, 0);
+        const totals = players.reduce((acc, player) => {
+          const score = scoreByUser.get(String(player.id || player.user_id)) || {};
+          acc.total_points += Number(score?.total_points || 0);
+          acc.scored_matches += Number(score?.scored_matches || 0);
+          return acc;
+        }, { total_points: 0, scored_matches: 0 });
 
         return {
           office_team_id: team.id,
           office_team_name: team.name,
           office_team_color: team.color,
           active_players: players.length,
-          total_points: total,
-          average_points: players.length ? total / players.length : 0
+          total_points: totals.total_points,
+          scored_matches: totals.scored_matches,
+          average_points: totals.scored_matches ? totals.total_points / totals.scored_matches : 0
         };
       })
       .filter((row) => row.active_players > 0)
@@ -1792,11 +1795,11 @@ const App = {
           <span class="home-team-rank">#${myRow.rank}</span>
           <div>
             <strong>${H.escapeHtml(myRow.office_team_name)}</strong>
-            <small>${Number(myRow.average_points || 0).toFixed(1)} pts/match · ${myRow.active_players} joueur${myRow.active_players > 1 ? "s" : ""}</small>
+            <small>${Number(myRow.average_points || 0).toFixed(2)} pts/match · ${myRow.scored_matches || 0} prono${Number(myRow.scored_matches || 0) > 1 ? "s" : ""} compté${Number(myRow.scored_matches || 0) > 1 ? "s" : ""}</small>
           </div>
         </div>
         ${leader && leader.office_team_id !== myRow.office_team_id ? `
-          <p class="home-team-average-leader">Leader : <strong>${H.escapeHtml(leader.office_team_name)}</strong> · ${Number(leader.average_points || 0).toFixed(1)} pts/match</p>
+          <p class="home-team-average-leader">Leader : <strong>${H.escapeHtml(leader.office_team_name)}</strong> · ${Number(leader.average_points || 0).toFixed(2)} pts/match</p>
         ` : `<p class="home-team-average-leader is-first">Ta team mène le nid à la moyenne 🦉</p>`}
       </article>
     `;
@@ -2407,34 +2410,52 @@ const App = {
       );
 
     const myDisplay = myPrediction ? (this.predictionForDisplay(myPrediction, match) || myPrediction) : null;
+    const myPoints = myDisplay?.points_total ?? "—";
+    const myPointsLabel = `${myPoints} pt${Number(myPoints || 0) > 1 ? "s" : ""}${myDisplay?.is_live_projection ? " live" : ""}`;
+    const myPronoLabel = myDisplay ? `${myDisplay.home_score_pred} - ${myDisplay.away_score_pred}` : "—";
+    const officialScore = ["finished", "live"].includes(match.status) ? H.scoreText(match.home_score, match.away_score) : "vs";
+    const matchLabel = `${match.home_team_short_name || match.home_team_name} - ${match.away_team_short_name || match.away_team_name}`;
 
     return `
-      <article class="played-match-card ${match.status === "live" ? "live" : "finished"}" id="played-match-${H.escapeHtml(match.id)}">
-        <div class="played-match-head">
-          <div>
+      <details class="played-match-card compact ${match.status === "live" ? "live" : "finished"}" id="played-match-${H.escapeHtml(match.id)}">
+        <summary class="played-match-summary">
+          <div class="played-summary-main">
             <span class="pill ${match.status}">${H.statusLabel(match.status)}</span>
             <strong>${H.matchFlagHtml(match, "home")} ${H.escapeHtml(match.home_team_short_name || match.home_team_name)} - ${H.matchFlagHtml(match, "away")} ${H.escapeHtml(match.away_team_short_name || match.away_team_name)}</strong>
             <small>${H.formatDateTime(match.kickoff_at)} · ${H.stageLabel(match.stage)}${match.stage === "group" && match.pool_round ? ` · J. poule ${match.pool_round}` : ""}</small>
           </div>
-          <div class="played-official-score">
-            <span>Score officiel</span>
-            <strong>${["finished", "live"].includes(match.status) ? H.scoreText(match.home_score, match.away_score) : "vs"}</strong>
-          </div>
-        </div>
 
-        <div class="played-match-grid">
+          <div class="played-summary-score">
+            <span>Résultat</span>
+            <strong>${officialScore}</strong>
+          </div>
+
+          <div class="played-summary-prono">
+            <span>Mon prono</span>
+            <strong>${H.escapeHtml(myPronoLabel)}</strong>
+          </div>
+
+          <div class="played-summary-points">
+            <span>Points</span>
+            <strong>${H.escapeHtml(String(myPointsLabel))}</strong>
+          </div>
+
+          <span class="played-summary-open">Voir les pronos</span>
+        </summary>
+
+        <div class="played-match-expanded">
           <section class="played-my-prono">
             <h4>Mon prono</h4>
             ${myDisplay ? `
               <div class="played-prono-big">
                 <strong>${myDisplay.home_score_pred} - ${myDisplay.away_score_pred}</strong>
-                <span>${myDisplay.points_total ?? "—"} pt${Number(myDisplay.points_total || 0) > 1 ? "s" : ""}${myDisplay.is_live_projection ? " live" : ""} · ${H.escapeHtml(this.predictionReasonLabel(myDisplay))}</span>
+                <span>${myPointsLabel} · ${H.escapeHtml(this.predictionReasonLabel(myDisplay))}</span>
               </div>
             ` : `<p class="muted">Tu n’avais pas posé de prono sur ce match.</p>`}
           </section>
 
           <section class="played-others-pronos">
-            <h4>Pronos du Nid</h4>
+            <h4>Pronos du Nid · ${H.escapeHtml(matchLabel)}</h4>
             ${visiblePreds.length ? `
               <div class="played-pred-list">
                 ${visiblePreds.map((p) => `
@@ -2448,7 +2469,7 @@ const App = {
             ` : `<p class="muted">Aucun prono visible pour ce match.</p>`}
           </section>
         </div>
-      </article>
+      </details>
     `;
   },
 
@@ -5214,29 +5235,44 @@ const App = {
 
 
   playerScoreDetailsHtml(userId, filters = {}) {
-    const rows = this.scoreDetailRowsForUser(userId, filters);
+    const rows = this.scoreDetailRowsForUser(userId, filters)
+      .slice()
+      .sort((a, b) => new Date(b.match.kickoff_at || 0) - new Date(a.match.kickoff_at || 0));
+
     if (!rows.length) {
       return `<p class="muted detail-empty">Aucun match terminé comptabilisé pour ce joueur.</p>`;
     }
 
-    return `
-      <div class="score-detail-list">
-        ${rows.map(({ prediction: p, match }) => `
-          <div class="score-detail-row">
-            <div class="score-detail-match">
-              <strong>${H.matchFlagHtml(match, "home")} ${H.escapeHtml(match.home_team_short_name || match.home_team_name)} - ${H.matchFlagHtml(match, "away")} ${H.escapeHtml(match.away_team_short_name || match.away_team_name)}</strong>
-              <small>${H.shortPoolRoundLabel(match)} · Réel : ${H.scoreText(match.home_score, match.away_score)} · Prono : ${p.home_score_pred} - ${p.away_score_pred}${p.qualified_team_name ? ` · Qualifié : ${H.escapeHtml(p.qualified_team_name)}` : ""}</small>
-            </div>
-            <div class="score-detail-points">
-              <strong>${p.points_total ?? 0}</strong>
-              <small>${H.escapeHtml(this.predictionReasonLabel(p))}</small>
-            </div>
-          </div>
-        `).join("")}
+    const rowHtml = ({ prediction: p, match }) => `
+      <div class="score-detail-row">
+        <div class="score-detail-match">
+          <strong>${H.matchFlagHtml(match, "home")} ${H.escapeHtml(match.home_team_short_name || match.home_team_name)} - ${H.matchFlagHtml(match, "away")} ${H.escapeHtml(match.away_team_short_name || match.away_team_name)}</strong>
+          <small>${H.formatDateTime(match.kickoff_at)} · ${H.shortPoolRoundLabel(match)} · Réel : ${H.scoreText(match.home_score, match.away_score)} · Prono : ${p.home_score_pred} - ${p.away_score_pred}${p.qualified_team_name ? ` · Qualifié : ${H.escapeHtml(p.qualified_team_name)}` : ""}</small>
+        </div>
+        <div class="score-detail-points">
+          <strong>${p.points_total ?? 0}</strong>
+          <small>${H.escapeHtml(this.predictionReasonLabel(p))}</small>
+        </div>
       </div>
     `;
-  },
 
+    const latestRows = rows.slice(0, 5);
+    const olderRows = rows.slice(5);
+
+    return `
+      <div class="score-detail-list">
+        ${latestRows.map(rowHtml).join("")}
+      </div>
+      ${olderRows.length ? `
+        <details class="score-detail-more">
+          <summary class="ghost-btn tiny-btn score-detail-more-btn">Voir les ${olderRows.length} autre${olderRows.length > 1 ? "s" : ""} match${olderRows.length > 1 ? "s" : ""}</summary>
+          <div class="score-detail-list score-detail-list-extra">
+            ${olderRows.map(rowHtml).join("")}
+          </div>
+        </details>
+      ` : ""}
+    `;
+  },
 
   averagePoints(row = {}) {
     const played = Number(row.scored_matches || row.matches_played || 0);
@@ -5327,7 +5363,6 @@ const App = {
             badge_color: r.badge_color || "#facc15"
           });
           const averageValue = Number(r.average_points || 0);
-          const scoredMatches = Number(r.scored_matches || 0);
           return `
           <details class="leader-details ${r.user_id === this.state.session.user.id ? "me" : ""}">
             <summary class="leader-row">
@@ -5341,7 +5376,6 @@ const App = {
                 ${this.pointsBreakdownHtml(r)}
                 <div class="score-breakdown average-breakdown">
                   <span title="Moyenne par match pronostiqué">${H.icon("trend")} ${averageValue.toFixed(2)} pts/match</span>
-                  <span title="Matchs comptés">${H.icon("list")} ${scoredMatches} match${scoredMatches > 1 ? "s" : ""}</span>
                 </div>
               </div>
               <div class="points">${valueMode === "average" ? averageValue.toFixed(2) : (r.total_points || 0)}<small>${valueMode === "average" ? "pts/match" : `pts${r.live_points ? ` · +${r.live_points} live` : ""}`}</small></div>
@@ -8355,7 +8389,7 @@ const App = {
           </div>
           <div class="profile-account-actions">
             <button class="ghost-btn" id="profileInstallAppBtn" type="button">Installer l’app</button>
-            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.4.3</button>
+            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.4.5</button>
             <button class="danger-btn" id="profileLogoutBtn" type="button">Déconnexion</button>
           </div>
         </div>
