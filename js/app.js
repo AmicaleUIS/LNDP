@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — APP PRINCIPALE V1.5.5
+// LE NID DES PRONOS — APP PRINCIPALE V1.5.6
 // ============================================================
 
 const H = window.Helpers;
@@ -465,7 +465,7 @@ const App = {
           <div>
             <p class="eyebrow">Crédits cachés</p>
             <h2 id="creditsTitle">Le Nid des Pronos</h2>
-            <p class="muted">Version publique <strong>1.5.5</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
+            <p class="muted">Version publique <strong>1.5.6</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
           </div>
         </div>
         <div class="credits-grid">
@@ -482,7 +482,7 @@ const App = {
             <p><strong>1.0.5</strong> — dashboard mobile/desktop stabilisé, sans chevauchement des cartes.</p>
           </section>
           <section>
-            <h3>Évolutions V1.5.5</h3>
+            <h3>Évolutions V1.5.6</h3>
             <ul class="changelog-list">
               <li>Le super admin peut désactiver ou réactiver l’affichage du module préparation.</li>
               <li>Quand la préparation est désactivée, les matchs test disparaissent des matchs/pronos, classements par phase et règles.</li>
@@ -1374,9 +1374,40 @@ const App = {
       .filter(Boolean);
   },
 
+
+  rankedOfficialLeaderboardRows(rows = []) {
+    const sortedRows = (rows || [])
+      .filter((row) => {
+        const profile = this.profileForUser(row.user_id || row.id, row);
+        return profile?.player_scope !== "family" && profile?.role !== "family";
+      })
+      .map((row) => ({
+        ...row,
+        user_id: row.user_id || row.id,
+        total_points: Number(row.total_points || 0),
+        exact_scores: Number(row.exact_scores || 0),
+        good_results: Number(row.good_results || 0),
+        good_goal_diffs: Number(row.good_goal_diffs || 0),
+        good_qualified: Number(row.good_qualified || 0),
+        scored_matches: Number(row.scored_matches || 0),
+        live_points: Number(row.live_points || 0),
+        live_match_count: Number(row.live_match_count || 0)
+      }))
+      .sort((a, b) =>
+        Number(b.total_points || 0) - Number(a.total_points || 0)
+        || Number(b.exact_scores || 0) - Number(a.exact_scores || 0)
+        || Number(b.good_results || 0) - Number(a.good_results || 0)
+        || Number(b.good_goal_diffs || 0) - Number(a.good_goal_diffs || 0)
+        || String(a.pseudo || "").localeCompare(String(b.pseudo || ""), "fr")
+      );
+
+    return this.rankRowsWithTies(sortedRows, (row) => Number(row.total_points || 0))
+      .map((row) => ({ ...row, has_live_projection: Number(row.live_match_count || 0) > 0 }));
+  },
+
   liveAdjustedLeaderboardRows(rows = this.state.playerScoreRows) {
     const liveRows = this.liveOfficialProjectionRows();
-    if (!liveRows.length) return rows;
+    if (!liveRows.length) return this.rankedOfficialLeaderboardRows(rows);
 
     const byUser = new Map();
 
@@ -1437,20 +1468,7 @@ const App = {
       byUser.set(userId, row);
     });
 
-    const sortedRows = [...byUser.values()]
-      .filter((row) => {
-        const profile = this.profileForUser(row.user_id, row);
-        return profile?.player_scope !== "family" && profile?.role !== "family";
-      })
-      .sort((a, b) =>
-        Number(b.total_points || 0) - Number(a.total_points || 0)
-        || Number(b.exact_scores || 0) - Number(a.exact_scores || 0)
-        || Number(b.good_results || 0) - Number(a.good_results || 0)
-        || Number(b.good_goal_diffs || 0) - Number(a.good_goal_diffs || 0)
-        || String(a.pseudo || "").localeCompare(String(b.pseudo || ""), "fr")
-      );
-    return this.rankRowsWithTies(sortedRows, (row) => Number(row.total_points || 0))
-      .map((row) => ({ ...row, has_live_projection: Number(row.live_match_count || 0) > 0 }));
+    return this.rankedOfficialLeaderboardRows([...byUser.values()]);
   },
 
   officialCompetitionStartAt() {
@@ -1945,7 +1963,9 @@ const App = {
       .maybeSingle();
 
     if (error) return null;
-    return data;
+    const rankedRows = this.rankedOfficialLeaderboardRows(this.state.playerScoreRows || []);
+    const localRank = this.myRankFromRows(rankedRows);
+    return localRank || data;
   },
 
 
@@ -8449,7 +8469,7 @@ const App = {
           </div>
           <div class="profile-account-actions">
             <button class="ghost-btn" id="profileInstallAppBtn" type="button">Installer l’app</button>
-            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.5.5</button>
+            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.5.6</button>
             <button class="danger-btn" id="profileLogoutBtn" type="button">Déconnexion</button>
           </div>
         </div>

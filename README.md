@@ -1,4 +1,11 @@
-# Le Nid des Pronos — V1.5.5
+# Le Nid des Pronos — V1.5.6
+
+## V1.5.6 — Accueil rang ex æquo
+
+- Corrige le rang affiché sur la carte Accueil / Classement général quand il n’y a pas de live.
+- L’accueil ne reprend plus le `rank` brut de Supabase : il recalcule le rang avec la logique ex æquo.
+- Exemple : si le joueur est 7e ex æquo, l’accueil affiche maintenant `#7 ex æquo`, et non plus `#9`.
+- Aucun patch SQL obligatoire.
 
 ## V1.5.5 — Famille live visible
 
