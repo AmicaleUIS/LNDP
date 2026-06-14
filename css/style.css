@@ -17495,3 +17495,14 @@ body[data-current-view] {
   color: #fecaca;
   background: rgba(248, 113, 113, .10);
 }
+
+
+/* ============================================================
+   V1.4.2 — Hotfix classement Famille valueMode
+   ============================================================ */
+
+.average-breakdown {
+  margin-top: 4px;
+}
+
+/* V1.4.2 — Hotfix Matchs joués : fonction playedMatchCardHtml restaurée */

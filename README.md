@@ -1,4 +1,11 @@
-# Le Nid des Pronos — V1.4.1
+# Le Nid des Pronos — V1.4.2
+
+## V1.4.2 — Hotfix classement Famille
+
+- Corrige l’erreur `ReferenceError: valueMode is not defined` dans le classement Famille joueurs.
+- Corrige l’erreur `this.playedMatchCardHtml is not a function` dans l’onglet Matchs joués.
+- Répare l’affichage de la moyenne dans les lignes de classement joueurs/Famille.
+- Aucun nouveau patch SQL obligatoire.
 
 ## V1.4.1 — Rôles Famille réels
 

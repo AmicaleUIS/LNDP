@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — APP PRINCIPALE V1.4.1
+// LE NID DES PRONOS — APP PRINCIPALE V1.4.2
 // ============================================================
 
 const H = window.Helpers;
@@ -465,7 +465,7 @@ const App = {
           <div>
             <p class="eyebrow">Crédits cachés</p>
             <h2 id="creditsTitle">Le Nid des Pronos</h2>
-            <p class="muted">Version publique <strong>1.4.1</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
+            <p class="muted">Version publique <strong>1.4.2</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
           </div>
         </div>
         <div class="credits-grid">
@@ -482,7 +482,7 @@ const App = {
             <p><strong>1.0.5</strong> — dashboard mobile/desktop stabilisé, sans chevauchement des cartes.</p>
           </section>
           <section>
-            <h3>Évolutions V1.4.1</h3>
+            <h3>Évolutions V1.4.2</h3>
             <ul class="changelog-list">
               <li>Le super admin peut désactiver ou réactiver l’affichage du module préparation.</li>
               <li>Quand la préparation est désactivée, les matchs test disparaissent des matchs/pronos, classements par phase et règles.</li>
@@ -5255,10 +5255,12 @@ const App = {
   leaderboardRowsHtml(rows, options = {}) {
     if (!rows.length) return `<p class="muted">Pas encore de points.</p>`;
     const filters = options.filters || {};
+    const valueMode = options.valueMode || "points";
 
     return `
       <div class="leaderboard-list">
-        ${rows.map((r) => {
+        ${rows.map((rawRow) => {
+          const r = this.withAveragePoints(rawRow);
           const playerProfile = this.visualProfile({
             pseudo: r.pseudo,
             office_team_id: r.office_team_id,
@@ -5269,6 +5271,8 @@ const App = {
             badge_shape: r.badge_shape || "rounded",
             badge_color: r.badge_color || "#facc15"
           });
+          const averageValue = Number(r.average_points || 0);
+          const scoredMatches = Number(r.scored_matches || 0);
           return `
           <details class="leader-details ${r.user_id === this.state.session.user.id ? "me" : ""}">
             <summary class="leader-row">
@@ -5280,8 +5284,12 @@ const App = {
                 <strong>${H.escapeHtml(r.pseudo)}</strong>
                 <small>${H.escapeHtml(r.office_team_name || "Sans team")}</small>
                 ${this.pointsBreakdownHtml(r)}
+                <div class="score-breakdown average-breakdown">
+                  <span title="Moyenne par match pronostiqué">${H.icon("trend")} ${averageValue.toFixed(2)} pts/match</span>
+                  <span title="Matchs comptés">${H.icon("list")} ${scoredMatches} match${scoredMatches > 1 ? "s" : ""}</span>
+                </div>
               </div>
-              <div class="points">${r.total_points || 0}<small>pts${r.live_points ? ` · +${r.live_points} live` : ""}</small></div>
+              <div class="points">${valueMode === "average" ? averageValue.toFixed(2) : (r.total_points || 0)}<small>${valueMode === "average" ? "pts/match" : `pts${r.live_points ? ` · +${r.live_points} live` : ""}`}</small></div>
             </summary>
             <div class="leader-expanded">
               <h4>Détail des points</h4>
@@ -6152,7 +6160,7 @@ const App = {
         </div>
         <div class="team-leaderboard-control-stack">${paneControls}${modeControls}</div>
         ${this.liveProjectionCountForMatchIds(null, { includeTest: true, userIds: this.familyProfileIds() }) ? `<div class="live-ranking-note">${H.icon("info")} Classement Famille joueurs provisoire : projections live incluses.</div>` : ""}
-        ${this.leaderboardRowsHtml(rows, { valueMode })}
+        ${this.leaderboardRowsHtml(rows, { valueMode: mode === "average" ? "average" : "points" })}
       </section>
     `;
     this.bindFamilyLeaderboardControls(root);
@@ -8282,7 +8290,7 @@ const App = {
           </div>
           <div class="profile-account-actions">
             <button class="ghost-btn" id="profileInstallAppBtn" type="button">Installer l’app</button>
-            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.4.1</button>
+            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.4.2</button>
             <button class="danger-btn" id="profileLogoutBtn" type="button">Déconnexion</button>
           </div>
         </div>
