@@ -1,6 +1,6 @@
 
 // ============================================================
-// LE NID DES PRONOS — BILAN PDF V1.5.6
+// LE NID DES PRONOS — BILAN PDF V1.6.0
 // ============================================================
 
 const H = window.Helpers;
@@ -16,7 +16,8 @@ const BilanPDF = {
       profiles: [],
       matches: [],
       manualBadges: [],
-      userBadges: []
+      userBadges: [],
+      secondWinnerPick: null
     },
     playerId: null,
     refreshTimer: null,
@@ -195,6 +196,8 @@ const BilanPDF = {
       "three-quarter-perch": { emoji: "🌿", title: "Perchoir presque plein", text: "75 % des pronos connus sont posés." },
       "all-picks-in": { emoji: "🔒", title: "Couvée complète", text: "Tous les pronos connus sont posés." },
       "champion-picked": { emoji: "🏆", title: "Champion choisi", text: "Le hibou a désigné son futur champion avant le grand envol." },
+      "second-champion-picked": { emoji: "🪶", title: "Deuxième plume posée", text: "2e champion choisi après les poules. Le Hibou a sorti le stylo de secours." },
+      "second-final-winner-oracle": { emoji: "🦉", title: "Rattrapage royal", text: "Le 2e champion choisi après les poules remporte la compétition." },
       "preparation-two-picks": { emoji: "🧪", title: "Préparation du nid", text: "Les matchs de préparation test ont été pronostiqués." },
       "prep-good-pick": { emoji: "✅", title: "Test concluant", text: "Au moins un match test a rapporté des points." },
       "first-flight": { emoji: "🛫", title: "Premier envol", text: "Premier match comptabilisé." },
@@ -261,7 +264,8 @@ const BilanPDF = {
       "three-day-ritual","three-quarter-perch","wet-feathers","wrong-exit","young-feathers","zero-tunnel"
     ]);
     if (known.has(id)) return `assets/badges/${id}.png`;
-    if (id === "champion-picked") return "assets/icons/owl-png/coupe-du-monde.png";
+    if (id === "champion-picked" || id === "second-final-winner-oracle") return "assets/icons/owl-png/coupe-du-monde.png";
+    if (id === "second-champion-picked") return "assets/icons/owl-png/badges.png";
     return "assets/icons/owl-png/badges.png";
   },
 
@@ -323,7 +327,7 @@ const BilanPDF = {
 
 
   emptyCompetitionSnapshot() {
-    return { leaderboard: [], predictions: [], profiles: [], matches: [], manualBadges: [], userBadges: [] };
+    return { leaderboard: [], predictions: [], profiles: [], matches: [], manualBadges: [], userBadges: [], secondWinnerPick: null };
   },
 
   competitionSnapshot() {
@@ -334,7 +338,8 @@ const BilanPDF = {
       profiles: Array.isArray(competition.profiles) ? competition.profiles : [],
       matches: Array.isArray(competition.matches) ? competition.matches : [],
       manualBadges: Array.isArray(competition.manualBadges) ? competition.manualBadges : [],
-      userBadges: Array.isArray(competition.userBadges) ? competition.userBadges : []
+      userBadges: Array.isArray(competition.userBadges) ? competition.userBadges : [],
+      secondWinnerPick: competition.secondWinnerPick || null
     };
   },
 
@@ -358,16 +363,17 @@ const BilanPDF = {
       }
     };
 
-    const [leaderboard, predictions, profiles, matches, manualBadges, userBadges] = await Promise.all([
+    const [leaderboard, predictions, profiles, matches, manualBadges, userBadges, secondWinnerRows] = await Promise.all([
       safe(window.sb.from("v_leaderboard_overall").select("*").order("rank")),
       safe(window.sb.from("v_visible_predictions").select("*")),
       safe(window.sb.from("v_public_profiles").select("*")),
       safe(window.sb.from("v_matches").select("*")),
       safe(window.sb.from("manual_user_badges").select("*").eq("user_id", this.state.playerId)),
-      safe(window.sb.from("user_badges").select("*").eq("user_id", this.state.playerId))
+      safe(window.sb.from("user_badges").select("*").eq("user_id", this.state.playerId)),
+      safe(window.sb.from("v_second_winner_predictions").select("*").eq("user_id", this.state.playerId))
     ]);
 
-    this.state.competition = { leaderboard, predictions, profiles, matches, manualBadges, userBadges };
+    this.state.competition = { leaderboard, predictions, profiles, matches, manualBadges, userBadges, secondWinnerPick: (secondWinnerRows || [])[0] || null };
   },
 
   officialPredictions() {
@@ -529,6 +535,8 @@ const BilanPDF = {
     const knownOfficialCount = knownOfficialMatches.length;
     const predictionCount = officialPredictions.length;
     const championPicked = Boolean(champion?.predicted_team_id || champion?.predicted_team_name);
+    const secondWinner = this.competitionSnapshot().secondWinnerPick;
+    const secondChampionPicked = Boolean(secondWinner?.predicted_team_id || secondWinner?.predicted_team_name);
 
     push("egg-hatched", predictionCount >= 1);
     push("young-feathers", predictionCount >= 10);
@@ -536,6 +544,8 @@ const BilanPDF = {
     push("three-quarter-perch", knownOfficialCount > 0 && predictionCount >= Math.ceil(knownOfficialCount * 0.75));
     push("all-picks-in", knownOfficialCount > 0 && predictionCount >= knownOfficialCount);
     push("champion-picked", championPicked, championPicked ? { text: `Champion choisi : ${champion.predicted_team_name || "équipe enregistrée"}.` } : {});
+    push("second-champion-picked", secondChampionPicked, secondChampionPicked ? { text: `2e champion : ${secondWinner.predicted_team_name || "équipe enregistrée"}.` } : {});
+    push("second-final-winner-oracle", secondWinner?.points_total === 50, { text: `Le 2e choix rapporte +50 points : ${secondWinner?.predicted_team_name || "équipe gagnante"}.` });
     push("preparation-two-picks", testPredictions.length >= 2);
     push("prep-good-pick", testPredictions.some((row) => this.n(row.points_total) > 0 || row.is_exact_score || row.is_good_result || row.is_good_goal_diff || row.is_good_qualified));
 

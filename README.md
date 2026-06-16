@@ -1,4 +1,14 @@
-# Le Nid des Pronos — V1.5.6
+# Le Nid des Pronos — V1.6.0
+
+## V1.6.0 — 2e champion + message Hibou
+
+- Ajout d’un 2e choix champion après les poules, valable +50 points.
+- Le choix initial reste intact et peut toujours rapporter +100 points.
+- Le 2e choix ne propose que les équipes qualifiées via `v_group_standings`.
+- Fermeture du 2e choix au premier match des 16èmes / phase à élimination directe.
+- Ajout d’exploits : `Deuxième plume posée` et `Rattrapage royal`.
+- Super admin : message temporaire du Hibou masqué à la connexion, paramétrable par date, heure, durée et importance.
+- Patch SQL obligatoire : `patch_v1_6_0_second_champion_hibou_message.sql`.
 
 ## V1.5.6 — Accueil rang ex æquo
 

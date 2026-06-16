@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — ADMIN V1.5.6
+// LE NID DES PRONOS — ADMIN V1.6.0
 // ============================================================
 
 const H = window.Helpers;
@@ -22,6 +22,7 @@ const Admin = {
     familyInvites: [],
     manualBadges: [],
     appSettings: {},
+    loginOwlMessage: null,
     familyModeEnabled: false,
     preparationModuleEnabled: true,
     graphPreviewTestMatchesEnabled: false,
@@ -82,7 +83,7 @@ const Admin = {
       p_category: category,
       p_details: details || {},
       p_metadata: {
-        app_version: "1.5.6",
+        app_version: "1.6.0",
         source: "admin_front"
       }
     });
@@ -643,7 +644,7 @@ const Admin = {
     const { data, error } = await window.sb
       .from("app_settings")
       .select("key,value")
-      .in("key", ["family_mode_enabled", "preparation_module_enabled", "graph_preview_test_matches_enabled", "graph_mock_preview_enabled", "home_progress_include_test_matches", "live_demo_match_enabled"]);
+      .in("key", ["family_mode_enabled", "preparation_module_enabled", "graph_preview_test_matches_enabled", "graph_mock_preview_enabled", "home_progress_include_test_matches", "live_demo_match_enabled", "login_owl_message"]);
 
     if (error) {
       console.warn("Paramètres app indisponibles", error);
@@ -653,6 +654,7 @@ const Admin = {
       this.state.graphMockPreviewEnabled = false;
       this.state.homeProgressIncludeTestMatches = false;
       this.state.liveDemoMatchEnabled = false;
+      this.state.loginOwlMessage = null;
       return;
     }
 
@@ -664,6 +666,7 @@ const Admin = {
     this.state.graphMockPreviewEnabled = this.settingBoolean(settings.graph_mock_preview_enabled, false);
     this.state.homeProgressIncludeTestMatches = this.settingBoolean(settings.home_progress_include_test_matches, false);
     this.state.liveDemoMatchEnabled = this.settingBoolean(settings.live_demo_match_enabled, false);
+    this.state.loginOwlMessage = settings.login_owl_message || null;
   },
 
   async loadAuditLogs() {
@@ -1738,6 +1741,93 @@ const Admin = {
     return "Tout le monde";
   },
 
+
+
+  owlLoginMessageAdminHtml() {
+    const msg = this.state.loginOwlMessage || {};
+    const start = msg.start_at ? this.datetimeLocalValue(msg.start_at) : this.datetimeLocalValue(new Date());
+    const durationDays = Number(msg.duration_days || 1);
+    return `
+      <section class="card admin-owl-message-card">
+        <div class="card-title-row">
+          <div>
+            <h3>${H.icon("diffusion")} Message temporaire du Hibou masqué</h3>
+            <p class="muted">Affiché à la connexion selon la date, l’heure, la durée et l’importance. Style nid, zéro communiqué ministériel.</p>
+          </div>
+          <span class="pill ${msg.enabled !== false && msg.body ? "success" : "neutral"}">${msg.enabled !== false && msg.body ? "Actif / planifié" : "Inactif"}</span>
+        </div>
+        <form id="owlLoginMessageForm" class="form-stack">
+          <div class="grid two">
+            <label><span>Titre</span><input name="title" maxlength="80" value="${H.escapeHtml(msg.title || "Message du Hibou masqué")}" required></label>
+            <label><span>Importance</span><select name="importance">
+              ${["info", "fun", "warning", "urgent"].map((value) => `<option value="${value}" ${msg.importance === value ? "selected" : ""}>${value}</option>`).join("")}
+            </select></label>
+            <label><span>Date et heure de début</span><input type="datetime-local" name="start_at" value="${H.escapeHtml(start)}" required></label>
+            <label><span>Durée en jours</span><input type="number" name="duration_days" min="0.04" step="0.04" value="${H.escapeHtml(String(durationDays || 1))}" required></label>
+          </div>
+          <label><span>Message</span><textarea name="body" rows="4" maxlength="700" placeholder="Ex : Le Hibou masqué rappelle que les 16èmes arrivent. Pas de panique, juste des plumes." required>${H.escapeHtml(msg.body || msg.message || "")}</textarea></label>
+          <label class="check-line"><input type="checkbox" name="enabled" ${msg.enabled === false ? "" : "checked"}> Activer / planifier ce message</label>
+          <div class="admin-chat-actions">
+            <button class="primary-btn" type="submit">Enregistrer le message</button>
+            <button class="danger-btn" id="clearOwlLoginMessageBtn" type="button">Désactiver</button>
+          </div>
+        </form>
+      </section>
+    `;
+  },
+
+  datetimeLocalValue(value) {
+    const date = value instanceof Date ? value : new Date(value || Date.now());
+    if (!Number.isFinite(date.getTime())) return "";
+    const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+    return local.toISOString().slice(0, 16);
+  },
+
+  async saveOwlLoginMessage(form) {
+    const formData = new FormData(form);
+    const startLocal = String(formData.get("start_at") || "");
+    const startDate = startLocal ? new Date(startLocal) : new Date();
+    const durationDays = Math.max(0.04, Number(formData.get("duration_days") || 1));
+    const endDate = new Date(startDate.getTime() + durationDays * 24 * 60 * 60 * 1000);
+    const payload = {
+      id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now()),
+      enabled: formData.get("enabled") === "on",
+      title: String(formData.get("title") || "Message du Hibou masqué").trim(),
+      body: String(formData.get("body") || "").trim(),
+      importance: String(formData.get("importance") || "info"),
+      start_at: startDate.toISOString(),
+      end_at: endDate.toISOString(),
+      duration_days: durationDays,
+      updated_at: new Date().toISOString()
+    };
+    if (!payload.body) {
+      H.toast("Le Hibou refuse de hululer dans le vide.", "error");
+      return;
+    }
+    const { error } = await window.sb.rpc("admin_set_login_owl_message", { p_message: payload });
+    if (error) {
+      H.toast(error.message || "Impossible d’enregistrer le message. Lance le patch SQL V1.6.0.", "error");
+      return;
+    }
+    await this.loadFamilyModeSetting();
+    this.renderChatModeration();
+    H.toast("Message du Hibou programmé", "success");
+  },
+
+  async clearOwlLoginMessage() {
+    if (!confirm("Désactiver le message temporaire du Hibou ?")) return;
+    const current = this.state.loginOwlMessage || {};
+    const payload = { ...current, enabled: false, updated_at: new Date().toISOString() };
+    const { error } = await window.sb.rpc("admin_set_login_owl_message", { p_message: payload });
+    if (error) {
+      H.toast(error.message || "Impossible de désactiver le message.", "error");
+      return;
+    }
+    await this.loadFamilyModeSetting();
+    this.renderChatModeration();
+    H.toast("Message du Hibou désactivé", "success");
+  },
+
   renderChatModeration() {
     const root = H.$("#chatModerationAdmin");
     if (!root) return;
@@ -1756,6 +1846,8 @@ const Admin = {
     }
 
     root.innerHTML = `
+
+      ${this.isSuperAdmin() ? this.owlLoginMessageAdminHtml() : ""}
       <div class="admin-chat-toolbar">
         <div class="segmented small">
           <button class="${scope === "all" ? "active" : ""}" type="button" data-chat-admin-filter="all">Tous</button>
@@ -1796,6 +1888,12 @@ const Admin = {
         `).join("") : `<p class="muted">Aucun message dans ce filtre.</p>`}
       </div>
     `;
+
+    H.$("#owlLoginMessageForm", root)?.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      await this.saveOwlLoginMessage(event.currentTarget);
+    });
+    H.$("#clearOwlLoginMessageBtn", root)?.addEventListener("click", async () => this.clearOwlLoginMessage());
 
     H.$$('[data-chat-admin-filter]', root).forEach((button) => {
       button.addEventListener("click", async () => {
@@ -2834,6 +2932,11 @@ const Admin = {
       })
       .on("postgres_changes", { event: "*", schema: "public", table: "team_chat_messages" }, async () => {
         await this.loadChatMessages();
+        this.renderChatModeration();
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "app_settings" }, async () => {
+        if (!this.isSuperAdmin()) return;
+        await this.loadFamilyModeSetting();
         this.renderChatModeration();
       })
       .on("postgres_changes", { event: "*", schema: "public", table: "family_invites" }, async () => {

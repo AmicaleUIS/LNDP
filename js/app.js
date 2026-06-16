@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — APP PRINCIPALE V1.5.6
+// LE NID DES PRONOS — APP PRINCIPALE V1.6.0
 // ============================================================
 
 const H = window.Helpers;
@@ -12,6 +12,7 @@ const App = {
     footballTeams: [],
     activeCompetition: null,
     winnerPrediction: null,
+    secondWinnerPrediction: null,
     matches: [],
     groupStandings: [],
     myPredictions: [],
@@ -24,6 +25,7 @@ const App = {
     publicProfiles: [],
     playerScoreRows: [],
     winnerPredictions: [],
+    secondWinnerPredictions: [],
     winnerPredictionsError: null,
     teamSelectedPlayerId: null,
     teamChatMessages: [],
@@ -128,6 +130,7 @@ const App = {
     const mustCompleteProfile = !this.profileSetupComplete();
     this.syncAchievementNotifications({ silent: !this.hasAchievementNotificationStore() });
     await this.loadView((mustChangePassword || mustCompleteProfile) ? "profile" : requestedView);
+    this.maybeShowLoginOwlMessage();
     await this.refreshTeamChatUnreadIndicator();
     if (mustChangePassword) {
       H.toast("Mot de passe temporaire : choisis ton nouveau mot de passe.", "info");
@@ -465,7 +468,7 @@ const App = {
           <div>
             <p class="eyebrow">Crédits cachés</p>
             <h2 id="creditsTitle">Le Nid des Pronos</h2>
-            <p class="muted">Version publique <strong>1.5.6</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
+            <p class="muted">Version publique <strong>1.6.0</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
           </div>
         </div>
         <div class="credits-grid">
@@ -482,7 +485,7 @@ const App = {
             <p><strong>1.0.5</strong> — dashboard mobile/desktop stabilisé, sans chevauchement des cartes.</p>
           </section>
           <section>
-            <h3>Évolutions V1.5.6</h3>
+            <h3>Évolutions V1.6.0</h3>
             <ul class="changelog-list">
               <li>Le super admin peut désactiver ou réactiver l’affichage du module préparation.</li>
               <li>Quand la préparation est désactivée, les matchs test disparaissent des matchs/pronos, classements par phase et règles.</li>
@@ -650,6 +653,7 @@ const App = {
     await Promise.all([
       this.loadPublicProfiles(),
       this.loadWinnerPrediction(),
+      this.loadSecondWinnerPrediction(),
       this.loadMiniRecordPredictionCounts(),
       this.loadManualBadges(),
       this.loadMyFamilyInvites()
@@ -723,6 +727,30 @@ const App = {
     this.state.winnerPrediction = data || null;
   },
 
+
+
+  async loadSecondWinnerPrediction() {
+    if (!this.state.activeCompetition) {
+      this.state.secondWinnerPrediction = null;
+      return;
+    }
+
+    const { data, error } = await window.sb
+      .from("second_winner_predictions")
+      .select("*")
+      .eq("user_id", this.state.session.user.id)
+      .eq("competition_id", this.state.activeCompetition.id)
+      .maybeSingle();
+
+    if (error) {
+      console.warn("second_winner_predictions indisponible : lance le patch SQL V1.6.0", error);
+      this.state.secondWinnerPrediction = null;
+      return;
+    }
+
+    this.state.secondWinnerPrediction = data || null;
+  },
+
   async loadPlayerScoreRows() {
     const { data, error } = await window.sb
       .from("v_leaderboard_overall")
@@ -756,7 +784,7 @@ const App = {
     const { data, error } = await window.sb
       .from("app_settings")
       .select("key,value")
-      .in("key", ["family_mode_enabled", "preparation_module_enabled", "graph_preview_test_matches_enabled", "graph_mock_preview_enabled", "home_progress_include_test_matches", "live_demo_match_enabled"]);
+      .in("key", ["family_mode_enabled", "preparation_module_enabled", "graph_preview_test_matches_enabled", "graph_mock_preview_enabled", "home_progress_include_test_matches", "live_demo_match_enabled", "login_owl_message"]);
 
     if (error) {
       console.warn("Paramètres app indisponibles", error);
@@ -765,6 +793,68 @@ const App = {
     }
 
     this.state.appSettings = Object.fromEntries((data || []).map((row) => [row.key, row.value]));
+  },
+
+
+
+  activeLoginOwlMessage() {
+    const message = this.state.appSettings?.login_owl_message;
+    if (!message || typeof message !== "object" || message.enabled === false) return null;
+    const now = Date.now();
+    const start = message.start_at ? new Date(message.start_at).getTime() : 0;
+    const end = message.end_at ? new Date(message.end_at).getTime() : 0;
+    if (start && now < start) return null;
+    if (end && now > end) return null;
+    if (!String(message.body || message.message || "").trim()) return null;
+    return message;
+  },
+
+  loginOwlMessageDismissKey(message) {
+    const signature = message.id || message.updated_at || `${message.start_at || ""}:${message.end_at || ""}:${message.body || message.message || ""}`;
+    return `${this.appStoragePrefix()}:login-owl-message:${btoa(unescape(encodeURIComponent(signature))).slice(0, 40)}`;
+  },
+
+  maybeShowLoginOwlMessage() {
+    const message = this.activeLoginOwlMessage();
+    if (!message) return;
+    const key = this.loginOwlMessageDismissKey(message);
+    try {
+      if (localStorage.getItem(key) === "dismissed") return;
+    } catch (error) {}
+    window.setTimeout(() => this.openLoginOwlMessageModal(message, key), 180);
+  },
+
+  openLoginOwlMessageModal(message, storageKey) {
+    if (document.querySelector(".login-owl-message-modal")) return;
+    const importance = message.importance || "info";
+    const title = message.title || "Message du Hibou masqué";
+    const body = message.body || message.message || "";
+    const modal = document.createElement("div");
+    modal.className = `modal-backdrop login-owl-message-modal importance-${importance}`;
+    modal.innerHTML = `
+      <div class="modal-card login-owl-message-card" role="dialog" aria-modal="true" aria-labelledby="loginOwlTitle">
+        <button class="modal-close" type="button" aria-label="Fermer">×</button>
+        <div class="login-owl-message-head">
+          <img src="assets/icons/owl-png/admin.png" alt="" class="login-owl-message-icon" loading="lazy" onerror="this.style.display='none'">
+          <div>
+            <p class="eyebrow">Le Hibou masqué passe une tête</p>
+            <h2 id="loginOwlTitle">${H.escapeHtml(title)}</h2>
+          </div>
+        </div>
+        <div class="login-owl-message-body">${H.escapeHtml(body).replace(/\n/g, "<br>")}</div>
+        <div class="login-owl-message-actions">
+          <button class="primary-btn" type="button" id="closeLoginOwlMessageBtn">Bien reçu, chef Hibou</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+    const close = () => {
+      try { localStorage.setItem(storageKey, "dismissed"); } catch (error) {}
+      modal.remove();
+    };
+    H.$("#closeLoginOwlMessageBtn", modal)?.addEventListener("click", close);
+    H.$(".modal-close", modal)?.addEventListener("click", close);
+    modal.addEventListener("click", (event) => { if (event.target === modal) close(); });
   },
 
   familyModeEnabled() {
@@ -1516,6 +1606,88 @@ const App = {
       : this.state.footballTeams;
 
     return [...candidates].sort((a, b) => String(a.name).localeCompare(String(b.name), "fr"));
+  },
+
+
+
+  secondChampionCloseAt() {
+    const knockout = this.competitionMatches()
+      .filter((match) => !["cancelled", "postponed"].includes(match.status))
+      .filter((match) => ["round_of_32", "round_of_16"].includes(match.stage))
+      .sort((a, b) => new Date(a.kickoff_at || 0) - new Date(b.kickoff_at || 0))[0];
+    return knockout?.kickoff_at ? new Date(knockout.kickoff_at) : null;
+  },
+
+  secondChampionPickOpen() {
+    const closeAt = this.secondChampionCloseAt();
+    return !closeAt || closeAt.getTime() > Date.now();
+  },
+
+  secondChampionCandidateTeams() {
+    const qualifiedStatuses = new Set(["qualified", "qualified_best_third"]);
+    const qualifiedIds = new Set((this.state.groupStandings || [])
+      .filter((row) => qualifiedStatuses.has(row.qualification_status))
+      .map((row) => row.team_id)
+      .filter(Boolean));
+
+    if (!qualifiedIds.size) {
+      this.competitionMatches()
+        .filter((match) => ["round_of_32", "round_of_16"].includes(match.stage))
+        .forEach((match) => {
+          if (match.home_team_id) qualifiedIds.add(match.home_team_id);
+          if (match.away_team_id) qualifiedIds.add(match.away_team_id);
+        });
+    }
+
+    return this.state.footballTeams
+      .filter((team) => qualifiedIds.has(team.id))
+      .sort((a, b) => String(a.name).localeCompare(String(b.name), "fr"));
+  },
+
+  secondChampionSelectedTeam() {
+    const teamId = this.state.secondWinnerPrediction?.predicted_team_id || "";
+    return this.state.footballTeams.find((team) => team.id === teamId) || null;
+  },
+
+  async saveSecondChampionPick(teamId) {
+    if (this.state.profile?.can_predict === false || this.state.profile?.is_banned) {
+      H.toast("Les pronostics sont désactivés sur ton compte.", "error");
+      return;
+    }
+    if (!this.state.activeCompetition) {
+      H.toast("Compétition active introuvable", "error");
+      return;
+    }
+    if (!teamId) {
+      H.toast("Choisis ton deuxième champion", "error");
+      return;
+    }
+    if (!this.secondChampionPickOpen()) {
+      H.toast("2e choix champion verrouillé : les 16èmes ont commencé.", "error");
+      return;
+    }
+    const allowedIds = new Set(this.secondChampionCandidateTeams().map((team) => team.id));
+    if (!allowedIds.has(teamId)) {
+      H.toast("Cette équipe n’est pas qualifiée pour le 2e choix. Le hibou refuse le ticket.", "error");
+      return;
+    }
+
+    const { error } = await window.sb.rpc("save_second_winner_prediction", {
+      p_predicted_team_id: teamId,
+      p_competition_id: this.state.activeCompetition.id
+    });
+
+    if (error) {
+      H.toast(error.message || "Impossible d’enregistrer le 2e champion. Lance le patch SQL V1.6.0.", "error");
+      return;
+    }
+
+    await this.loadSecondWinnerPrediction();
+    await this.loadPlayerScoreRows().catch(() => {});
+    this.syncAchievementNotifications();
+    this.scheduleAchievementResync();
+    H.toast("2e champion enregistré : +50 points si ça passe !", "success");
+    await this.renderProfile();
   },
 
   async saveChampionPick(teamId) {
@@ -2982,6 +3154,8 @@ const App = {
     const latestPredictionAt = countRow?.latest_prediction_at || countRow?.latest_at || null;
     const availableMatchCount = this.availablePredictionMatches().length;
     const champion = this.winnerPredictionForUser(userId);
+    const secondChampion = String(userId) === String(this.state.session?.user?.id) ? this.state.secondWinnerPrediction : null;
+    const final = this.finalMatch();
 
     if (predictionCount >= 1) unlock("egg-hatched", firstPredictionAt);
     if (predictionCount >= 10) unlock("young-feathers", latestPredictionAt || firstPredictionAt);
@@ -2989,6 +3163,8 @@ const App = {
     if (availableMatchCount > 0 && predictionCount >= Math.ceil(availableMatchCount * 0.75)) unlock("three-quarter-perch", latestPredictionAt || firstPredictionAt);
     if (availableMatchCount > 0 && predictionCount >= availableMatchCount) unlock("all-picks-in", latestPredictionAt || firstPredictionAt);
     if (champion?.predicted_team_id) unlock("champion-picked", champion.locked_at || champion.updated_at || champion.created_at || firstPredictionAt);
+    if (secondChampion?.predicted_team_id) unlock("second-champion-picked", secondChampion.locked_at || secondChampion.updated_at || secondChampion.created_at || latestPredictionAt || firstPredictionAt);
+    if (final?.status === "finished" && final?.winner_team_id && secondChampion?.predicted_team_id === final.winner_team_id) unlock("second-final-winner-oracle", this.matchResultDate(final));
 
     return badges.sort((a, b) => {
       const aDate = a.unlockedAt?.getTime?.() || 0;
@@ -4451,7 +4627,9 @@ const App = {
       { id: "last-wingbeat", title: "Dernier battement d’aile", description: "Un prono ajusté dans les 2 heures avant le coup d’envoi. Frisson, sueur, validation.", type: "neutral", category: "fidelity" },
 
       { id: "champion-picked", title: "Champion choisi", description: "L’équipe championne a été désignée avant le grand envol. Le hibou assume son oracle.", type: "neutral", category: "progression" },
+      { id: "second-champion-picked", title: "Deuxième plume posée", description: "Un 2e champion a été choisi après les poules. Le hibou sort son stylo de secours.", type: "neutral", category: "progression" },
       { id: "final-winner-oracle", title: "Oracle de la finale", description: "L’équipe choisie championne avant le départ gagne réellement la Coupe. Là, le nid sort les confettis.", type: "neutral" },
+      { id: "second-final-winner-oracle", title: "Rattrapage royal", description: "Le 2e champion choisi après les poules gagne la compétition. Filet de sécurité validé par le Hibou.", type: "positive" },
       { id: "bus-stuck", title: "Descente du bus impossible", description: "L’équipe désignée championne reste bloquée en phase de groupes. Le bus a calé avant la sortie des poules.", type: "negative" },
       { id: "final-perfect-score", title: "Finale millimétrée", description: "Score exact trouvé sur la finale. Une plume, une règle, zéro tremblement.", type: "neutral" },
       { id: "first-flight", title: "Premier envol", description: "Premier match comptabilisé. Le hibou a quitté le nid.", type: "neutral" },
@@ -4550,9 +4728,10 @@ const App = {
       return pred === real;
     });
     const earlyWinnerPick = this.winnerPredictionForUser(userId);
+    const secondWinnerPick = String(userId) === String(this.state.session?.user?.id) ? this.state.secondWinnerPrediction : null;
     const manualBadges = this.manualBadgesForUser(userId);
 
-    if (!rows.length && !predictionRows.length && !prepPredictionRows.length && !earlyWinnerPick?.predicted_team_id && !manualBadges.length) return [];
+    if (!rows.length && !predictionRows.length && !prepPredictionRows.length && !earlyWinnerPick?.predicted_team_id && !secondWinnerPick?.predicted_team_id && !manualBadges.length) return [];
 
     const exact = rows.filter(({ prediction }) => prediction.is_exact_score).length;
     const goodResults = rows.filter(({ prediction }) => prediction.is_good_result).length;
@@ -4756,6 +4935,8 @@ const App = {
     if (hasLastWingbeat) unlock("last-wingbeat", this.predictionActivityDate(lastWingbeatPrediction));
 
     if (hasFinalWinnerPick) unlock("final-winner-oracle", finalDate);
+    if (secondWinnerPick?.predicted_team_id) unlock("second-champion-picked", secondWinnerPick.locked_at || secondWinnerPick.updated_at || secondWinnerPick.created_at || null);
+    if (final?.status === "finished" && final?.winner_team_id && secondWinnerPick?.predicted_team_id === final.winner_team_id) unlock("second-final-winner-oracle", finalDate);
     const championGroupExitDate = this.championGroupExitDate(finalWinnerPick);
     if (championGroupExitDate) unlock("bus-stuck", championGroupExitDate);
     if (hasPerfectFinalScore) unlock("final-perfect-score", this.scoreRowResultDate(finalPerfectRow));
@@ -8380,6 +8561,11 @@ const App = {
     const selectedWinnerId = this.state.winnerPrediction?.predicted_team_id || "";
     const selectedWinner = this.state.footballTeams.find((team) => team.id === selectedWinnerId);
     const championTeams = this.championCandidateTeams();
+    const secondChampionTeams = this.secondChampionCandidateTeams();
+    const secondChampionOpen = this.secondChampionPickOpen();
+    const secondChampionCloseAt = this.secondChampionCloseAt();
+    const selectedSecondWinnerId = this.state.secondWinnerPrediction?.predicted_team_id || "";
+    const selectedSecondWinner = this.secondChampionSelectedTeam();
     const competitionName = this.state.activeCompetition?.name || "la compétition";
     const currentAvatar = H.normalizeAvatarKey(profile.avatar_key);
     const currentShape = profile.badge_shape || "rounded";
@@ -8469,7 +8655,7 @@ const App = {
           </div>
           <div class="profile-account-actions">
             <button class="ghost-btn" id="profileInstallAppBtn" type="button">Installer l’app</button>
-            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.5.6</button>
+            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.6.0</button>
             <button class="danger-btn" id="profileLogoutBtn" type="button">Déconnexion</button>
           </div>
         </div>
@@ -8597,6 +8783,43 @@ const App = {
           <p class="muted small-note">Verrouillage au premier match officiel : ${startAt ? H.formatDateTime(startAt) : "à confirmer"}</p>
         </div>
       </section>
+
+      <section class="card champion-pick-card second-champion-card ${secondChampionOpen ? "" : "is-locked"}">
+        <div class="card-title-row">
+          <div>
+            <h3>${H.icon("trophy")} Mon 2e champion après les poules</h3>
+            <p class="muted">Choix bonus ouvert après la mise à jour des qualifiés. Il vaut <strong>+50 points</strong> et ne remplace pas ton champion initial.</p>
+          </div>
+          <span class="pill ${secondChampionOpen ? "success" : "danger"}">${secondChampionOpen ? "Ouvert" : "Verrouillé"}</span>
+        </div>
+
+        ${secondChampionTeams.length ? `
+          <form id="secondChampionPickForm" class="winner-pick-form">
+            <label class="winner-team-label">
+              <span>2e équipe championne possible</span>
+              <select name="predicted_team_id" ${secondChampionOpen ? "" : "disabled"} required>
+                <option value="">Choisir une équipe qualifiée</option>
+                ${secondChampionTeams.map((team) => `<option value="${H.escapeHtml(team.id)}" ${selectedSecondWinnerId === team.id ? "selected" : ""}>${H.escapeHtml(team.name)}${team.short_name ? ` · ${H.escapeHtml(team.short_name)}` : ""}</option>`).join("")}
+              </select>
+            </label>
+            <button class="primary-btn" type="submit" ${secondChampionOpen ? "" : "disabled"}>Enregistrer mon 2e champion</button>
+          </form>
+        ` : `<div class="empty-state compact"><strong>Qualifiés pas encore prêts</strong><p>Quand les poules seront terminées et les qualifiés mis à jour, le Hibou ouvrira ce 2e choix.</p></div>`}
+
+        <div class="winner-pick-status">
+          ${selectedSecondWinner ? `
+            <div class="winner-team-preview">
+              ${H.flagImgHtml({ flagUrl: selectedSecondWinner.flag_url, countryCode: selectedSecondWinner.country_code, shortName: selectedSecondWinner.short_name, name: selectedSecondWinner.name })}
+              <div>
+                <strong>${H.escapeHtml(selectedSecondWinner.name)}</strong>
+                <small>2e choix bonus enregistré · +50 pts si cette équipe gagne.</small>
+              </div>
+            </div>
+          ` : `<p class="muted">Aucun 2e champion choisi pour l’instant.</p>`}
+          <p class="muted small-note">Fermeture au premier match des 16èmes : ${secondChampionCloseAt ? H.formatDateTime(secondChampionCloseAt) : "à confirmer"}</p>
+        </div>
+      </section>
+
     `;
 
     const updatePreview = () => {
@@ -8655,6 +8878,17 @@ const App = {
         event.preventDefault();
         const formData = new FormData(event.currentTarget);
         await this.saveChampionPick(formData.get("predicted_team_id"));
+      });
+    }
+
+
+
+    const secondChampionForm = H.$("#secondChampionPickForm");
+    if (secondChampionForm && secondChampionOpen) {
+      secondChampionForm.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const formData = new FormData(event.currentTarget);
+        await this.saveSecondChampionPick(formData.get("predicted_team_id"));
       });
     }
 
@@ -8810,6 +9044,13 @@ const App = {
       })
       .on("postgres_changes", { event: "*", schema: "public", table: "winner_predictions" }, async () => {
         await this.refreshCurrentViewFromRealtime("winner");
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "second_winner_predictions" }, async () => {
+        await this.loadSecondWinnerPrediction();
+        await this.refreshCurrentViewFromRealtime("second-winner");
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "app_settings" }, async () => {
+        await this.loadAppSettings();
       })
       .on("postgres_changes", { event: "*", schema: "public", table: "team_chat_messages" }, async (payload) => {
         await this.handleTeamChatRealtime(payload);
