@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — APP PRINCIPALE V1.6.3
+// LE NID DES PRONOS — APP PRINCIPALE V1.6.4
 // ============================================================
 
 const H = window.Helpers;
@@ -22,6 +22,7 @@ const App = {
     familyInvites: [],
     blockedUserIds: new Set(),
     appSettings: {},
+    owlMessages: [],
     publicProfiles: [],
     playerScoreRows: [],
     winnerPredictions: [],
@@ -468,7 +469,7 @@ const App = {
           <div>
             <p class="eyebrow">Crédits cachés</p>
             <h2 id="creditsTitle">Le Nid des Pronos</h2>
-            <p class="muted">Version publique <strong>1.6.3</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
+            <p class="muted">Version publique <strong>1.6.4</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
           </div>
         </div>
         <div class="credits-grid">
@@ -485,7 +486,7 @@ const App = {
             <p><strong>1.0.5</strong> — dashboard mobile/desktop stabilisé, sans chevauchement des cartes.</p>
           </section>
           <section>
-            <h3>Évolutions V1.6.3</h3>
+            <h3>Évolutions V1.6.4</h3>
             <ul class="changelog-list">
               <li>Le super admin peut désactiver ou réactiver l’affichage du module préparation.</li>
               <li>Quand la préparation est désactivée, les matchs test disparaissent des matchs/pronos, classements par phase et règles.</li>
@@ -647,6 +648,7 @@ const App = {
       this.loadMyPredictions(),
       this.loadVisiblePredictions(),
       this.loadAppSettings(),
+      this.loadOwlMessages(),
       this.loadBlockedUsers()
     ]);
 
@@ -797,10 +799,42 @@ const App = {
 
 
 
+
+  async loadOwlMessages() {
+    const nowIso = new Date().toISOString();
+    const { data, error } = await window.sb
+      .from("owl_messages")
+      .select("id,title,body,importance,start_at,end_at,duration_days,enabled,show_in_history,created_at,updated_at")
+      .eq("enabled", true)
+      .eq("show_in_history", true)
+      .lte("start_at", nowIso)
+      .order("start_at", { ascending: false })
+      .limit(100);
+
+    if (error) {
+      console.warn("Messages Hibou indisponibles : lance le patch SQL V1.6.4", error);
+      this.state.owlMessages = [];
+      return;
+    }
+
+    this.state.owlMessages = data || [];
+  },
+
+
   activeLoginOwlMessage() {
+    const now = Date.now();
+    const fromTable = (this.state.owlMessages || []).find((message) => {
+      if (!message || message.enabled === false) return false;
+      const start = message.start_at ? new Date(message.start_at).getTime() : 0;
+      const end = message.end_at ? new Date(message.end_at).getTime() : 0;
+      if (start && now < start) return false;
+      if (end && now > end) return false;
+      return Boolean(String(message.body || message.message || "").trim());
+    });
+    if (fromTable) return fromTable;
+
     const message = this.state.appSettings?.login_owl_message;
     if (!message || typeof message !== "object" || message.enabled === false) return null;
-    const now = Date.now();
     const start = message.start_at ? new Date(message.start_at).getTime() : 0;
     const end = message.end_at ? new Date(message.end_at).getTime() : 0;
     if (start && now < start) return null;
@@ -854,6 +888,55 @@ const App = {
     };
     H.$("#closeLoginOwlMessageBtn", modal)?.addEventListener("click", close);
     H.$(".modal-close", modal)?.addEventListener("click", close);
+    modal.addEventListener("click", (event) => { if (event.target === modal) close(); });
+  },
+
+
+
+  openOwlMessagesHistoryModal() {
+    H.$("#owlMessagesHistoryModal")?.remove();
+    const messages = (this.state.owlMessages || [])
+      .slice()
+      .sort((a, b) => new Date(b.start_at || b.created_at || 0) - new Date(a.start_at || a.created_at || 0));
+
+    const modal = document.createElement("div");
+    modal.id = "owlMessagesHistoryModal";
+    modal.className = "modal-backdrop owl-messages-history-modal";
+    modal.innerHTML = `
+      <div class="modal-card owl-messages-history-card" role="dialog" aria-modal="true" aria-labelledby="owlMessagesHistoryTitle">
+        <button class="modal-x-btn" id="closeOwlMessagesHistoryBtn" type="button" aria-label="Fermer">×</button>
+        <div class="card-title-row">
+          <div>
+            <p class="eyebrow">${H.icon("diffusion")} Messages du Hibou masqué</p>
+            <h2 id="owlMessagesHistoryTitle">Le grimoire des annonces</h2>
+            <p class="muted">Tous les messages publiés par le Hibou, du plus récent au plus ancien. Les vieilles plumes restent lisibles.</p>
+          </div>
+        </div>
+        <div class="owl-message-history-list">
+          ${messages.length ? messages.map((message) => `
+            <article class="owl-message-history-item importance-${H.escapeHtml(message.importance || "info")}">
+              <div class="owl-message-history-head">
+                <img src="assets/icons/owl-png/admin.png" alt="" loading="lazy" onerror="this.style.display='none'">
+                <div>
+                  <strong>${H.escapeHtml(message.title || "Message du Hibou masqué")}</strong>
+                  <small>${H.formatDateTime(message.start_at || message.created_at)}${message.end_at ? ` · visible jusqu’au ${H.formatDateTime(message.end_at)}` : ""}</small>
+                </div>
+                <span class="pill">${H.escapeHtml(message.importance || "info")}</span>
+              </div>
+              <p>${H.escapeHtml(message.body || message.message || "").replace(/\\n/g, "<br>")}</p>
+            </article>
+          `).join("") : `
+            <div class="empty-state compact">
+              <strong>Aucun message publié</strong>
+              <p>Le Hibou masqué n’a pas encore déposé de parchemin public.</p>
+            </div>
+          `}
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+    const close = () => modal.remove();
+    H.$("#closeOwlMessagesHistoryBtn", modal)?.addEventListener("click", close);
     modal.addEventListener("click", (event) => { if (event.target === modal) close(); });
   },
 
@@ -1784,6 +1867,7 @@ const App = {
             </div>
             <div class="home-hero-actions">
               <button class="ghost-btn rules-home-btn" id="rulesHomeBtn" type="button">${H.icon("list")} Règles & points</button>
+              <button class="ghost-btn owl-messages-home-btn" id="owlMessagesHomeBtn" type="button">${H.icon("diffusion")} Messages du Hibou</button>
             </div>
           </div>
         </section>
@@ -1840,6 +1924,10 @@ const App = {
     `;
 
     H.$("#rulesHomeBtn")?.addEventListener("click", () => this.openRulesModal());
+    H.$("#owlMessagesHomeBtn")?.addEventListener("click", async () => {
+      await this.loadOwlMessages();
+      this.openOwlMessagesHistoryModal();
+    });
     H.$('[data-action="continue-predictions"]', root)?.addEventListener("click", async () => {
       if (missing.length) {
         await this.goToNearestMissingPrediction();
@@ -8663,7 +8751,7 @@ const App = {
           </div>
           <div class="profile-account-actions">
             <button class="ghost-btn" id="profileInstallAppBtn" type="button">Installer l’app</button>
-            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.6.3</button>
+            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.6.4</button>
             <button class="danger-btn" id="profileLogoutBtn" type="button">Déconnexion</button>
           </div>
         </div>
@@ -9068,7 +9156,8 @@ const App = {
       this.loadGroupStandings(),
       this.loadMyPredictions(),
       this.loadVisiblePredictions(),
-      this.loadWinnerPrediction()
+      this.loadWinnerPrediction(),
+      this.loadOwlMessages()
     ]);
 
     this.syncAchievementNotifications();

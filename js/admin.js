@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — ADMIN V1.6.3
+// LE NID DES PRONOS — ADMIN V1.6.4
 // ============================================================
 
 const H = window.Helpers;
@@ -23,6 +23,7 @@ const Admin = {
     manualBadges: [],
     appSettings: {},
     loginOwlMessage: null,
+    owlMessages: [],
     familyModeEnabled: false,
     preparationModuleEnabled: true,
     graphPreviewTestMatchesEnabled: false,
@@ -83,7 +84,7 @@ const Admin = {
       p_category: category,
       p_details: details || {},
       p_metadata: {
-        app_version: "1.6.3",
+        app_version: "1.6.4",
         source: "admin_front"
       }
     });
@@ -427,6 +428,7 @@ const Admin = {
         this.loadFamilyInvites(),
         this.loadManualBadges(),
         this.loadFamilyModeSetting(),
+        this.loadOwlMessagesAdmin(),
         this.loadAuditLogs(),
         this.loadHealthSnapshot()
       ]);
@@ -638,6 +640,28 @@ const Admin = {
     if (typeof value === "string") return value === "true";
     if (value && typeof value === "object" && "enabled" in value) return Boolean(value.enabled);
     return Boolean(value);
+  },
+
+
+  async loadOwlMessagesAdmin() {
+    if (!this.isSuperAdmin()) {
+      this.state.owlMessages = [];
+      return;
+    }
+
+    const { data, error } = await window.sb
+      .from("owl_messages")
+      .select("*")
+      .order("start_at", { ascending: false })
+      .limit(200);
+
+    if (error) {
+      console.warn("Historique Hibou indisponible : lance le patch SQL V1.6.4", error);
+      this.state.owlMessages = [];
+      return;
+    }
+
+    this.state.owlMessages = data || [];
   },
 
   async loadFamilyModeSetting() {
@@ -1747,15 +1771,18 @@ const Admin = {
     const msg = this.state.loginOwlMessage || {};
     const start = msg.start_at ? this.datetimeLocalValue(msg.start_at) : this.datetimeLocalValue(new Date());
     const durationDays = Number(msg.duration_days || 1);
+    const rows = (this.state.owlMessages || []).slice().sort((a, b) => new Date(b.start_at || b.created_at || 0) - new Date(a.start_at || a.created_at || 0));
+
     return `
       <section class="card admin-owl-message-card">
         <div class="card-title-row">
           <div>
-            <h3>${H.icon("diffusion")} Message temporaire du Hibou masqué</h3>
-            <p class="muted">Affiché à la connexion selon la date, l’heure, la durée et l’importance. Style nid, zéro communiqué ministériel.</p>
+            <h3>${H.icon("diffusion")} Messages du Hibou masqué</h3>
+            <p class="muted">Crée une annonce à la connexion, puis gère tous les anciens messages : actif, affiché dans l’historique, ou caché au fond du nid.</p>
           </div>
-          <span class="pill ${msg.enabled !== false && msg.body ? "success" : "neutral"}">${msg.enabled !== false && msg.body ? "Actif / planifié" : "Inactif"}</span>
+          <span class="pill ${rows.some((row) => row.enabled) ? "success" : "neutral"}">${rows.length} message(s)</span>
         </div>
+
         <form id="owlLoginMessageForm" class="form-stack">
           <div class="grid two">
             <label><span>Titre</span><input name="title" maxlength="120" value="${H.escapeHtml(msg.title || "Message du Hibou masqué")}" required></label>
@@ -1766,12 +1793,38 @@ const Admin = {
             <label><span>Durée en jours</span><input type="number" name="duration_days" min="0.04" step="0.04" value="${H.escapeHtml(String(durationDays || 1))}" required></label>
           </div>
           <label><span>Message</span><textarea name="body" rows="8" maxlength="4000" placeholder="Ex : Le Hibou masqué rappelle que les 16èmes arrivent. Pas de panique, juste des plumes." required>${H.escapeHtml(msg.body || msg.message || "")}</textarea><small class="muted">Maximum 4000 caractères. Le Hibou masqué peut enfin faire son discours.</small></label>
-          <label class="check-line"><input type="checkbox" name="enabled" ${msg.enabled === false ? "" : "checked"}> Activer / planifier ce message</label>
+          <div class="grid two">
+            <label class="check-line"><input type="checkbox" name="enabled" ${msg.enabled === false ? "" : "checked"}> Activer / planifier ce message</label>
+            <label class="check-line"><input type="checkbox" name="show_in_history" checked> Afficher dans le bouton “Messages du Hibou”</label>
+          </div>
           <div class="admin-chat-actions">
-            <button class="primary-btn" type="submit">Enregistrer le message</button>
-            <button class="danger-btn" id="clearOwlLoginMessageBtn" type="button">Désactiver</button>
+            <button class="primary-btn" type="submit">Créer le message</button>
+            <button class="danger-btn" id="clearOwlLoginMessageBtn" type="button">Désactiver les messages actifs</button>
           </div>
         </form>
+
+        <div class="admin-owl-message-history">
+          <div class="section-title-row">
+            <h4>Historique des messages</h4>
+            <small class="muted">Tri décroissant · plus récent en haut</small>
+          </div>
+          ${rows.length ? rows.map((message) => `
+            <article class="admin-owl-message-row ${message.enabled ? "" : "is-disabled"}" data-owl-message-id="${H.escapeHtml(message.id)}" data-enabled="${message.enabled ? "true" : "false"}" data-history="${message.show_in_history === false ? "false" : "true"}">
+              <div>
+                <strong>${H.escapeHtml(message.title || "Message du Hibou masqué")}</strong>
+                <small>${H.escapeHtml(message.importance || "info")} · début ${H.formatDateTime(message.start_at || message.created_at)}${message.end_at ? ` · fin ${H.formatDateTime(message.end_at)}` : ""}</small>
+                <p>${H.escapeHtml(String(message.body || "").slice(0, 260))}${String(message.body || "").length > 260 ? "…" : ""}</p>
+              </div>
+              <div class="admin-owl-message-actions">
+                <span class="pill ${message.enabled ? "success" : "neutral"}">${message.enabled ? "Actif/planifié" : "Inactif"}</span>
+                <span class="pill ${message.show_in_history === false ? "neutral" : "success"}">${message.show_in_history === false ? "Caché historique" : "Visible historique"}</span>
+                <button class="ghost-btn toggle-owl-message-enabled-btn" type="button">${message.enabled ? "Désactiver" : "Activer"}</button>
+                <button class="ghost-btn toggle-owl-message-history-btn" type="button">${message.show_in_history === false ? "Afficher historique" : "Masquer historique"}</button>
+                <button class="danger-btn archive-owl-message-btn" type="button">Cacher partout</button>
+              </div>
+            </article>
+          `).join("") : `<p class="muted">Aucun message Hibou enregistré pour l’instant.</p>`}
+        </div>
       </section>
     `;
   },
@@ -1790,42 +1843,81 @@ const Admin = {
     const durationDays = Math.max(0.04, Number(formData.get("duration_days") || 1));
     const endDate = new Date(startDate.getTime() + durationDays * 24 * 60 * 60 * 1000);
     const payload = {
-      id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now()),
       enabled: formData.get("enabled") === "on",
+      show_in_history: formData.get("show_in_history") === "on",
       title: String(formData.get("title") || "Message du Hibou masqué").trim(),
       body: String(formData.get("body") || "").trim(),
       importance: String(formData.get("importance") || "info"),
       start_at: startDate.toISOString(),
       end_at: endDate.toISOString(),
-      duration_days: durationDays,
-      updated_at: new Date().toISOString()
+      duration_days: durationDays
     };
+
     if (!payload.body) {
       H.toast("Le Hibou refuse de hululer dans le vide.", "error");
       return;
     }
-    const { error } = await window.sb.rpc("admin_set_login_owl_message", { p_message: payload });
+
+    const { error } = await window.sb.from("owl_messages").insert(payload);
     if (error) {
-      H.toast(error.message || "Impossible d’enregistrer le message. Lance le patch SQL V1.6.0.", "error");
+      H.toast(error.message || "Impossible d’enregistrer le message. Lance le patch SQL V1.6.4.", "error");
       return;
     }
+
+    await this.loadOwlMessagesAdmin();
     await this.loadFamilyModeSetting();
     this.renderChatModeration();
-    H.toast("Message du Hibou programmé", "success");
+    H.toast("Message du Hibou créé", "success");
   },
 
   async clearOwlLoginMessage() {
-    if (!confirm("Désactiver le message temporaire du Hibou ?")) return;
-    const current = this.state.loginOwlMessage || {};
-    const payload = { ...current, enabled: false, updated_at: new Date().toISOString() };
-    const { error } = await window.sb.rpc("admin_set_login_owl_message", { p_message: payload });
+    if (!confirm("Désactiver tous les messages Hibou actifs ou planifiés ?")) return;
+    const { error } = await window.sb
+      .from("owl_messages")
+      .update({ enabled: false })
+      .eq("enabled", true);
+
     if (error) {
-      H.toast(error.message || "Impossible de désactiver le message.", "error");
+      H.toast(error.message || "Impossible de désactiver les messages.", "error");
       return;
     }
-    await this.loadFamilyModeSetting();
+
+    await this.loadOwlMessagesAdmin();
     this.renderChatModeration();
-    H.toast("Message du Hibou désactivé", "success");
+    H.toast("Messages Hibou désactivés", "success");
+  },
+
+  async toggleOwlMessageEnabled(row) {
+    const id = row?.dataset.owlMessageId;
+    if (!id) return;
+    const next = row.dataset.enabled !== "true";
+    const { error } = await window.sb.from("owl_messages").update({ enabled: next }).eq("id", id);
+    if (error) return H.toast(error.message || "Modification impossible.", "error");
+    await this.loadOwlMessagesAdmin();
+    this.renderChatModeration();
+    H.toast(next ? "Message activé" : "Message désactivé", "success");
+  },
+
+  async toggleOwlMessageHistory(row) {
+    const id = row?.dataset.owlMessageId;
+    if (!id) return;
+    const next = row.dataset.history !== "true";
+    const { error } = await window.sb.from("owl_messages").update({ show_in_history: next }).eq("id", id);
+    if (error) return H.toast(error.message || "Modification impossible.", "error");
+    await this.loadOwlMessagesAdmin();
+    this.renderChatModeration();
+    H.toast(next ? "Message visible dans l’historique" : "Message masqué de l’historique", "success");
+  },
+
+  async archiveOwlMessage(row) {
+    const id = row?.dataset.owlMessageId;
+    if (!id) return;
+    if (!confirm("Cacher ce message partout ? Il restera en base mais ne sera plus visible côté joueurs.")) return;
+    const { error } = await window.sb.from("owl_messages").update({ enabled: false, show_in_history: false }).eq("id", id);
+    if (error) return H.toast(error.message || "Modification impossible.", "error");
+    await this.loadOwlMessagesAdmin();
+    this.renderChatModeration();
+    H.toast("Message caché partout", "success");
   },
 
   renderChatModeration() {
@@ -1894,6 +1986,15 @@ const Admin = {
       await this.saveOwlLoginMessage(event.currentTarget);
     });
     H.$("#clearOwlLoginMessageBtn", root)?.addEventListener("click", async () => this.clearOwlLoginMessage());
+    H.$$(".toggle-owl-message-enabled-btn", root).forEach((button) => {
+      button.addEventListener("click", (event) => this.toggleOwlMessageEnabled(event.currentTarget.closest(".admin-owl-message-row")));
+    });
+    H.$$(".toggle-owl-message-history-btn", root).forEach((button) => {
+      button.addEventListener("click", (event) => this.toggleOwlMessageHistory(event.currentTarget.closest(".admin-owl-message-row")));
+    });
+    H.$$(".archive-owl-message-btn", root).forEach((button) => {
+      button.addEventListener("click", (event) => this.archiveOwlMessage(event.currentTarget.closest(".admin-owl-message-row")));
+    });
 
     H.$$('[data-chat-admin-filter]', root).forEach((button) => {
       button.addEventListener("click", async () => {

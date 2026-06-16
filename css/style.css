@@ -17895,3 +17895,110 @@ body[data-current-view] {
   min-height: 220px;
   resize: vertical;
 }
+
+
+/* ============================================================
+   V1.6.4 — Messages du Hibou masqué
+   ============================================================ */
+
+.home-hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.owl-messages-history-card {
+  width: min(920px, calc(100vw - 28px));
+  max-height: min(86vh, 920px);
+  overflow: auto;
+}
+
+.owl-message-history-list {
+  display: grid;
+  gap: 14px;
+  margin-top: 18px;
+}
+
+.owl-message-history-item,
+.admin-owl-message-row {
+  border: 1px solid rgba(250, 204, 21, .22);
+  border-radius: 22px;
+  background: rgba(15, 23, 42, .78);
+  padding: 16px;
+}
+
+.owl-message-history-item.importance-warning,
+.owl-message-history-item.importance-urgent {
+  border-color: rgba(248, 113, 113, .46);
+}
+
+.owl-message-history-head {
+  display: grid;
+  grid-template-columns: 46px 1fr auto;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.owl-message-history-head img {
+  width: 42px;
+  height: 42px;
+  object-fit: contain;
+}
+
+.owl-message-history-head strong {
+  display: block;
+  color: #fff;
+}
+
+.owl-message-history-head small,
+.admin-owl-message-row small {
+  color: var(--muted);
+}
+
+.owl-message-history-item p {
+  margin: 0;
+  color: #e5e7eb;
+  line-height: 1.55;
+}
+
+.admin-owl-message-history {
+  display: grid;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.admin-owl-message-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 14px;
+  align-items: start;
+}
+
+.admin-owl-message-row.is-disabled {
+  opacity: .72;
+}
+
+.admin-owl-message-row p {
+  margin: 8px 0 0;
+  color: #dbeafe;
+}
+
+.admin-owl-message-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+  max-width: 360px;
+}
+
+@media (max-width: 760px) {
+  .admin-owl-message-row,
+  .owl-message-history-head {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-owl-message-actions {
+    justify-content: flex-start;
+  }
+}

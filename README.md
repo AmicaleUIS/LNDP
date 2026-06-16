@@ -1,4 +1,4 @@
-# Le Nid des Pronos — V1.6.3
+# Le Nid des Pronos — V1.6.4
 
 ## V1.6.0 — 2e champion + message Hibou
 
@@ -602,3 +602,16 @@ Ce patch conserve les colonnes historiques de `v_leaderboard_overall` et ajoute 
 - Le titre passe de 80 à 120 caractères.
 - Le champ message est agrandi côté super admin.
 - Aucun patch SQL obligatoire.
+
+
+## V1.6.4 — Messages du Hibou masqué
+
+- Ajout d’un bouton `Messages du Hibou` sur l’accueil, à côté de `Règles & points`.
+- Les joueurs peuvent consulter tous les messages publiés, du plus récent au plus ancien.
+- Le super admin peut créer plusieurs messages, les activer/désactiver, les afficher/masquer dans l’historique, ou les cacher partout.
+- Patch SQL obligatoire : `patch_v1_6_4_owl_messages_history.sql`.
+
+
+### Rattrapage badge Champion choisi
+
+Le patch V1.6.4 ajoute aussi un rattrapage automatique du badge `champion-picked` pour tous les joueurs qui avaient déjà choisi une équipe championne dans `winner_predictions`.
