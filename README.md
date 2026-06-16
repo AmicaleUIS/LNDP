@@ -1,4 +1,4 @@
-# Le Nid des Pronos — V1.6.1
+# Le Nid des Pronos — V1.6.2
 
 ## V1.6.0 — 2e champion + message Hibou
 
@@ -587,3 +587,10 @@ Ce patch conserve les colonnes historiques de `v_leaderboard_overall` et ajoute 
 - Les équipes placeholders de phases finales (`M73A`, `M73B`, etc.) ne sont plus proposées.
 - Après la fin des poules, la liste est resserrée aux équipes qualifiées via `v_group_standings`.
 - Patch SQL à lancer : `patch_v1_6_1_second_champion_candidates.sql`.
+
+
+## V1.6.2 — 2e champion RPC + vrais drapeaux
+
+- Corrige l’erreur SQL `column reference "user_id" is ambiguous` au moment de valider le 2e champion.
+- Remplace le menu déroulant natif du 2e champion par un menu personnalisé avec vrais drapeaux images.
+- Patch SQL à lancer : `patch_v1_6_2_second_champion_rpc_flags.sql`.

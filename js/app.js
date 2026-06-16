@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — APP PRINCIPALE V1.6.1
+// LE NID DES PRONOS — APP PRINCIPALE V1.6.2
 // ============================================================
 
 const H = window.Helpers;
@@ -468,7 +468,7 @@ const App = {
           <div>
             <p class="eyebrow">Crédits cachés</p>
             <h2 id="creditsTitle">Le Nid des Pronos</h2>
-            <p class="muted">Version publique <strong>1.6.1</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
+            <p class="muted">Version publique <strong>1.6.2</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
           </div>
         </div>
         <div class="credits-grid">
@@ -485,7 +485,7 @@ const App = {
             <p><strong>1.0.5</strong> — dashboard mobile/desktop stabilisé, sans chevauchement des cartes.</p>
           </section>
           <section>
-            <h3>Évolutions V1.6.1</h3>
+            <h3>Évolutions V1.6.2</h3>
             <ul class="changelog-list">
               <li>Le super admin peut désactiver ou réactiver l’affichage du module préparation.</li>
               <li>Quand la préparation est désactivée, les matchs test disparaissent des matchs/pronos, classements par phase et règles.</li>
@@ -1675,7 +1675,7 @@ const App = {
     }
     const allowedIds = new Set(this.secondChampionCandidateTeams().map((team) => team.id));
     if (!allowedIds.has(teamId)) {
-      H.toast("Cette équipe n’est pas qualifiée pour le 2e choix. Le hibou refuse le ticket.", "error");
+      H.toast("Cette équipe n’est pas disponible pour le 2e choix. Le hibou refuse le ticket.", "error");
       return;
     }
 
@@ -8663,7 +8663,7 @@ const App = {
           </div>
           <div class="profile-account-actions">
             <button class="ghost-btn" id="profileInstallAppBtn" type="button">Installer l’app</button>
-            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.6.1</button>
+            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.6.2</button>
             <button class="danger-btn" id="profileLogoutBtn" type="button">Déconnexion</button>
           </div>
         </div>
@@ -8805,10 +8805,28 @@ const App = {
           <form id="secondChampionPickForm" class="winner-pick-form">
             <label class="winner-team-label">
               <span>2e équipe championne possible</span>
-              <select name="predicted_team_id" ${secondChampionOpen ? "" : "disabled"} required>
-                <option value="">${secondChampionAfterGroups ? "Choisir une équipe qualifiée" : "Choisir une équipe"}</option>
-                ${secondChampionTeams.map((team) => `<option value="${H.escapeHtml(team.id)}" ${selectedSecondWinnerId === team.id ? "selected" : ""}>${H.escapeHtml(team.name)}${team.short_name ? ` · ${H.escapeHtml(team.short_name)}` : ""}</option>`).join("")}
-              </select>
+              <div class="champion-picker second-champion-picker ${secondChampionOpen ? "" : "is-disabled"}" id="secondChampionPicker">
+                <input type="hidden" name="predicted_team_id" value="${H.escapeHtml(selectedSecondWinnerId)}">
+                <button class="champion-picker-toggle" type="button" ${secondChampionOpen ? "" : "disabled"} aria-expanded="false">
+                  <span class="champion-picker-current">
+                    ${selectedSecondWinner ? `
+                      ${H.flagImgHtml({ flagUrl: selectedSecondWinner.flag_url, countryCode: selectedSecondWinner.country_code, shortName: selectedSecondWinner.short_name, name: selectedSecondWinner.name, className: "team-flag-img champion-option-flag" })}
+                      <span class="champion-option-name">${H.escapeHtml(selectedSecondWinner.name)}</span>
+                      <small>${H.escapeHtml(selectedSecondWinner.short_name || selectedSecondWinner.country_code || "")}</small>
+                    ` : `<span class="champion-picker-empty">${secondChampionAfterGroups ? "Choisir une équipe qualifiée" : "Choisir une équipe"}</span>`}
+                  </span>
+                  <span class="champion-picker-caret" aria-hidden="true">⌄</span>
+                </button>
+                <div class="champion-picker-menu" hidden>
+                  ${secondChampionTeams.map((team) => `
+                    <button type="button" class="champion-option ${selectedSecondWinnerId === team.id ? "is-selected" : ""}" data-team-id="${H.escapeHtml(team.id)}">
+                      ${H.flagImgHtml({ flagUrl: team.flag_url, countryCode: team.country_code, shortName: team.short_name, name: team.name, className: "team-flag-img champion-option-flag" })}
+                      <span class="champion-option-name">${H.escapeHtml(team.name)}</span>
+                      <small>${H.escapeHtml(team.short_name || team.country_code || "")}</small>
+                    </button>
+                  `).join("")}
+                </div>
+              </div>
             </label>
             <button class="primary-btn" type="submit" ${secondChampionOpen ? "" : "disabled"}>Enregistrer mon 2e champion</button>
           </form>
@@ -8932,6 +8950,42 @@ const App = {
 
       document.addEventListener("click", (event) => {
         if (!championPicker.contains(event.target)) closePicker();
+      });
+    }
+
+
+    const secondChampionPicker = H.$("#secondChampionPicker");
+    if (secondChampionPicker && secondChampionOpen) {
+      const toggle = H.$(".champion-picker-toggle", secondChampionPicker);
+      const menu = H.$(".champion-picker-menu", secondChampionPicker);
+      const input = H.$('input[name="predicted_team_id"]', secondChampionPicker);
+      const current = H.$(".champion-picker-current", secondChampionPicker);
+      const closeSecondPicker = () => {
+        if (!menu.hidden) {
+          menu.hidden = true;
+          toggle.setAttribute("aria-expanded", "false");
+        }
+      };
+
+      toggle.addEventListener("click", (event) => {
+        event.stopPropagation();
+        menu.hidden = !menu.hidden;
+        toggle.setAttribute("aria-expanded", String(!menu.hidden));
+      });
+
+      H.$$(".champion-option", secondChampionPicker).forEach((button) => {
+        button.addEventListener("click", (event) => {
+          event.stopPropagation();
+          input.value = button.dataset.teamId || "";
+          H.$$(".champion-option", secondChampionPicker).forEach((option) => option.classList.remove("is-selected"));
+          button.classList.add("is-selected");
+          current.innerHTML = button.innerHTML;
+          closeSecondPicker();
+        });
+      });
+
+      document.addEventListener("click", (event) => {
+        if (!secondChampionPicker.contains(event.target)) closeSecondPicker();
       });
     }
 

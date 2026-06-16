@@ -17868,3 +17868,20 @@ body[data-current-view] {
   background: #0f172a;
   color: #f8fafc;
 }
+
+
+/* ============================================================
+   V1.6.2 — 2e champion menu drapeaux
+   ============================================================ */
+
+.second-champion-picker .champion-picker-menu {
+  max-height: 420px;
+  overflow: auto;
+}
+
+.second-champion-picker .champion-option-flag {
+  width: 28px;
+  height: 20px;
+  object-fit: cover;
+  border-radius: 4px;
+}
