@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — ADMIN V1.6.2
+// LE NID DES PRONOS — ADMIN V1.6.3
 // ============================================================
 
 const H = window.Helpers;
@@ -83,7 +83,7 @@ const Admin = {
       p_category: category,
       p_details: details || {},
       p_metadata: {
-        app_version: "1.6.2",
+        app_version: "1.6.3",
         source: "admin_front"
       }
     });
@@ -1758,14 +1758,14 @@ const Admin = {
         </div>
         <form id="owlLoginMessageForm" class="form-stack">
           <div class="grid two">
-            <label><span>Titre</span><input name="title" maxlength="80" value="${H.escapeHtml(msg.title || "Message du Hibou masqué")}" required></label>
+            <label><span>Titre</span><input name="title" maxlength="120" value="${H.escapeHtml(msg.title || "Message du Hibou masqué")}" required></label>
             <label><span>Importance</span><select name="importance">
               ${["info", "fun", "warning", "urgent"].map((value) => `<option value="${value}" ${msg.importance === value ? "selected" : ""}>${value}</option>`).join("")}
             </select></label>
             <label><span>Date et heure de début</span><input type="datetime-local" name="start_at" value="${H.escapeHtml(start)}" required></label>
             <label><span>Durée en jours</span><input type="number" name="duration_days" min="0.04" step="0.04" value="${H.escapeHtml(String(durationDays || 1))}" required></label>
           </div>
-          <label><span>Message</span><textarea name="body" rows="4" maxlength="700" placeholder="Ex : Le Hibou masqué rappelle que les 16èmes arrivent. Pas de panique, juste des plumes." required>${H.escapeHtml(msg.body || msg.message || "")}</textarea></label>
+          <label><span>Message</span><textarea name="body" rows="8" maxlength="4000" placeholder="Ex : Le Hibou masqué rappelle que les 16èmes arrivent. Pas de panique, juste des plumes." required>${H.escapeHtml(msg.body || msg.message || "")}</textarea><small class="muted">Maximum 4000 caractères. Le Hibou masqué peut enfin faire son discours.</small></label>
           <label class="check-line"><input type="checkbox" name="enabled" ${msg.enabled === false ? "" : "checked"}> Activer / planifier ce message</label>
           <div class="admin-chat-actions">
             <button class="primary-btn" type="submit">Enregistrer le message</button>

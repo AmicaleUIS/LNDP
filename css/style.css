@@ -17885,3 +17885,13 @@ body[data-current-view] {
   object-fit: cover;
   border-radius: 4px;
 }
+
+
+/* ============================================================
+   V1.6.3 — Message Hibou masqué long
+   ============================================================ */
+
+.admin-owl-message-card textarea[name="body"] {
+  min-height: 220px;
+  resize: vertical;
+}

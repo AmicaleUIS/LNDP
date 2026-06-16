@@ -1,4 +1,4 @@
-# Le Nid des Pronos — V1.6.2
+# Le Nid des Pronos — V1.6.3
 
 ## V1.6.0 — 2e champion + message Hibou
 
@@ -594,3 +594,11 @@ Ce patch conserve les colonnes historiques de `v_leaderboard_overall` et ajoute 
 - Corrige l’erreur SQL `column reference "user_id" is ambiguous` au moment de valider le 2e champion.
 - Remplace le menu déroulant natif du 2e champion par un menu personnalisé avec vrais drapeaux images.
 - Patch SQL à lancer : `patch_v1_6_2_second_champion_rpc_flags.sql`.
+
+
+## V1.6.3 — Message Hibou masqué long
+
+- Le message temporaire du Hibou masqué passe de 700 à 4000 caractères.
+- Le titre passe de 80 à 120 caractères.
+- Le champ message est agrandi côté super admin.
+- Aucun patch SQL obligatoire.
