@@ -1,11 +1,11 @@
 
 -- ============================================================
--- LE NID DES PRONOS — PATCH V1.6.0
+-- LE NID DES PRONOS — PATCH V1.6.1
 -- 2e choix champion après les poules + message temporaire du Hibou masqué
 -- ============================================================
--- À lancer dans Supabase SQL Editor avant de publier les fichiers V1.6.0.
+-- À lancer dans Supabase SQL Editor avant de publier les fichiers V1.6.1.
 
--- 1) 2e choix champion : +50 pts, uniquement équipes qualifiées,
+-- 1) 2e choix champion : +50 pts, toutes les équipes avant fin des poules puis qualifiées,
 -- ouvert jusqu'au premier match des 16èmes / phase à élimination directe.
 
 create table if not exists public.second_winner_predictions (
@@ -54,16 +54,68 @@ as $$
 $$;
 
 create or replace view public.v_second_winner_candidate_teams as
+with group_progress as (
+  select
+    m.competition_id,
+    count(*)::int as total_group_matches,
+    count(*) filter (where m.status = 'finished'::public.match_status)::int as finished_group_matches,
+    (
+      count(*) > 0
+      and count(*) = count(*) filter (where m.status = 'finished'::public.match_status)
+    ) as all_groups_finished
+  from public.matches m
+  where m.stage = 'group'::public.match_stage
+    and coalesce(m.is_test_match, false) = false
+    and coalesce(m.status::text, '') not in ('cancelled', 'postponed')
+  group by m.competition_id
+),
+group_teams as (
+  select distinct
+    m.competition_id,
+    m.home_team_id as team_id
+  from public.matches m
+  where m.stage = 'group'::public.match_stage
+    and coalesce(m.is_test_match, false) = false
+    and m.home_team_id is not null
+
+  union
+
+  select distinct
+    m.competition_id,
+    m.away_team_id as team_id
+  from public.matches m
+  where m.stage = 'group'::public.match_stage
+    and coalesce(m.is_test_match, false) = false
+    and m.away_team_id is not null
+),
+qualified as (
+  select
+    gs.competition_id,
+    gs.team_id,
+    gs.qualification_status::text as qualification_status
+  from public.v_group_standings gs
+  where gs.qualification_status in ('qualified', 'qualified_best_third')
+)
 select
-  gs.competition_id,
-  gs.team_id,
-  gs.team_name,
-  gs.short_name,
-  gs.country_code,
-  gs.flag_url,
-  gs.qualification_status
-from public.v_group_standings gs
-where gs.qualification_status in ('qualified', 'qualified_best_third');
+  gt.competition_id,
+  gt.team_id,
+  ft.name as team_name,
+  ft.short_name,
+  ft.country_code,
+  ft.flag_url,
+  case
+    when coalesce(gp.all_groups_finished, false) then coalesce(q.qualification_status, 'eliminated')
+    else 'available_before_groups_end'
+  end::text as qualification_status
+from group_teams gt
+join public.football_teams ft on ft.id = gt.team_id
+left join group_progress gp on gp.competition_id = gt.competition_id
+left join qualified q on q.competition_id = gt.competition_id and q.team_id = gt.team_id
+where
+  -- Avant la fin des poules : toutes les équipes réelles de groupes sont disponibles.
+  not coalesce(gp.all_groups_finished, false)
+  -- Après la fin des poules : seulement les qualifiées.
+  or q.team_id is not null;
 
 grant select on public.v_second_winner_candidate_teams to authenticated;
 
@@ -409,6 +461,6 @@ exception
 end $$;
 
 select
-  'patch_v1_6_0_ready' as check_name,
+  'patch_v1_6_1_ready' as check_name,
   public.second_winner_prediction_close_at((select id from public.competitions where is_active = true limit 1)) as second_choice_close_at,
   public.is_second_winner_prediction_open((select id from public.competitions where is_active = true limit 1)) as second_choice_open;

@@ -1,4 +1,4 @@
-# Le Nid des Pronos — V1.6.0
+# Le Nid des Pronos — V1.6.1
 
 ## V1.6.0 — 2e champion + message Hibou
 
@@ -571,3 +571,19 @@ le-nid-des-pronos-v1-2-4
 - Les infos Famille sont masquées dans le PDF si le joueur n’a pas activé le mode Famille.
 - Le journal admin remplace les UUID joueurs par les pseudos quand ils sont connus.
 - Patch SQL à lancer : `patch_v1_3_0_lancement_bilan.sql`.
+
+
+## Patch SQL V1.6.0b — correction vue leaderboard
+
+Si Supabase affiche `ERROR: 42P16: cannot drop columns from view`, utilise :
+`patch_v1_6_0b_second_champion_hibou_message_VIEW_FIX.sql`
+
+Ce patch conserve les colonnes historiques de `v_leaderboard_overall` et ajoute les colonnes du 2e champion à la fin de la vue.
+
+
+## V1.6.1 — 2e champion : liste corrigée
+
+- Avant la fin des poules, le 2e choix champion affiche toutes les vraies équipes de la compétition.
+- Les équipes placeholders de phases finales (`M73A`, `M73B`, etc.) ne sont plus proposées.
+- Après la fin des poules, la liste est resserrée aux équipes qualifiées via `v_group_standings`.
+- Patch SQL à lancer : `patch_v1_6_1_second_champion_candidates.sql`.

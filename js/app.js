@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — APP PRINCIPALE V1.6.0
+// LE NID DES PRONOS — APP PRINCIPALE V1.6.1
 // ============================================================
 
 const H = window.Helpers;
@@ -468,7 +468,7 @@ const App = {
           <div>
             <p class="eyebrow">Crédits cachés</p>
             <h2 id="creditsTitle">Le Nid des Pronos</h2>
-            <p class="muted">Version publique <strong>1.6.0</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
+            <p class="muted">Version publique <strong>1.6.1</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
           </div>
         </div>
         <div class="credits-grid">
@@ -485,7 +485,7 @@ const App = {
             <p><strong>1.0.5</strong> — dashboard mobile/desktop stabilisé, sans chevauchement des cartes.</p>
           </section>
           <section>
-            <h3>Évolutions V1.6.0</h3>
+            <h3>Évolutions V1.6.1</h3>
             <ul class="changelog-list">
               <li>Le super admin peut désactiver ou réactiver l’affichage du module préparation.</li>
               <li>Quand la préparation est désactivée, les matchs test disparaissent des matchs/pronos, classements par phase et règles.</li>
@@ -1623,21 +1623,28 @@ const App = {
     return !closeAt || closeAt.getTime() > Date.now();
   },
 
+
+  groupStageFinishedForSecondChampion() {
+    const groupMatches = this.competitionMatches()
+      .filter((match) => match.stage === "group" && !["cancelled", "postponed"].includes(match.status));
+    return Boolean(groupMatches.length) && groupMatches.every((match) => match.status === "finished");
+  },
+
   secondChampionCandidateTeams() {
+    const groupFinished = this.groupStageFinishedForSecondChampion();
+
+    if (!groupFinished) {
+      // Avant la fin des poules : tous les vrais pays de la compétition sont disponibles.
+      // On se base uniquement sur les matchs de groupe pour éviter les placeholders M73A/M73B.
+      return this.championCandidateTeams();
+    }
+
+    // Après les poules : seulement les qualifiés réels.
     const qualifiedStatuses = new Set(["qualified", "qualified_best_third"]);
     const qualifiedIds = new Set((this.state.groupStandings || [])
       .filter((row) => qualifiedStatuses.has(row.qualification_status))
       .map((row) => row.team_id)
       .filter(Boolean));
-
-    if (!qualifiedIds.size) {
-      this.competitionMatches()
-        .filter((match) => ["round_of_32", "round_of_16"].includes(match.stage))
-        .forEach((match) => {
-          if (match.home_team_id) qualifiedIds.add(match.home_team_id);
-          if (match.away_team_id) qualifiedIds.add(match.away_team_id);
-        });
-    }
 
     return this.state.footballTeams
       .filter((team) => qualifiedIds.has(team.id))
@@ -8562,6 +8569,7 @@ const App = {
     const selectedWinner = this.state.footballTeams.find((team) => team.id === selectedWinnerId);
     const championTeams = this.championCandidateTeams();
     const secondChampionTeams = this.secondChampionCandidateTeams();
+    const secondChampionAfterGroups = this.groupStageFinishedForSecondChampion();
     const secondChampionOpen = this.secondChampionPickOpen();
     const secondChampionCloseAt = this.secondChampionCloseAt();
     const selectedSecondWinnerId = this.state.secondWinnerPrediction?.predicted_team_id || "";
@@ -8655,7 +8663,7 @@ const App = {
           </div>
           <div class="profile-account-actions">
             <button class="ghost-btn" id="profileInstallAppBtn" type="button">Installer l’app</button>
-            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.6.0</button>
+            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.6.1</button>
             <button class="danger-btn" id="profileLogoutBtn" type="button">Déconnexion</button>
           </div>
         </div>
@@ -8788,7 +8796,7 @@ const App = {
         <div class="card-title-row">
           <div>
             <h3>${H.icon("trophy")} Mon 2e champion après les poules</h3>
-            <p class="muted">Choix bonus ouvert après la mise à jour des qualifiés. Il vaut <strong>+50 points</strong> et ne remplace pas ton champion initial.</p>
+            <p class="muted">${secondChampionAfterGroups ? "Les poules sont terminées : seuls les qualifiés restent disponibles." : "Avant la fin des poules, toutes les équipes de la compétition restent disponibles. La liste sera resserrée aux qualifiés après mise à jour."} Ce choix vaut <strong>+50 points</strong> et ne remplace pas ton champion initial.</p>
           </div>
           <span class="pill ${secondChampionOpen ? "success" : "danger"}">${secondChampionOpen ? "Ouvert" : "Verrouillé"}</span>
         </div>
@@ -8798,13 +8806,13 @@ const App = {
             <label class="winner-team-label">
               <span>2e équipe championne possible</span>
               <select name="predicted_team_id" ${secondChampionOpen ? "" : "disabled"} required>
-                <option value="">Choisir une équipe qualifiée</option>
+                <option value="">${secondChampionAfterGroups ? "Choisir une équipe qualifiée" : "Choisir une équipe"}</option>
                 ${secondChampionTeams.map((team) => `<option value="${H.escapeHtml(team.id)}" ${selectedSecondWinnerId === team.id ? "selected" : ""}>${H.escapeHtml(team.name)}${team.short_name ? ` · ${H.escapeHtml(team.short_name)}` : ""}</option>`).join("")}
               </select>
             </label>
             <button class="primary-btn" type="submit" ${secondChampionOpen ? "" : "disabled"}>Enregistrer mon 2e champion</button>
           </form>
-        ` : `<div class="empty-state compact"><strong>Qualifiés pas encore prêts</strong><p>Quand les poules seront terminées et les qualifiés mis à jour, le Hibou ouvrira ce 2e choix.</p></div>`}
+        ` : `<div class="empty-state compact"><strong>Liste indisponible</strong><p>Le Hibou ne trouve aucune équipe réelle à proposer. Vérifie les matchs de poule et les équipes qualifiées.</p></div>`}
 
         <div class="winner-pick-status">
           ${selectedSecondWinner ? `
