@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — ADMIN V1.6.4
+// LE NID DES PRONOS — ADMIN V1.7.0
 // ============================================================
 
 const H = window.Helpers;
@@ -84,7 +84,7 @@ const Admin = {
       p_category: category,
       p_details: details || {},
       p_metadata: {
-        app_version: "1.6.4",
+        app_version: "1.7.0",
         source: "admin_front"
       }
     });
@@ -1783,7 +1783,11 @@ const Admin = {
           <span class="pill ${rows.some((row) => row.enabled) ? "success" : "neutral"}">${rows.length} message(s)</span>
         </div>
 
-        <form id="owlLoginMessageForm" class="form-stack">
+        <div class="admin-chat-actions">
+          <button class="primary-btn" id="newOwlMessageBtn" type="button">Créer un nouveau message du Hibou</button>
+        </div>
+
+        <form id="owlLoginMessageForm" class="form-stack owl-message-create-form" hidden>
           <div class="grid two">
             <label><span>Titre</span><input name="title" maxlength="120" value="${H.escapeHtml(msg.title || "Message du Hibou masqué")}" required></label>
             <label><span>Importance</span><select name="importance">
@@ -1980,6 +1984,14 @@ const Admin = {
         `).join("") : `<p class="muted">Aucun message dans ce filtre.</p>`}
       </div>
     `;
+
+    H.$("#newOwlMessageBtn", root)?.addEventListener("click", () => {
+      const form = H.$("#owlLoginMessageForm", root);
+      const button = H.$("#newOwlMessageBtn", root);
+      if (!form || !button) return;
+      form.hidden = !form.hidden;
+      button.textContent = form.hidden ? "Créer un nouveau message du Hibou" : "Refermer le formulaire du Hibou";
+    });
 
     H.$("#owlLoginMessageForm", root)?.addEventListener("submit", async (event) => {
       event.preventDefault();

@@ -1,4 +1,4 @@
-# Le Nid des Pronos — V1.6.4
+# Le Nid des Pronos — V1.7.0
 
 ## V1.6.0 — 2e champion + message Hibou
 
@@ -615,3 +615,14 @@ Ce patch conserve les colonnes historiques de `v_leaderboard_overall` et ajoute 
 ### Rattrapage badge Champion choisi
 
 Le patch V1.6.4 ajoute aussi un rattrapage automatique du badge `champion-picked` pour tous les joueurs qui avaient déjà choisi une équipe championne dans `winner_predictions`.
+
+
+## V1.7.0 — Refonte bilan PDF collector
+
+- Affiche le 2e choix champion dans le PDF et les fiches joueurs.
+- Tableau de chasse enrichi avec icônes.
+- Carte d’identité enrichie : inscription, heures de pronos, meilleur match, casserole, journée de grâce/désespoir.
+- Mur des exploits en chronologie avec dates, badges mis en avant séparés, et correction du faux badge `all-picks-in`.
+- Records/casseroles/compétition/mini-records étoffés.
+- Historique des pronos en capsules 3 par ligne.
+- Fonds PDF stabilisés en impression.

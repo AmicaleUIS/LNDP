@@ -18002,3 +18002,7 @@ body[data-current-view] {
     justify-content: flex-start;
   }
 }
+
+/* V1.7.0 — fiche joueur : champion initial + 2e champion */
+.player-winner-picks-duo { display: grid; gap: 10px; }
+.owl-message-create-form[hidden] { display: none !important; }

@@ -689,3 +689,41 @@
 
 
 /* V1.5.2 — Bilan collector : badges acquis chargés depuis les tables */
+
+
+/* ============================================================
+   V1.7.0 — Refonte PDF collector
+   ============================================================ */
+.bilan-page { background-size: cover; background-position: center center; }
+.icon-stats-grid .icon-stat { display: grid; grid-template-columns: 46px 1fr; align-items: center; gap: 12px; }
+.icon-stat img, .record-card.with-icon img, .mini-record-grid img, .mini-record-player-card img { width: 42px; height: 42px; object-fit: contain; filter: drop-shadow(0 8px 14px rgba(250,204,21,.18)); }
+.champion-card .champion-pick-line { align-items: center; gap: 12px; }
+.champion-pick-line p { margin: 0; display: grid; gap: 3px; }
+.champion-pick-line span, .champion-pick-line small { color: var(--bilan-muted); }
+.identity-mini-facts { display: grid; gap: 8px; margin-top: 16px; color: var(--bilan-muted); }
+.identity-detail-grid, .history-capsule-grid, .mini-record-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 18px; }
+.detail-match-card, .history-capsule, .mini-record-grid article { border: 1px solid rgba(250,204,21,.22); border-radius: 20px; background: rgba(15,23,42,.72); padding: 12px; }
+.detail-match-card h4, .history-capsule strong { margin: 6px 0; color: #fff; }
+.detail-match-card p, .history-capsule p { margin: 8px 0 0; color: var(--bilan-muted); }
+.vs-mini { opacity: .6; margin: 0 3px; }
+.hour-radar { display: grid; grid-template-columns: repeat(4, 1fr); align-items: end; gap: 10px; height: 132px; margin: 12px 0 6px; }
+.hour-radar div { display: grid; grid-template-rows: auto 1fr auto; align-items: end; gap: 6px; text-align: center; color: var(--bilan-muted); height: 100%; }
+.hour-radar b { display: block; width: 100%; border-radius: 999px 999px 8px 8px; background: linear-gradient(180deg, #facc15, #38bdf8); min-height: 8px; }
+.badge-section-title { margin: 16px 0 10px; color: #fff7cc; }
+.featured-badges { grid-template-columns: repeat(3, 1fr); }
+.featured-badge-card { border-color: rgba(250,204,21,.55); box-shadow: 0 0 0 1px rgba(250,204,21,.18), 0 20px 45px rgba(250,204,21,.08); }
+.badge-card small { display: block; margin: 4px 0 6px; color: var(--bilan-muted); font-size: .78rem; }
+.rich-record-grid .record-card { min-height: 126px; }
+.mini-record-player-card p { display: flex; align-items: center; gap: 10px; }
+.mini-record-grid article { display: grid; gap: 6px; }
+.mini-record-grid article span { color: var(--bilan-muted); font-size: .85rem; }
+.history-capsule-grid { grid-template-columns: repeat(3, 1fr); }
+.history-capsule { min-height: 132px; }
+.history-capsule.good { border-color: rgba(34,197,94,.35); }
+.history-capsule.bad { border-color: rgba(248,113,113,.35); }
+@media print {
+  .bilan-page, .bilan-page.diploma { background-size: cover !important; background-position: center center !important; }
+  .bilan-page.diploma { width: 210mm !important; height: 297mm !important; min-height: 297mm !important; page: auto !important; padding: 14mm !important; }
+  .bilan-page.diploma .bilan-page-content { min-height: 260mm !important; }
+  .identity-detail-grid, .history-capsule-grid, .mini-record-grid { grid-template-columns: repeat(3, 1fr); }
+}

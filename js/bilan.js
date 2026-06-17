@@ -1,6 +1,6 @@
 
 // ============================================================
-// LE NID DES PRONOS — BILAN PDF V1.6.4
+// LE NID DES PRONOS — BILAN PDF V1.7.0
 // ============================================================
 
 const H = window.Helpers;
@@ -115,6 +115,25 @@ const BilanPDF = {
   },
 
   normalizeChampionPrediction(row = null) {
+    if (!row) return null;
+    return {
+      user_id: row.user_id,
+      competition_id: row.competition_id,
+      predicted_team_id: row.predicted_team_id,
+      predicted_team_name: row.predicted_team_name || row.team_name || row.name || row.predicted_team?.name,
+      predicted_team_short_name: row.predicted_team_short_name || row.predicted_team?.short_name,
+      predicted_team_country_code: row.predicted_team_country_code || row.predicted_team?.country_code,
+      predicted_team_flag_url: row.predicted_team_flag_url || row.predicted_team?.flag_url,
+      actual_winner_team_id: row.actual_winner_team_id,
+      actual_winner_team_name: row.actual_winner_team_name,
+      points_total: this.n(row.points_total, 0),
+      created_at: row.created_at,
+      updated_at: row.updated_at,
+      locked_at: row.locked_at
+    };
+  },
+
+  normalizeSecondChampionPrediction(row = null) {
     if (!row) return null;
     return {
       user_id: row.user_id,
@@ -395,31 +414,19 @@ const BilanPDF = {
   },
 
   stats() {
-    const rows = this.scoredRows().slice().sort((a, b) => new Date(a.kickoff_at || 0) - new Date(b.kickoff_at || 0));
+    const rows = this.scoredRows();
     const total = rows.reduce((sum, row) => sum + this.n(row.points_total), 0);
     const exact = rows.filter((row) => row.is_exact_score).length;
     const good = rows.filter((row) => row.is_good_result).length;
     const diff = rows.filter((row) => row.is_good_goal_diff).length;
     const qualified = rows.filter((row) => row.is_good_qualified).length;
     const zeros = rows.filter((row) => this.n(row.points_total) === 0).length;
-    const average = rows.length ? total / rows.length : 0;
-    const best = [...rows].sort((a,b) => this.n(b.points_total) - this.n(a.points_total))[0] || null;
-    const worst = [...rows].sort((a,b) => this.n(a.points_total) - this.n(b.points_total))[0] || null;
-    const bestDay = this.bestDay(rows);
-    const exactRate = rows.length ? exact / rows.length : 0;
-    const zeroRate = rows.length ? zeros / rows.length : 0;
+    const best = rows.slice().sort((a, b) => this.n(b.points_total) - this.n(a.points_total) || new Date(a.kickoff_at || 0) - new Date(b.kickoff_at || 0))[0] || null;
+    const worst = rows.slice().sort((a, b) => this.n(a.points_total) - this.n(b.points_total) || this.missDistance(b) - this.missDistance(a))[0] || null;
+    const bestDay = this.dayDetails(rows, true);
+    const worstDay = this.dayDetails(rows, false);
     const casseroleRows = this.casseroleRows(rows);
-    const signature = this.playerSignature({ rows, total, exact, good, diff, qualified, zeros, average, best, worst, bestDay, exactRate, zeroRate, casseroleRows });
-    return { rows, total, exact, good, diff, qualified, zeros, average, best, worst, bestDay, exactRate, zeroRate, casseroleRows, signature };
-  },
-
-  outcomeFromScores(home, away) {
-    const h = Number(home);
-    const a = Number(away);
-    if (!Number.isFinite(h) || !Number.isFinite(a)) return "draw";
-    if (h > a) return "home";
-    if (a > h) return "away";
-    return "draw";
+    return { rows, total, exact, good, diff, qualified, zeros, best, worst, bestDay, worstDay, casseroleRows, exactRate: rows.length ? exact / rows.length : 0, zeroRate: rows.length ? zeros / rows.length : 0, average: rows.length ? total / rows.length : 0, favoriteHour: this.favoriteHour(this.officialPredictions()), officialMatchCount: this.competitionSnapshot().matches.filter((match) => !match.is_test_match).length };
   },
 
   missDistance(row = {}) {
@@ -507,50 +514,40 @@ const BilanPDF = {
     const badges = [];
     const used = new Set();
     const catalog = this.badgeCatalogLite();
-
     const push = (id, condition = true, override = {}) => {
       if (!condition || used.has(id)) return;
       const base = catalog[id] || {};
-      badges.push({
-        id,
-        emoji: override.emoji || base.emoji || "🏅",
-        title: override.title || base.title || id,
-        text: override.text || base.text || "Exploit enregistré dans le Nid.",
-        file: override.file || base.file || this.badgeAsset(id)
-      });
+      badges.push({ id, emoji: override.emoji || base.emoji || "🏅", title: override.title || base.title || this.titleFromBadgeId(id), text: override.text || base.text || "Exploit enregistré dans le Nid.", file: override.file || base.file || this.badgeAsset(id), acquired_at: override.acquired_at || override.unlockedAt || null });
       used.add(id);
     };
-
     [...this.reportBadgeCandidates(), ...this.acquiredBadgeCandidates()].forEach((badge) => {
       const id = badge.id || badge.title;
       if (!id || used.has(id)) return;
-      badges.push(badge);
+      badges.push({ ...badge, title: badge.title || this.titleFromBadgeId(id), file: badge.file || this.badgeAsset(id), acquired_at: badge.acquired_at || badge.unlockedAt || badge.granted_at || badge.created_at || badge.updated_at || null });
       used.add(id);
     });
-
     const officialPredictions = this.allPredictionRows({ includeTest: false });
     const allPredictions = this.allPredictionRows({ includeTest: true });
     const testPredictions = allPredictions.filter((row) => row.is_test_match);
-    const knownOfficialMatches = (this.state.report.predictions || []).filter((row) => !row.is_test_match);
-    const knownOfficialCount = knownOfficialMatches.length;
+    const officialMatchCount = Math.max(stats.officialMatchCount || 0, (this.competitionSnapshot().matches || []).filter((m) => !m.is_test_match).length);
     const predictionCount = officialPredictions.length;
     const championPicked = Boolean(champion?.predicted_team_id || champion?.predicted_team_name);
     const secondWinner = this.competitionSnapshot().secondWinnerPick;
     const secondChampionPicked = Boolean(secondWinner?.predicted_team_id || secondWinner?.predicted_team_name);
+    const nthPredictionDate = (n) => officialPredictions.map((row) => this.predictionActivityDate(row)).filter(Boolean).sort((a, b) => a - b)[Math.max(0, n - 1)]?.toISOString() || null;
 
-    push("egg-hatched", predictionCount >= 1);
-    push("young-feathers", predictionCount >= 10);
-    push("half-nest", knownOfficialCount > 0 && predictionCount >= Math.ceil(knownOfficialCount / 2));
-    push("three-quarter-perch", knownOfficialCount > 0 && predictionCount >= Math.ceil(knownOfficialCount * 0.75));
-    push("all-picks-in", knownOfficialCount > 0 && predictionCount >= knownOfficialCount);
-    push("champion-picked", championPicked, championPicked ? { text: `Champion choisi : ${champion.predicted_team_name || "équipe enregistrée"}.` } : {});
-    push("second-champion-picked", secondChampionPicked, secondChampionPicked ? { text: `2e champion : ${secondWinner.predicted_team_name || "équipe enregistrée"}.` } : {});
-    push("second-final-winner-oracle", secondWinner?.points_total === 50, { text: `Le 2e choix rapporte +50 points : ${secondWinner?.predicted_team_name || "équipe gagnante"}.` });
-    push("preparation-two-picks", testPredictions.length >= 2);
+    push("egg-hatched", predictionCount >= 1, { acquired_at: nthPredictionDate(1) });
+    push("young-feathers", predictionCount >= 10, { acquired_at: nthPredictionDate(10) });
+    push("half-nest", officialMatchCount > 0 && predictionCount >= Math.ceil(officialMatchCount / 2), { acquired_at: nthPredictionDate(Math.ceil(officialMatchCount / 2)) });
+    push("three-quarter-perch", officialMatchCount > 0 && predictionCount >= Math.ceil(officialMatchCount * 0.75), { acquired_at: nthPredictionDate(Math.ceil(officialMatchCount * 0.75)) });
+    push("all-picks-in", officialMatchCount > 0 && predictionCount >= officialMatchCount, { acquired_at: nthPredictionDate(officialMatchCount) });
+    push("champion-picked", championPicked, { text: `Champion choisi : ${champion?.predicted_team_name || "équipe enregistrée"}.`, acquired_at: champion?.locked_at || champion?.updated_at || champion?.created_at });
+    push("second-champion-picked", secondChampionPicked, { text: `2e champion : ${secondWinner?.predicted_team_name || "équipe enregistrée"}.`, acquired_at: secondWinner?.locked_at || secondWinner?.updated_at || secondWinner?.created_at });
+    push("second-final-winner-oracle", secondWinner?.points_total === 50, { text: `Le 2e choix rapporte +50 points : ${secondWinner?.predicted_team_name || "équipe gagnante"}.`, acquired_at: secondWinner?.updated_at || secondWinner?.created_at });
+    push("preparation-two-picks", testPredictions.length >= 2, { acquired_at: testPredictions[1]?.created_at || testPredictions[1]?.updated_at });
     push("prep-good-pick", testPredictions.some((row) => this.n(row.points_total) > 0 || row.is_exact_score || row.is_good_result || row.is_good_goal_diff || row.is_good_qualified));
-
-    push("first-flight", stats.rows.length >= 1);
-    push("first-perfect", stats.exact >= 1);
+    push("first-flight", stats.rows.length >= 1, { acquired_at: stats.rows[0]?.kickoff_at });
+    push("first-perfect", stats.exact >= 1, { acquired_at: stats.rows.find((r) => r.is_exact_score)?.kickoff_at });
     push("surgical-beak", stats.exact >= 3);
     push("owl-sniper", stats.exact >= 10);
     push("accountant", stats.good >= 10);
@@ -561,8 +558,14 @@ const BilanPDF = {
     push("streak-3-exact", this.streak(stats.rows, (r) => r.is_exact_score) >= 3);
     push("zero-tunnel", this.streak(stats.rows, (r) => this.n(r.points_total) === 0) >= 5);
     push("empty-nest", stats.rows.length >= 3 && stats.zeros === stats.rows.length);
+    push("full-perch", Boolean(stats.bestDay && stats.bestDay.matches >= 4), { acquired_at: stats.bestDay?.key });
+    push("big-owch", Boolean(stats.casseroleRows?.[0]?.opposite_result), { acquired_at: stats.casseroleRows?.[0]?.kickoff_at });
 
-    return badges.slice(0, 24);
+    return badges.map((badge, index) => ({ ...badge, orderIndex: index, acquiredDate: this.badgeDateValue(badge) })).sort((a, b) => {
+      const ta = a.acquiredDate ? a.acquiredDate.getTime() : Number.POSITIVE_INFINITY;
+      const tb = b.acquiredDate ? b.acquiredDate.getTime() : Number.POSITIVE_INFINITY;
+      return ta - tb || a.orderIndex - b.orderIndex;
+    });
   },
 
   funnyTitle(stats, leaderboard) {
@@ -802,6 +805,7 @@ const BilanPDF = {
     const family = report.family_rank || {};
     const familyTeam = report.family_team_rank || {};
     const champion = this.normalizeChampionPrediction(report.champion_prediction || report.winner_prediction || report.winner || null);
+    const secondChampion = this.normalizeSecondChampionPrediction(this.competitionSnapshot().secondWinnerPick);
     const stats = this.stats();
     const badges = this.unlockedBadges(stats, champion);
     const title = this.funnyTitle(stats, leaderboard);
@@ -817,7 +821,7 @@ const BilanPDF = {
     root.innerHTML = `
       <article class="bilan-document collector">
         ${this.pageCover(player, avatarProfile, leaderboard, stats, title, quote)}
-        ${this.pageStats(player, leaderboard, team, family, familyTeam, champion, stats)}
+        ${this.pageStats(player, leaderboard, team, family, familyTeam, champion, secondChampion, stats)}
         ${this.pageIdentity(player, avatarProfile, stats)}
         ${this.pageBadges(badges, stats)}
         ${this.pageRecords(stats)}
@@ -847,63 +851,169 @@ const BilanPDF = {
     </div></section>`;
   },
 
-  pageStats(player, leaderboard, team, family, familyTeam, champion, stats) {
+
+  dateLabel(value) {
+    if (!value) return "—";
+    try { return H.formatDateTime?.(value) || new Date(value).toLocaleString("fr-FR"); }
+    catch (error) { return String(value); }
+  },
+
+  predictionActivityDate(row = {}) {
+    const raw = row.predicted_at || row.submitted_at || row.created_at || row.updated_at || row.locked_at;
+    if (!raw) return null;
+    const d = new Date(raw);
+    return Number.isFinite(d.getTime()) ? d : null;
+  },
+
+  matchTitleHtml(row = {}) {
+    return `${this.matchFlag(row, "home")} ${this.e(row.home_team_short_name || row.home_team_name)} <span class="vs-mini">-</span> ${this.matchFlag(row, "away")} ${this.e(row.away_team_short_name || row.away_team_name)}`;
+  },
+
+  matchMetaHtml(row = {}) {
+    return `${this.e(this.phaseKey(row))} · ${this.e(H.formatDateTime?.(row.kickoff_at) || row.match_day || "date inconnue")}`;
+  },
+
+  scoreIconCard(id, value, label, extra = "") {
+    return `<div class="stat-card icon-stat"><img src="${this.e(this.badgeAsset(id))}" alt=""><div><strong>${this.e(value)}</strong><span>${this.e(label)}</span>${extra ? `<small>${extra}</small>` : ""}</div></div>`;
+  },
+
+  dayDetails(rows = [], best = true) {
+    const byDay = new Map();
+    rows.forEach((row) => {
+      const key = row.match_day || (row.kickoff_at || "").slice(0, 10) || "Sans date";
+      const item = byDay.get(key) || { key, points: 0, matches: 0, exact: 0, zeros: 0, rows: [] };
+      item.points += this.n(row.points_total);
+      item.matches += 1;
+      if (row.is_exact_score) item.exact += 1;
+      if (this.n(row.points_total) === 0) item.zeros += 1;
+      item.rows.push(row);
+      byDay.set(key, item);
+    });
+    return [...byDay.values()].sort((a, b) => best ? b.points - a.points || b.exact - a.exact || b.matches - a.matches : b.zeros - a.zeros || a.points - b.points || b.matches - a.matches)[0] || null;
+  },
+
+  predictionHourBuckets(rows = []) {
+    const buckets = Array.from({ length: 24 }, (_, hour) => ({ hour, count: 0 }));
+    rows.forEach((row) => {
+      const d = this.predictionActivityDate(row);
+      if (d) buckets[d.getHours()].count += 1;
+    });
+    return buckets;
+  },
+
+  favoriteHour(rows = []) {
+    const best = this.predictionHourBuckets(rows).sort((a, b) => b.count - a.count || a.hour - b.hour)[0];
+    if (!best || !best.count) return "—";
+    return `${String(best.hour).padStart(2, "0")}h-${String((best.hour + 1) % 24).padStart(2, "0")}h`;
+  },
+
+  hourRadarHtml(rows = []) {
+    const buckets = this.predictionHourBuckets(rows);
+    const groups = [
+      { label: "Nuit", count: buckets.slice(0, 6).reduce((s, b) => s + b.count, 0) },
+      { label: "Matin", count: buckets.slice(6, 12).reduce((s, b) => s + b.count, 0) },
+      { label: "Aprèm", count: buckets.slice(12, 18).reduce((s, b) => s + b.count, 0) },
+      { label: "Soir", count: buckets.slice(18, 24).reduce((s, b) => s + b.count, 0) }
+    ];
+    const max = Math.max(1, ...groups.map((g) => g.count));
+    return `<div class="hour-radar">${groups.map((g) => `<div><span>${this.e(g.label)}</span><b style="height:${Math.max(8, (g.count/max)*76).toFixed(0)}%"></b><em>${g.count}</em></div>`).join("")}</div>`;
+  },
+
+  rowDetailCard(row, title) {
+    if (!row) return `<article class="detail-match-card"><strong>${this.e(title)}</strong><p class="muted">Pas encore assez de données.</p></article>`;
+    return `<article class="detail-match-card"><strong>${this.e(title)}</strong><h4>${this.matchTitleHtml(row)}</h4><small>${this.matchMetaHtml(row)}</small><p>Prono <b>${this.e(this.predText(row))}</b> · Réel <b>${this.e(this.scoreText(row))}</b> · <b>${this.e(row.points_total ?? 0)} pt(s)</b></p></article>`;
+  },
+
+  titleFromBadgeId(id = "") {
+    return String(id || "badge").split("-").map((part) => part ? part.charAt(0).toUpperCase() + part.slice(1) : "").join(" ");
+  },
+
+  badgeDateValue(badge = {}) {
+    const raw = badge.acquired_at || badge.unlockedAt || badge.granted_at || badge.created_at || badge.updated_at || null;
+    const d = raw ? new Date(raw) : null;
+    return d && Number.isFinite(d.getTime()) ? d : null;
+  },
+
+  featuredBadgeIds() {
+    const raw = this.state.report?.profile?.featured_badge_ids || [];
+    return Array.isArray(raw) ? raw.map(String) : [];
+  },
+
+  miniRecordDefinitions() {
+    return [
+      { id: "record-points", title: "Banque centrale du Nid", icon: "assets/records/record-points.png", unit: "pts", value: (s) => s.total },
+      { id: "record-exact", title: "Œil laser", icon: "assets/records/record-exact.png", unit: "exacts", value: (s) => s.exact },
+      { id: "record-results", title: "Bons résultats à la chaîne", icon: "assets/records/record-results.png", unit: "bons", value: (s) => s.good },
+      { id: "record-diffs", title: "Géomètre volant", icon: "assets/records/record-diffs.png", unit: "écarts", value: (s) => s.diff },
+      { id: "record-average", title: "Moyenne de rapace", icon: "assets/records/record-average.png", unit: "pts/match", decimals: 2, value: (s) => s.average },
+      { id: "record-zero", title: "Collection de casseroles", icon: "assets/records/record-zero.png", unit: "zéros", value: (s) => s.zeros }
+    ];
+  },
+
+  playerSummaryFromRows(userId) {
+    const rows = this.competitionPredictionRows().filter((row) => String(row.user_id) === String(userId));
+    const total = rows.reduce((s, r) => s + this.n(r.points_total), 0);
+    const exact = rows.filter((r) => r.is_exact_score).length;
+    const good = rows.filter((r) => r.is_good_result).length;
+    const diff = rows.filter((r) => r.is_good_goal_diff).length;
+    const zeros = rows.filter((r) => this.n(r.points_total) === 0).length;
+    return { rows, total, exact, good, diff, zeros, average: rows.length ? total / rows.length : 0 };
+  },
+
+  miniRecordPodiums() {
+    const competition = this.competitionSnapshot();
+    const userIds = [...new Set(this.competitionPredictionRows().map((row) => row.user_id).filter(Boolean))];
+    const summaries = userIds.map((id) => ({ id, profile: this.profileForUser(id, (competition.leaderboard || []).find((row) => String(row.user_id || row.id) === String(id)) || {}), stats: this.playerSummaryFromRows(id) }));
+    return this.miniRecordDefinitions().map((record) => ({
+      record,
+      podium: summaries.map((item) => ({ ...item, value: Number(record.value(item.stats) || 0) })).filter((item) => item.value > 0).sort((a, b) => b.value - a.value || String(a.profile.pseudo || "").localeCompare(String(b.profile.pseudo || ""), "fr")).slice(0, 3)
+    }));
+  },
+
+  formatRecordValue(value, record = {}) {
+    const n = Number(value || 0);
+    return `${record.decimals ? n.toFixed(record.decimals) : String(Math.round(n * 10) / 10)} ${record.unit || ""}`.trim();
+  },
+
+
+  pageStats(player, leaderboard, team, family, familyTeam, champion, secondChampion, stats) {
     const showFamily = this.showFamilyContext();
-    const familyRows = showFamily ? `
-          <div class="rank-row"><div><strong>Famille joueur</strong><small>classement parallèle</small></div><span class="big-rank">#${this.e(family.rank || "—")}</span></div>
-          <div class="rank-row"><div><strong>Famille team</strong><small>moyenne équipe famille</small></div><span class="big-rank">#${this.e(familyTeam.rank || "—")}</span></div>
-    ` : "";
+    const familyRows = showFamily ? `<div class="rank-row"><div><strong>Famille joueur</strong><small>classement parallèle</small></div><span class="big-rank">#${this.e(family.rank || "—")}</span></div><div class="rank-row"><div><strong>Famille team</strong><small>moyenne équipe famille</small></div><span class="big-rank">#${this.e(familyTeam.rank || "—")}</span></div>` : "";
+    const championLine = (pick, title, pts) => pick ? `<div class="champion-pick-line">${pick.predicted_team_flag_url || pick.predicted_team_country_code ? H.flagImgHtml({ flagUrl: pick.predicted_team_flag_url, countryCode: pick.predicted_team_country_code, shortName: pick.predicted_team_short_name, name: pick.predicted_team_name, className: "team-flag-img champion-option-flag" }) : ""}<p><span>${this.e(title)}</span><strong>${this.e(pick.predicted_team_name)}</strong><small>${this.e(pts)} pts possibles · actuellement ${this.e(pick.points_total || 0)} pt(s)</small></p></div>` : `<p class="muted">${this.e(title)} : non choisi ou indisponible.</p>`;
     return `<section class="bilan-page stats"><div class="bilan-page-content">
-      <div class="bilan-page-head"><div><h2>Tableau de chasse</h2><p>Les chiffres froids, les plumes chaudes, et les quelques casseroles assumées.</p></div><span class="page-number">02</span></div>
-      <div class="stats-grid">
+      <div class="bilan-page-head"><div><h2>Tableau de chasse</h2><p>Les chiffres froids, les plumes chaudes, et les casseroles assumées avec panache.</p></div><span class="page-number">02</span></div>
+      <div class="stats-grid icon-stats-grid">
         <div class="stat-card feature"><strong>${this.e(leaderboard.total_points ?? stats.total)}</strong><span>points au total</span></div>
         <div class="stat-card"><strong>#${this.e(leaderboard.rank || "—")}</strong><span>rang joueur</span></div>
-        <div class="stat-card"><strong>${stats.exact}</strong><span>scores exacts</span></div>
-        <div class="stat-card"><strong>${stats.good}</strong><span>bons résultats</span></div>
-        <div class="stat-card"><strong>${stats.diff}</strong><span>bons écarts</span></div>
-        <div class="stat-card"><strong>${stats.qualified}</strong><span>bons qualifiés</span></div>
-        <div class="stat-card"><strong>${stats.zeros}</strong><span>zéros pointés</span></div>
-        <div class="stat-card"><strong>${stats.rows.length}</strong><span>matchs comptés</span></div>
+        ${this.scoreIconCard("first-perfect", stats.exact, "scores exacts")}
+        ${this.scoreIconCard("accountant", stats.good, "bons résultats")}
+        ${this.scoreIconCard("geometry", stats.diff, "bons écarts")}
+        ${this.scoreIconCard("knife-edge", stats.qualified, "bons qualifiés")}
+        ${this.scoreIconCard("zero-tunnel", stats.zeros, "zéros pointés")}
+        ${this.scoreIconCard("all-picks-in", `${stats.rows.length}/${stats.officialMatchCount || "?"}`, "matchs comptés")}
       </div>
       <div class="two-col">
-        <div class="graph-card"><h3>Classements</h3><div class="ranking-list">
-          <div class="rank-row"><div><strong>Joueur officiel</strong><small>${this.e(player.pseudo)}</small></div><span class="big-rank">#${this.e(leaderboard.rank || "—")}</span></div>
-          <div class="rank-row"><div><strong>Team officielle</strong><small>${this.e(team.office_team_name || player.office_team_name || "Sans team")}</small></div><span class="big-rank">#${this.e(team.rank || "—")}</span></div>
-          ${familyRows}
-        </div></div>
-        <div class="graph-card champion-card"><h3>Champion du monde</h3>${champion ? `<div class="champion-pick-line">${champion.predicted_team_flag_url || champion.predicted_team_country_code ? H.flagImgHtml({ flagUrl: champion.predicted_team_flag_url, countryCode: champion.predicted_team_country_code, shortName: champion.predicted_team_short_name, name: champion.predicted_team_name, className: "team-flag-img champion-option-flag" }) : ""}<p>Choix : <strong>${this.e(champion.predicted_team_name)}</strong></p></div><p>Bonus actuel : <strong>${this.e(champion.points_total || 0)} pts</strong></p><p class="muted">${champion.actual_winner_team_name ? `Vainqueur réel : ${this.e(champion.actual_winner_team_name)}` : "En attente du vainqueur final."}</p>` : `<p class="muted">Aucun champion choisi ou donnée indisponible.</p>`}</div>
+        <div class="graph-card"><h3>Classements</h3><div class="ranking-list"><div class="rank-row"><div><strong>Joueur officiel</strong><small>${this.e(player.pseudo)}</small></div><span class="big-rank">#${this.e(leaderboard.rank || "—")}</span></div><div class="rank-row"><div><strong>Team officielle</strong><small>${this.e(team.office_team_name || player.office_team_name || "Sans team")}</small></div><span class="big-rank">#${this.e(team.rank || "—")}</span></div>${familyRows}</div></div>
+        <div class="graph-card champion-card"><h3>Champions choisis</h3>${championLine(champion, "Choix initial", 100)}${championLine(secondChampion, "2e choix bonus", 50)}<p class="muted">${champion && secondChampion && champion.predicted_team_id === secondChampion.predicted_team_id ? "Même équipe choisie deux fois : jackpot potentiel à 150 points." : "Le 2e choix ne remplace pas le champion initial : il ajoute un filet de sécurité."}</p></div>
       </div>
     </div></section>`;
   },
-
 
   pageIdentity(player, avatarProfile, stats) {
     const signature = stats.signature || this.playerSignature(stats);
     const exactPct = stats.rows.length ? Math.round(stats.exactRate * 100) : 0;
     const zeroPct = stats.rows.length ? Math.round(stats.zeroRate * 100) : 0;
     const instinct = Math.min(100, Math.round(stats.average * 22));
+    const registeredAt = player.created_at || player.inserted_at || this.state.report.profile?.created_at || null;
+    const bestDay = stats.bestDay;
+    const worstDay = stats.worstDay;
     return `<section class="bilan-page identity"><div class="bilan-page-content">
-      <div class="bilan-page-head"><div><h2>Carte d’identité du pronostiqueur</h2><p>Un rang unique, calculé à partir de son historique. Inutile de contester : le hibou a tamponné.</p></div><span class="page-number">03</span></div>
+      <div class="bilan-page-head"><div><h2>Carte d’identité du pronostiqueur</h2><p>Rang collector, rythme de prono, match rentable et vraie casserole certifiée par le Nid.</p></div><span class="page-number">03</span></div>
       <div class="identity-layout">
-        <div class="identity-rank-card ${this.e(signature.tone)}">
-          ${H.profileBadgeHtml(avatarProfile, "profile-badge leader")}
-          <p class="eyebrow">Rang collector</p>
-          <h3>${this.e(signature.title)}</h3>
-          <p>${this.e(signature.subtitle)}</p>
-        </div>
-        <div class="identity-meter-card">
-          <h3>Radar de plumes</h3>
-          ${this.meterHtml("Précision", exactPct)}
-          ${this.meterHtml("Instinct à points", instinct)}
-          ${this.meterHtml("Goût du risque", Math.min(100, zeroPct + 25))}
-          ${this.meterHtml("Résistance aux casseroles", Math.max(0, 100 - zeroPct))}
-        </div>
+        <div class="identity-rank-card ${this.e(signature.tone)}">${H.profileBadgeHtml(avatarProfile, "profile-badge leader")}<p class="eyebrow">Rang collector</p><h3>${this.e(signature.title)}</h3><p>${this.e(signature.subtitle)}</p><div class="identity-mini-facts"><span>Inscription : <b>${this.e(registeredAt ? this.dateLabel(registeredAt) : "non disponible")}</b></span><span>Créneau préféré : <b>${this.e(stats.favoriteHour)}</b></span></div></div>
+        <div class="identity-meter-card"><h3>Radar de plumes</h3>${this.meterHtml("Précision", exactPct)}${this.meterHtml("Instinct à points", instinct)}${this.meterHtml("Goût du risque", Math.min(100, zeroPct + 25))}${this.meterHtml("Résistance aux casseroles", Math.max(0, 100 - zeroPct))}<h3 class="mini-title">Heures de vol</h3>${this.hourRadarHtml(this.officialPredictions())}</div>
       </div>
-      <div class="fun-fact-grid">
-        <article><strong>${stats.best ? this.e(this.scoreText(stats.best)) : "—"}</strong><span>son score officiel le plus rentable</span></article>
-        <article><strong>${stats.casseroleRows?.[0] ? this.e(this.predText(stats.casseroleRows[0])) : "—"}</strong><span>sa casserole la plus spectaculaire</span></article>
-        <article><strong>${stats.bestDay ? this.e(stats.bestDay.key) : "—"}</strong><span>sa journée de grâce</span></article>
-      </div>
+      <div class="identity-detail-grid">${this.rowDetailCard(stats.best, "Score officiel le plus rentable")}${this.rowDetailCard(stats.casseroleRows?.[0], "Casserole spectaculaire")}<article class="detail-match-card"><strong>Journée de grâce</strong><h4>${this.e(bestDay?.key || "—")} · ${this.e(bestDay?.points ?? "—")} pts</h4><p>${this.e(bestDay?.matches || 0)} match(s), ${this.e(bestDay?.exact || 0)} exact(s), ${this.e(bestDay?.zeros || 0)} zéro(s).</p></article><article class="detail-match-card"><strong>Journée du désespoir</strong><h4>${this.e(worstDay?.key || "—")} · ${this.e(worstDay?.zeros ?? "—")} zéro(s)</h4><p>${this.e(worstDay?.matches || 0)} match(s), ${this.e(worstDay?.points ?? 0)} point(s), une plume qui grince.</p></article></div>
     </div></section>`;
   },
 
@@ -913,64 +1023,37 @@ const BilanPDF = {
   },
 
   pageBadges(badges, stats) {
-    return `<section class="bilan-page badges"><div class="bilan-page-content">
-      <div class="bilan-page-head"><div><h2>Mur des exploits</h2><p>${badges.length} exploit(s) repéré(s), avec les vraies images du Nid quand elles existent.</p></div><span class="page-number">04</span></div>
-      <div class="badge-grid collector-badges">
-        ${badges.length ? badges.map((badge) => `<article class="badge-card"><img class="badge-png" src="${this.e(badge.file || this.badgeAsset(badge.id))}" alt=""><strong>${this.e(badge.title)}</strong><p>${this.e(badge.text)}</p></article>`).join("") : `<article class="badge-card"><img class="badge-png" src="assets/icons/owl-png/badges.png" alt=""><strong>Le nid attend</strong><p>Les badges apparaîtront avec les résultats comptabilisés.</p></article>`}
-      </div>
-    </div></section>`;
+    const featuredIds = this.featuredBadgeIds();
+    const featured = featuredIds.map((id) => badges.find((badge) => String(badge.id) === String(id))).filter(Boolean);
+    const rest = badges.filter((badge) => !featuredIds.includes(String(badge.id)));
+    const chunks = this.chunk(rest, 10);
+    const card = (badge, featured = false) => `<article class="badge-card ${featured ? "featured-badge-card" : ""}"><img class="badge-png" src="${this.e(badge.file || this.badgeAsset(badge.id))}" alt=""><strong>${this.e(badge.title || this.titleFromBadgeId(badge.id))}</strong><small>${badge.acquiredDate ? this.e(this.dateLabel(badge.acquiredDate)) : "date non dispo"}</small><p>${this.e(badge.text || badge.description || "Exploit enregistré dans le Nid.")}</p></article>`;
+    if (!badges.length) return `<section class="bilan-page badges"><div class="bilan-page-content"><div class="bilan-page-head"><div><h2>Mur des exploits</h2><p>Le nid attend ses premiers badges.</p></div><span class="page-number">04</span></div><div class="badge-grid collector-badges"><article class="badge-card"><img class="badge-png" src="assets/icons/owl-png/badges.png" alt=""><strong>Le nid attend</strong><p>Les badges apparaîtront avec les résultats comptabilisés.</p></article></div></div></section>`;
+    const pages = [];
+    pages.push(`<section class="bilan-page badges"><div class="bilan-page-content"><div class="bilan-page-head"><div><h2>Mur des exploits</h2><p>${badges.length} exploit(s), classés par date d’obtention. Les 3 mis en avant sont séparés en haut.</p></div><span class="page-number">04</span></div>${featured.length ? `<h3 class="badge-section-title">Badges mis en avant</h3><div class="badge-grid featured-badges">${featured.map((badge) => card(badge, true)).join("")}</div>` : ""}<h3 class="badge-section-title">Chronologie des exploits</h3><div class="badge-grid collector-badges">${chunks[0]?.map((badge) => card(badge)).join("") || ""}</div></div></section>`);
+    chunks.slice(1).forEach((chunk, index) => pages.push(`<section class="bilan-page badges"><div class="bilan-page-content"><div class="bilan-page-head"><div><h2>Mur des exploits</h2><p>Suite ${index + 2} · chronologie des badges.</p></div><span class="page-number">B-${index + 2}</span></div><div class="badge-grid collector-badges">${chunk.map((badge) => card(badge)).join("")}</div></div></section>`));
+    return pages.join("");
   },
 
   pageRecords(stats) {
-    const best = stats.best;
-    const worst = stats.worst;
+    const best = stats.best, worst = stats.worst;
     const exactStreak = this.streak(stats.rows, (row) => row.is_exact_score);
     const goodStreak = this.streak(stats.rows, (row) => row.is_good_result);
     const zeroStreak = this.streak(stats.rows, (row) => this.n(row.points_total) === 0);
-    return `<section class="bilan-page records"><div class="bilan-page-content">
-      <div class="bilan-page-head"><div><h2>Records & casseroles</h2><p>Les moments que le hibou racontera au coin du perchoir.</p></div><span class="page-number">05</span></div>
-      <div class="record-grid">
-        <article class="record-card"><span class="value">${best ? this.e(best.points_total) : "—"}</span><strong>Meilleur match</strong><small>${best ? `${this.e(best.home_team_name)} - ${this.e(best.away_team_name)}` : "En attente"}</small></article>
-        <article class="record-card"><span class="value">${stats.bestDay ? this.e(stats.bestDay.points) : "—"}</span><strong>Meilleure journée</strong><small>${stats.bestDay ? `${this.e(stats.bestDay.key)} · ${stats.bestDay.matches} match(s)` : "En attente"}</small></article>
-        <article class="record-card"><span class="value">${exactStreak}</span><strong>Série scores exacts</strong><small>Le pic de précision du tournoi.</small></article>
-        <article class="record-card"><span class="value">${goodStreak}</span><strong>Série bons résultats</strong><small>Le mode pilote automatique.</small></article>
-        <article class="record-card"><span class="value">${zeroStreak}</span><strong>Traversée du brouillard</strong><small>Le tunnel zéro, version plumes mouillées.</small></article>
-        <article class="record-card"><span class="value">${worst ? this.e(worst.points_total) : "—"}</span><strong>Casserole favorite</strong><small>${worst ? `${this.e(worst.home_team_name)} - ${this.e(worst.away_team_name)} · prono ${this.e(this.predText(worst))}` : "Aucune casserole officielle"}</small></article>
-      </div>
-    </div></section>`;
+    const playerMiniRecords = this.miniRecordPodiums().filter((item) => item.podium[0] && String(item.podium[0].id) === String(this.state.playerId));
+    return `<section class="bilan-page records"><div class="bilan-page-content"><div class="bilan-page-head"><div><h2>Records & casseroles</h2><p>Les moments que le hibou racontera au coin du perchoir, avec drapeaux et dossiers.</p></div><span class="page-number">05</span></div><div class="record-grid rich-record-grid"><article class="record-card with-icon"><img src="assets/records/record-points.png" alt=""><span class="value">${best ? this.e(best.points_total) : "—"}</span><strong>Meilleur match</strong><small>${best ? `${this.matchTitleHtml(best)} · ${this.matchMetaHtml(best)}` : "En attente"}</small></article><article class="record-card with-icon"><img src="assets/records/record-day.png" alt=""><span class="value">${stats.bestDay ? this.e(stats.bestDay.points) : "—"}</span><strong>Journée de grâce</strong><small>${stats.bestDay ? `${this.e(stats.bestDay.key)} · ${stats.bestDay.matches} match(s) · ${stats.bestDay.exact} exact(s)` : "En attente"}</small></article><article class="record-card with-icon"><img src="assets/records/record-exact-streak.png" alt=""><span class="value">${exactStreak}</span><strong>Série scores exacts</strong><small>Le pic de précision du tournoi.</small></article><article class="record-card with-icon"><img src="assets/records/record-results.png" alt=""><span class="value">${goodStreak}</span><strong>Série bons résultats</strong><small>Le mode pilote automatique.</small></article><article class="record-card with-icon"><img src="assets/records/record-zero-streak.png" alt=""><span class="value">${zeroStreak}</span><strong>Traversée du brouillard</strong><small>Le tunnel zéro, version plumes mouillées.</small></article><article class="record-card with-icon"><img src="assets/records/record-zero.png" alt=""><span class="value">${worst ? this.e(worst.points_total) : "—"}</span><strong>Casserole favorite</strong><small>${worst ? `${this.matchTitleHtml(worst)} · prono ${this.e(this.predText(worst))} · réel ${this.e(this.scoreText(worst))}` : "Aucune casserole officielle"}</small></article></div><div class="graph-card mini-record-player-card"><h3>Mini-records détenus</h3>${playerMiniRecords.length ? playerMiniRecords.map(({ record, podium }) => `<p><img src="${this.e(record.icon)}" alt=""> <strong>${this.e(record.title)}</strong> · ${this.e(this.formatRecordValue(podium[0].value, record))}</p>`).join("") : `<p class="muted">Aucun mini-record détenu actuellement. Le perchoir reste ouvert.</p>`}</div></div></section>`;
   },
-
 
   pageCompetitionPulse(stats) {
     const metrics = this.competitionMetrics();
-    const cursed = metrics.cursedMatch;
-    const best = metrics.bestMatch;
-    return `<section class="bilan-page competition"><div class="bilan-page-content">
-      <div class="bilan-page-head"><div><h2>La compétition en chiffres</h2><p>Le Nid entier vu depuis le perchoir du super admin.</p></div><span class="page-number">06</span></div>
-      <div class="stats-grid collector-stats">
-        <div class="stat-card feature"><strong>${metrics.totalPoints}</strong><span>points distribués dans le Nid</span></div>
-        <div class="stat-card"><strong>${metrics.uniquePlayers}</strong><span>joueurs avec pronos comptés</span></div>
-        <div class="stat-card"><strong>${metrics.finishedMatches.length}</strong><span>matchs terminés</span></div>
-        <div class="stat-card"><strong>${metrics.exacts}</strong><span>scores exacts collectifs</span></div>
-        <div class="stat-card"><strong>${metrics.zeros}</strong><span>zéros récoltés</span></div>
-        <div class="stat-card"><strong>${metrics.rows.length}</strong><span>pronos analysés</span></div>
-      </div>
-      <div class="two-col">
-        <article class="graph-card"><h3>Match jackpot</h3>${best ? `<p><strong>${this.e(best.row.home_team_name)} - ${this.e(best.row.away_team_name)}</strong></p><p>${best.points} pts distribués · ${best.exacts} score(s) exact(s)</p>` : `<p class="muted">Pas encore de match jackpot.</p>`}</article>
-        <article class="graph-card"><h3>Match casserole</h3>${cursed ? `<p><strong>${this.e(cursed.row.home_team_name)} - ${this.e(cursed.row.away_team_name)}</strong></p><p>${cursed.zeros}/${cursed.count} prono(s) à zéro. Le perchoir s’en souviendra.</p>` : `<p class="muted">Pas encore de grande catastrophe.</p>`}</article>
-      </div>
-    </div></section>`;
+    const cursed = metrics.cursedMatch, best = metrics.bestMatch;
+    const podiums = this.miniRecordPodiums();
+    return `<section class="bilan-page competition"><div class="bilan-page-content"><div class="bilan-page-head"><div><h2>La compétition en chiffres</h2><p>Le Nid entier vu depuis le perchoir du super admin : pays, drapeaux, records et catastrophes.</p></div><span class="page-number">06</span></div><div class="stats-grid collector-stats"><div class="stat-card feature"><strong>${metrics.totalPoints}</strong><span>points distribués dans le Nid</span></div><div class="stat-card"><strong>${metrics.uniquePlayers}</strong><span>joueurs avec pronos comptés</span></div><div class="stat-card"><strong>${metrics.finishedMatches.length}</strong><span>matchs terminés</span></div><div class="stat-card"><strong>${metrics.exacts}</strong><span>scores exacts collectifs</span></div><div class="stat-card"><strong>${metrics.zeros}</strong><span>zéros récoltés</span></div><div class="stat-card"><strong>${metrics.rows.length}</strong><span>pronos analysés</span></div></div><div class="two-col"><article class="graph-card"><h3>Match jackpot</h3>${best ? `<p><strong>${this.matchTitleHtml(best.row)}</strong></p><p>${best.points} pts distribués · ${best.exacts} score(s) exact(s)</p>` : `<p class="muted">Pas encore de match jackpot.</p>`}</article><article class="graph-card"><h3>Match casserole</h3>${cursed ? `<p><strong>${this.matchTitleHtml(cursed.row)}</strong></p><p>${cursed.zeros}/${cursed.count} prono(s) à zéro. Le perchoir s’en souviendra.</p>` : `<p class="muted">Pas encore de grande catastrophe.</p>`}</article></div><div class="graph-card mini-records-podiums"><h3>Tous les mini-records · Top 3</h3><div class="mini-record-grid">${podiums.map(({ record, podium }) => `<article><img src="${this.e(record.icon)}" alt=""><strong>${this.e(record.title)}</strong>${podium.length ? podium.map((p, i) => `<span>#${i+1} ${this.e(p.profile.pseudo || "Joueur")} · ${this.e(this.formatRecordValue(p.value, record))}</span>`).join("") : `<span>Pas encore de détenteur</span>`}</article>`).join("")}</div></div></div></section>`;
   },
 
   pageRace(stats) {
     const series = this.playerRaceSeries(stats);
-    return `<section class="bilan-page race"><div class="bilan-page-content">
-      <div class="bilan-page-head"><div><h2>Course aux points</h2><p>La trajectoire du joueur comparée aux meilleurs du Nid.</p></div><span class="page-number">07</span></div>
-      <div class="graph-card race-card">
-        ${this.raceChartSvg(series)}
-        ${this.raceLegendHtml(series)}
-      </div>
-    </div></section>`;
+    return `<section class="bilan-page race"><div class="bilan-page-content"><div class="bilan-page-head"><div><h2>Course aux points</h2><p>Trajectoire du joueur, comparaison aux meilleurs, et lectures en moyenne.</p></div><span class="page-number">07</span></div><div class="graph-card race-card"><h3>Évolution des points</h3>${this.raceChartSvg(series)}${this.raceLegendHtml(series)}</div><div class="two-col"><div class="graph-card"><h3>Évolution moyenne joueur</h3>${this.lineChartSvg(stats.rows.map((row, i) => ({ ...row, points_total: (this.cumulativeSeries(stats.rows)[i]?.y || 0) / (i + 1) })))}</div><div class="graph-card"><h3>Moyenne team</h3><p class="muted">Repère synthétique : ${this.e(this.state.report.team_leaderboard?.average_points?.toFixed?.(2) || this.state.report.team_leaderboard?.average_points || "—")} pts/match pour la team.</p>${this.barsHtml(stats.rows)}</div></div></div></section>`;
   },
 
   pageCasseroles(stats) {
@@ -991,33 +1074,19 @@ const BilanPDF = {
   },
 
   pageGraphs(stats) {
-    return `<section class="bilan-page graphs"><div class="bilan-page-content">
-      <div class="bilan-page-head"><div><h2>Courbes du perchoir</h2><p>Évolution des points et moyennes par phase.</p></div><span class="page-number">09</span></div>
-      <div class="two-col">
-        <div class="graph-card"><h3>Progression cumulée</h3>${this.lineChartSvg(stats.rows)}</div>
-        <div class="graph-card"><h3>Moyennes par phase</h3>${this.barsHtml(stats.rows)}</div>
-      </div>
-    </div></section>`;
+    return `<section class="bilan-page graphs"><div class="bilan-page-content"><div class="bilan-page-head"><div><h2>Courbes du perchoir</h2><p>Évolution, phase, heures de prono et densité des casseroles.</p></div><span class="page-number">09</span></div><div class="two-col"><div class="graph-card"><h3>Progression cumulée</h3>${this.lineChartSvg(stats.rows)}</div><div class="graph-card"><h3>Moyennes par phase</h3>${this.barsHtml(stats.rows)}</div></div><div class="two-col"><div class="graph-card"><h3>Heures de prono</h3>${this.hourRadarHtml(this.officialPredictions())}<p class="muted">Calcul : on regarde l’heure d’enregistrement/modification des pronos, puis on groupe en nuit, matin, après-midi et soir.</p></div><div class="graph-card"><h3>Indice casserole</h3>${this.meterHtml("Taux de zéro", Math.round(stats.zeroRate * 100))}${this.meterHtml("Précision exacte", Math.round(stats.exactRate * 100))}${this.meterHtml("Rentabilité moyenne", Math.min(100, Math.round(stats.average * 22)))}</div></div></div></section>`;
   },
 
   predictionHistoryPages(rows) {
     const sorted = rows.slice().sort((a, b) => {
-      const phaseOrder = (row) => {
-        const stage = row.stage || "group";
-        const order = { group: 1, round_of_32: 2, round_of_16: 3, quarter: 4, semi: 5, third_place: 6, final: 7 };
-        return (order[stage] || 99) * 100 + Number(row.pool_round || 0);
-      };
+      const phaseOrder = (row) => { const stage = row.stage || "group"; const order = { group: 1, round_of_32: 2, round_of_16: 3, quarter: 4, semi: 5, third_place: 6, final: 7 }; return (order[stage] || 99) * 100 + Number(row.pool_round || 0); };
       return phaseOrder(a) - phaseOrder(b) || new Date(a.kickoff_at || 0) - new Date(b.kickoff_at || 0);
     });
-    const chunks = this.chunk(sorted, 18);
-    if (!chunks.length) {
-      return `<section class="bilan-page history"><div class="bilan-page-content"><div class="bilan-page-head"><div><h2>Historique des pronos</h2><p>Encore vierge.</p></div><span class="page-number">10</span></div><p class="muted">Aucun prono terminé à afficher.</p></div></section>`;
-    }
-    return chunks.map((chunk, index) => `<section class="bilan-page history"><div class="bilan-page-content">
-      <div class="bilan-page-head"><div><h2>Historique des pronos</h2><p>Page ${index + 1}/${chunks.length} · rangé par journée et phase finale.</p></div><span class="page-number">H-${index + 1}</span></div>
-      ${this.predictionsTableHtml(chunk, { showPhase: true })}
-    </div></section>`).join("");
+    const chunks = this.chunk(sorted, 9);
+    if (!chunks.length) return `<section class="bilan-page history"><div class="bilan-page-content"><div class="bilan-page-head"><div><h2>Historique des pronos</h2><p>Encore vierge.</p></div><span class="page-number">10</span></div><p class="muted">Aucun prono terminé à afficher.</p></div></section>`;
+    return chunks.map((chunk, index) => `<section class="bilan-page history"><div class="bilan-page-content"><div class="bilan-page-head"><div><h2>Historique des pronos</h2><p>Page ${index + 1}/${chunks.length} · capsules de matchs, 3 par ligne.</p></div><span class="page-number">H-${index + 1}</span></div><div class="history-capsule-grid">${chunk.map((row) => { const result = this.resultLabel(row); return `<article class="history-capsule ${result.cls}"><small>${this.e(this.phaseKey(row))} · ${this.e(H.formatDateTime?.(row.kickoff_at) || row.match_day || "")}</small><strong>${this.matchTitleHtml(row)}</strong><p>Prono <b>${this.e(this.predText(row))}</b> · Réel <b>${this.e(this.scoreText(row))}</b></p><span class="result-pill ${result.cls}">${this.e(result.text)} · ${this.e(row.points_total ?? 0)} pt(s)</span></article>`; }).join("")}</div></div></section>`).join("");
   },
+
 
   pageDiploma(player, avatarProfile, leaderboard, stats, title) {
     return `<section class="bilan-page diploma"><div class="bilan-page-content">

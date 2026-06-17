@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — APP PRINCIPALE V1.6.4
+// LE NID DES PRONOS — APP PRINCIPALE V1.7.0
 // ============================================================
 
 const H = window.Helpers;
@@ -469,7 +469,7 @@ const App = {
           <div>
             <p class="eyebrow">Crédits cachés</p>
             <h2 id="creditsTitle">Le Nid des Pronos</h2>
-            <p class="muted">Version publique <strong>1.6.4</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
+            <p class="muted">Version publique <strong>1.7.0</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
           </div>
         </div>
         <div class="credits-grid">
@@ -486,7 +486,7 @@ const App = {
             <p><strong>1.0.5</strong> — dashboard mobile/desktop stabilisé, sans chevauchement des cartes.</p>
           </section>
           <section>
-            <h3>Évolutions V1.6.4</h3>
+            <h3>Évolutions V1.7.0</h3>
             <ul class="changelog-list">
               <li>Le super admin peut désactiver ou réactiver l’affichage du module préparation.</li>
               <li>Quand la préparation est désactivée, les matchs test disparaissent des matchs/pronos, classements par phase et règles.</li>
@@ -1054,6 +1054,28 @@ const App = {
     }
 
     this.state.blockedUserIds = new Set((data || []).map((row) => String(row.blocked_id)));
+  },
+
+
+  async loadSecondWinnerPredictionsForTeams() {
+    const selectFields = "user_id,predicted_team_id,predicted_team_name,predicted_team_short_name,predicted_team_country_code,predicted_team_flag_url,points_total,competition_id,created_at,updated_at,locked_at";
+    let query = window.sb
+      .from("v_second_winner_predictions")
+      .select(selectFields)
+      .order("predicted_team_name", { ascending: true });
+
+    if (this.state.activeCompetition?.id) {
+      query = query.eq("competition_id", this.state.activeCompetition.id);
+    }
+
+    const { data, error } = await query;
+    if (error) {
+      console.warn("2e choix champion indisponible pour les fiches joueurs", error);
+      this.state.secondWinnerPredictions = [];
+      return;
+    }
+
+    this.state.secondWinnerPredictions = data || [];
   },
 
   miniRecordPredictionCountRow(userId) {
@@ -3161,7 +3183,7 @@ const App = {
   },
 
   async renderAchievements() {
-    await Promise.all([this.loadMatches(), this.loadVisiblePredictions(), this.loadMiniRecordPredictionCounts(), this.loadWinnerPredictionsForTeams(), this.loadPlayerScoreRows()]);
+    await Promise.all([this.loadMatches(), this.loadVisiblePredictions(), this.loadMiniRecordPredictionCounts(), this.loadWinnerPredictionsForTeams(), this.loadSecondWinnerPredictionsForTeams(), this.loadPlayerScoreRows()]);
 
     const root = H.$("#viewRoot");
     root.innerHTML = `
@@ -3294,7 +3316,8 @@ const App = {
       this.loadPlayerScoreRows().catch((error) => console.warn("Classement indisponible pour le Hall", error)),
       this.loadVisiblePredictions().catch((error) => console.warn("Pronos visibles indisponibles pour le Hall", error)),
       this.loadMiniRecordPredictionCounts().catch((error) => console.warn("Compteurs publics indisponibles pour le Hall", error)),
-      this.loadWinnerPredictionsForTeams().catch((error) => console.warn("Choix champion indisponibles pour le Hall", error))
+      this.loadWinnerPredictionsForTeams().catch((error) => console.warn("Choix champion indisponibles pour le Hall", error)),
+      this.loadSecondWinnerPredictionsForTeams().catch((error) => console.warn("2e choix champion indisponibles pour le Hall", error))
     ]);
 
     const byUser = new Map();
@@ -5367,7 +5390,8 @@ const App = {
             this.loadMyPredictions(),
             this.loadVisiblePredictions(),
             this.loadWinnerPrediction(),
-            this.loadWinnerPredictionsForTeams().catch(() => null)
+            this.loadWinnerPredictionsForTeams().catch(() => null),
+            this.loadSecondWinnerPredictionsForTeams().catch(() => null)
           ]);
           this.syncAchievementNotifications();
         } catch (error) {
@@ -7002,6 +7026,10 @@ const App = {
     return null;
   },
 
+  secondWinnerInfoForPlayer(playerId) {
+    return this.state.secondWinnerPredictions.find((row) => String(row.user_id) === String(playerId)) || null;
+  },
+
   playerStatsCardsHtml(row, badges) {
     return `
       <div class="player-detail-stats">
@@ -7016,22 +7044,35 @@ const App = {
 
   playerChampionPickHtml(playerId) {
     const winner = this.winnerInfoForPlayer(playerId);
+    const secondWinner = this.secondWinnerInfoForPlayer(playerId);
 
-    if (winner) {
+    const pickCard = (pick, label, emptyLabel) => {
+      if (!pick) {
+        return `<div class="player-winner-pick muted-box"><strong>${emptyLabel}</strong><small>Pas encore visible ou pas encore choisi.</small></div>`;
+      }
       const flag = H.flagImgHtml({
-        flagUrl: winner.predicted_team_flag_url,
-        countryCode: winner.predicted_team_country_code,
-        shortName: winner.predicted_team_short_name,
-        name: winner.predicted_team_name,
+        flagUrl: pick.predicted_team_flag_url,
+        countryCode: pick.predicted_team_country_code,
+        shortName: pick.predicted_team_short_name,
+        name: pick.predicted_team_name,
         className: "team-flag-img champion-option-flag"
       });
       return `
         <div class="player-winner-pick picked">
           ${flag}
           <div>
-            <strong>${H.escapeHtml(winner.predicted_team_name || "Équipe choisie")}</strong>
-            <small>Champion du monde choisi${winner.points_total ? ` · +${winner.points_total} pts` : ""}</small>
+            <strong>${H.escapeHtml(pick.predicted_team_name || "Équipe choisie")}</strong>
+            <small>${label}${pick.points_total ? ` · +${pick.points_total} pts` : ""}</small>
           </div>
+        </div>
+      `;
+    };
+
+    if (winner || secondWinner) {
+      return `
+        <div class="player-winner-picks-duo">
+          ${pickCard(winner, "Champion initial", "Champion initial non visible")}
+          ${pickCard(secondWinner, "2e champion bonus", "2e champion non choisi")}
         </div>
       `;
     }
@@ -7047,8 +7088,8 @@ const App = {
 
     return `
       <div class="player-winner-pick muted-box">
-        <strong>Choix champion non visible</strong>
-        <small>Soit le joueur ne l’a pas encore choisi, soit le choix reste masqué jusqu’au verrouillage.</small>
+        <strong>Choix champions non visibles</strong>
+        <small>Soit le joueur ne les a pas encore choisis, soit les choix restent masqués.</small>
       </div>
     `;
   },
@@ -7961,7 +8002,8 @@ const App = {
     await Promise.all([
       this.loadPublicProfiles(),
       this.loadPlayerScoreRows(),
-      this.loadWinnerPredictionsForTeams()
+      this.loadWinnerPredictionsForTeams(),
+      this.loadSecondWinnerPredictionsForTeams()
     ]);
 
     const scopes = this.availableChatScopes();
@@ -8751,7 +8793,7 @@ const App = {
           </div>
           <div class="profile-account-actions">
             <button class="ghost-btn" id="profileInstallAppBtn" type="button">Installer l’app</button>
-            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.6.4</button>
+            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.7.0</button>
             <button class="danger-btn" id="profileLogoutBtn" type="button">Déconnexion</button>
           </div>
         </div>
