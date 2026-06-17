@@ -727,3 +727,14 @@
   .bilan-page.diploma .bilan-page-content { min-height: 260mm !important; }
   .identity-detail-grid, .history-capsule-grid, .mini-record-grid { grid-template-columns: repeat(3, 1fr); }
 }
+
+
+/* V1.7.1 — Course aux points : top 8 + joueur */
+.race-legend {
+  grid-template-columns: repeat(3, 1fr);
+}
+@media print {
+  .race-legend {
+    grid-template-columns: repeat(3, 1fr) !important;
+  }
+}

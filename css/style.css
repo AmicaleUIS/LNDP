@@ -18006,3 +18006,9 @@ body[data-current-view] {
 /* V1.7.0 — fiche joueur : champion initial + 2e champion */
 .player-winner-picks-duo { display: grid; gap: 10px; }
 .owl-message-create-form[hidden] { display: none !important; }
+
+
+/* V1.7.1 — badges spéciaux sans 404 */
+.player-winner-picks-duo .player-winner-pick {
+  min-width: 0;
+}

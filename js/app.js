@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — APP PRINCIPALE V1.7.0
+// LE NID DES PRONOS — APP PRINCIPALE V1.7.1
 // ============================================================
 
 const H = window.Helpers;
@@ -469,7 +469,7 @@ const App = {
           <div>
             <p class="eyebrow">Crédits cachés</p>
             <h2 id="creditsTitle">Le Nid des Pronos</h2>
-            <p class="muted">Version publique <strong>1.7.0</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
+            <p class="muted">Version publique <strong>1.7.1</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
           </div>
         </div>
         <div class="credits-grid">
@@ -486,7 +486,7 @@ const App = {
             <p><strong>1.0.5</strong> — dashboard mobile/desktop stabilisé, sans chevauchement des cartes.</p>
           </section>
           <section>
-            <h3>Évolutions V1.7.0</h3>
+            <h3>Évolutions V1.7.1</h3>
             <ul class="changelog-list">
               <li>Le super admin peut désactiver ou réactiver l’affichage du module préparation.</li>
               <li>Quand la préparation est désactivée, les matchs test disparaissent des matchs/pronos, classements par phase et règles.</li>
@@ -1058,7 +1058,7 @@ const App = {
 
 
   async loadSecondWinnerPredictionsForTeams() {
-    const selectFields = "user_id,predicted_team_id,predicted_team_name,predicted_team_short_name,predicted_team_country_code,predicted_team_flag_url,points_total,competition_id,created_at,updated_at,locked_at";
+    const selectFields = "user_id,predicted_team_id,predicted_team_name,predicted_team_short_name,predicted_team_country_code,predicted_team_flag_url,points_total,competition_id,created_at,updated_at";
     let query = window.sb
       .from("v_second_winner_predictions")
       .select(selectFields)
@@ -3183,7 +3183,7 @@ const App = {
   },
 
   async renderAchievements() {
-    await Promise.all([this.loadMatches(), this.loadVisiblePredictions(), this.loadMiniRecordPredictionCounts(), this.loadWinnerPredictionsForTeams(), this.loadSecondWinnerPredictionsForTeams(), this.loadPlayerScoreRows()]);
+    await Promise.all([this.loadMatches(), this.loadVisiblePredictions(), this.loadMiniRecordPredictionCounts(), this.loadWinnerPrediction(), this.loadSecondWinnerPrediction(), this.loadWinnerPredictionsForTeams(), this.loadSecondWinnerPredictionsForTeams(), this.loadPlayerScoreRows()]);
 
     const root = H.$("#viewRoot");
     root.innerHTML = `
@@ -3316,6 +3316,8 @@ const App = {
       this.loadPlayerScoreRows().catch((error) => console.warn("Classement indisponible pour le Hall", error)),
       this.loadVisiblePredictions().catch((error) => console.warn("Pronos visibles indisponibles pour le Hall", error)),
       this.loadMiniRecordPredictionCounts().catch((error) => console.warn("Compteurs publics indisponibles pour le Hall", error)),
+      this.loadWinnerPrediction().catch(() => null),
+      this.loadSecondWinnerPrediction().catch(() => null),
       this.loadWinnerPredictionsForTeams().catch((error) => console.warn("Choix champion indisponibles pour le Hall", error)),
       this.loadSecondWinnerPredictionsForTeams().catch((error) => console.warn("2e choix champion indisponibles pour le Hall", error))
     ]);
@@ -5129,11 +5131,17 @@ const App = {
     const id = H.escapeHtml(badge.id);
     const title = H.escapeHtml(badge.title);
     const isMiniRecord = badge.isMiniRecord || String(badge.id || "").startsWith("record-");
+    const specialBadgeAssets = {
+      "champion-picked": "assets/icons/owl-png/coupe-du-monde.png",
+      "second-champion-picked": "assets/icons/owl-png/badges.png",
+      "second-final-winner-oracle": "assets/icons/owl-png/coupe-du-monde.png"
+    };
     const assetFolder = isMiniRecord ? "assets/records" : "assets/badges";
+    const src = specialBadgeAssets[badge.id] || `${assetFolder}/${id}.png`;
     const altPrefix = isMiniRecord ? "Mini-record" : "Badge";
     return `
       <span class="achievement-art ${unlocked ? "unlocked" : "locked"} ${isMiniRecord ? "mini-record-art" : ""}">
-        <img src="${assetFolder}/${id}.png" alt="${altPrefix} ${title}" loading="lazy" onerror="this.remove()">
+        <img src="${src}" alt="${altPrefix} ${title}" loading="lazy" onerror="this.remove()">
         <span class="achievement-fallback">${H.icon(this.badgeIconName(badge))}</span>
       </span>
     `;
@@ -5390,6 +5398,7 @@ const App = {
             this.loadMyPredictions(),
             this.loadVisiblePredictions(),
             this.loadWinnerPrediction(),
+            this.loadSecondWinnerPrediction().catch(() => null),
             this.loadWinnerPredictionsForTeams().catch(() => null),
             this.loadSecondWinnerPredictionsForTeams().catch(() => null)
           ]);
@@ -7005,29 +7014,43 @@ const App = {
   },
 
   winnerInfoForPlayer(userId) {
-    const publicWinner = this.state.winnerPredictions.find((row) => row.user_id === userId);
+    const publicWinner = this.state.winnerPredictions.find((row) => String(row.user_id) === String(userId));
     if (publicWinner) return publicWinner;
 
     if (userId === this.state.session.user.id && this.state.winnerPrediction?.predicted_team_id) {
       const team = this.state.footballTeams.find((item) => item.id === this.state.winnerPrediction.predicted_team_id);
-      if (team) {
-        return {
-          user_id: userId,
-          predicted_team_id: team.id,
-          predicted_team_name: team.name,
-          predicted_team_short_name: team.short_name,
-          predicted_team_country_code: team.country_code,
-          predicted_team_flag_url: team.flag_url,
-          points_total: 0
-        };
-      }
+      return {
+        user_id: userId,
+        predicted_team_id: team?.id || this.state.winnerPrediction.predicted_team_id,
+        predicted_team_name: team?.name || "Champion choisi",
+        predicted_team_short_name: team?.short_name,
+        predicted_team_country_code: team?.country_code,
+        predicted_team_flag_url: team?.flag_url,
+        points_total: this.state.winnerPrediction.points_total || 0
+      };
     }
 
     return null;
   },
 
   secondWinnerInfoForPlayer(playerId) {
-    return this.state.secondWinnerPredictions.find((row) => String(row.user_id) === String(playerId)) || null;
+    const publicSecond = this.state.secondWinnerPredictions.find((row) => String(row.user_id) === String(playerId));
+    if (publicSecond) return publicSecond;
+
+    if (String(playerId) === String(this.state.session.user.id) && this.state.secondWinnerPrediction?.predicted_team_id) {
+      const team = this.state.footballTeams.find((item) => item.id === this.state.secondWinnerPrediction.predicted_team_id);
+      return {
+        user_id: playerId,
+        predicted_team_id: team?.id || this.state.secondWinnerPrediction.predicted_team_id,
+        predicted_team_name: team?.name || "2e champion choisi",
+        predicted_team_short_name: team?.short_name,
+        predicted_team_country_code: team?.country_code,
+        predicted_team_flag_url: team?.flag_url,
+        points_total: this.state.secondWinnerPrediction.points_total || 0
+      };
+    }
+
+    return null;
   },
 
   playerStatsCardsHtml(row, badges) {
@@ -8002,6 +8025,8 @@ const App = {
     await Promise.all([
       this.loadPublicProfiles(),
       this.loadPlayerScoreRows(),
+      this.loadWinnerPrediction().catch(() => null),
+      this.loadSecondWinnerPrediction().catch(() => null),
       this.loadWinnerPredictionsForTeams(),
       this.loadSecondWinnerPredictionsForTeams()
     ]);
@@ -8793,7 +8818,7 @@ const App = {
           </div>
           <div class="profile-account-actions">
             <button class="ghost-btn" id="profileInstallAppBtn" type="button">Installer l’app</button>
-            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.7.0</button>
+            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.7.1</button>
             <button class="danger-btn" id="profileLogoutBtn" type="button">Déconnexion</button>
           </div>
         </div>

@@ -1,4 +1,4 @@
-# Le Nid des Pronos — V1.7.0
+# Le Nid des Pronos — V1.7.1
 
 ## V1.6.0 — 2e champion + message Hibou
 
@@ -626,3 +626,13 @@ Le patch V1.6.4 ajoute aussi un rattrapage automatique du badge `champion-picked
 - Records/casseroles/compétition/mini-records étoffés.
 - Historique des pronos en capsules 3 par ligne.
 - Fonds PDF stabilisés en impression.
+
+
+## V1.7.1 — Hotfix bilan et champions
+
+- Corrige `this.outcomeFromScores is not a function` dans le bilan PDF.
+- Supprime la requête vers `user_badges` quand la table n’existe pas.
+- Corrige la requête `v_second_winner_predictions` qui demandait `locked_at`.
+- Affiche le champion initial et le 2e champion du joueur même si les vues publiques ne répondent pas.
+- Corrige les 404 sur `champion-picked.png` et `second-champion-picked.png`.
+- Dans la course aux points du PDF : affiche les 8 meilleurs + le joueur courant même s’il est 10e, 15e ou perdu dans la brume.

@@ -1,6 +1,6 @@
 
 // ============================================================
-// LE NID DES PRONOS — BILAN PDF V1.7.0
+// LE NID DES PRONOS — BILAN PDF V1.7.1
 // ============================================================
 
 const H = window.Helpers;
@@ -382,17 +382,16 @@ const BilanPDF = {
       }
     };
 
-    const [leaderboard, predictions, profiles, matches, manualBadges, userBadges, secondWinnerRows] = await Promise.all([
+    const [leaderboard, predictions, profiles, matches, manualBadges, secondWinnerRows] = await Promise.all([
       safe(window.sb.from("v_leaderboard_overall").select("*").order("rank")),
       safe(window.sb.from("v_visible_predictions").select("*")),
       safe(window.sb.from("v_public_profiles").select("*")),
       safe(window.sb.from("v_matches").select("*")),
       safe(window.sb.from("manual_user_badges").select("*").eq("user_id", this.state.playerId)),
-      safe(window.sb.from("user_badges").select("*").eq("user_id", this.state.playerId)),
       safe(window.sb.from("v_second_winner_predictions").select("*").eq("user_id", this.state.playerId))
     ]);
 
-    this.state.competition = { leaderboard, predictions, profiles, matches, manualBadges, userBadges, secondWinnerPick: (secondWinnerRows || [])[0] || null };
+    this.state.competition = { leaderboard, predictions, profiles, matches, manualBadges, userBadges: [], secondWinnerPick: (secondWinnerRows || [])[0] || null };
   },
 
   officialPredictions() {
@@ -432,6 +431,15 @@ const BilanPDF = {
   missDistance(row = {}) {
     return Math.abs(this.n(row.home_score_pred) - this.n(row.home_score))
       + Math.abs(this.n(row.away_score_pred) - this.n(row.away_score));
+  },
+
+  outcomeFromScores(home, away) {
+    const h = Number(home);
+    const a = Number(away);
+    if (!Number.isFinite(h) || !Number.isFinite(a)) return null;
+    if (h > a) return "home";
+    if (a > h) return "away";
+    return "draw";
   },
 
   isOppositeResult(row = {}) {
@@ -673,9 +681,9 @@ const BilanPDF = {
     const competition = this.competitionSnapshot();
     const leaderboard = competition.leaderboard || [];
     const playerId = this.state.playerId;
-    const topIds = leaderboard.slice(0, 5).map((row) => row.user_id || row.id).filter(Boolean);
+    const topIds = leaderboard.slice(0, 8).map((row) => row.user_id || row.id).filter(Boolean);
     if (playerId && !topIds.map(String).includes(String(playerId))) topIds.push(playerId);
-    const playerIds = topIds.slice(0, 6);
+    const playerIds = topIds.slice(0, 9);
     if (!rows.length || !playerIds.length) {
       return {
         playerIds: [playerId],
@@ -704,7 +712,7 @@ const BilanPDF = {
     const playerIds = series.playerIds || [];
     const snapshots = series.snapshots || [];
     if (!playerIds.length || !snapshots.length) return `<p class="muted">Pas encore assez de données pour afficher la course aux points.</p>`;
-    const colors = ["#facc15", "#38bdf8", "#a78bfa", "#fb7185", "#34d399", "#fb923c"];
+    const colors = ["#facc15", "#38bdf8", "#a78bfa", "#fb7185", "#34d399", "#fb923c", "#f472b6", "#22c55e", "#60a5fa"];
     const width = 760, height = 300, pad = { left: 44, right: 22, top: 24, bottom: 42 };
     const max = Math.max(5, ...snapshots.flatMap((snapshot) => playerIds.map((id) => snapshot.totals.get(String(id)) || 0)));
     const x = (index) => pad.left + (snapshots.length === 1 ? 0 : (index / (snapshots.length - 1)) * (width - pad.left - pad.right));
@@ -722,7 +730,7 @@ const BilanPDF = {
   },
 
   raceLegendHtml(series) {
-    const colors = ["#facc15", "#38bdf8", "#a78bfa", "#fb7185", "#34d399", "#fb923c"];
+    const colors = ["#facc15", "#38bdf8", "#a78bfa", "#fb7185", "#34d399", "#fb923c", "#f472b6", "#22c55e", "#60a5fa"];
     return `<div class="race-legend">${(series.playerIds || []).map((id, index) => {
       const competition = this.competitionSnapshot();
       const profile = this.profileForUser(id, (competition.leaderboard || []).find((row) => String(row.user_id || row.id) === String(id)) || {});
@@ -1027,7 +1035,7 @@ const BilanPDF = {
     const featured = featuredIds.map((id) => badges.find((badge) => String(badge.id) === String(id))).filter(Boolean);
     const rest = badges.filter((badge) => !featuredIds.includes(String(badge.id)));
     const chunks = this.chunk(rest, 10);
-    const card = (badge, featured = false) => `<article class="badge-card ${featured ? "featured-badge-card" : ""}"><img class="badge-png" src="${this.e(badge.file || this.badgeAsset(badge.id))}" alt=""><strong>${this.e(badge.title || this.titleFromBadgeId(badge.id))}</strong><small>${badge.acquiredDate ? this.e(this.dateLabel(badge.acquiredDate)) : "date non dispo"}</small><p>${this.e(badge.text || badge.description || "Exploit enregistré dans le Nid.")}</p></article>`;
+    const card = (badge, featured = false) => `<article class="badge-card ${featured ? "featured-badge-card" : ""}"><img class="badge-png" src="${this.e(badge.file || this.badgeAsset(badge.id))}" alt="" onerror="this.src='assets/icons/owl-png/badges.png'"><strong>${this.e(badge.title || this.titleFromBadgeId(badge.id))}</strong><small>${badge.acquiredDate ? this.e(this.dateLabel(badge.acquiredDate)) : "date non dispo"}</small><p>${this.e(badge.text || badge.description || "Exploit enregistré dans le Nid.")}</p></article>`;
     if (!badges.length) return `<section class="bilan-page badges"><div class="bilan-page-content"><div class="bilan-page-head"><div><h2>Mur des exploits</h2><p>Le nid attend ses premiers badges.</p></div><span class="page-number">04</span></div><div class="badge-grid collector-badges"><article class="badge-card"><img class="badge-png" src="assets/icons/owl-png/badges.png" alt=""><strong>Le nid attend</strong><p>Les badges apparaîtront avec les résultats comptabilisés.</p></article></div></div></section>`;
     const pages = [];
     pages.push(`<section class="bilan-page badges"><div class="bilan-page-content"><div class="bilan-page-head"><div><h2>Mur des exploits</h2><p>${badges.length} exploit(s), classés par date d’obtention. Les 3 mis en avant sont séparés en haut.</p></div><span class="page-number">04</span></div>${featured.length ? `<h3 class="badge-section-title">Badges mis en avant</h3><div class="badge-grid featured-badges">${featured.map((badge) => card(badge, true)).join("")}</div>` : ""}<h3 class="badge-section-title">Chronologie des exploits</h3><div class="badge-grid collector-badges">${chunks[0]?.map((badge) => card(badge)).join("") || ""}</div></div></section>`);
