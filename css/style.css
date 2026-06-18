@@ -18186,3 +18186,44 @@ body[data-current-view] {
   letter-spacing: .03em;
   text-transform: uppercase;
 }
+
+
+/* ============================================================
+   V1.8.2 — Classement : flèches de mouvement
+   ============================================================ */
+
+.rank {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+
+.rank-movement-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 42px;
+  padding: 3px 7px;
+  border-radius: 999px;
+  font-size: .72rem;
+  line-height: 1;
+  font-weight: 1000;
+  letter-spacing: .02em;
+  border: 1px solid rgba(148,163,184,.22);
+  background: rgba(15,23,42,.72);
+  box-shadow: 0 8px 18px rgba(0,0,0,.16);
+}
+
+.rank-movement-pill.up {
+  color: #bbf7d0;
+  border-color: rgba(34,197,94,.42);
+  background: rgba(34,197,94,.14);
+}
+
+.rank-movement-pill.down {
+  color: #fecaca;
+  border-color: rgba(248,113,113,.42);
+  background: rgba(248,113,113,.14);
+}

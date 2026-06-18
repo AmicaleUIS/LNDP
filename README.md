@@ -1,4 +1,4 @@
-# Le Nid des Pronos — V1.8.1
+# Le Nid des Pronos — V1.8.2
 
 ## V1.6.0 — 2e champion + message Hibou
 
@@ -654,4 +654,12 @@ Le patch V1.6.4 ajoute aussi un rattrapage automatique du badge `champion-picked
 - Les projections `live_points` sont explicitement retirées du calcul de rang de la sentinelle.
 - Aucun snapshot de rang n’est sauvegardé pendant un live, pour éviter de mémoriser un classement provisoire.
 - La modale précise maintenant : `Classement officiel uniquement · pas de live`.
+- Aucun patch SQL obligatoire.
+
+
+## V1.8.2 — Flèches de mouvement dans le classement
+
+- Ajoute un indicateur dans le classement joueurs général : `↑ +2` si un joueur gagne 2 places, `↓ -1` s’il perd 1 place.
+- Le calcul reste basé sur le classement officiel uniquement.
+- L’indicateur utilise le snapshot précédent du Hibou Sentinelle, sans prendre en compte le live.
 - Aucun patch SQL obligatoire.

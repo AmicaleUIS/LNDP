@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — APP PRINCIPALE V1.8.1
+// LE NID DES PRONOS — APP PRINCIPALE V1.8.2
 // ============================================================
 
 const H = window.Helpers;
@@ -72,6 +72,7 @@ const App = {
     rankSentinelQueue: [],
     rankSentinelModalOpen: false,
     rankSentinelLastSnapshot: null,
+    rankSentinelPreviousSnapshot: null,
     achievementNotificationQueue: [],
     achievementModalOpen: false,
     achievementNotificationTimer: null,
@@ -472,7 +473,7 @@ const App = {
           <div>
             <p class="eyebrow">Crédits cachés</p>
             <h2 id="creditsTitle">Le Nid des Pronos</h2>
-            <p class="muted">Version publique <strong>1.8.1</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
+            <p class="muted">Version publique <strong>1.8.2</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
           </div>
         </div>
         <div class="credits-grid">
@@ -489,7 +490,7 @@ const App = {
             <p><strong>1.0.5</strong> — dashboard mobile/desktop stabilisé, sans chevauchement des cartes.</p>
           </section>
           <section>
-            <h3>Évolutions V1.8.1</h3>
+            <h3>Évolutions V1.8.2</h3>
             <ul class="changelog-list">
               <li>Le super admin peut désactiver ou réactiver l’affichage du module préparation.</li>
               <li>Quand la préparation est désactivée, les matchs test disparaissent des matchs/pronos, classements par phase et règles.</li>
@@ -2269,6 +2270,7 @@ const App = {
     if (!current || !Number.isFinite(current.rank) || current.rank <= 0) return;
 
     const previous = this.readRankSentinelSnapshot();
+    this.state.rankSentinelPreviousSnapshot = previous || null;
     if (!previous || !Number.isFinite(Number(previous.rank))) {
       this.writeRankSentinelSnapshot(current);
       return;
@@ -2402,6 +2404,38 @@ const App = {
       if (event.target === modal) close();
     });
     H.$("#closeRankSentinelBtn", modal)?.focus();
+  },
+
+
+
+  rankMovementForUser(userId, currentRank) {
+    if (this.rankSentinelHasLiveOfficialMatch()) return null;
+    const previous = this.state.rankSentinelPreviousSnapshot;
+    if (!previous || !Array.isArray(previous.rows)) return null;
+
+    const previousRow = previous.rows.find((row) => String(row.userId) === String(userId));
+    if (!previousRow) return null;
+
+    const oldRank = Number(previousRow.rank);
+    const newRank = Number(currentRank);
+    if (!Number.isFinite(oldRank) || !Number.isFinite(newRank) || oldRank === newRank) return null;
+
+    const delta = oldRank - newRank;
+    return {
+      delta,
+      direction: delta > 0 ? "up" : "down",
+      label: `${delta > 0 ? "↑" : "↓"} ${delta > 0 ? "+" : ""}${delta}`
+    };
+  },
+
+  rankMovementHtml(row) {
+    const userId = row?.user_id || row?.id;
+    const movement = this.rankMovementForUser(userId, row?.rank);
+    if (!movement) return "";
+    const title = movement.direction === "up"
+      ? `${movement.delta} place${Math.abs(movement.delta) > 1 ? "s" : ""} gagnée${Math.abs(movement.delta) > 1 ? "s" : ""}`
+      : `${Math.abs(movement.delta)} place${Math.abs(movement.delta) > 1 ? "s" : ""} perdue${Math.abs(movement.delta) > 1 ? "s" : ""}`;
+    return `<span class="rank-movement-pill ${movement.direction}" title="${H.escapeHtml(title)}">${H.escapeHtml(movement.label)}</span>`;
   },
 
 
@@ -5945,6 +5979,9 @@ const App = {
     if (!rows.length) return `<p class="muted">Pas encore de points.</p>`;
     const filters = options.filters || {};
     const valueMode = options.valueMode || "points";
+    const showRankMovement = options.showRankMovement !== undefined
+      ? Boolean(options.showRankMovement)
+      : (!filters.matchIds && valueMode === "points");
 
     return `
       <div class="leaderboard-list">
@@ -5961,10 +5998,11 @@ const App = {
             badge_color: r.badge_color || "#facc15"
           });
           const averageValue = Number(r.average_points || 0);
+          const movementHtml = showRankMovement ? this.rankMovementHtml(r) : "";
           return `
           <details class="leader-details ${r.user_id === this.state.session.user.id ? "me" : ""}">
             <summary class="leader-row">
-              <div class="rank">#${r.rank}</div>
+              <div class="rank">#${r.rank}${movementHtml}</div>
               <div class="leader-avatar" aria-hidden="true">
                 ${H.profileBadgeHtml(playerProfile, "profile-badge leader")}
               </div>
@@ -9040,7 +9078,7 @@ const App = {
           </div>
           <div class="profile-account-actions">
             <button class="ghost-btn" id="profileInstallAppBtn" type="button">Installer l’app</button>
-            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.8.1</button>
+            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.8.2</button>
             <button class="danger-btn" id="profileLogoutBtn" type="button">Déconnexion</button>
           </div>
         </div>
