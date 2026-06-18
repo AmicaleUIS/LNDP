@@ -18012,3 +18012,160 @@ body[data-current-view] {
 .player-winner-picks-duo .player-winner-pick {
   min-width: 0;
 }
+
+
+/* ============================================================
+   V1.8.0 — Hibou Sentinelle : modale classement
+   ============================================================ */
+
+.rank-sentinel-modal {
+  backdrop-filter: blur(14px);
+}
+
+.rank-sentinel-card {
+  position: relative;
+  width: min(620px, calc(100vw - 28px));
+  overflow: hidden;
+  text-align: center;
+  border-color: rgba(250, 204, 21, .42);
+  box-shadow: 0 28px 90px rgba(0,0,0,.55);
+}
+
+.rank-sentinel-glow {
+  position: absolute;
+  inset: -30%;
+  background:
+    radial-gradient(circle at 50% 10%, rgba(250,204,21,.28), transparent 32%),
+    radial-gradient(circle at 20% 70%, rgba(56,189,248,.18), transparent 28%);
+  pointer-events: none;
+}
+
+.rank-sentinel-modal.rank-down .rank-sentinel-glow {
+  background:
+    radial-gradient(circle at 50% 10%, rgba(251,146,60,.24), transparent 32%),
+    radial-gradient(circle at 80% 80%, rgba(248,113,113,.18), transparent 28%);
+}
+
+.rank-sentinel-card > *:not(.rank-sentinel-glow) {
+  position: relative;
+  z-index: 2;
+}
+
+.rank-sentinel-owl {
+  width: 92px;
+  height: 92px;
+  margin: 0 auto 12px;
+  display: grid;
+  place-items: center;
+  border-radius: 28px;
+  background: rgba(15,23,42,.62);
+  border: 1px solid rgba(250,204,21,.28);
+}
+
+.rank-sentinel-owl img {
+  width: 74px;
+  height: 74px;
+  object-fit: contain;
+  grid-area: 1 / 1;
+  filter: drop-shadow(0 12px 22px rgba(0,0,0,.35));
+}
+
+.rank-sentinel-owl span {
+  grid-area: 1 / 1;
+  transform: translate(38px, 34px);
+  font-size: 1.35rem;
+}
+
+.rank-sentinel-card h2 {
+  margin: 6px 0 8px;
+  font-size: clamp(1.8rem, 5vw, 3rem);
+  line-height: .95;
+}
+
+.rank-sentinel-headline {
+  margin: 0 auto 8px;
+  color: #fde68a;
+  font-size: 1.25rem;
+  font-weight: 1000;
+}
+
+.rank-sentinel-story {
+  margin: 0 auto 18px;
+  max-width: 520px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.rank-sentinel-stats {
+  display: grid;
+  grid-template-columns: 1fr 58px 1fr;
+  align-items: stretch;
+  gap: 10px;
+  margin: 18px 0;
+}
+
+.rank-sentinel-stats article {
+  border-radius: 22px;
+  border: 1px solid rgba(250,204,21,.22);
+  background: rgba(15,23,42,.72);
+  padding: 14px;
+}
+
+.rank-sentinel-stats article span,
+.rank-sentinel-stats article small {
+  display: block;
+  color: var(--muted);
+}
+
+.rank-sentinel-stats article strong {
+  display: block;
+  margin: 4px 0;
+  color: #facc15;
+  font-size: 2.1rem;
+  line-height: 1;
+}
+
+.rank-sentinel-arrow {
+  display: grid;
+  place-items: center;
+  color: #facc15;
+  font-size: 2.4rem;
+  font-weight: 1000;
+}
+
+.rank-sentinel-crossed {
+  display: grid;
+  gap: 8px;
+  margin: 12px 0 18px;
+  text-align: left;
+}
+
+.rank-sentinel-crossed strong {
+  color: #fff7cc;
+}
+
+.rank-sentinel-crossed span {
+  display: block;
+  padding: 9px 12px;
+  border-radius: 14px;
+  background: rgba(2,6,23,.35);
+  border: 1px solid rgba(148,163,184,.16);
+  color: #e5e7eb;
+  font-weight: 800;
+}
+
+.rank-sentinel-actions {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+@media (max-width: 560px) {
+  .rank-sentinel-stats {
+    grid-template-columns: 1fr;
+  }
+  .rank-sentinel-arrow {
+    min-height: 42px;
+  }
+}

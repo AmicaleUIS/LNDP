@@ -1,4 +1,4 @@
-# Le Nid des Pronos — V1.7.1
+# Le Nid des Pronos — V1.8.0
 
 ## V1.6.0 — 2e champion + message Hibou
 
@@ -636,3 +636,13 @@ Le patch V1.6.4 ajoute aussi un rattrapage automatique du badge `champion-picked
 - Affiche le champion initial et le 2e champion du joueur même si les vues publiques ne répondent pas.
 - Corrige les 404 sur `champion-picked.png` et `second-champion-picked.png`.
 - Dans la course aux points du PDF : affiche les 8 meilleurs + le joueur courant même s’il est 10e, 15e ou perdu dans la brume.
+
+
+## V1.8.0 — Hibou Sentinelle du classement
+
+- Ajout d’une modale in-app quand le rang officiel du joueur change.
+- Si le joueur dépasse quelqu’un : message drôle + ancien rang / nouveau rang + joueur(s) dépassé(s).
+- Si quelqu’un le dépasse : alerte plume froissée + joueur(s) passé(s) devant.
+- Pas de notification navigateur : tout est dans l’application.
+- Snapshot local par joueur pour éviter les répétitions à chaque refresh.
+- Aucun patch SQL obligatoire.
