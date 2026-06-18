@@ -1,4 +1,4 @@
-# Le Nid des Pronos — V1.8.0
+# Le Nid des Pronos — V1.8.1
 
 ## V1.6.0 — 2e champion + message Hibou
 
@@ -645,4 +645,13 @@ Le patch V1.6.4 ajoute aussi un rattrapage automatique du badge `champion-picked
 - Si quelqu’un le dépasse : alerte plume froissée + joueur(s) passé(s) devant.
 - Pas de notification navigateur : tout est dans l’application.
 - Snapshot local par joueur pour éviter les répétitions à chaque refresh.
+- Aucun patch SQL obligatoire.
+
+
+## V1.8.1 — Sentinelle sans live
+
+- Le Hibou Sentinelle ne déclenche plus d’alerte pendant un match officiel en live.
+- Les projections `live_points` sont explicitement retirées du calcul de rang de la sentinelle.
+- Aucun snapshot de rang n’est sauvegardé pendant un live, pour éviter de mémoriser un classement provisoire.
+- La modale précise maintenant : `Classement officiel uniquement · pas de live`.
 - Aucun patch SQL obligatoire.

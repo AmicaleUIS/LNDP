@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — APP PRINCIPALE V1.8.0
+// LE NID DES PRONOS — APP PRINCIPALE V1.8.1
 // ============================================================
 
 const H = window.Helpers;
@@ -472,7 +472,7 @@ const App = {
           <div>
             <p class="eyebrow">Crédits cachés</p>
             <h2 id="creditsTitle">Le Nid des Pronos</h2>
-            <p class="muted">Version publique <strong>1.8.0</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
+            <p class="muted">Version publique <strong>1.8.1</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
           </div>
         </div>
         <div class="credits-grid">
@@ -489,7 +489,7 @@ const App = {
             <p><strong>1.0.5</strong> — dashboard mobile/desktop stabilisé, sans chevauchement des cartes.</p>
           </section>
           <section>
-            <h3>Évolutions V1.8.0</h3>
+            <h3>Évolutions V1.8.1</h3>
             <ul class="changelog-list">
               <li>Le super admin peut désactiver ou réactiver l’affichage du module préparation.</li>
               <li>Quand la préparation est désactivée, les matchs test disparaissent des matchs/pronos, classements par phase et règles.</li>
@@ -2193,8 +2193,25 @@ const App = {
     return `${this.appStoragePrefix()}:rank-sentinel-snapshot:v1`;
   },
 
+  rankSentinelHasLiveOfficialMatch() {
+    return (this.state.matches || []).some((match) =>
+      match.status === "live"
+      && !match.is_test_match
+    ) || this.liveOfficialProjectionRows().length > 0;
+  },
+
   rankSentinelRows(rows = this.state.playerScoreRows) {
-    return this.rankedOfficialLeaderboardRows(rows || [])
+    const officialOnlyRows = (rows || []).map((row) => ({
+      ...row,
+      // Sécurité anti-live : si une ligne arrive avec une projection,
+      // on l'enlève du total et on recalcule le rang officiel.
+      total_points: Number(row.total_points || 0) - Number(row.live_points || 0),
+      live_points: 0,
+      live_match_count: 0,
+      has_live_projection: false
+    }));
+
+    return this.rankedOfficialLeaderboardRows(officialOnlyRows)
       .map((row, index) => ({
         userId: String(row.user_id || row.id || ""),
         pseudo: row.pseudo || row.display_name || "Joueur",
@@ -2243,6 +2260,11 @@ const App = {
   },
 
   observeRankSentinel(reason = "leaderboard") {
+    // Le Hibou Sentinelle ne regarde jamais les projections live.
+    // Pendant un match live officiel, il ne sauvegarde pas non plus de nouveau snapshot,
+    // pour éviter de polluer la référence avec un rang provisoire.
+    if (this.rankSentinelHasLiveOfficialMatch()) return;
+
     const current = this.currentRankSentinelSnapshot();
     if (!current || !Number.isFinite(current.rank) || current.rank <= 0) return;
 
@@ -9018,7 +9040,7 @@ const App = {
           </div>
           <div class="profile-account-actions">
             <button class="ghost-btn" id="profileInstallAppBtn" type="button">Installer l’app</button>
-            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.8.0</button>
+            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.8.1</button>
             <button class="danger-btn" id="profileLogoutBtn" type="button">Déconnexion</button>
           </div>
         </div>

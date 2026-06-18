@@ -18169,3 +18169,20 @@ body[data-current-view] {
     min-height: 42px;
   }
 }
+
+
+/* V1.8.1 — Hibou Sentinelle officiel uniquement */
+.rank-sentinel-card::after {
+  content: "Classement officiel uniquement · pas de live";
+  display: inline-flex;
+  margin-top: 12px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(250,204,21,.22);
+  background: rgba(250,204,21,.10);
+  color: #fde68a;
+  font-size: .72rem;
+  font-weight: 900;
+  letter-spacing: .03em;
+  text-transform: uppercase;
+}
