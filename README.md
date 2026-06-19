@@ -1,4 +1,4 @@
-# Le Nid des Pronos — V1.8.3
+# Le Nid des Pronos — V1.8.4
 
 ## V1.6.0 — 2e champion + message Hibou
 
@@ -673,4 +673,13 @@ Le patch V1.6.4 ajoute aussi un rattrapage automatique du badge `champion-picked
 - Le dernier message de sentinelle Général et le dernier message Famille apparaissent dans `Messages du Hibou`.
 - La modale est corrigée sur mobile : scrollable, moins haute, mieux adaptée.
 - Le `+1 / -2` est visible sur mobile avec une colonne de rang élargie.
+- Aucun patch SQL obligatoire.
+
+
+## V1.8.4 — Rattrapage évolution classement
+
+- Si l’app est installée après que les nouveaux résultats ont déjà été saisis, la Sentinelle reconstruit un état `avant dernier match terminé`.
+- Les flèches `↑ +2 / ↓ -1` peuvent donc apparaître au premier lancement même si les scores étaient déjà validés avant la mise à jour.
+- Fonctionne pour le classement général et pour le classement Famille si le mode Famille est activé.
+- Le rattrapage ne se rejoue qu’une fois par dernier match terminé pour éviter le spam.
 - Aucun patch SQL obligatoire.

@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — APP PRINCIPALE V1.8.3
+// LE NID DES PRONOS — APP PRINCIPALE V1.8.4
 // ============================================================
 
 const H = window.Helpers;
@@ -474,7 +474,7 @@ const App = {
           <div>
             <p class="eyebrow">Crédits cachés</p>
             <h2 id="creditsTitle">Le Nid des Pronos</h2>
-            <p class="muted">Version publique <strong>1.8.3</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
+            <p class="muted">Version publique <strong>1.8.4</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
           </div>
         </div>
         <div class="credits-grid">
@@ -491,7 +491,7 @@ const App = {
             <p><strong>1.0.5</strong> — dashboard mobile/desktop stabilisé, sans chevauchement des cartes.</p>
           </section>
           <section>
-            <h3>Évolutions V1.8.3</h3>
+            <h3>Évolutions V1.8.4</h3>
             <ul class="changelog-list">
               <li>Le super admin peut désactiver ou réactiver l’affichage du module préparation.</li>
               <li>Quand la préparation est désactivée, les matchs test disparaissent des matchs/pronos, classements par phase et règles.</li>
@@ -2402,31 +2402,118 @@ const App = {
     return list;
   },
 
-  observeRankSentinel(reason = "leaderboard", context = "official", sourceRows = this.state.playerScoreRows) {
+  rankSentinelBackfillStorageKey(context = "official") {
+    return `${this.appStoragePrefix()}:rank-sentinel-${this.rankSentinelContextKey(context)}-backfill:v1`;
+  },
+
+  latestFinishedOfficialMatchBatch() {
+    const finished = (this.state.matches || [])
+      .filter((match) =>
+        match.status === "finished"
+        && !match.is_test_match
+        && !this.isLiveDemoMatch(match)
+        && !["cancelled", "postponed"].includes(match.status)
+      )
+      .sort((a, b) => new Date(b.kickoff_at || b.updated_at || 0) - new Date(a.kickoff_at || a.updated_at || 0));
+
+    if (!finished.length) return [];
+    const latestTime = new Date(finished[0].kickoff_at || finished[0].updated_at || 0).getTime();
+    return finished.filter((match) => {
+      const time = new Date(match.kickoff_at || match.updated_at || 0).getTime();
+      return Number.isFinite(time) && Math.abs(time - latestTime) < 60 * 1000;
+    });
+  },
+
+  rankSentinelBackfillSignature(matches = []) {
+    return matches
+      .map((match) => String(match.id || ""))
+      .filter(Boolean)
+      .sort()
+      .join("|");
+  },
+
+  rankSentinelBackfillAlreadyDone(context = "official", signature = "") {
+    if (!signature) return true;
+    try {
+      return window.localStorage.getItem(this.rankSentinelBackfillStorageKey(context)) === signature;
+    } catch (error) {
+      return false;
+    }
+  },
+
+  writeRankSentinelBackfillDone(context = "official", signature = "") {
+    if (!signature) return;
+    try {
+      window.localStorage.setItem(this.rankSentinelBackfillStorageKey(context), signature);
+    } catch (error) {}
+  },
+
+  rankSentinelRowsBeforeMatches(sourceRows = [], matchIds = new Set()) {
+    if (!matchIds || !matchIds.size) return sourceRows || [];
+    const byUser = new Map();
+
+    (this.state.visiblePredictions || [])
+      .filter((prediction) => matchIds.has(String(prediction.match_id)))
+      .forEach((prediction) => {
+        const userId = String(prediction.user_id || "");
+        if (!userId) return;
+        const item = byUser.get(userId) || {
+          points: 0,
+          exact: 0,
+          good: 0,
+          diff: 0,
+          qualified: 0,
+          scored: 0
+        };
+        item.points += Number(prediction.points_total || 0);
+        item.exact += prediction.is_exact_score ? 1 : 0;
+        item.good += prediction.is_good_result ? 1 : 0;
+        item.diff += prediction.is_good_goal_diff ? 1 : 0;
+        item.qualified += prediction.is_good_qualified ? 1 : 0;
+        item.scored += prediction.points_total !== null && prediction.points_total !== undefined ? 1 : 0;
+        byUser.set(userId, item);
+      });
+
+    return (sourceRows || []).map((row) => {
+      const userId = String(row.user_id || row.id || "");
+      const minus = byUser.get(userId);
+      if (!minus) return { ...row };
+
+      return {
+        ...row,
+        total_points: Math.max(0, Number(row.total_points || 0) - minus.points),
+        exact_scores: Math.max(0, Number(row.exact_scores || 0) - minus.exact),
+        good_results: Math.max(0, Number(row.good_results || 0) - minus.good),
+        good_goal_diffs: Math.max(0, Number(row.good_goal_diffs || 0) - minus.diff),
+        good_qualified: Math.max(0, Number(row.good_qualified || 0) - minus.qualified),
+        scored_matches: Math.max(0, Number(row.scored_matches || 0) - minus.scored),
+        live_points: 0,
+        live_match_count: 0,
+        has_live_projection: false
+      };
+    });
+  },
+
+  rankSentinelBackfillPreviousSnapshot(context = "official", sourceRows = this.state.playerScoreRows) {
     const key = this.rankSentinelContextKey(context);
-    // Le Hibou Sentinelle ne regarde jamais les projections live.
-    // Pendant un match live officiel, il ne sauvegarde pas non plus de nouveau snapshot,
-    // pour éviter de polluer la référence avec un rang provisoire.
-    if (this.rankSentinelHasLiveOfficialMatch()) return;
+    const matches = this.latestFinishedOfficialMatchBatch();
+    const signature = this.rankSentinelBackfillSignature(matches);
+    if (!matches.length || !signature || this.rankSentinelBackfillAlreadyDone(key, signature)) return null;
 
-    if (key === "family" && !this.canSeeFamily()) return;
-
-    const current = this.currentRankSentinelSnapshot(key, sourceRows);
-    if (!current || !Number.isFinite(current.rank) || current.rank <= 0) return;
-
-    const previous = this.readRankSentinelSnapshot(key);
-    if (key === "official") this.state.rankSentinelPreviousSnapshot = previous || null;
-
-    if (!previous || !Number.isFinite(Number(previous.rank))) {
-      this.writeRankSentinelSnapshot(current, key);
-      this.writeRankMovementMap({}, key);
-      return;
+    const matchIds = new Set(matches.map((match) => String(match.id)));
+    const previousRows = this.rankSentinelRowsBeforeMatches(sourceRows, matchIds);
+    const snapshot = this.currentRankSentinelSnapshot(key, previousRows);
+    if (snapshot) {
+      snapshot.backfill = true;
+      snapshot.backfill_signature = signature;
+      snapshot.backfill_match_ids = [...matchIds];
     }
+    return snapshot;
+  },
 
-    if (!this.rankSnapshotChanged(previous, current)) {
-      this.writeRankSentinelSnapshot(current, key);
-      return;
-    }
+  emitRankSentinelChange(previous, current, reason = "leaderboard", context = "official", options = {}) {
+    const key = this.rankSentinelContextKey(context);
+    if (!previous || !current) return false;
 
     const movementMap = this.buildRankMovementMap(previous, current);
     this.writeRankMovementMap(movementMap, key);
@@ -2438,7 +2525,11 @@ const App = {
 
     this.writeRankSentinelSnapshot(current, key);
 
-    if (oldRank === newRank) return;
+    if (options.backfillSignature) {
+      this.writeRankSentinelBackfillDone(key, options.backfillSignature);
+    }
+
+    if (oldRank === newRank) return false;
 
     const improved = newRank < oldRank;
     const crossed = this.rankSentinelCrossedPlayers(previous, current, improved)
@@ -2461,7 +2552,69 @@ const App = {
 
     this.writeRankSentinelLastMessage(change);
     this.enqueueRankSentinelModal(change);
+    return true;
   },
+
+
+  observeRankSentinel(reason = "leaderboard", context = "official", sourceRows = this.state.playerScoreRows) {
+    const key = this.rankSentinelContextKey(context);
+    // Le Hibou Sentinelle ne regarde jamais les projections live.
+    // Pendant un match live officiel, il ne sauvegarde pas non plus de nouveau snapshot,
+    // pour éviter de polluer la référence avec un rang provisoire.
+    if (this.rankSentinelHasLiveOfficialMatch()) return;
+
+    if (key === "family" && !this.canSeeFamily()) return;
+
+    const current = this.currentRankSentinelSnapshot(key, sourceRows);
+    if (!current || !Number.isFinite(current.rank) || current.rank <= 0) return;
+
+    const previous = this.readRankSentinelSnapshot(key);
+    if (key === "official") this.state.rankSentinelPreviousSnapshot = previous || null;
+
+    const existingMovementMap = this.readRankMovementMap(key);
+    const hasStoredMovements = Object.keys(existingMovementMap || {}).length > 0;
+
+    if (!previous || !Number.isFinite(Number(previous.rank))) {
+      const backfill = this.rankSentinelBackfillPreviousSnapshot(key, sourceRows);
+      if (backfill && this.rankSnapshotChanged(backfill, current)) {
+        this.emitRankSentinelChange(backfill, current, `${reason}-backfill`, key, {
+          backfillSignature: backfill.backfill_signature
+        });
+        return;
+      }
+
+      if (backfill?.backfill_signature) {
+        this.writeRankSentinelBackfillDone(key, backfill.backfill_signature);
+      }
+      this.writeRankSentinelSnapshot(current, key);
+      this.writeRankMovementMap({}, key);
+      return;
+    }
+
+    if (!this.rankSnapshotChanged(previous, current)) {
+      // Cas important : l'utilisateur installe la Sentinelle après les résultats.
+      // Le snapshot local existe déjà avec le classement actuel, donc on reconstruit
+      // une comparaison "avant dernier match terminé" une seule fois.
+      if (!hasStoredMovements) {
+        const backfill = this.rankSentinelBackfillPreviousSnapshot(key, sourceRows);
+        if (backfill && this.rankSnapshotChanged(backfill, current)) {
+          this.emitRankSentinelChange(backfill, current, `${reason}-late-backfill`, key, {
+            backfillSignature: backfill.backfill_signature
+          });
+          return;
+        }
+        if (backfill?.backfill_signature) {
+          this.writeRankSentinelBackfillDone(key, backfill.backfill_signature);
+        }
+      }
+
+      this.writeRankSentinelSnapshot(current, key);
+      return;
+    }
+
+    this.emitRankSentinelChange(previous, current, reason, key);
+  },
+
 
   rankSentinelCrossedPlayers(previous, current, improved) {
     const oldRank = Number(previous.rank);
@@ -9234,7 +9387,7 @@ const App = {
           </div>
           <div class="profile-account-actions">
             <button class="ghost-btn" id="profileInstallAppBtn" type="button">Installer l’app</button>
-            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.8.3</button>
+            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.8.4</button>
             <button class="danger-btn" id="profileLogoutBtn" type="button">Déconnexion</button>
           </div>
         </div>

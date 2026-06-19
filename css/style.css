@@ -18346,3 +18346,20 @@ body[data-current-view] {
     font-size: 1.08rem;
   }
 }
+
+
+/* V1.8.4 — Rattrapage Sentinelle après résultats déjà validés */
+.rank-sentinel-card::before {
+  content: "Rattrapage possible depuis le dernier match terminé";
+  display: inline-flex;
+  margin-bottom: 8px;
+  padding: 4px 9px;
+  border-radius: 999px;
+  background: rgba(56,189,248,.10);
+  border: 1px solid rgba(56,189,248,.22);
+  color: #bae6fd;
+  font-size: .68rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: .03em;
+}
