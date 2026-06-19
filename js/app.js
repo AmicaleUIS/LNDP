@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — APP PRINCIPALE V1.8.2
+// LE NID DES PRONOS — APP PRINCIPALE V1.8.3
 // ============================================================
 
 const H = window.Helpers;
@@ -73,6 +73,7 @@ const App = {
     rankSentinelModalOpen: false,
     rankSentinelLastSnapshot: null,
     rankSentinelPreviousSnapshot: null,
+    rankSentinelMovementMaps: { official: {}, family: {} },
     achievementNotificationQueue: [],
     achievementModalOpen: false,
     achievementNotificationTimer: null,
@@ -473,7 +474,7 @@ const App = {
           <div>
             <p class="eyebrow">Crédits cachés</p>
             <h2 id="creditsTitle">Le Nid des Pronos</h2>
-            <p class="muted">Version publique <strong>1.8.2</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
+            <p class="muted">Version publique <strong>1.8.3</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
           </div>
         </div>
         <div class="credits-grid">
@@ -490,7 +491,7 @@ const App = {
             <p><strong>1.0.5</strong> — dashboard mobile/desktop stabilisé, sans chevauchement des cartes.</p>
           </section>
           <section>
-            <h3>Évolutions V1.8.2</h3>
+            <h3>Évolutions V1.8.3</h3>
             <ul class="changelog-list">
               <li>Le super admin peut désactiver ou réactiver l’affichage du module préparation.</li>
               <li>Quand la préparation est désactivée, les matchs test disparaissent des matchs/pronos, classements par phase et règles.</li>
@@ -901,7 +902,10 @@ const App = {
 
   openOwlMessagesHistoryModal() {
     H.$("#owlMessagesHistoryModal")?.remove();
-    const messages = (this.state.owlMessages || [])
+    const messages = [
+      ...this.rankSentinelHistoryMessages(),
+      ...(this.state.owlMessages || [])
+    ]
       .slice()
       .sort((a, b) => new Date(b.start_at || b.created_at || 0) - new Date(a.start_at || a.created_at || 0));
 
@@ -1871,6 +1875,7 @@ const App = {
     const myRankTieCount = myRank ? this.tieCountForRank(liveAdjustedRows, myRank.rank) : 0;
     const teamAverageRows = this.overallTeamAverageRows(liveAdjustedRows);
     const familyRows = this.canSeeFamily() ? this.familyPlayerRows() : [];
+    if (this.canSeeFamily()) this.observeRankSentinel("family-home", "family", familyRows);
     const myFamilyRank = familyRows.find((row) => String(row.user_id || row.id) === String(this.state.session.user.id));
     const myFamilyRankTieCount = myFamilyRank ? this.tieCountForRank(familyRows, myFamilyRank.rank) : 0;
     const familyTeamRows = this.canSeeFamily() ? this.familyTeamRows(null, "average") : [];
@@ -2190,8 +2195,20 @@ const App = {
 
 
 
-  rankSentinelStorageKey() {
-    return `${this.appStoragePrefix()}:rank-sentinel-snapshot:v1`;
+  rankSentinelContextKey(context = "official") {
+    return context === "family" ? "family" : "official";
+  },
+
+  rankSentinelStorageKey(context = "official") {
+    return `${this.appStoragePrefix()}:rank-sentinel-${this.rankSentinelContextKey(context)}-snapshot:v2`;
+  },
+
+  rankMovementStorageKey(context = "official") {
+    return `${this.appStoragePrefix()}:rank-sentinel-${this.rankSentinelContextKey(context)}-movement:v2`;
+  },
+
+  rankSentinelLastMessagesKey() {
+    return `${this.appStoragePrefix()}:rank-sentinel-last-messages:v1`;
   },
 
   rankSentinelHasLiveOfficialMatch() {
@@ -2201,18 +2218,23 @@ const App = {
     ) || this.liveOfficialProjectionRows().length > 0;
   },
 
-  rankSentinelRows(rows = this.state.playerScoreRows) {
+  rankSentinelRows(rows = this.state.playerScoreRows, context = "official") {
+    const key = this.rankSentinelContextKey(context);
     const officialOnlyRows = (rows || []).map((row) => ({
       ...row,
       // Sécurité anti-live : si une ligne arrive avec une projection,
-      // on l'enlève du total et on recalcule le rang officiel.
+      // on l'enlève du total et on recalcule le rang.
       total_points: Number(row.total_points || 0) - Number(row.live_points || 0),
       live_points: 0,
       live_match_count: 0,
       has_live_projection: false
     }));
 
-    return this.rankedOfficialLeaderboardRows(officialOnlyRows)
+    const ranked = key === "family"
+      ? this.sortPlayerRows(officialOnlyRows, "points")
+      : this.rankedOfficialLeaderboardRows(officialOnlyRows);
+
+    return ranked
       .map((row, index) => ({
         userId: String(row.user_id || row.id || ""),
         pseudo: row.pseudo || row.display_name || "Joueur",
@@ -2224,11 +2246,13 @@ const App = {
       .filter((row) => row.userId);
   },
 
-  currentRankSentinelSnapshot() {
-    const rows = this.rankSentinelRows();
+  currentRankSentinelSnapshot(context = "official", sourceRows = this.state.playerScoreRows) {
+    const key = this.rankSentinelContextKey(context);
+    const rows = this.rankSentinelRows(sourceRows, key);
     const me = rows.find((row) => row.userId === String(this.state.session?.user?.id));
     if (!me) return null;
     return {
+      context: key,
       userId: me.userId,
       rank: Number(me.rank || 0),
       total_points: Number(me.total_points || 0),
@@ -2238,9 +2262,9 @@ const App = {
     };
   },
 
-  readRankSentinelSnapshot() {
+  readRankSentinelSnapshot(context = "official") {
     try {
-      const raw = window.localStorage.getItem(this.rankSentinelStorageKey());
+      const raw = window.localStorage.getItem(this.rankSentinelStorageKey(context));
       if (!raw) return null;
       const parsed = JSON.parse(raw);
       if (!parsed || parsed.userId !== String(this.state.session?.user?.id)) return null;
@@ -2250,38 +2274,169 @@ const App = {
     }
   },
 
-  writeRankSentinelSnapshot(snapshot) {
+  writeRankSentinelSnapshot(snapshot, context = "official") {
     if (!snapshot) return;
+    const key = this.rankSentinelContextKey(context);
     try {
-      window.localStorage.setItem(this.rankSentinelStorageKey(), JSON.stringify(snapshot));
+      window.localStorage.setItem(this.rankSentinelStorageKey(key), JSON.stringify(snapshot));
       this.state.rankSentinelLastSnapshot = snapshot;
     } catch (error) {
       console.warn("Hibou Sentinelle : snapshot impossible à sauvegarder", error);
     }
   },
 
-  observeRankSentinel(reason = "leaderboard") {
+  readRankMovementMap(context = "official") {
+    const key = this.rankSentinelContextKey(context);
+    if (this.state.rankSentinelMovementMaps?.[key]) return this.state.rankSentinelMovementMaps[key];
+
+    try {
+      const raw = window.localStorage.getItem(this.rankMovementStorageKey(key));
+      const parsed = raw ? JSON.parse(raw) : {};
+      this.state.rankSentinelMovementMaps[key] = parsed && typeof parsed === "object" ? parsed : {};
+      return this.state.rankSentinelMovementMaps[key];
+    } catch (error) {
+      this.state.rankSentinelMovementMaps[key] = {};
+      return {};
+    }
+  },
+
+  writeRankMovementMap(map = {}, context = "official") {
+    const key = this.rankSentinelContextKey(context);
+    const safeMap = map && typeof map === "object" ? map : {};
+    this.state.rankSentinelMovementMaps[key] = safeMap;
+    try {
+      window.localStorage.setItem(this.rankMovementStorageKey(key), JSON.stringify(safeMap));
+    } catch (error) {
+      console.warn("Hibou Sentinelle : mouvements impossibles à sauvegarder", error);
+    }
+  },
+
+  rankSnapshotChanged(previous, current) {
+    if (!previous || !current) return false;
+    const previousRows = Array.isArray(previous.rows) ? previous.rows : [];
+    const currentRows = Array.isArray(current.rows) ? current.rows : [];
+    if (previousRows.length !== currentRows.length) return true;
+
+    const previousById = new Map(previousRows.map((row) => [String(row.userId), row]));
+    return currentRows.some((row) => {
+      const old = previousById.get(String(row.userId));
+      if (!old) return true;
+      return Number(old.rank) !== Number(row.rank)
+        || Number(old.total_points || 0) !== Number(row.total_points || 0)
+        || Number(old.exact_scores || 0) !== Number(row.exact_scores || 0)
+        || Number(old.good_results || 0) !== Number(row.good_results || 0);
+    });
+  },
+
+  buildRankMovementMap(previous, current) {
+    const previousRows = Array.isArray(previous?.rows) ? previous.rows : [];
+    const currentRows = Array.isArray(current?.rows) ? current.rows : [];
+    const previousById = new Map(previousRows.map((row) => [String(row.userId), row]));
+    const map = {};
+
+    currentRows.forEach((row) => {
+      const old = previousById.get(String(row.userId));
+      if (!old) return;
+      const oldRank = Number(old.rank);
+      const newRank = Number(row.rank);
+      if (!Number.isFinite(oldRank) || !Number.isFinite(newRank) || oldRank === newRank) return;
+      const delta = oldRank - newRank;
+      map[String(row.userId)] = {
+        delta,
+        direction: delta > 0 ? "up" : "down",
+        oldRank,
+        newRank,
+        total_points: Number(row.total_points || 0),
+        updated_at: current.captured_at
+      };
+    });
+
+    return map;
+  },
+
+  readRankSentinelLastMessages() {
+    try {
+      const raw = window.localStorage.getItem(this.rankSentinelLastMessagesKey());
+      const parsed = raw ? JSON.parse(raw) : {};
+      return parsed && typeof parsed === "object" ? parsed : {};
+    } catch (error) {
+      return {};
+    }
+  },
+
+  writeRankSentinelLastMessage(change) {
+    if (!change) return;
+    const key = this.rankSentinelContextKey(change.context);
+    const messages = this.readRankSentinelLastMessages();
+    const contextLabel = key === "family" ? "Famille" : "Général";
+    const crossedNames = this.rankSentinelNames(change.crossed);
+    const body = change.improved
+      ? `Tu es passé de #${change.oldRank} à #${change.newRank}${crossedNames ? ` en dépassant ${crossedNames}` : ""}. Le Hibou a secoué ses plumes avec fierté.`
+      : `Tu es passé de #${change.oldRank} à #${change.newRank}${crossedNames ? `, ${crossedNames} est passé devant` : ""}. Le Hibou garde ça pour la revanche.`;
+
+    messages[key] = {
+      id: `rank-sentinel-${key}-${change.id}`,
+      title: key === "family" ? "Hibou Sentinelle · classement Famille" : "Hibou Sentinelle · classement général",
+      body,
+      importance: change.improved ? "fun" : "warning",
+      start_at: change.created_at || new Date().toISOString(),
+      created_at: change.created_at || new Date().toISOString(),
+      show_in_history: true,
+      enabled: true,
+      is_local_rank_sentinel: true,
+      context_label: contextLabel
+    };
+
+    try {
+      window.localStorage.setItem(this.rankSentinelLastMessagesKey(), JSON.stringify(messages));
+    } catch (error) {
+      console.warn("Hibou Sentinelle : impossible de stocker le dernier message", error);
+    }
+  },
+
+  rankSentinelHistoryMessages() {
+    const messages = this.readRankSentinelLastMessages();
+    const list = [];
+    if (messages.official) list.push(messages.official);
+    if (this.canSeeFamily() && messages.family) list.push(messages.family);
+    return list;
+  },
+
+  observeRankSentinel(reason = "leaderboard", context = "official", sourceRows = this.state.playerScoreRows) {
+    const key = this.rankSentinelContextKey(context);
     // Le Hibou Sentinelle ne regarde jamais les projections live.
     // Pendant un match live officiel, il ne sauvegarde pas non plus de nouveau snapshot,
     // pour éviter de polluer la référence avec un rang provisoire.
     if (this.rankSentinelHasLiveOfficialMatch()) return;
 
-    const current = this.currentRankSentinelSnapshot();
+    if (key === "family" && !this.canSeeFamily()) return;
+
+    const current = this.currentRankSentinelSnapshot(key, sourceRows);
     if (!current || !Number.isFinite(current.rank) || current.rank <= 0) return;
 
-    const previous = this.readRankSentinelSnapshot();
-    this.state.rankSentinelPreviousSnapshot = previous || null;
+    const previous = this.readRankSentinelSnapshot(key);
+    if (key === "official") this.state.rankSentinelPreviousSnapshot = previous || null;
+
     if (!previous || !Number.isFinite(Number(previous.rank))) {
-      this.writeRankSentinelSnapshot(current);
+      this.writeRankSentinelSnapshot(current, key);
+      this.writeRankMovementMap({}, key);
       return;
     }
+
+    if (!this.rankSnapshotChanged(previous, current)) {
+      this.writeRankSentinelSnapshot(current, key);
+      return;
+    }
+
+    const movementMap = this.buildRankMovementMap(previous, current);
+    this.writeRankMovementMap(movementMap, key);
 
     const oldRank = Number(previous.rank);
     const newRank = Number(current.rank);
     const oldPoints = Number(previous.total_points || 0);
     const newPoints = Number(current.total_points || 0);
 
-    this.writeRankSentinelSnapshot(current);
+    this.writeRankSentinelSnapshot(current, key);
 
     if (oldRank === newRank) return;
 
@@ -2291,7 +2446,8 @@ const App = {
       .slice(0, 6);
 
     const change = {
-      id: `${Date.now()}-${oldRank}-${newRank}`,
+      id: `${Date.now()}-${key}-${oldRank}-${newRank}`,
+      context: key,
       reason,
       improved,
       oldRank,
@@ -2299,9 +2455,11 @@ const App = {
       oldPoints,
       newPoints,
       crossed,
+      created_at: new Date().toISOString(),
       playerPseudo: current.pseudo || this.state.profile?.pseudo || "Toi"
     };
 
+    this.writeRankSentinelLastMessage(change);
     this.enqueueRankSentinelModal(change);
   },
 
@@ -2348,6 +2506,7 @@ const App = {
     this.state.rankSentinelModalOpen = true;
     H.$("#rankSentinelModal")?.remove();
 
+    const contextLabel = this.rankSentinelContextKey(change.context) === "family" ? "Famille" : "Général";
     const crossedNames = this.rankSentinelNames(change.crossed);
     const pointsDelta = Number(change.newPoints || 0) - Number(change.oldPoints || 0);
     const title = change.improved ? "Le Hibou sentinelle bat des ailes !" : "Alerte plume froissée sur le perchoir";
@@ -2360,7 +2519,7 @@ const App = {
 
     const modal = document.createElement("div");
     modal.id = "rankSentinelModal";
-    modal.className = `modal-backdrop rank-sentinel-modal ${change.improved ? "rank-up" : "rank-down"}`;
+    modal.className = `modal-backdrop rank-sentinel-modal ${change.improved ? "rank-up" : "rank-down"} context-${this.rankSentinelContextKey(change.context)}`;
     modal.innerHTML = `
       <div class="modal-card rank-sentinel-card" role="dialog" aria-modal="true" aria-labelledby="rankSentinelTitle">
         <button class="modal-x-btn" id="closeRankSentinelXBtn" type="button" aria-label="Fermer">×</button>
@@ -2369,7 +2528,7 @@ const App = {
           <img src="assets/icons/owl-png/admin.png" alt="" loading="lazy" onerror="this.style.display='none'">
           <span>${change.improved ? "🦉⬆️" : "🦉⚠️"}</span>
         </div>
-        <p class="eyebrow">${H.icon("diffusion")} Hibou Sentinelle du classement</p>
+        <p class="eyebrow">${H.icon("diffusion")} Hibou Sentinelle · ${H.escapeHtml(contextLabel)}</p>
         <h2 id="rankSentinelTitle">${H.escapeHtml(title)}</h2>
         <p class="rank-sentinel-headline">${H.escapeHtml(headline)}</p>
         <p class="rank-sentinel-story">${story}</p>
@@ -2399,6 +2558,10 @@ const App = {
     H.$("#rankSentinelLeaderboardBtn", modal)?.addEventListener("click", async () => {
       close();
       await this.loadView("leaderboard");
+      if (this.rankSentinelContextKey(change.context) === "family") {
+        this.state.leaderboardTab = "family";
+        await this.renderLeaderboardContent();
+      }
     });
     modal.addEventListener("click", (event) => {
       if (event.target === modal) close();
@@ -2406,36 +2569,27 @@ const App = {
     H.$("#closeRankSentinelBtn", modal)?.focus();
   },
 
+  rankMovementForUser(userId, currentRank, context = "official") {
+    const map = this.readRankMovementMap(context);
+    const movement = map?.[String(userId)];
+    if (!movement) return null;
 
-
-  rankMovementForUser(userId, currentRank) {
-    if (this.rankSentinelHasLiveOfficialMatch()) return null;
-    const previous = this.state.rankSentinelPreviousSnapshot;
-    if (!previous || !Array.isArray(previous.rows)) return null;
-
-    const previousRow = previous.rows.find((row) => String(row.userId) === String(userId));
-    if (!previousRow) return null;
-
-    const oldRank = Number(previousRow.rank);
     const newRank = Number(currentRank);
-    if (!Number.isFinite(oldRank) || !Number.isFinite(newRank) || oldRank === newRank) return null;
-
-    const delta = oldRank - newRank;
-    return {
-      delta,
-      direction: delta > 0 ? "up" : "down",
-      label: `${delta > 0 ? "↑" : "↓"} ${delta > 0 ? "+" : ""}${delta}`
-    };
+    if (Number.isFinite(newRank) && Number(movement.newRank) !== newRank) return null;
+    return movement;
   },
 
-  rankMovementHtml(row) {
+  rankMovementHtml(row, context = "official") {
     const userId = row?.user_id || row?.id;
-    const movement = this.rankMovementForUser(userId, row?.rank);
+    const movement = this.rankMovementForUser(userId, row?.rank, context);
     if (!movement) return "";
+    const delta = Number(movement.delta || 0);
+    if (!delta) return "";
     const title = movement.direction === "up"
-      ? `${movement.delta} place${Math.abs(movement.delta) > 1 ? "s" : ""} gagnée${Math.abs(movement.delta) > 1 ? "s" : ""}`
-      : `${Math.abs(movement.delta)} place${Math.abs(movement.delta) > 1 ? "s" : ""} perdue${Math.abs(movement.delta) > 1 ? "s" : ""}`;
-    return `<span class="rank-movement-pill ${movement.direction}" title="${H.escapeHtml(title)}">${H.escapeHtml(movement.label)}</span>`;
+      ? `${Math.abs(delta)} place${Math.abs(delta) > 1 ? "s" : ""} gagnée${Math.abs(delta) > 1 ? "s" : ""}`
+      : `${Math.abs(delta)} place${Math.abs(delta) > 1 ? "s" : ""} perdue${Math.abs(delta) > 1 ? "s" : ""}`;
+    const label = `${movement.direction === "up" ? "↑" : "↓"} ${delta > 0 ? "+" : ""}${delta}`;
+    return `<span class="rank-movement-pill ${movement.direction}" title="${H.escapeHtml(title)}">${H.escapeHtml(label)}</span>`;
   },
 
 
@@ -5979,6 +6133,7 @@ const App = {
     if (!rows.length) return `<p class="muted">Pas encore de points.</p>`;
     const filters = options.filters || {};
     const valueMode = options.valueMode || "points";
+    const movementContext = options.movementContext || "official";
     const showRankMovement = options.showRankMovement !== undefined
       ? Boolean(options.showRankMovement)
       : (!filters.matchIds && valueMode === "points");
@@ -5998,7 +6153,7 @@ const App = {
             badge_color: r.badge_color || "#facc15"
           });
           const averageValue = Number(r.average_points || 0);
-          const movementHtml = showRankMovement ? this.rankMovementHtml(r) : "";
+          const movementHtml = showRankMovement ? this.rankMovementHtml(r, movementContext) : "";
           return `
           <details class="leader-details ${r.user_id === this.state.session.user.id ? "me" : ""}">
             <summary class="leader-row">
@@ -6891,7 +7046,7 @@ const App = {
           ${pager}
           ${group ? `<div class="team-phase-head"><strong>${H.escapeHtml(group.key)}</strong><small>${finishedCount}/${group.matches.length} match${group.matches.length > 1 ? "s" : ""} terminé/en direct · ${H.matchDateRangeLabel(group.matches)}</small></div>` : `<p class="muted">Aucune phase à afficher pour le moment.</p>`}
           ${liveProjectionCount ? `<div class="live-ranking-note">${H.icon("info")} Classement Famille joueurs provisoire : ${liveProjectionCount} projection${liveProjectionCount > 1 ? "s" : ""} live incluse${liveProjectionCount > 1 ? "s" : ""}.</div>` : ""}
-          ${this.leaderboardRowsHtml(rows)}
+          ${this.leaderboardRowsHtml(rows, { showRankMovement: false, movementContext: "family" })}
           ${pager}
         </section>`;
       this.bindFamilyLeaderboardControls(root);
@@ -6901,6 +7056,7 @@ const App = {
     }
 
     const rows = this.familyPlayerRows(null, mode === "average" ? "average" : "points");
+    if (mode === "overall") this.observeRankSentinel("family-leaderboard", "family", rows);
     root.innerHTML = `
       <section class="card player-leaderboard-card family-leaderboard-card">
         <div class="card-title-row leaderboard-compact-title">
@@ -6908,7 +7064,7 @@ const App = {
         </div>
         <div class="team-leaderboard-control-stack">${paneControls}${modeControls}</div>
         ${this.liveProjectionCountForMatchIds(null, { userIds: this.familyProfileIds() }) ? `<div class="live-ranking-note">${H.icon("info")} Classement Famille joueurs provisoire : projections live incluses.</div>` : ""}
-        ${this.leaderboardRowsHtml(rows, { valueMode: mode === "average" ? "average" : "points" })}
+        ${this.leaderboardRowsHtml(rows, { valueMode: mode === "average" ? "average" : "points", movementContext: "family", showRankMovement: mode === "overall" })}
       </section>
     `;
     this.bindFamilyLeaderboardControls(root);
@@ -9078,7 +9234,7 @@ const App = {
           </div>
           <div class="profile-account-actions">
             <button class="ghost-btn" id="profileInstallAppBtn" type="button">Installer l’app</button>
-            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.8.2</button>
+            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.8.3</button>
             <button class="danger-btn" id="profileLogoutBtn" type="button">Déconnexion</button>
           </div>
         </div>

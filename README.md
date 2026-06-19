@@ -1,4 +1,4 @@
-# Le Nid des Pronos — V1.8.2
+# Le Nid des Pronos — V1.8.3
 
 ## V1.6.0 — 2e champion + message Hibou
 
@@ -662,4 +662,15 @@ Le patch V1.6.4 ajoute aussi un rattrapage automatique du badge `champion-picked
 - Ajoute un indicateur dans le classement joueurs général : `↑ +2` si un joueur gagne 2 places, `↓ -1` s’il perd 1 place.
 - Le calcul reste basé sur le classement officiel uniquement.
 - L’indicateur utilise le snapshot précédent du Hibou Sentinelle, sans prendre en compte le live.
+- Aucun patch SQL obligatoire.
+
+
+## V1.8.3 — Sentinelle persistante + Famille
+
+- Les flèches de mouvement sont maintenant persistantes : elles restent affichées jusqu’au prochain changement officiel.
+- Le classement général et le classement Famille ont chacun leur snapshot et leurs flèches.
+- Le Hibou Sentinelle affiche aussi une modale pour le classement Famille quand le mode Famille est activé.
+- Le dernier message de sentinelle Général et le dernier message Famille apparaissent dans `Messages du Hibou`.
+- La modale est corrigée sur mobile : scrollable, moins haute, mieux adaptée.
+- Le `+1 / -2` est visible sur mobile avec une colonne de rang élargie.
 - Aucun patch SQL obligatoire.
