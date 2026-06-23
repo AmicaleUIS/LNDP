@@ -1,4 +1,4 @@
-# Le Nid des Pronos — V1.8.14ed
+# Le Nid des Pronos — V1.8.15ed
 
 ## V1.6.0 — 2e champion + message Hibou
 
@@ -822,4 +822,12 @@ Le patch V1.6.4 ajoute aussi un rattrapage automatique du badge `champion-picked
 
 - Corrige définitivement `this.openPredictionsForMatch is not a function`.
 - La méthode est vraiment définie dans `js/app.js`, et pas seulement appelée.
+- Aucun patch SQL obligatoire.
+
+
+## V1.8.15 — Modal accueil et mobile compact
+
+- Accueil : `Voir les pronos du Nid` ouvre un modal directement sur l’accueil.
+- `Continuer mes pronos` pointe maintenant vers le prochain match non pronostiqué global, trié par date.
+- Classement mobile : cartes plus compactes, pictos plus petits, rang/avatar/points mieux alignés.
 - Aucun patch SQL obligatoire.

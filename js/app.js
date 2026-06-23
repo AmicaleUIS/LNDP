@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — APP PRINCIPALE V1.8.14
+// LE NID DES PRONOS — APP PRINCIPALE V1.8.15
 // ============================================================
 
 const H = window.Helpers;
@@ -474,7 +474,7 @@ const App = {
           <div>
             <p class="eyebrow">Crédits cachés</p>
             <h2 id="creditsTitle">Le Nid des Pronos</h2>
-            <p class="muted">Version publique <strong>1.8.14</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
+            <p class="muted">Version publique <strong>1.8.15</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
           </div>
         </div>
         <div class="credits-grid">
@@ -491,7 +491,7 @@ const App = {
             <p><strong>1.0.5</strong> — dashboard mobile/desktop stabilisé, sans chevauchement des cartes.</p>
           </section>
           <section>
-            <h3>Évolutions V1.8.14</h3>
+            <h3>Évolutions V1.8.15</h3>
             <ul class="changelog-list">
               <li>Le super admin peut désactiver ou réactiver l’affichage du module préparation.</li>
               <li>Quand la préparation est désactivée, les matchs test disparaissent des matchs/pronos, classements par phase et règles.</li>
@@ -2848,6 +2848,92 @@ const App = {
     `;
   },
 
+  homePredictionRowHtml(prediction, match) {
+    const display = this.predictionForDisplay(prediction, match) || prediction;
+    const isMine = String(prediction.user_id || "") === String(this.state.session?.user?.id || "");
+    const points = display.points_total ?? "—";
+    const reason = this.predictionReasonLabel(display);
+    return `
+      <div class="home-prono-row ${isMine ? "me" : ""} ${display.is_live_projection ? "live" : ""}">
+        <div class="home-prono-player">
+          <strong>${H.escapeHtml(prediction.pseudo || (isMine ? "Moi" : "Joueur"))}</strong>
+          <small>${isMine ? "Ton prono" : H.escapeHtml(prediction.office_team_name || "Le Nid")}</small>
+        </div>
+        <div class="home-prono-score">
+          <strong>${Number(prediction.home_score_pred)} - ${Number(prediction.away_score_pred)}</strong>
+          <small>${H.escapeHtml(reason)}</small>
+        </div>
+        <div class="home-prono-points">
+          <strong>${H.escapeHtml(String(points))}</strong>
+          <small>pt${Number(points || 0) > 1 ? "s" : ""}${display.is_live_projection ? " live" : ""}</small>
+        </div>
+      </div>
+    `;
+  },
+
+  async openHomePredictionsModal(matchId) {
+    const match = this.state.matches.find((item) => String(item.id) === String(matchId));
+    if (!match) {
+      H.toast("Match introuvable pour afficher les pronos.", "error");
+      return;
+    }
+
+    await this.loadVisiblePredictions().catch((error) => console.warn("Rafraîchissement pronos live impossible", error));
+
+    const rows = this.predictionsForMatch(match.id)
+      .map((prediction) => this.predictionForDisplay(prediction, match) || prediction)
+      .sort((a, b) =>
+        Number(b.points_total ?? -1) - Number(a.points_total ?? -1)
+        || String(a.pseudo || "").localeCompare(String(b.pseudo || ""), "fr")
+      );
+
+    const myPrediction = this.getMyPrediction(match.id);
+    const title = `${match.home_team_short_name || match.home_team_name} - ${match.away_team_short_name || match.away_team_name}`;
+
+    document.querySelector("#homePredictionsModal")?.remove();
+
+    const modal = document.createElement("div");
+    modal.id = "homePredictionsModal";
+    modal.className = "modal-backdrop home-predictions-modal";
+    modal.innerHTML = `
+      <div class="modal-card home-predictions-card" role="dialog" aria-modal="true" aria-labelledby="homePredictionsTitle">
+        <button class="modal-x-btn" id="closeHomePredictionsXBtn" type="button" aria-label="Fermer">×</button>
+        <div class="home-predictions-head">
+          <span class="pill danger">${match.status === "live" ? "En direct" : H.statusLabel(match.status)}</span>
+          <h2 id="homePredictionsTitle">${H.matchFlagHtml(match, "home")} ${H.escapeHtml(title)} ${H.matchFlagHtml(match, "away")}</h2>
+          <p>${H.escapeHtml(H.shortPoolRoundLabel(match))} · Score actuel : <strong>${H.scoreText(match.home_score, match.away_score)}</strong></p>
+        </div>
+
+        ${myPrediction ? `
+          <div class="home-prono-mine">
+            <small>Ton prono</small>
+            <strong>${Number(myPrediction.home_score_pred)} - ${Number(myPrediction.away_score_pred)}</strong>
+          </div>
+        ` : `<div class="home-prono-mine missing"><small>Ton prono</small><strong>Non posé</strong></div>`}
+
+        <div class="home-prono-list">
+          ${rows.length ? rows.map((row) => this.homePredictionRowHtml(row, match)).join("") : `<p class="muted">Aucun prono visible pour ce match pour le moment.</p>`}
+        </div>
+
+        <div class="modal-actions-row">
+          <button class="ghost-btn" id="homePredictionsGoMatchBtn" type="button">Ouvrir le match</button>
+          <button class="primary-btn" id="closeHomePredictionsBtn" type="button">Fermer</button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(modal);
+    const close = () => modal.remove();
+    H.$("#closeHomePredictionsXBtn", modal)?.addEventListener("click", close);
+    H.$("#closeHomePredictionsBtn", modal)?.addEventListener("click", close);
+    H.$("#homePredictionsGoMatchBtn", modal)?.addEventListener("click", async () => {
+      close();
+      await this.goToMatchPrediction(match.id, { openPredictions: true });
+    });
+    modal.addEventListener("click", (event) => { if (event.target === modal) close(); });
+    H.$("#closeHomePredictionsBtn", modal)?.focus();
+  },
+
   async fetchMyRank() {
     const { data, error } = await window.sb
       .from("v_leaderboard_overall")
@@ -3021,7 +3107,7 @@ const App = {
     H.$$("[data-home-live-predictions-id]", root).forEach((button) => {
       button.addEventListener("click", async (event) => {
         event.stopPropagation();
-        await this.goToMatchPrediction(button.dataset.homeLivePredictionsId, { openPredictions: true });
+        await this.openHomePredictionsModal(button.dataset.homeLivePredictionsId);
       });
     });
 
@@ -3228,24 +3314,10 @@ const App = {
   },
 
   nearestMissingPredictionMatch() {
-    const groups = this.groupMatchesByPouleRound(this.displayMatches());
-    const activeIndex = this.clampPhaseIndex("matchPhaseIndex", groups);
-    const activeGroup = groups[activeIndex];
-
-    const isMissingUpcoming = (match) =>
-      new Date(match.kickoff_at).getTime() > Date.now()
-      && !this.getMyPrediction(match.id);
-
-    // Priorité absolue : la page/journée actuellement affichée.
-    const currentPageMissing = (activeGroup?.matches || [])
-      .filter(isMissingUpcoming)
-      .sort((a, b) => new Date(a.kickoff_at || 0) - new Date(b.kickoff_at || 0));
-
-    if (currentPageMissing.length) return currentPageMissing[0];
-
-    // Sinon seulement, on va chercher le prochain prono manquant global.
-    return this.displayMatches()
-      .filter(isMissingUpcoming)
+    const now = Date.now();
+    return this.availablePredictionMatches()
+      .filter((match) => new Date(match.kickoff_at || 0).getTime() > now)
+      .filter((match) => !this.getMyPrediction(match.id))
       .sort((a, b) => new Date(a.kickoff_at || 0) - new Date(b.kickoff_at || 0))[0] || null;
   },
 
@@ -9564,7 +9636,7 @@ const App = {
           </div>
           <div class="profile-account-actions">
             <button class="ghost-btn" id="profileInstallAppBtn" type="button">Installer l’app</button>
-            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.8.14</button>
+            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.8.15</button>
             <button class="danger-btn" id="profileLogoutBtn" type="button">Déconnexion</button>
           </div>
         </div>
