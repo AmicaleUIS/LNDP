@@ -1,4 +1,4 @@
-# Le Nid des Pronos — V1.8.11ed
+# Le Nid des Pronos — V1.8.12ed
 
 ## V1.6.0 — 2e champion + message Hibou
 
@@ -793,3 +793,11 @@ Le patch V1.6.4 ajoute aussi un rattrapage automatique du badge `champion-picked
 - Les teams Famille en général utilisent aussi ces lignes officielles par joueur.
 - Résultat attendu : un joueur à 44 matchs comptés en général reste à 44 en Famille.
 - Aucun patch SQL obligatoire ; le SQL fourni est uniquement un diagnostic.
+
+
+## V1.8.12 — Live : pronos manquants
+
+- Ajoute la vue SQL `v_live_visible_predictions`.
+- L’app fusionne maintenant `v_visible_predictions` avec `v_live_visible_predictions`.
+- Si un joueur a pronostiqué un match en direct, son prono doit apparaître dans le live même si la vue générale avait un trou.
+- Patch SQL : `patch_v1_8_12_live_visible_predictions.sql`.

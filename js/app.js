@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — APP PRINCIPALE V1.8.11
+// LE NID DES PRONOS — APP PRINCIPALE V1.8.12
 // ============================================================
 
 const H = window.Helpers;
@@ -474,7 +474,7 @@ const App = {
           <div>
             <p class="eyebrow">Crédits cachés</p>
             <h2 id="creditsTitle">Le Nid des Pronos</h2>
-            <p class="muted">Version publique <strong>1.8.11</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
+            <p class="muted">Version publique <strong>1.8.12</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
           </div>
         </div>
         <div class="credits-grid">
@@ -491,7 +491,7 @@ const App = {
             <p><strong>1.0.5</strong> — dashboard mobile/desktop stabilisé, sans chevauchement des cartes.</p>
           </section>
           <section>
-            <h3>Évolutions V1.8.11</h3>
+            <h3>Évolutions V1.8.12</h3>
             <ul class="changelog-list">
               <li>Le super admin peut désactiver ou réactiver l’affichage du module préparation.</li>
               <li>Quand la préparation est désactivée, les matchs test disparaissent des matchs/pronos, classements par phase et règles.</li>
@@ -1163,6 +1163,18 @@ const App = {
     this.state.myPredictions = data || [];
   },
 
+  mergePredictionRows(baseRows = [], extraRows = []) {
+    const byKey = new Map();
+    [...(baseRows || []), ...(extraRows || [])].forEach((row) => {
+      if (!row) return;
+      const key = `${row.prediction_id || row.id || ""}:${row.user_id || ""}:${row.match_id || ""}`;
+      if (!key.replace(/:/g, "")) return;
+      byKey.set(key, { ...(byKey.get(key) || {}), ...row });
+    });
+    return [...byKey.values()];
+  },
+
+
   async loadVisiblePredictions() {
     const { data, error } = await window.sb
       .from("v_visible_predictions")
@@ -1171,9 +1183,22 @@ const App = {
     if (error) {
       console.warn("v_visible_predictions indisponible pour le moment", error);
       this.state.visiblePredictions = [];
-      return;
+    } else {
+      this.state.visiblePredictions = data || [];
     }
-    this.state.visiblePredictions = data || [];
+
+    // V1.8.12 — filet spécial live :
+    // si la vue générale rate un prono sur un match en direct,
+    // la vue dédiée v_live_visible_predictions le réinjecte.
+    const liveResult = await window.sb
+      .from("v_live_visible_predictions")
+      .select("*");
+
+    if (!liveResult.error && Array.isArray(liveResult.data) && liveResult.data.length) {
+      this.state.visiblePredictions = this.mergePredictionRows(this.state.visiblePredictions, liveResult.data);
+    } else if (liveResult.error && !/relation .*v_live_visible_predictions|does not exist|PGRST205/i.test(liveResult.error.message || "")) {
+      console.warn("v_live_visible_predictions indisponible", liveResult.error);
+    }
   },
 
 
@@ -1349,7 +1374,12 @@ const App = {
   },
 
   predictionsForMatch(matchId) {
-    return this.state.visiblePredictions.filter((p) => p.match_id === matchId);
+    const rows = this.state.visiblePredictions.filter((p) => p.match_id === matchId);
+    const mine = this.state.myPredictions.find((p) => p.match_id === matchId);
+    if (mine && !rows.some((row) => String(row.user_id) === String(this.state.session?.user?.id))) {
+      return this.mergePredictionRows(rows, [{ ...mine, user_id: this.state.session?.user?.id, pseudo: this.state.profile?.pseudo }]);
+    }
+    return rows;
   },
 
   upcomingMatches() {
@@ -9501,7 +9531,7 @@ const App = {
           </div>
           <div class="profile-account-actions">
             <button class="ghost-btn" id="profileInstallAppBtn" type="button">Installer l’app</button>
-            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.8.11</button>
+            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.8.12</button>
             <button class="danger-btn" id="profileLogoutBtn" type="button">Déconnexion</button>
           </div>
         </div>
