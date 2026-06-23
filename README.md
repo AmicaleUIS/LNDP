@@ -1,4 +1,4 @@
-# Le Nid des Pronos — V1.8.8ed
+# Le Nid des Pronos — V1.8.9ed
 
 ## V1.6.0 — 2e champion + message Hibou
 
@@ -752,3 +752,18 @@ Le patch V1.6.4 ajoute aussi un rattrapage automatique du badge `champion-picked
 - Ajoute `admin_repair_missing_scores()` pour le bouton super admin.
 - Le bouton `Réparer scores manquants + recalculer` appelle cette fonction et affiche le nombre de lignes recalculées.
 - Patch SQL obligatoire : `patch_v1_8_8_repair_missing_scores_and_visible_view.sql`.
+
+
+## V1.8.8b — DROP VIEW avant recréation
+
+- Corrige les erreurs PostgreSQL `cannot change name of view column ...`.
+- Le patch supprime `public.v_visible_predictions` puis la recrée proprement.
+- À lancer à la place du patch V1.8.8 précédent.
+
+
+## V1.8.9 — Unification des matchs comptés
+
+- Général, phase, teams bureau et teams famille repartent de la même source de pronos visibles.
+- Le classement par phase SQL est recréé à partir de `v_visible_predictions`.
+- Le calcul team par phase côté app utilise désormais `scoreDetailRowsForUser`, comme les détails joueurs.
+- Patch SQL obligatoire : `patch_v1_8_9_unify_counted_matches.sql`.

@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — APP PRINCIPALE V1.8.8
+// LE NID DES PRONOS — APP PRINCIPALE V1.8.9
 // ============================================================
 
 const H = window.Helpers;
@@ -474,7 +474,7 @@ const App = {
           <div>
             <p class="eyebrow">Crédits cachés</p>
             <h2 id="creditsTitle">Le Nid des Pronos</h2>
-            <p class="muted">Version publique <strong>1.8.8</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
+            <p class="muted">Version publique <strong>1.8.9</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
           </div>
         </div>
         <div class="credits-grid">
@@ -491,7 +491,7 @@ const App = {
             <p><strong>1.0.5</strong> — dashboard mobile/desktop stabilisé, sans chevauchement des cartes.</p>
           </section>
           <section>
-            <h3>Évolutions V1.8.8</h3>
+            <h3>Évolutions V1.8.9</h3>
             <ul class="changelog-list">
               <li>Le super admin peut désactiver ou réactiver l’affichage du module préparation.</li>
               <li>Quand la préparation est désactivée, les matchs test disparaissent des matchs/pronos, classements par phase et règles.</li>
@@ -6531,17 +6531,9 @@ const App = {
   },
 
   teamPhaseRows(matchIds = [], mode = "average") {
-    const matchIdSet = new Set(matchIds);
     const teams = this.state.officeTeams.map((team) => {
       const players = this.teamPlayers(team.id, { officialOnly: true }).filter((player) => player.profile_setup_done !== false);
-      const playerIds = new Set(players.map((player) => player.id));
-      const details = this.state.visiblePredictions
-        .filter((prediction) => playerIds.has(prediction.user_id) && matchIdSet.has(prediction.match_id))
-        .map((prediction) => {
-          const match = this.state.matches.find((m) => m.id === prediction.match_id);
-          return { prediction: this.predictionForDisplay(prediction, match) || prediction, match };
-        })
-        .filter(({ match, prediction }) => ["finished", "live"].includes(match?.status) && prediction.points_total !== null && prediction.points_total !== undefined);
+      const details = players.flatMap((player) => this.scoreDetailRowsForUser(player.id || player.user_id, { matchIds }));
 
       const total = details.reduce((sum, { prediction }) => sum + Number(prediction.points_total || 0), 0);
       const exact = details.filter(({ prediction }) => prediction.is_exact_score).length;
@@ -6669,6 +6661,7 @@ const App = {
   },
 
   async renderTeamLeaderboard() {
+    await Promise.all([this.loadMatches(), this.loadVisiblePredictions(), this.loadPublicProfiles(), this.loadPlayerScoreRows()]);
     const root = H.$("#leaderboardContent");
     const teamTab = ["average", "points", "evolution_average", "evolution_points"].includes(this.state.teamTab) ? this.state.teamTab : "average";
     const scope = this.state.teamLeaderboardScope === "phase" ? "phase" : "overall";
@@ -9434,7 +9427,7 @@ const App = {
           </div>
           <div class="profile-account-actions">
             <button class="ghost-btn" id="profileInstallAppBtn" type="button">Installer l’app</button>
-            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.8.8</button>
+            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.8.9</button>
             <button class="danger-btn" id="profileLogoutBtn" type="button">Déconnexion</button>
           </div>
         </div>
