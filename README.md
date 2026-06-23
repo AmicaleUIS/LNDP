@@ -1,4 +1,4 @@
-# Le Nid des Pronos — V1.8.5
+# Le Nid des Pronos — V1.8.6ed
 
 ## V1.6.0 — 2e champion + message Hibou
 
@@ -692,3 +692,40 @@ Le patch V1.6.4 ajoute aussi un rattrapage automatique du badge `champion-picked
 - Ajoute un trigger : quand un score/statut/vainqueur est modifié, les points du match sont recalculés.
 - Corrige les cas où des pronos validés apparaissent à `— pts`.
 - Le bouton `À faire ici / Aller au prono manquant` cherche d'abord dans la journée/phase affichée avant de partir vers une autre journée.
+
+
+## V1.8.5b — Fix DROP FUNCTION
+
+- Corrige l’erreur PostgreSQL `cannot change return type of existing function`.
+- Le patch SQL supprime d’abord les anciennes fonctions `recalc_match_points`, `recalc_all_points`, `score_prediction_for_match` et le trigger associé avant recréation.
+- À lancer à la place du patch V1.8.5 précédent.
+
+
+## V1.8.5c — Fix prediction_id
+
+- Corrige l’erreur `null value in column "prediction_id"`.
+- `recalc_match_points()` insère maintenant `prediction_id = predictions.id`.
+- Le recalcul remplit aussi `home_score_pred`, `away_score_pred`, `home_score`, `away_score` et `calculated_at`.
+- À lancer à la place des patchs V1.8.5 / V1.8.5b.
+
+
+## V1.8.5d — INSERT minimal prediction_points
+
+- Corrige l’erreur `column "home_score_pred" of relation "prediction_points" does not exist`.
+- Le recalcul insère maintenant uniquement les colonnes sûres : `prediction_id`, `user_id`, `match_id`, `points_total` et les flags.
+- À lancer à la place des patchs V1.8.5 / V1.8.5b / V1.8.5c.
+
+
+## V1.8.5e — Sans admin_log_action bloquant
+
+- Corrige l’erreur `Réservé au super admin`.
+- Le recalcul ne tente plus d’écrire dans `admin_log_action`.
+- À lancer à la place des patchs V1.8.5 / b / c / d.
+
+
+## V1.8.6 — Points dynamiques + filet app
+
+- Côté app : si `prediction_points` manque pour un match terminé, les points sont recalculés à l’affichage à partir du résultat officiel.
+- Côté SQL : `patch_v1_8_6_dynamic_recalc_points.sql` recalcule les points en détectant dynamiquement les colonnes existantes dans `prediction_points`.
+- Corrige les cas de `— pt` sur des pronos valides comme un 4-0 sur un 3-0.
+- À lancer à la place des patchs V1.8.5 précédents.

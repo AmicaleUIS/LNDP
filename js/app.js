@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — APP PRINCIPALE V1.8.5
+// LE NID DES PRONOS — APP PRINCIPALE V1.8.6
 // ============================================================
 
 const H = window.Helpers;
@@ -474,7 +474,7 @@ const App = {
           <div>
             <p class="eyebrow">Crédits cachés</p>
             <h2 id="creditsTitle">Le Nid des Pronos</h2>
-            <p class="muted">Version publique <strong>1.8.5</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
+            <p class="muted">Version publique <strong>1.8.6</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
           </div>
         </div>
         <div class="credits-grid">
@@ -491,7 +491,7 @@ const App = {
             <p><strong>1.0.5</strong> — dashboard mobile/desktop stabilisé, sans chevauchement des cartes.</p>
           </section>
           <section>
-            <h3>Évolutions V1.8.5</h3>
+            <h3>Évolutions V1.8.6</h3>
             <ul class="changelog-list">
               <li>Le super admin peut désactiver ou réactiver l’affichage du module préparation.</li>
               <li>Quand la préparation est désactivée, les matchs test disparaissent des matchs/pronos, classements par phase et règles.</li>
@@ -1510,6 +1510,17 @@ const App = {
   predictionForDisplay(prediction, match) {
     if (!prediction) return null;
     if (match?.status === "live") return this.projectedPredictionPoints(prediction, match) || prediction;
+
+    // V1.8.6 — filet de sécurité :
+    // si prediction_points n'a pas encore été créé/recalculé en base,
+    // on calcule quand même les points affichés à partir du résultat officiel.
+    if (
+      match?.status === "finished"
+      && (prediction.points_total === null || prediction.points_total === undefined)
+    ) {
+      return this.projectedPredictionPoints(prediction, match) || prediction;
+    }
+
     return prediction;
   },
 
@@ -3308,7 +3319,7 @@ const App = {
     const storedPoints = this.myPointsForMatch(match.id);
     const points = match.status === "live"
       ? this.predictionForDisplay(prediction, match)
-      : storedPoints;
+      : this.predictionForDisplay(storedPoints || prediction, match);
     const liveSuffix = match.status === "live" ? " live" : "";
     const pointsText = match.is_test_match
       ? (points?.is_live_projection ? `${Number(points.points_total ?? 0)} pt${Number(points.points_total ?? 0) > 1 ? "s" : ""} test live · ${H.escapeHtml(this.predictionReasonLabel(points))}` : "Match test · hors classement")
@@ -9411,7 +9422,7 @@ const App = {
           </div>
           <div class="profile-account-actions">
             <button class="ghost-btn" id="profileInstallAppBtn" type="button">Installer l’app</button>
-            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.8.5</button>
+            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.8.6</button>
             <button class="danger-btn" id="profileLogoutBtn" type="button">Déconnexion</button>
           </div>
         </div>
