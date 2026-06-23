@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — ADMIN V1.8.15
+// LE NID DES PRONOS — ADMIN V1.8.16
 // ============================================================
 
 const H = window.Helpers;
@@ -84,7 +84,7 @@ const Admin = {
       p_category: category,
       p_details: details || {},
       p_metadata: {
-        app_version: "1.8.15",
+        app_version: "1.8.16",
         source: "admin_front"
       }
     });
@@ -481,6 +481,61 @@ const Admin = {
     );
   },
 
+  displayCountryName(name = "") {
+    return String(name || "").trim() === "Mexico" ? "Mexique" : name;
+  },
+
+  normalizeTeamLabels(row = {}) {
+    const copy = { ...row };
+    [
+      "name",
+      "team_name",
+      "home_team_name",
+      "away_team_name",
+      "qualified_team_name",
+      "winner_team_name",
+      "venue_country_name"
+    ].forEach((key) => {
+      if (copy[key]) copy[key] = this.displayCountryName(copy[key]);
+    });
+    return copy;
+  },
+
+  footballTeamOptionsHtml(currentId = "") {
+    const current = String(currentId || "");
+    return [
+      `<option value="">À déterminer</option>`,
+      ...(this.state.footballTeams || []).map((team) =>
+        `<option value="${team.id}" ${String(team.id) === current ? "selected" : ""}>${H.escapeHtml(this.displayCountryName(team.name))} ${team.short_name ? `(${H.escapeHtml(team.short_name)})` : ""}</option>`
+      )
+    ].join("");
+  },
+
+  finalTeamsEditorHtml(match = {}) {
+    if (match.stage === "group" || match.is_test_match) return "";
+    return `
+      <details class="final-teams-editor">
+        <summary>Équipes qualifiées / phase finale</summary>
+        <p class="mini-help">Sélectionne manuellement les équipes du match. Les pronos et scores déjà posés restent liés au match.</p>
+        <div class="match-info-grid final-teams-grid">
+          <label>
+            Équipe domicile
+            <select class="match-home-team-id">
+              ${this.footballTeamOptionsHtml(match.home_team_id)}
+            </select>
+          </label>
+          <label>
+            Équipe extérieur
+            <select class="match-away-team-id">
+              ${this.footballTeamOptionsHtml(match.away_team_id)}
+            </select>
+          </label>
+        </div>
+      </details>
+    `;
+  },
+
+
   async loadUsers() {
     const { data, error } = await window.sb
       .from("profiles")
@@ -508,7 +563,7 @@ const Admin = {
       .order("name");
 
     if (error) throw error;
-    this.state.footballTeams = data || [];
+    this.state.footballTeams = (data || []).map((row) => this.normalizeTeamLabels(row));
   },
 
 
@@ -572,11 +627,11 @@ const Admin = {
         .select("*")
         .order("kickoff_at", { ascending: true });
       if (refreshError) throw refreshError;
-      this.state.matches = refreshed || [];
+      this.state.matches = (refreshed || []).map((row) => this.normalizeTeamLabels(row));
       H.toast("Match live initialisé à 0 - 0", "info");
       return;
     }
-    this.state.matches = rows;
+    this.state.matches = rows.map((row) => this.normalizeTeamLabels(row));
   },
 
   async loadBackups() {
@@ -2433,6 +2488,7 @@ const Admin = {
                   <small>${H.formatDateTime(match.kickoff_at)} · ${H.shortPoolRoundLabel(match)} · ${H.statusLabel(match.status)} · <span class="admin-location-line">${H.matchLocationHtml(match, true)}</span></small>
                 </div>
                 ${this.matchInfoEditorHtml(match, "match")}
+                ${this.finalTeamsEditorHtml(match)}
                 <div class="admin-controls match-controls">
                   <select class="match-status">
                     ${this.statusOptionsHtml(match.status, canScore)}
@@ -2489,6 +2545,12 @@ const Admin = {
       return;
     }
 
+    const homeTeamSelect = row.querySelector(".match-home-team-id");
+    const awayTeamSelect = row.querySelector(".match-away-team-id");
+    const manualTeamPayload = {};
+    if (homeTeamSelect) manualTeamPayload.home_team_id = homeTeamSelect.value || null;
+    if (awayTeamSelect) manualTeamPayload.away_team_id = awayTeamSelect.value || null;
+
     const payload = {
       status,
       home_score: homeScore,
@@ -2496,6 +2558,7 @@ const Admin = {
       winner_team_id: winnerTeamId,
       tv_channel: this.tvChannelValueFromRow(row, "match"),
       tv_channel_source: "manual",
+      ...manualTeamPayload,
       ...infoPayload
     };
 

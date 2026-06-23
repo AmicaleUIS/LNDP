@@ -1,4 +1,4 @@
-# Le Nid des Pronos — V1.8.15ed
+# Le Nid des Pronos — V1.8.16ed
 
 ## V1.6.0 — 2e champion + message Hibou
 
@@ -831,3 +831,12 @@ Le patch V1.6.4 ajoute aussi un rattrapage automatique du badge `champion-picked
 - `Continuer mes pronos` pointe maintenant vers le prochain match non pronostiqué global, trié par date.
 - Classement mobile : cartes plus compactes, pictos plus petits, rang/avatar/points mieux alignés.
 - Aucun patch SQL obligatoire.
+
+
+## V1.8.16 — Mexique, prochain prono, phase finale admin
+
+- Force l’affichage `Mexico` → `Mexique` côté app/admin.
+- Patch SQL fourni pour renommer l’équipe dans `football_teams` sans toucher aux IDs, pronos ou scores.
+- `Continuer mes pronos` priorise les matchs de poule connus avant les 16e, et ignore les matchs avec équipes encore `TBD`.
+- Modal accueil `Voir les pronos du Nid` : bouton `Ouvrir le match` retiré, seul `Fermer` reste.
+- Admin > Scores : pour les matchs de phase finale, ajout d’un éditeur manuel des deux équipes.

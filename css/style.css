@@ -18701,3 +18701,28 @@ body[data-current-view] {
     font-size: 1.02rem !important;
   }
 }
+
+
+/* V1.8.16 — Admin équipes phase finale */
+.final-teams-editor {
+  grid-column: 1 / -1;
+  margin-top: 8px;
+  padding: 10px 12px;
+  border-radius: 16px;
+  background: rgba(250,204,21,.06);
+  border: 1px solid rgba(250,204,21,.18);
+}
+
+.final-teams-editor summary {
+  cursor: pointer;
+  font-weight: 950;
+  color: var(--gold);
+}
+
+.final-teams-grid {
+  margin-top: 10px;
+}
+
+.final-teams-grid select {
+  width: 100%;
+}

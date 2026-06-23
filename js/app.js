@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — APP PRINCIPALE V1.8.15
+// LE NID DES PRONOS — APP PRINCIPALE V1.8.16
 // ============================================================
 
 const H = window.Helpers;
@@ -474,7 +474,7 @@ const App = {
           <div>
             <p class="eyebrow">Crédits cachés</p>
             <h2 id="creditsTitle">Le Nid des Pronos</h2>
-            <p class="muted">Version publique <strong>1.8.15</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
+            <p class="muted">Version publique <strong>1.8.16</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
           </div>
         </div>
         <div class="credits-grid">
@@ -491,7 +491,7 @@ const App = {
             <p><strong>1.0.5</strong> — dashboard mobile/desktop stabilisé, sans chevauchement des cartes.</p>
           </section>
           <section>
-            <h3>Évolutions V1.8.15</h3>
+            <h3>Évolutions V1.8.16</h3>
             <ul class="changelog-list">
               <li>Le super admin peut désactiver ou réactiver l’affichage du module préparation.</li>
               <li>Quand la préparation est désactivée, les matchs test disparaissent des matchs/pronos, classements par phase et règles.</li>
@@ -669,6 +669,34 @@ const App = {
     this.renderShell();
   },
 
+  displayCountryName(name = "") {
+    return String(name || "").trim() === "Mexico" ? "Mexique" : name;
+  },
+
+  normalizeTeamLabels(row = {}) {
+    const copy = { ...row };
+    [
+      "name",
+      "team_name",
+      "home_team_name",
+      "away_team_name",
+      "qualified_team_name",
+      "winner_team_name",
+      "venue_country_name"
+    ].forEach((key) => {
+      if (copy[key]) copy[key] = this.displayCountryName(copy[key]);
+    });
+    return copy;
+  },
+
+  hasKnownMatchTeams(match = {}) {
+    const bad = (value = "") => /^(tbd|à déterminer|a determiner|1st group|2nd group|3rd group|winner|runner-up)/i.test(String(value || "").trim());
+    return Boolean(match.home_team_id && match.away_team_id)
+      && !bad(match.home_team_name)
+      && !bad(match.away_team_name);
+  },
+
+
   async loadProfile() {
     const userId = this.state.session.user.id;
     const { data, error } = await window.sb
@@ -698,7 +726,7 @@ const App = {
       .order("name");
 
     if (error) throw error;
-    this.state.footballTeams = data || [];
+    this.state.footballTeams = (data || []).map((row) => this.normalizeTeamLabels(row));
   },
 
   async loadActiveCompetition() {
@@ -1134,7 +1162,7 @@ const App = {
       .order("kickoff_at", { ascending: true });
 
     if (error) throw error;
-    this.state.matches = data || [];
+    this.state.matches = (data || []).map((row) => this.normalizeTeamLabels(row));
   },
 
   async loadGroupStandings() {
@@ -1150,7 +1178,7 @@ const App = {
       return;
     }
 
-    this.state.groupStandings = data || [];
+    this.state.groupStandings = (data || []).map((row) => this.normalizeTeamLabels(row));
   },
 
   async loadMyPredictions() {
@@ -1391,7 +1419,12 @@ const App = {
   },
 
   availablePredictionMatches() {
-    return this.state.matches.filter((m) => !this.isLiveDemoMatch(m) && !m.is_test_match && !["cancelled", "postponed"].includes(m.status));
+    return this.state.matches.filter((m) =>
+      !this.isLiveDemoMatch(m)
+      && !m.is_test_match
+      && !["cancelled", "postponed"].includes(m.status)
+      && this.hasKnownMatchTeams(m)
+    );
   },
 
   preparationMatches() {
@@ -2916,7 +2949,6 @@ const App = {
         </div>
 
         <div class="modal-actions-row">
-          <button class="ghost-btn" id="homePredictionsGoMatchBtn" type="button">Ouvrir le match</button>
           <button class="primary-btn" id="closeHomePredictionsBtn" type="button">Fermer</button>
         </div>
       </div>
@@ -2926,10 +2958,6 @@ const App = {
     const close = () => modal.remove();
     H.$("#closeHomePredictionsXBtn", modal)?.addEventListener("click", close);
     H.$("#closeHomePredictionsBtn", modal)?.addEventListener("click", close);
-    H.$("#homePredictionsGoMatchBtn", modal)?.addEventListener("click", async () => {
-      close();
-      await this.goToMatchPrediction(match.id, { openPredictions: true });
-    });
     modal.addEventListener("click", (event) => { if (event.target === modal) close(); });
     H.$("#closeHomePredictionsBtn", modal)?.focus();
   },
@@ -3315,10 +3343,14 @@ const App = {
 
   nearestMissingPredictionMatch() {
     const now = Date.now();
-    return this.availablePredictionMatches()
+    const missing = this.availablePredictionMatches()
       .filter((match) => new Date(match.kickoff_at || 0).getTime() > now)
       .filter((match) => !this.getMyPrediction(match.id))
-      .sort((a, b) => new Date(a.kickoff_at || 0) - new Date(b.kickoff_at || 0))[0] || null;
+      .sort((a, b) => new Date(a.kickoff_at || 0) - new Date(b.kickoff_at || 0));
+
+    // Tant que des matchs de poule restent à pronostiquer,
+    // on ne saute jamais vers les 16e.
+    return missing.find((match) => match.stage === "group") || missing[0] || null;
   },
 
   async goToNearestMissingPrediction() {
@@ -9636,7 +9668,7 @@ const App = {
           </div>
           <div class="profile-account-actions">
             <button class="ghost-btn" id="profileInstallAppBtn" type="button">Installer l’app</button>
-            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.8.15</button>
+            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.8.16</button>
             <button class="danger-btn" id="profileLogoutBtn" type="button">Déconnexion</button>
           </div>
         </div>
