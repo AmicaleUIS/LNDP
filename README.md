@@ -1,4 +1,4 @@
-# Le Nid des Pronos — V1.8.6ed
+# Le Nid des Pronos — V1.8.7ed
 
 ## V1.6.0 — 2e champion + message Hibou
 
@@ -729,3 +729,18 @@ Le patch V1.6.4 ajoute aussi un rattrapage automatique du badge `champion-picked
 - Côté SQL : `patch_v1_8_6_dynamic_recalc_points.sql` recalcule les points en détectant dynamiquement les colonnes existantes dans `prediction_points`.
 - Corrige les cas de `— pt` sur des pronos valides comme un 4-0 sur un 3-0.
 - À lancer à la place des patchs V1.8.5 précédents.
+
+
+## V1.8.6b — Fix array_append
+
+- Corrige l’erreur PostgreSQL `malformed array literal: "prediction_id"`.
+- Remplace les concaténations `cols := cols || '...'` par `array_append(cols, '...')`.
+- À lancer à la place du patch V1.8.6.
+
+
+## V1.8.7 — Détail classement complet
+
+- Corrige `v_visible_predictions` pour que les pronos validés soient visibles dans le détail des classements même si `prediction_points` est incomplet.
+- La vue recalcule les points à la volée si besoin.
+- Côté app, le détail du joueur courant fusionne aussi ses pronos locaux pour éviter les trous d’affichage.
+- Patch SQL obligatoire : `patch_v1_8_7_visible_predictions_detail_fix.sql`.
