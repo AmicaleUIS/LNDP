@@ -1,4 +1,4 @@
-# Le Nid des Pronos — V1.8.13ed
+# Le Nid des Pronos — V1.8.14ed
 
 ## V1.6.0 — 2e champion + message Hibou
 
@@ -816,3 +816,10 @@ Le patch V1.6.4 ajoute aussi un rattrapage automatique du badge `champion-picked
 - Corrige l’erreur `this.openPredictionsForMatch is not a function`.
 - Le bouton `Voir les pronos du Nid` ouvre maintenant le bloc des pronos du match.
 - Aucun patch SQL obligatoire si V1.8.12b a déjà été lancé.
+
+
+## V1.8.14 — Hotfix openPredictionsForMatch
+
+- Corrige définitivement `this.openPredictionsForMatch is not a function`.
+- La méthode est vraiment définie dans `js/app.js`, et pas seulement appelée.
+- Aucun patch SQL obligatoire.

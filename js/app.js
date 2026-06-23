@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — APP PRINCIPALE V1.8.13
+// LE NID DES PRONOS — APP PRINCIPALE V1.8.14
 // ============================================================
 
 const H = window.Helpers;
@@ -474,7 +474,7 @@ const App = {
           <div>
             <p class="eyebrow">Crédits cachés</p>
             <h2 id="creditsTitle">Le Nid des Pronos</h2>
-            <p class="muted">Version publique <strong>1.8.13</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
+            <p class="muted">Version publique <strong>1.8.14</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
           </div>
         </div>
         <div class="credits-grid">
@@ -491,7 +491,7 @@ const App = {
             <p><strong>1.0.5</strong> — dashboard mobile/desktop stabilisé, sans chevauchement des cartes.</p>
           </section>
           <section>
-            <h3>Évolutions V1.8.13</h3>
+            <h3>Évolutions V1.8.14</h3>
             <ul class="changelog-list">
               <li>Le super admin peut désactiver ou réactiver l’affichage du module préparation.</li>
               <li>Quand la préparation est désactivée, les matchs test disparaissent des matchs/pronos, classements par phase et règles.</li>
@@ -3142,6 +3142,39 @@ const App = {
     updateAll();
     this.state.homeCountdownTimer = window.setInterval(updateAll, 30000);
   },
+
+  openPredictionsForMatch(matchId) {
+    if (!matchId) return false;
+
+    const stringId = String(matchId);
+    const matchCard = document.getElementById(`match-${stringId}`);
+    const playedCard = document.getElementById(`played-match-${stringId}`);
+
+    const formNode = [...document.querySelectorAll("[data-match-id]")]
+      .find((node) => String(node.dataset.matchId) === stringId);
+
+    const details = matchCard?.querySelector(".others-predictions")
+      || formNode?.closest(".match-card")?.querySelector(".others-predictions")
+      || playedCard;
+
+    if (details) {
+      if ("open" in details) details.open = true;
+      details.hidden = false;
+      details.scrollIntoView({ behavior: "smooth", block: "center" });
+      const summary = details.querySelector?.("summary");
+      if (summary) summary.focus?.({ preventScroll: true });
+      return true;
+    }
+
+    const target = matchCard || playedCard || formNode?.closest(".match-card");
+    if (target) {
+      target.scrollIntoView({ behavior: "smooth", block: "center" });
+      return true;
+    }
+
+    return false;
+  },
+
 
   async goToMatchPrediction(matchId, options = {}) {
     const match = this.state.matches.find((item) => item.id === matchId);
@@ -9531,7 +9564,7 @@ const App = {
           </div>
           <div class="profile-account-actions">
             <button class="ghost-btn" id="profileInstallAppBtn" type="button">Installer l’app</button>
-            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.8.13</button>
+            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.8.14</button>
             <button class="danger-btn" id="profileLogoutBtn" type="button">Déconnexion</button>
           </div>
         </div>
