@@ -18363,3 +18363,47 @@ body[data-current-view] {
   text-transform: uppercase;
   letter-spacing: .03em;
 }
+
+
+/* ============================================================
+   V1.8.10 — Pictos score visibles sur mobile
+   ============================================================ */
+
+@media (max-width: 640px) {
+  .leaderboard-list summary .score-breakdown,
+  .leaderboard-list .leader-main .score-breakdown {
+    display: flex !important;
+    flex-wrap: wrap;
+    gap: 5px;
+    margin-top: 6px;
+  }
+
+  .leaderboard-list .leader-main .score-breakdown span {
+    min-height: 24px;
+    padding: 3px 7px;
+    border-radius: 999px;
+    font-size: .68rem;
+    line-height: 1;
+  }
+
+  .leaderboard-list .leader-main .score-breakdown .owl-icon {
+    width: 18px !important;
+    height: 18px !important;
+    min-width: 18px !important;
+  }
+
+  .leaderboard-list .leader-main .average-breakdown {
+    margin-top: 5px;
+  }
+}
+
+@media (max-width: 420px) {
+  .leaderboard-list .leader-main .score-breakdown {
+    max-width: 100%;
+  }
+
+  .leaderboard-list .leader-main .score-breakdown span {
+    font-size: .64rem;
+    padding: 3px 6px;
+  }
+}

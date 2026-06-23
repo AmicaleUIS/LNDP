@@ -1,4 +1,4 @@
-# Le Nid des Pronos — V1.8.9ed
+# Le Nid des Pronos — V1.8.11ed
 
 ## V1.6.0 — 2e champion + message Hibou
 
@@ -767,3 +767,29 @@ Le patch V1.6.4 ajoute aussi un rattrapage automatique du badge `champion-picked
 - Le classement par phase SQL est recréé à partir de `v_visible_predictions`.
 - Le calcul team par phase côté app utilise désormais `scoreDetailRowsForUser`, comme les détails joueurs.
 - Patch SQL obligatoire : `patch_v1_8_9_unify_counted_matches.sql`.
+
+
+## V1.8.9b — Préparation exclue des classements
+
+- Corrige un piège côté app : passer `matchIds` ne réactive plus automatiquement les matchs test/préparation.
+- Les classements par phase, teams et famille utilisent désormais `includeTest: false` par défaut.
+- Le patch SQL recrée `v_leaderboard_by_pool_round` en excluant explicitement `is_test_match = true`.
+- Patch SQL : `patch_v1_8_9b_no_prepa_in_rankings.sql`.
+
+
+## V1.8.10 — Général aligné + Mexique + pictos mobile
+
+- Recrée `v_leaderboard_overall` en excluant explicitement les matchs de préparation/test.
+- Recrée `v_leaderboard_by_pool_round` avec la même logique hors préparation.
+- Renomme l’équipe `Mexico` en `Mexique` sans modifier les IDs, pronos ou scores.
+- Affiche les pictos de détail score dans les cartes classement mobile.
+- Patch SQL : `patch_v1_8_10_general_no_prepa_mexique_mobile.sql`.
+
+
+## V1.8.11 — Famille alignée sur le général
+
+- Le classement Famille général ne recalcule plus les lignes depuis une source partielle.
+- Pour un même joueur, Famille reprend la ligne de `v_leaderboard_overall` si elle existe.
+- Les teams Famille en général utilisent aussi ces lignes officielles par joueur.
+- Résultat attendu : un joueur à 44 matchs comptés en général reste à 44 en Famille.
+- Aucun patch SQL obligatoire ; le SQL fourni est uniquement un diagnostic.

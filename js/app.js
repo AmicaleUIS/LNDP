@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — APP PRINCIPALE V1.8.9
+// LE NID DES PRONOS — APP PRINCIPALE V1.8.11
 // ============================================================
 
 const H = window.Helpers;
@@ -474,7 +474,7 @@ const App = {
           <div>
             <p class="eyebrow">Crédits cachés</p>
             <h2 id="creditsTitle">Le Nid des Pronos</h2>
-            <p class="muted">Version publique <strong>1.8.9</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
+            <p class="muted">Version publique <strong>1.8.11</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
           </div>
         </div>
         <div class="credits-grid">
@@ -491,7 +491,7 @@ const App = {
             <p><strong>1.0.5</strong> — dashboard mobile/desktop stabilisé, sans chevauchement des cartes.</p>
           </section>
           <section>
-            <h3>Évolutions V1.8.9</h3>
+            <h3>Évolutions V1.8.11</h3>
             <ul class="changelog-list">
               <li>Le super admin peut désactiver ou réactiver l’affichage du module préparation.</li>
               <li>Quand la préparation est désactivée, les matchs test disparaissent des matchs/pronos, classements par phase et règles.</li>
@@ -5092,7 +5092,7 @@ const App = {
   },
 
   scoreDetailRowsForUser(userId, filters = {}) {
-    const includeTest = Boolean(filters.includeTest || (filters.matchIds && filters.matchIds.length));
+    const includeTest = filters.includeTest === true;
     const includeLiveDemo = Boolean(filters.includeLiveDemo);
     const finishedOnly = Boolean(filters.finishedOnly);
 
@@ -6436,7 +6436,7 @@ const App = {
     const finishedCount = group.matches.filter((m) => ["finished", "live"].includes(m.status)).length;
     const liveProjectionCount = this.liveProjectionCountForMatchIds(matchIds);
     const sortedRows = [...byUser.values()].map((player) => {
-      const details = this.scoreDetailRowsForUser(player.user_id, { matchIds });
+      const details = this.scoreDetailRowsForUser(player.user_id, { matchIds, includeTest: false });
       const total = details.reduce((sum, { prediction }) => sum + Number(prediction.points_total || 0), 0);
       const exact = details.filter(({ prediction }) => prediction.is_exact_score).length;
       const goodResults = details.filter(({ prediction }) => prediction.is_good_result).length;
@@ -6533,7 +6533,7 @@ const App = {
   teamPhaseRows(matchIds = [], mode = "average") {
     const teams = this.state.officeTeams.map((team) => {
       const players = this.teamPlayers(team.id, { officialOnly: true }).filter((player) => player.profile_setup_done !== false);
-      const details = players.flatMap((player) => this.scoreDetailRowsForUser(player.id || player.user_id, { matchIds }));
+      const details = players.flatMap((player) => this.scoreDetailRowsForUser(player.id || player.user_id, { matchIds, includeTest: false }));
 
       const total = details.reduce((sum, { prediction }) => sum + Number(prediction.points_total || 0), 0);
       const exact = details.filter(({ prediction }) => prediction.is_exact_score).length;
@@ -6920,12 +6920,72 @@ const App = {
     `;
   },
 
+  officialOverallRowForUser(userId) {
+    if (!userId) return null;
+    return this.state.playerScoreRows.find((row) => String(row.user_id || row.id) === String(userId)) || null;
+  },
+
+  familyPlayerOverallRow(player) {
+    const userId = player.id || player.user_id;
+    const official = this.officialOverallRowForUser(userId);
+
+    // En mode général Famille, un joueur doit avoir exactement les mêmes matchs comptés
+    // que dans le classement général officiel. La famille sert à filtrer l'affichage,
+    // pas à recalculer une source différente.
+    if (official) {
+      return this.withAveragePoints({
+        ...player,
+        ...official,
+        id: userId,
+        user_id: userId,
+        pseudo: official.pseudo || player.pseudo,
+        office_team_id: official.office_team_id || player.office_team_id,
+        office_team_name: official.office_team_name || player.office_team_name,
+        office_team_slug: official.office_team_slug || player.office_team_slug,
+        office_team_color: official.office_team_color || player.office_team_color,
+        avatar_key: official.avatar_key || player.avatar_key,
+        badge_shape: official.badge_shape || player.badge_shape,
+        badge_color: official.badge_color || player.badge_color
+      });
+    }
+
+    const details = this.scoreDetailRowsForUser(userId, { includeTest: false });
+    const total = details.reduce((sum, { prediction }) => sum + Number(prediction.points_total || 0), 0);
+    const livePoints = details
+      .filter(({ prediction }) => prediction.is_live_projection)
+      .reduce((sum, { prediction }) => sum + Number(prediction.points_total || 0), 0);
+    const liveMatchCount = details.filter(({ prediction }) => prediction.is_live_projection).length;
+    const exact = details.filter(({ prediction }) => prediction.is_exact_score).length;
+    const goodResults = details.filter(({ prediction }) => prediction.is_good_result).length;
+    const goodDiffs = details.filter(({ prediction }) => prediction.is_good_goal_diff).length;
+
+    return this.withAveragePoints({
+      ...player,
+      user_id: userId,
+      total_points: total,
+      exact_scores: exact,
+      good_results: goodResults,
+      good_goal_diffs: goodDiffs,
+      scored_matches: details.length,
+      live_points: livePoints,
+      live_match_count: liveMatchCount,
+      has_live_projection: liveMatchCount > 0
+    });
+  },
+
+
   familyPlayerRows(matchIds = null, mode = "points") {
     const participants = this.familyProfiles(this.state.publicProfiles)
       .filter((player) => this.isFamily(player) || player.profile_setup_done !== false);
+
     const rows = participants.map((player) => {
       const userId = player.id || player.user_id;
-      const details = this.scoreDetailRowsForUser(userId, matchIds ? { matchIds } : {});
+
+      if (!matchIds) {
+        return this.familyPlayerOverallRow(player);
+      }
+
+      const details = this.scoreDetailRowsForUser(userId, { matchIds, includeTest: false });
       const total = details.reduce((sum, { prediction }) => sum + Number(prediction.points_total || 0), 0);
       const livePoints = details
         .filter(({ prediction }) => prediction.is_live_projection)
@@ -6934,6 +6994,7 @@ const App = {
       const exact = details.filter(({ prediction }) => prediction.is_exact_score).length;
       const goodResults = details.filter(({ prediction }) => prediction.is_good_result).length;
       const goodDiffs = details.filter(({ prediction }) => prediction.is_good_goal_diff).length;
+
       return this.withAveragePoints({
         ...player,
         user_id: userId,
@@ -6947,6 +7008,7 @@ const App = {
         has_live_projection: liveMatchCount > 0
       });
     });
+
     return this.sortPlayerRows(rows, mode);
   },
 
@@ -6959,7 +7021,8 @@ const App = {
       if (!player.office_team_id) return;
       const team = this.state.officeTeams.find((item) => item.id === player.office_team_id) || {};
       const userId = player.id || player.user_id;
-      const details = this.scoreDetailRowsForUser(userId, matchIds ? { matchIds } : {});
+      const overallRow = !matchIds ? this.familyPlayerOverallRow(player) : null;
+      const details = matchIds ? this.scoreDetailRowsForUser(userId, { matchIds, includeTest: false }) : [];
       const row = byTeam.get(player.office_team_id) || {
         office_team_id: player.office_team_id,
         office_team_name: player.office_team_name || team.name || "Team",
@@ -6974,17 +7037,28 @@ const App = {
         live_match_count: 0
       };
       row.active_players += 1;
-      details.forEach(({ prediction }) => {
-        row.total_points += Number(prediction.points_total || 0);
-        if (prediction.is_live_projection) {
-          row.live_points += Number(prediction.points_total || 0);
-          row.live_match_count += 1;
-        }
-        row.exact_scores += prediction.is_exact_score ? 1 : 0;
-        row.good_results += prediction.is_good_result ? 1 : 0;
-        row.good_goal_diffs += prediction.is_good_goal_diff ? 1 : 0;
-        row.scored_matches += 1;
-      });
+
+      if (overallRow) {
+        row.total_points += Number(overallRow.total_points || 0);
+        row.live_points += Number(overallRow.live_points || 0);
+        row.live_match_count += Number(overallRow.live_match_count || 0);
+        row.exact_scores += Number(overallRow.exact_scores || 0);
+        row.good_results += Number(overallRow.good_results || 0);
+        row.good_goal_diffs += Number(overallRow.good_goal_diffs || 0);
+        row.scored_matches += Number(overallRow.scored_matches || overallRow.matches_played || 0);
+      } else {
+        details.forEach(({ prediction }) => {
+          row.total_points += Number(prediction.points_total || 0);
+          if (prediction.is_live_projection) {
+            row.live_points += Number(prediction.points_total || 0);
+            row.live_match_count += 1;
+          }
+          row.exact_scores += prediction.is_exact_score ? 1 : 0;
+          row.good_results += prediction.is_good_result ? 1 : 0;
+          row.good_goal_diffs += prediction.is_good_goal_diff ? 1 : 0;
+          row.scored_matches += 1;
+        });
+      }
       byTeam.set(player.office_team_id, row);
     });
 
@@ -9427,7 +9501,7 @@ const App = {
           </div>
           <div class="profile-account-actions">
             <button class="ghost-btn" id="profileInstallAppBtn" type="button">Installer l’app</button>
-            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.8.9</button>
+            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.8.11</button>
             <button class="danger-btn" id="profileLogoutBtn" type="button">Déconnexion</button>
           </div>
         </div>
