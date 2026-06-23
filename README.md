@@ -1,4 +1,4 @@
-# Le Nid des Pronos — V1.8.12ed
+# Le Nid des Pronos — V1.8.13ed
 
 ## V1.6.0 — 2e champion + message Hibou
 
@@ -801,3 +801,18 @@ Le patch V1.6.4 ajoute aussi un rattrapage automatique du badge `champion-picked
 - L’app fusionne maintenant `v_visible_predictions` avec `v_live_visible_predictions`.
 - Si un joueur a pronostiqué un match en direct, son prono doit apparaître dans le live même si la vue générale avait un trou.
 - Patch SQL : `patch_v1_8_12_live_visible_predictions.sql`.
+
+
+## V1.8.12b — Diagnostic SQL compatible
+
+- Corrige l’erreur `column m.home_team_short_name does not exist`.
+- La vue `v_live_visible_predictions` reste identique.
+- Seul le diagnostic final a été modifié pour ne plus utiliser de colonnes absentes selon les installations.
+- À lancer à la place du patch V1.8.12.
+
+
+## V1.8.13 — Fix Voir les pronos
+
+- Corrige l’erreur `this.openPredictionsForMatch is not a function`.
+- Le bouton `Voir les pronos du Nid` ouvre maintenant le bloc des pronos du match.
+- Aucun patch SQL obligatoire si V1.8.12b a déjà été lancé.
