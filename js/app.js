@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — APP PRINCIPALE V1.8.4
+// LE NID DES PRONOS — APP PRINCIPALE V1.8.5
 // ============================================================
 
 const H = window.Helpers;
@@ -474,7 +474,7 @@ const App = {
           <div>
             <p class="eyebrow">Crédits cachés</p>
             <h2 id="creditsTitle">Le Nid des Pronos</h2>
-            <p class="muted">Version publique <strong>1.8.4</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
+            <p class="muted">Version publique <strong>1.8.5</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
           </div>
         </div>
         <div class="credits-grid">
@@ -491,7 +491,7 @@ const App = {
             <p><strong>1.0.5</strong> — dashboard mobile/desktop stabilisé, sans chevauchement des cartes.</p>
           </section>
           <section>
-            <h3>Évolutions V1.8.4</h3>
+            <h3>Évolutions V1.8.5</h3>
             <ul class="changelog-list">
               <li>Le super admin peut désactiver ou réactiver l’affichage du module préparation.</li>
               <li>Quand la préparation est désactivée, les matchs test disparaissent des matchs/pronos, classements par phase et règles.</li>
@@ -2954,19 +2954,22 @@ const App = {
   },
 
   predictionPhaseSummaryHtml(group) {
-    const allMissing = this.missingPredictions();
     const visibleMatches = this.displayMatches();
+    const currentGroupMatches = group?.matches?.length ? group.matches : visibleMatches;
+    const groupMissing = currentGroupMatches
+      .filter((match) => new Date(match.kickoff_at).getTime() > Date.now())
+      .filter((match) => !this.getMyPrediction(match.id));
     const allDone = visibleMatches.filter((match) => this.getMyPrediction(match.id));
     const locked = visibleMatches.filter((match) => H.isKickoffPassed(match.kickoff_at));
 
     return `
       <section class="grid three stats-grid combined-prono-stats">
         <article class="stat-card"><strong>${allDone.length}</strong><span>Pronos posés</span></article>
-        ${allMissing.length ? `
-          <button class="stat-card stat-card-action" type="button" data-action="go-nearest-missing" title="Aller au prono manquant le plus proche">
-            <strong>${allMissing.length}</strong><span>À faire</span>
+        ${groupMissing.length ? `
+          <button class="stat-card stat-card-action" type="button" data-action="go-nearest-missing" title="Aller au prono manquant le plus proche de cette page">
+            <strong>${groupMissing.length}</strong><span>À faire ici</span>
           </button>
-        ` : `<article class="stat-card"><strong>0</strong><span>À faire</span></article>`}
+        ` : `<article class="stat-card"><strong>0</strong><span>À faire ici</span></article>`}
         <article class="stat-card"><strong>${locked.length}</strong><span>Verrouillés</span></article>
       </section>
     `;
@@ -3150,14 +3153,35 @@ const App = {
     setTimeout(() => target.classList.remove("match-card-highlight"), 1200);
   },
 
+  nearestMissingPredictionMatch() {
+    const groups = this.groupMatchesByPouleRound(this.displayMatches());
+    const activeIndex = this.clampPhaseIndex("matchPhaseIndex", groups);
+    const activeGroup = groups[activeIndex];
+
+    const isMissingUpcoming = (match) =>
+      new Date(match.kickoff_at).getTime() > Date.now()
+      && !this.getMyPrediction(match.id);
+
+    // Priorité absolue : la page/journée actuellement affichée.
+    const currentPageMissing = (activeGroup?.matches || [])
+      .filter(isMissingUpcoming)
+      .sort((a, b) => new Date(a.kickoff_at || 0) - new Date(b.kickoff_at || 0));
+
+    if (currentPageMissing.length) return currentPageMissing[0];
+
+    // Sinon seulement, on va chercher le prochain prono manquant global.
+    return this.displayMatches()
+      .filter(isMissingUpcoming)
+      .sort((a, b) => new Date(a.kickoff_at || 0) - new Date(b.kickoff_at || 0))[0] || null;
+  },
+
   async goToNearestMissingPrediction() {
-    const missing = this.missingPredictions();
-    if (!missing.length) {
+    const match = this.nearestMissingPredictionMatch();
+    if (!match) {
       H.toast("Tous tes pronos à venir sont posés. La chouette est tranquille.", "success");
       return;
     }
 
-    const match = missing[0];
     const groups = this.groupMatchesByPouleRound(this.displayMatches());
     const groupIndex = groups.findIndex((group) => group.matches.some((item) => item.id === match.id));
     if (groupIndex >= 0) this.state.matchPhaseIndex = groupIndex;
@@ -3367,7 +3391,7 @@ const App = {
                   <div class="played-pred-row ${p.user_id === this.state.session.user.id ? "me" : ""}">
                     <span>${H.escapeHtml(p.pseudo || "Joueur")} ${H.resultIcon(p)}</span>
                     <strong>${p.home_score_pred} - ${p.away_score_pred}</strong>
-                    <em>${p.points_total ?? "—"} pt${Number(p.points_total || 0) > 1 ? "s" : ""}${p.is_live_projection ? " live" : ""}</em>
+                    <em>${p.points_total ?? "—"} pt${p.points_total === null || p.points_total === undefined ? " · recalcul requis" : ""}${Number(p.points_total || 0) > 1 ? "s" : ""}${p.is_live_projection ? " live" : ""}</em>
                   </div>
                 `).join("")}
               </div>
@@ -9387,7 +9411,7 @@ const App = {
           </div>
           <div class="profile-account-actions">
             <button class="ghost-btn" id="profileInstallAppBtn" type="button">Installer l’app</button>
-            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.8.4</button>
+            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.8.5</button>
             <button class="danger-btn" id="profileLogoutBtn" type="button">Déconnexion</button>
           </div>
         </div>

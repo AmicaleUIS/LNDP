@@ -1,4 +1,4 @@
-# Le Nid des Pronos — V1.8.4
+# Le Nid des Pronos — V1.8.5
 
 ## V1.6.0 — 2e champion + message Hibou
 
@@ -683,3 +683,12 @@ Le patch V1.6.4 ajoute aussi un rattrapage automatique du badge `champion-picked
 - Fonctionne pour le classement général et pour le classement Famille si le mode Famille est activé.
 - Le rattrapage ne se rejoue qu’une fois par dernier match terminé pour éviter le spam.
 - Aucun patch SQL obligatoire.
+
+
+## V1.8.5 — Recalcul points + vrai prochain prono
+
+- Ajoute le patch SQL `patch_v1_8_5_recalc_points_next_prono.sql`.
+- Recalcule immédiatement tous les points des matchs terminés.
+- Ajoute un trigger : quand un score/statut/vainqueur est modifié, les points du match sont recalculés.
+- Corrige les cas où des pronos validés apparaissent à `— pts`.
+- Le bouton `À faire ici / Aller au prono manquant` cherche d'abord dans la journée/phase affichée avant de partir vers une autre journée.
