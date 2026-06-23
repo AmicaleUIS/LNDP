@@ -1,4 +1,4 @@
-# Le Nid des Pronos — V1.8.7ed
+# Le Nid des Pronos — V1.8.8ed
 
 ## V1.6.0 — 2e champion + message Hibou
 
@@ -744,3 +744,11 @@ Le patch V1.6.4 ajoute aussi un rattrapage automatique du badge `champion-picked
 - La vue recalcule les points à la volée si besoin.
 - Côté app, le détail du joueur courant fusionne aussi ses pronos locaux pour éviter les trous d’affichage.
 - Patch SQL obligatoire : `patch_v1_8_7_visible_predictions_detail_fix.sql`.
+
+
+## V1.8.8 — Réparation scores manquants + vue corrigée
+
+- Corrige le patch SQL `v_visible_predictions` : l’ordre des colonnes historiques est conservé pour éviter l’erreur `cannot change name of view column user_id to prediction_id`.
+- Ajoute `admin_repair_missing_scores()` pour le bouton super admin.
+- Le bouton `Réparer scores manquants + recalculer` appelle cette fonction et affiche le nombre de lignes recalculées.
+- Patch SQL obligatoire : `patch_v1_8_8_repair_missing_scores_and_visible_view.sql`.

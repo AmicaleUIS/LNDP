@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — ADMIN V1.8.7
+// LE NID DES PRONOS — ADMIN V1.8.8
 // ============================================================
 
 const H = window.Helpers;
@@ -84,7 +84,7 @@ const Admin = {
       p_category: category,
       p_details: details || {},
       p_metadata: {
-        app_version: "1.8.7",
+        app_version: "1.8.8",
         source: "admin_front"
       }
     });
@@ -2532,12 +2532,42 @@ const Admin = {
   },
 
   async recalcAll() {
-    const { error } = await window.sb.rpc("recalc_all_points");
+    const btn = H.$("#recalcAllBtn");
+    if (btn) {
+      btn.disabled = true;
+      btn.dataset.originalText = btn.dataset.originalText || btn.textContent;
+      btn.textContent = "Réparation en cours…";
+    }
+
+    let result = null;
+    let { data, error } = await window.sb.rpc("admin_repair_missing_scores");
+
+    // Compatibilité : si le patch SQL V1.8.8 n'est pas encore lancé,
+    // on tente quand même l'ancien recalcul global.
+    if (error && /function .*admin_repair_missing_scores|Could not find the function|PGRST202/i.test(error.message || "")) {
+      ({ data, error } = await window.sb.rpc("recalc_all_points"));
+    }
+
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = btn.dataset.originalText || "Réparer scores manquants + recalculer";
+    }
+
     if (error) {
       H.toast(error.message, "error");
       return;
     }
-    H.toast("Tous les points ont été recalculés", "success");
+
+    result = Array.isArray(data) ? data[0] : data;
+    const recalculated = Number(result?.recalculated_prediction_points ?? result ?? 0);
+    const missingAfter = Number(result?.missing_after ?? 0);
+    const message = missingAfter > 0
+      ? `Recalcul terminé : ${recalculated} ligne(s). Encore ${missingAfter} score(s) manquant(s) à vérifier.`
+      : `Scores manquants réparés : ${recalculated} ligne(s) recalculée(s).`;
+
+    H.toast(message, missingAfter > 0 ? "warning" : "success");
+    await this.reloadAll();
+    if (this.state.adminSection === "scores") this.renderMatches();
     await this.loadAuditLogs();
     this.renderAudit();
   },
