@@ -18728,7 +18728,7 @@ body[data-current-view] {
 }
 
 /* ============================================================
-   V1.8.23 — Phase finale par emplacement + scroll propre
+   V1.8.24 — Phase finale par emplacement + scroll propre
    ============================================================ */
 .group-table tr.eliminated-zone {
   background: linear-gradient(90deg, rgba(239, 68, 68, .26), rgba(239, 68, 68, .10)) !important;
@@ -18935,7 +18935,7 @@ body[data-current-view] {
 }
 
 /* ============================================================
-   V1.8.23 — Phase finale lisible en blocs de continuité
+   V1.8.24 — Phase finale lisible en blocs de continuité
    ============================================================ */
 .final-bracket-road-shell {
   display: block !important;
@@ -19228,7 +19228,7 @@ body[data-current-view] {
 }
 
 /* =====================================================
-   V1.8.23 — Phase finale format officiel desktop/mobile
+   V1.8.24 — Phase finale format officiel desktop/mobile
    ===================================================== */
 .final-bracket-official {
   border: 1px solid rgba(255, 212, 59, 0.18);
@@ -19465,7 +19465,7 @@ body[data-current-view] {
 }
 
 /* =====================================================
-   V1.8.23 — Phase finale verticale sans chevauchement
+   V1.8.24 — Phase finale verticale sans chevauchement
    ===================================================== */
 .final-bracket-vertical-shell {
   position: relative;
@@ -19763,7 +19763,7 @@ body[data-current-view] {
 }
 
 /* =====================================================
-   V1.8.23 — Phase finale par tour actif + messages éditables
+   V1.8.24 — Phase finale par tour actif + messages éditables
    ===================================================== */
 .final-focus-shell {
   border: 1px solid rgba(255, 212, 59, 0.22);
@@ -20039,7 +20039,7 @@ body[data-current-view] {
 }
 
 /* =====================================================
-   V1.8.23 — Phase finale : une seule rangée d'onglets + scroll mobile
+   V1.8.24 — Phase finale : une seule rangée d'onglets + scroll mobile
    ===================================================== */
 .final-focus-tabs {
   display: none !important;
@@ -20137,6 +20137,161 @@ body[data-current-view] {
     grid-template-columns: 205px 185px 172px 172px 185px;
   }
   .final-focus-head .pill {
+    display: none;
+  }
+}
+
+/* =====================================================
+   V1.8.24 — Phase finale : colonnes compactes + vrai swipe mobile
+   ===================================================== */
+.final-focus-shell {
+  overflow-x: auto !important;
+  overflow-y: hidden;
+  max-width: 100%;
+  cursor: grab;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+  touch-action: pan-y;
+}
+.final-focus-shell.is-dragging {
+  cursor: grabbing;
+  user-select: none;
+}
+.final-focus-board {
+  display: grid;
+  grid-template-columns: 390px 295px 245px 245px 260px !important;
+  gap: 12px !important;
+  width: max-content !important;
+  min-width: 0 !important;
+  padding-right: 22px;
+}
+.final-focus-board[data-active-round="round_of_32"] {
+  grid-template-columns: 395px 285px 230px 230px 250px !important;
+}
+.final-focus-board[data-active-round="round_of_16"] {
+  grid-template-columns: 300px 380px 240px 230px 250px !important;
+}
+.final-focus-board[data-active-round="quarter_final"] {
+  grid-template-columns: 285px 285px 360px 235px 250px !important;
+}
+.final-focus-board[data-active-round="semi_final"] {
+  grid-template-columns: 275px 275px 255px 350px 250px !important;
+}
+.final-focus-board[data-active-round="final"] {
+  grid-template-columns: 270px 270px 240px 240px 360px !important;
+}
+.final-focus-match.detailed {
+  min-height: 104px !important;
+  padding: 10px 11px !important;
+}
+.final-focus-match.detailed header {
+  margin-bottom: 7px !important;
+}
+.final-focus-match.detailed header strong {
+  font-size: 0.86rem !important;
+}
+.final-focus-match.detailed header small {
+  font-size: 0.72rem !important;
+}
+.final-focus-detailed-teams strong {
+  font-size: 0.86rem !important;
+}
+.final-focus-match.detailed footer {
+  font-size: 0.70rem !important;
+  margin-top: 7px !important;
+}
+.final-focus-match.compact {
+  min-height: 52px !important;
+  padding: 7px 8px !important;
+}
+.final-focus-match.compact small {
+  font-size: 0.68rem !important;
+  margin-bottom: 4px !important;
+}
+.final-focus-compact-teams strong,
+.final-focus-compact-teams b {
+  font-size: 0.72rem !important;
+}
+.final-focus-stage-grid {
+  grid-template-rows: repeat(16, minmax(58px, auto)) !important;
+  gap: 7px !important;
+  min-height: 980px !important;
+}
+.final-focus-stage-title {
+  min-height: 34px !important;
+  padding: 7px 9px !important;
+  margin-bottom: 10px !important;
+  font-size: 0.9rem;
+}
+.final-focus-stage-title small {
+  font-size: 0.63rem !important;
+}
+@media (min-width: 901px) {
+  .final-focus-head .pill {
+    display: none;
+  }
+  .final-focus-shell {
+    padding: 16px !important;
+  }
+}
+@media (max-width: 900px) {
+  .final-focus-shell {
+    overflow-x: scroll !important;
+    overflow-y: hidden;
+    touch-action: pan-y;
+    scroll-snap-type: none !important;
+    margin-left: -10px !important;
+    margin-right: -10px !important;
+    padding: 12px 10px 16px !important;
+  }
+  .final-focus-board,
+  .final-focus-board[data-active-round="round_of_32"],
+  .final-focus-board[data-active-round="round_of_16"],
+  .final-focus-board[data-active-round="quarter_final"],
+  .final-focus-board[data-active-round="semi_final"],
+  .final-focus-board[data-active-round="final"] {
+    grid-template-columns: 220px 220px 205px 205px 220px !important;
+    gap: 10px !important;
+    width: max-content !important;
+    min-width: 1090px !important;
+    padding-left: 8px;
+    padding-right: 70px;
+  }
+  .final-focus-stage {
+    scroll-snap-align: none !important;
+  }
+  .final-focus-stage-grid {
+    grid-template-rows: repeat(16, minmax(58px, auto)) !important;
+    min-height: 990px !important;
+  }
+  .final-focus-stage.is-active .final-focus-match.detailed {
+    min-height: 96px !important;
+  }
+  .final-focus-match.detailed {
+    min-height: 92px !important;
+    padding: 9px !important;
+  }
+  .final-focus-match.compact {
+    min-height: 52px !important;
+  }
+  .final-focus-detailed-teams strong {
+    font-size: 0.82rem !important;
+  }
+  .final-focus-match.detailed footer {
+    font-size: 0.68rem !important;
+  }
+}
+@media (max-width: 520px) {
+  .final-focus-board,
+  .final-focus-board[data-active-round="round_of_32"],
+  .final-focus-board[data-active-round="round_of_16"],
+  .final-focus-board[data-active-round="quarter_final"],
+  .final-focus-board[data-active-round="semi_final"],
+  .final-focus-board[data-active-round="final"] {
+    grid-template-columns: 205px 205px 190px 190px 205px !important;
+    min-width: 1035px !important;
+  }
+  .final-focus-head span:not(.pill) {
     display: none;
   }
 }

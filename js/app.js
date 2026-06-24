@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — APP PRINCIPALE V1.8.23
+// LE NID DES PRONOS — APP PRINCIPALE V1.8.24
 // ============================================================
 
 const H = window.Helpers;
@@ -475,7 +475,7 @@ const App = {
           <div>
             <p class="eyebrow">Crédits cachés</p>
             <h2 id="creditsTitle">Le Nid des Pronos</h2>
-            <p class="muted">Version publique <strong>1.8.23</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
+            <p class="muted">Version publique <strong>1.8.24</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
           </div>
         </div>
         <div class="credits-grid">
@@ -492,7 +492,7 @@ const App = {
             <p><strong>1.0.5</strong> — dashboard mobile/desktop stabilisé, sans chevauchement des cartes.</p>
           </section>
           <section>
-            <h3>Évolutions V1.8.23</h3>
+            <h3>Évolutions V1.8.24</h3>
             <ul class="changelog-list">
               <li>Le super admin peut désactiver ou réactiver l’affichage du module préparation.</li>
               <li>Quand la préparation est désactivée, les matchs test disparaissent des matchs/pronos, classements par phase et règles.</li>
@@ -1240,7 +1240,7 @@ const App = {
 
 
   async loadVisiblePredictions() {
-    // V1.8.23 — IMPORTANT : Supabase REST renvoie 1000 lignes max par requête.
+    // V1.8.24 — IMPORTANT : Supabase REST renvoie 1000 lignes max par requête.
     // Le classement général est agrégé en base, mais les détails joueurs et le classement Famille
     // repartent des pronos visibles côté front. On pagine donc toute la vue, sinon les détails
     // s'arrêtent après les premiers paquets de matchs/joueurs.
@@ -5032,6 +5032,7 @@ const App = {
     this.bindFinalBracketRoundTabs();
     this.bindFinalBracketDrag();
     this.bindFinalBracketControls();
+    this.scrollFinalBracketToActiveRound();
   },
 
   bindFinalBracketRoundTabs() {
@@ -5053,6 +5054,10 @@ const App = {
     let isDown = false;
     let startX = 0;
     let startScrollLeft = 0;
+    let touchStartX = 0;
+    let touchStartY = 0;
+    let touchStartLeft = 0;
+    let touchDragging = false;
 
     const stop = () => {
       isDown = false;
@@ -5075,9 +5080,50 @@ const App = {
       scroller.scrollLeft = startScrollLeft - (event.clientX - startX);
     });
 
+    scroller.addEventListener("touchstart", (event) => {
+      if (!event.touches || event.touches.length !== 1) return;
+      const touch = event.touches[0];
+      touchStartX = touch.clientX;
+      touchStartY = touch.clientY;
+      touchStartLeft = scroller.scrollLeft;
+      touchDragging = false;
+    }, { passive: true });
+
+    scroller.addEventListener("touchmove", (event) => {
+      if (!event.touches || event.touches.length !== 1) return;
+      const touch = event.touches[0];
+      const dx = touch.clientX - touchStartX;
+      const dy = touch.clientY - touchStartY;
+      if (!touchDragging && Math.abs(dx) > Math.abs(dy) + 6) touchDragging = true;
+      if (!touchDragging) return;
+      event.preventDefault();
+      scroller.scrollLeft = touchStartLeft - dx;
+    }, { passive: false });
+
+    scroller.addEventListener("touchend", () => { touchDragging = false; }, { passive: true });
+    scroller.addEventListener("touchcancel", () => { touchDragging = false; }, { passive: true });
     scroller.addEventListener("pointerup", stop);
     scroller.addEventListener("pointercancel", stop);
     scroller.addEventListener("mouseleave", stop);
+  },
+
+  scrollFinalBracketToActiveRound() {
+    const scroller = H.$("#finalBracketScroll");
+    const board = scroller?.querySelector?.(".final-focus-board");
+    if (!scroller || !board) return;
+    const activeRound = this.state.finalBracketActiveRound || board.dataset.activeRound;
+    if (!activeRound) return;
+
+    window.setTimeout(() => {
+      const activeStage = scroller.querySelector(`.final-focus-stage.stage-${CSS.escape(activeRound)}`);
+      if (!activeStage) return;
+      const isSmallScreen = window.matchMedia?.("(max-width: 900px)")?.matches;
+      const maxLeft = Math.max(0, scroller.scrollWidth - scroller.clientWidth);
+      const desiredLeft = isSmallScreen
+        ? activeStage.offsetLeft - 14
+        : Math.max(0, activeStage.offsetLeft - 24);
+      scroller.scrollTo({ left: Math.min(maxLeft, Math.max(0, desiredLeft)), behavior: "smooth" });
+    }, 40);
   },
 
   bindFinalBracketControls() {
@@ -10269,7 +10315,7 @@ const App = {
           </div>
           <div class="profile-account-actions">
             <button class="ghost-btn" id="profileInstallAppBtn" type="button">Installer l’app</button>
-            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.8.23</button>
+            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.8.24</button>
             <button class="danger-btn" id="profileLogoutBtn" type="button">Déconnexion</button>
           </div>
         </div>
