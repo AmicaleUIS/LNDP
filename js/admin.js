@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — ADMIN V1.8.21
+// LE NID DES PRONOS — ADMIN V1.8.22
 // ============================================================
 
 const H = window.Helpers;
@@ -84,7 +84,7 @@ const Admin = {
       p_category: category,
       p_details: details || {},
       p_metadata: {
-        app_version: "1.8.21",
+        app_version: "1.8.22",
         source: "admin_front"
       }
     });
@@ -1843,6 +1843,7 @@ const Admin = {
         </div>
 
         <form id="owlLoginMessageForm" class="form-stack owl-message-create-form" hidden>
+          <input type="hidden" name="message_id" id="owlMessageEditId" value="">
           <div class="grid two">
             <label><span>Titre</span><input name="title" maxlength="120" value="${H.escapeHtml(msg.title || "Message du Hibou masqué")}" required></label>
             <label><span>Importance</span><select name="importance">
@@ -1857,7 +1858,8 @@ const Admin = {
             <label class="check-line"><input type="checkbox" name="show_in_history" checked> Afficher dans le bouton “Messages du Hibou”</label>
           </div>
           <div class="admin-chat-actions">
-            <button class="primary-btn" type="submit">Créer le message</button>
+            <button class="primary-btn" id="owlMessageSubmitBtn" type="submit">Créer le message</button>
+            <button class="ghost-btn" id="cancelOwlMessageEditBtn" type="button" hidden>Annuler la modification</button>
             <button class="danger-btn" id="clearOwlLoginMessageBtn" type="button">Désactiver les messages actifs</button>
           </div>
         </form>
@@ -1877,6 +1879,7 @@ const Admin = {
               <div class="admin-owl-message-actions">
                 <span class="pill ${message.enabled ? "success" : "neutral"}">${message.enabled ? "Actif/planifié" : "Inactif"}</span>
                 <span class="pill ${message.show_in_history === false ? "neutral" : "success"}">${message.show_in_history === false ? "Caché historique" : "Visible historique"}</span>
+                <button class="ghost-btn edit-owl-message-btn" type="button">Modifier</button>
                 <button class="ghost-btn toggle-owl-message-enabled-btn" type="button">${message.enabled ? "Désactiver" : "Activer"}</button>
                 <button class="ghost-btn toggle-owl-message-history-btn" type="button">${message.show_in_history === false ? "Afficher historique" : "Masquer historique"}</button>
                 <button class="danger-btn archive-owl-message-btn" type="button">Cacher partout</button>
@@ -1917,7 +1920,11 @@ const Admin = {
       return;
     }
 
-    const { error } = await window.sb.from("owl_messages").insert(payload);
+    const messageId = String(formData.get("message_id") || "").trim();
+    const request = messageId
+      ? window.sb.from("owl_messages").update(payload).eq("id", messageId)
+      : window.sb.from("owl_messages").insert(payload);
+    const { error } = await request;
     if (error) {
       H.toast(error.message || "Impossible d’enregistrer le message. Lance le patch SQL V1.6.4.", "error");
       return;
@@ -1926,7 +1933,50 @@ const Admin = {
     await this.loadOwlMessagesAdmin();
     await this.loadFamilyModeSetting();
     this.renderChatModeration();
-    H.toast("Message du Hibou créé", "success");
+    H.toast(messageId ? "Message du Hibou modifié" : "Message du Hibou créé", "success");
+  },
+
+  startEditOwlMessage(row) {
+    const id = row?.dataset.owlMessageId;
+    if (!id) return;
+    const message = (this.state.owlMessages || []).find((item) => String(item.id) === String(id));
+    if (!message) return H.toast("Message introuvable dans le nid.", "error");
+
+    const root = H.$("#chatModerationAdmin");
+    const form = H.$("#owlLoginMessageForm", root);
+    const newButton = H.$("#newOwlMessageBtn", root);
+    if (!form) return;
+
+    const durationDays = Number(message.duration_days || ((new Date(message.end_at || 0) - new Date(message.start_at || Date.now())) / 86400000) || 1);
+    form.hidden = false;
+    H.$("#owlMessageEditId", form).value = String(message.id);
+    form.elements.title.value = message.title || "Message du Hibou masqué";
+    form.elements.importance.value = message.importance || "info";
+    form.elements.start_at.value = this.datetimeLocalValue(message.start_at || message.created_at || new Date());
+    form.elements.duration_days.value = String(Math.max(0.04, durationDays || 1));
+    form.elements.body.value = message.body || message.message || "";
+    form.elements.enabled.checked = message.enabled !== false;
+    form.elements.show_in_history.checked = message.show_in_history !== false;
+    H.$("#owlMessageSubmitBtn", form).textContent = "Enregistrer les modifications";
+    H.$("#cancelOwlMessageEditBtn", form).hidden = false;
+    if (newButton) newButton.textContent = "Refermer le formulaire du Hibou";
+    form.scrollIntoView({ behavior: "smooth", block: "center" });
+  },
+
+  resetOwlMessageForm() {
+    const root = H.$("#chatModerationAdmin");
+    const form = H.$("#owlLoginMessageForm", root);
+    if (!form) return;
+    form.reset();
+    H.$("#owlMessageEditId", form).value = "";
+    form.elements.title.value = "Message du Hibou masqué";
+    form.elements.importance.value = "info";
+    form.elements.start_at.value = this.datetimeLocalValue(new Date());
+    form.elements.duration_days.value = "1";
+    form.elements.enabled.checked = true;
+    form.elements.show_in_history.checked = true;
+    H.$("#owlMessageSubmitBtn", form).textContent = "Créer le message";
+    H.$("#cancelOwlMessageEditBtn", form).hidden = true;
   },
 
   async clearOwlLoginMessage() {
@@ -2045,6 +2095,7 @@ const Admin = {
       const button = H.$("#newOwlMessageBtn", root);
       if (!form || !button) return;
       form.hidden = !form.hidden;
+      if (!form.hidden) this.resetOwlMessageForm();
       button.textContent = form.hidden ? "Créer un nouveau message du Hibou" : "Refermer le formulaire du Hibou";
     });
 
@@ -2053,6 +2104,10 @@ const Admin = {
       await this.saveOwlLoginMessage(event.currentTarget);
     });
     H.$("#clearOwlLoginMessageBtn", root)?.addEventListener("click", async () => this.clearOwlLoginMessage());
+    H.$("#cancelOwlMessageEditBtn", root)?.addEventListener("click", () => this.resetOwlMessageForm());
+    H.$$(".edit-owl-message-btn", root).forEach((button) => {
+      button.addEventListener("click", (event) => this.startEditOwlMessage(event.currentTarget.closest(".admin-owl-message-row")));
+    });
     H.$$(".toggle-owl-message-enabled-btn", root).forEach((button) => {
       button.addEventListener("click", (event) => this.toggleOwlMessageEnabled(event.currentTarget.closest(".admin-owl-message-row")));
     });
@@ -2814,7 +2869,7 @@ const Admin = {
 
     const { data, error } = await window.sb.rpc("admin_clean_start_preserve_predictions", { p_confirm: "DEPART PROPRE" });
     if (error) {
-      H.toast(error.message || "Reset classements impossible. Lance le patch SQL V1.8.21.", "error");
+      H.toast(error.message || "Reset classements impossible. Lance le patch SQL V1.8.22.", "error");
       return;
     }
 

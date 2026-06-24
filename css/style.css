@@ -18728,7 +18728,7 @@ body[data-current-view] {
 }
 
 /* ============================================================
-   V1.8.21 — Phase finale par emplacement + scroll propre
+   V1.8.22 — Phase finale par emplacement + scroll propre
    ============================================================ */
 .group-table tr.eliminated-zone {
   background: linear-gradient(90deg, rgba(239, 68, 68, .26), rgba(239, 68, 68, .10)) !important;
@@ -18935,7 +18935,7 @@ body[data-current-view] {
 }
 
 /* ============================================================
-   V1.8.21 — Phase finale lisible en blocs de continuité
+   V1.8.22 — Phase finale lisible en blocs de continuité
    ============================================================ */
 .final-bracket-road-shell {
   display: block !important;
@@ -19228,7 +19228,7 @@ body[data-current-view] {
 }
 
 /* =====================================================
-   V1.8.21 — Phase finale format officiel desktop/mobile
+   V1.8.22 — Phase finale format officiel desktop/mobile
    ===================================================== */
 .final-bracket-official {
   border: 1px solid rgba(255, 212, 59, 0.18);
@@ -19465,7 +19465,7 @@ body[data-current-view] {
 }
 
 /* =====================================================
-   V1.8.21 — Phase finale verticale sans chevauchement
+   V1.8.22 — Phase finale verticale sans chevauchement
    ===================================================== */
 .final-bracket-vertical-shell {
   position: relative;
@@ -19759,5 +19759,281 @@ body[data-current-view] {
   }
   .final-bracket-match.vertical-compact .final-bracket-team strong {
     font-size: 0.82rem;
+  }
+}
+
+/* =====================================================
+   V1.8.22 — Phase finale par tour actif + messages éditables
+   ===================================================== */
+.final-focus-shell {
+  border: 1px solid rgba(255, 212, 59, 0.22);
+  border-radius: 28px;
+  padding: 18px;
+  background:
+    radial-gradient(circle at top left, rgba(34, 197, 94, 0.12), transparent 34%),
+    linear-gradient(180deg, rgba(8, 27, 58, 0.98), rgba(5, 17, 39, 0.99));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.06), 0 16px 44px rgba(0,0,0,0.32);
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+.final-focus-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+.final-focus-head strong {
+  display: block;
+  color: #fff;
+  font-size: 1.16rem;
+  margin-bottom: 4px;
+}
+.final-focus-head span:not(.pill) {
+  color: rgba(218, 229, 245, 0.78);
+  font-size: 0.95rem;
+}
+.final-focus-tabs {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(110px, 1fr));
+  gap: 10px;
+  min-width: 720px;
+  margin-bottom: 16px;
+}
+.final-focus-tabs button {
+  border: 1px solid rgba(255, 212, 59, 0.28);
+  border-radius: 999px;
+  padding: 10px 12px;
+  background: linear-gradient(90deg, rgba(255, 213, 35, 0.9), rgba(245, 158, 11, 0.9));
+  color: #07101f;
+  font-weight: 900;
+  letter-spacing: 0.03em;
+  cursor: pointer;
+  box-shadow: 0 8px 18px rgba(0,0,0,0.20);
+}
+.final-focus-tabs button span,
+.final-focus-tabs button small {
+  display: block;
+  line-height: 1.05;
+}
+.final-focus-tabs button small {
+  margin-top: 3px;
+  font-size: 0.68rem;
+  opacity: 0.75;
+  text-transform: uppercase;
+}
+.final-focus-tabs button.active {
+  transform: translateY(-1px);
+  box-shadow: 0 0 0 3px rgba(255, 212, 59, 0.22), 0 12px 26px rgba(245, 158, 11, 0.28);
+  filter: saturate(1.12);
+}
+.final-focus-tabs button.is-complete:not(.active) {
+  background: linear-gradient(90deg, rgba(34,197,94,0.90), rgba(22,163,74,0.90));
+  color: #04130b;
+}
+.final-focus-board {
+  display: grid;
+  grid-template-columns: minmax(220px, 1.45fr) minmax(200px, 1.25fr) minmax(190px, 1fr) minmax(190px, 0.95fr) minmax(210px, 1fr);
+  gap: 14px;
+  min-width: 1180px;
+  align-items: stretch;
+}
+.final-focus-stage {
+  min-width: 0;
+}
+.final-focus-stage-title {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  min-height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  margin-bottom: 12px;
+  padding: 9px 10px;
+  color: #06101f;
+  font-weight: 950;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  background: linear-gradient(90deg, #facc15, #f59e0b);
+  box-shadow: 0 8px 20px rgba(0,0,0,0.22);
+}
+.final-focus-stage.is-active .final-focus-stage-title {
+  box-shadow: 0 0 0 3px rgba(255, 212, 59, 0.18), 0 12px 28px rgba(245,158,11,0.24);
+}
+.final-focus-stage-grid {
+  display: grid;
+  grid-template-rows: repeat(16, minmax(70px, auto));
+  gap: 8px;
+  min-height: 1200px;
+}
+.final-focus-slot {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+.final-focus-match {
+  width: 100%;
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  border-radius: 18px;
+  background: rgba(6, 18, 39, 0.94);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.04), 0 6px 16px rgba(0,0,0,0.20);
+  min-width: 0;
+}
+.final-focus-match.finished {
+  border-color: rgba(34, 197, 94, 0.35);
+}
+.final-focus-match.live {
+  border-color: rgba(239, 68, 68, 0.55);
+}
+.final-focus-match.placeholder {
+  opacity: 0.76;
+  border-style: dashed;
+}
+.final-focus-match.compact {
+  padding: 9px 10px;
+  min-height: 60px;
+}
+.final-focus-match.compact small {
+  display: block;
+  color: #facc15;
+  font-weight: 900;
+  font-size: 0.72rem;
+  margin-bottom: 6px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.final-focus-compact-teams {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  gap: 6px;
+  align-items: center;
+}
+.final-focus-compact-teams span {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+}
+.final-focus-compact-teams span:last-child {
+  justify-content: flex-end;
+}
+.final-focus-compact-teams strong {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 0.78rem;
+  color: #e5edf9;
+}
+.final-focus-compact-teams b {
+  color: #facc15;
+  font-size: 0.78rem;
+}
+.final-focus-match.detailed {
+  padding: 12px;
+  min-height: 118px;
+  border-color: rgba(255, 212, 59, 0.38);
+  background: linear-gradient(180deg, rgba(10, 31, 65, 0.98), rgba(5, 18, 41, 0.99));
+}
+.final-focus-match.detailed header {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 9px;
+}
+.final-focus-match.detailed header strong {
+  color: #facc15;
+  font-size: 0.9rem;
+  letter-spacing: 0.03em;
+}
+.final-focus-match.detailed header small {
+  color: #e5edf9;
+  font-size: 0.76rem;
+  text-align: right;
+}
+.final-focus-detailed-teams {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+}
+.final-focus-detailed-teams div {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.final-focus-detailed-teams div:last-child {
+  justify-content: flex-end;
+}
+.final-focus-detailed-teams strong {
+  color: #fff;
+  font-size: 0.92rem;
+  line-height: 1.15;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.final-focus-detailed-teams b {
+  color: #facc15;
+  font-size: 0.92rem;
+  padding: 0 4px;
+}
+.final-focus-match.detailed footer {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  color: rgba(205, 217, 235, 0.78);
+  font-size: 0.74rem;
+  margin-top: 9px;
+}
+.final-focus-match .team-flag-img,
+.final-focus-match .flag-placeholder,
+.final-focus-match .flag-mini {
+  width: 17px;
+  height: 17px;
+  flex: 0 0 17px;
+}
+.final-focus-stage.is-compact {
+  opacity: 0.82;
+}
+.final-focus-stage.is-compact .final-focus-stage-title {
+  filter: saturate(0.82);
+}
+.final-focus-stage.is-compact .final-focus-match {
+  background: rgba(4, 15, 33, 0.82);
+}
+@media (max-width: 900px) {
+  .final-focus-shell {
+    padding: 14px;
+    border-radius: 22px;
+  }
+  .final-focus-head {
+    flex-direction: column;
+  }
+  .final-focus-tabs {
+    min-width: 660px;
+    gap: 8px;
+  }
+  .final-focus-board {
+    min-width: 1040px;
+    grid-template-columns: 210px 190px 180px 180px 190px;
+    gap: 10px;
+  }
+  .final-focus-stage-grid {
+    grid-template-rows: repeat(16, minmax(64px, auto));
+    gap: 7px;
+  }
+  .final-focus-match.compact {
+    min-height: 56px;
+    padding: 8px;
+  }
+  .final-focus-match.detailed {
+    min-height: 106px;
+    padding: 10px;
   }
 }

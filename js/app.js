@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — APP PRINCIPALE V1.8.21
+// LE NID DES PRONOS — APP PRINCIPALE V1.8.22
 // ============================================================
 
 const H = window.Helpers;
@@ -64,6 +64,7 @@ const App = {
     familyLeaderboardEvolutionMode: "day",
     achievementsTab: "mine",
     worldcupTab: "groups",
+    finalBracketActiveRound: null,
     matchPhaseIndex: 0,
     myPredictionsPhaseIndex: 0,
     leaderboardPhaseIndex: 0,
@@ -474,7 +475,7 @@ const App = {
           <div>
             <p class="eyebrow">Crédits cachés</p>
             <h2 id="creditsTitle">Le Nid des Pronos</h2>
-            <p class="muted">Version publique <strong>1.8.21</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
+            <p class="muted">Version publique <strong>1.8.22</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
           </div>
         </div>
         <div class="credits-grid">
@@ -491,7 +492,7 @@ const App = {
             <p><strong>1.0.5</strong> — dashboard mobile/desktop stabilisé, sans chevauchement des cartes.</p>
           </section>
           <section>
-            <h3>Évolutions V1.8.21</h3>
+            <h3>Évolutions V1.8.22</h3>
             <ul class="changelog-list">
               <li>Le super admin peut désactiver ou réactiver l’affichage du module préparation.</li>
               <li>Quand la préparation est désactivée, les matchs test disparaissent des matchs/pronos, classements par phase et règles.</li>
@@ -1239,7 +1240,7 @@ const App = {
 
 
   async loadVisiblePredictions() {
-    // V1.8.21 — IMPORTANT : Supabase REST renvoie 1000 lignes max par requête.
+    // V1.8.22 — IMPORTANT : Supabase REST renvoie 1000 lignes max par requête.
     // Le classement général est agrégé en base, mais les détails joueurs et le classement Famille
     // repartent des pronos visibles côté front. On pagine donc toute la vue, sinon les détails
     // s'arrêtent après les premiers paquets de matchs/joueurs.
@@ -5020,7 +5021,7 @@ const App = {
       <section class="toolbar-card compact-toolbar worldcup-final-toolbar">
         <div>
           <h3>Phase finale</h3>
-          <p class="muted">Tableau lisible : chaque 8e reste placé entre ses deux 16èmes, puis les chemins convergent vers les quarts et la finale.</p>
+          <p class="muted">Choisis un tour : ce tour s’ouvre en détail, les autres restent compacts pour garder la lecture du tableau.</p>
         </div>
         <div class="final-bracket-toolbar-actions">
           <span class="pill neutral">${totalFinalMatches} match${totalFinalMatches > 1 ? "s" : ""}</span>
@@ -5028,8 +5029,20 @@ const App = {
       </section>
       ${totalFinalMatches ? this.finalBracketHtml(byStage) : `<section class="card"><p class="muted">Aucune phase finale à afficher pour le moment.</p></section>`}
     `;
+    this.bindFinalBracketRoundTabs();
     this.bindFinalBracketDrag();
     this.bindFinalBracketControls();
+  },
+
+  bindFinalBracketRoundTabs() {
+    H.$$('[data-final-round]').forEach((button) => {
+      if (button.dataset.finalRoundBound === "true") return;
+      button.dataset.finalRoundBound = "true";
+      button.addEventListener("click", () => {
+        this.state.finalBracketActiveRound = button.dataset.finalRound || null;
+        this.renderWorldCupFinals();
+      });
+    });
   },
 
   bindFinalBracketDrag() {
@@ -5469,9 +5482,200 @@ const App = {
     `;
   },
 
+  finalBracketRoundConfigs() {
+    return [
+      {
+        key: "round_of_32",
+        label: "16èmes",
+        shortLabel: "16e",
+        title: "Seizièmes de finale",
+        numbers: [73, 75, 74, 77, 83, 84, 81, 82, 76, 78, 79, 80, 86, 88, 85, 87],
+        rowStart: (index) => index + 1,
+        rowSpan: 1
+      },
+      {
+        key: "round_of_16",
+        label: "8èmes",
+        shortLabel: "8e",
+        title: "Huitièmes de finale",
+        numbers: [90, 89, 93, 94, 91, 92, 95, 96],
+        rowStart: (index) => index * 2 + 1,
+        rowSpan: 2
+      },
+      {
+        key: "quarter_final",
+        label: "Quarts",
+        shortLabel: "Quart",
+        title: "Quarts de finale",
+        numbers: [97, 98, 99, 100],
+        rowStart: (index) => index * 4 + 1,
+        rowSpan: 4
+      },
+      {
+        key: "semi_final",
+        label: "Demies",
+        shortLabel: "Demi",
+        title: "Demi-finales",
+        numbers: [101, 102],
+        rowStart: (index) => index * 8 + 1,
+        rowSpan: 8
+      },
+      {
+        key: "final",
+        label: "Finale",
+        shortLabel: "Finale",
+        title: "Finale et 3e place",
+        numbers: [104, 103],
+        rowStart: (index) => index === 0 ? 5 : 12,
+        rowSpan: 4
+      }
+    ];
+  },
+
+  isFinalRoundComplete(matchMap, config) {
+    const requiredNumbers = (config?.numbers || []).filter((number) => !(config.key === "final" && Number(number) === 103));
+    return Boolean(requiredNumbers.length)
+      && requiredNumbers.every((number) => {
+        const match = this.finalBracketMatchByNumber(matchMap, number);
+        return match && match.status === "finished";
+      });
+  },
+
+  defaultFinalBracketRound(matchMap) {
+    const configs = this.finalBracketRoundConfigs();
+    for (const config of configs) {
+      if (!this.isFinalRoundComplete(matchMap, config)) return config.key;
+    }
+    return "final";
+  },
+
+  activeFinalBracketRound(matchMap) {
+    const configs = this.finalBracketRoundConfigs();
+    const validKeys = new Set(configs.map((config) => config.key));
+    if (validKeys.has(this.state.finalBracketActiveRound)) return this.state.finalBracketActiveRound;
+    return this.defaultFinalBracketRound(matchMap);
+  },
+
+  finalBracketRoundTabsHtml(matchMap, activeRound) {
+    return `
+      <div class="final-focus-tabs" role="tablist" aria-label="Tours de la phase finale">
+        ${this.finalBracketRoundConfigs().map((config) => {
+          const complete = this.isFinalRoundComplete(matchMap, config);
+          return `<button type="button" class="${activeRound === config.key ? "active" : ""} ${complete ? "is-complete" : ""}" data-final-round="${H.escapeHtml(config.key)}" role="tab" aria-selected="${activeRound === config.key ? "true" : "false"}">
+            <span>${H.escapeHtml(config.label)}</span>
+            ${complete ? `<small>terminé</small>` : `<small>${H.escapeHtml(config.shortLabel)}</small>`}
+          </button>`;
+        }).join("")}
+      </div>
+    `;
+  },
+
+  finalFocusBracketHtml(matchMap, activeRound) {
+    const configs = this.finalBracketRoundConfigs();
+    const activeConfig = configs.find((config) => config.key === activeRound) || configs[0];
+    return `
+      <section class="final-focus-shell" id="finalBracketScroll" aria-label="Tableau de la phase finale par tour" tabindex="0">
+        <header class="final-focus-head">
+          <div>
+            <strong>${H.escapeHtml(activeConfig.title)}</strong>
+            <span>Cartes détaillées pour le tour sélectionné. Les autres tours restent compacts pour garder le chemin jusqu’à la finale.</span>
+          </div>
+          <span class="pill neutral">Vue active : ${H.escapeHtml(activeConfig.label)}</span>
+        </header>
+        ${this.finalBracketRoundTabsHtml(matchMap, activeRound)}
+        <div class="final-focus-board" data-active-round="${H.escapeHtml(activeRound)}">
+          ${configs.map((config) => this.finalFocusStageColumnHtml(matchMap, config, activeRound)).join("")}
+        </div>
+      </section>
+    `;
+  },
+
+  finalFocusStageColumnHtml(matchMap, config, activeRound) {
+    const isActive = config.key === activeRound;
+    return `
+      <section class="final-focus-stage ${isActive ? "is-active" : "is-compact"} stage-${H.escapeHtml(config.key)}" aria-label="${H.escapeHtml(config.title)}">
+        <div class="final-focus-stage-title">${H.escapeHtml(config.label)}</div>
+        <div class="final-focus-stage-grid">
+          ${config.numbers.map((number, index) => {
+            const rowStart = config.rowStart(index);
+            const span = config.rowSpan;
+            return `<div class="final-focus-slot" style="grid-row:${rowStart} / span ${span};">
+              ${this.finalFocusMatchCardHtml(matchMap, number, config, isActive)}
+            </div>`;
+          }).join("")}
+        </div>
+      </section>
+    `;
+  },
+
+  finalFocusMatchCardHtml(matchMap, number, config, detailed) {
+    const match = this.finalBracketMatchByNumber(matchMap, number);
+    const title = `${config.shortLabel} · M${number}`;
+    if (!match) return this.finalFocusPlaceholderHtml(title, detailed);
+
+    const isScored = match.status === "finished" || match.status === "live";
+    const score = isScored ? H.scoreText(match.home_score, match.away_score) : "vs";
+    const home = match.home_team_name || "À déterminer";
+    const away = match.away_team_name || "À déterminer";
+    const date = H.formatDateTime(match.kickoff_at);
+    const compactDate = this.finalFocusCompactDate(match.kickoff_at);
+    const location = [match.city, match.venue].filter(Boolean).join(" · ");
+
+    if (!detailed) {
+      return `
+        <article class="final-focus-match compact ${match.status || "scheduled"}">
+          <small>${H.escapeHtml(title)} · ${H.escapeHtml(compactDate)}</small>
+          <div class="final-focus-compact-teams">
+            <span>${H.matchFlagHtml(match, "home")}<strong>${H.escapeHtml(home)}</strong></span>
+            <b>${H.escapeHtml(score)}</b>
+            <span>${H.matchFlagHtml(match, "away")}<strong>${H.escapeHtml(away)}</strong></span>
+          </div>
+        </article>
+      `;
+    }
+
+    return `
+      <article class="final-focus-match detailed ${match.status || "scheduled"}">
+        <header>
+          <strong>${H.escapeHtml(title)}</strong>
+          <small>${H.escapeHtml(date)}</small>
+        </header>
+        <div class="final-focus-detailed-teams">
+          <div>${H.matchFlagHtml(match, "home")}<strong>${H.escapeHtml(home)}</strong></div>
+          <b>${H.escapeHtml(score)}</b>
+          <div>${H.matchFlagHtml(match, "away")}<strong>${H.escapeHtml(away)}</strong></div>
+        </div>
+        <footer>
+          <span>${location ? H.escapeHtml(location) : "Lieu à confirmer"}</span>
+          <span>${H.icon("tv")} ${H.tvChannelLogosHtml(this.matchTvChannel(match), "tv-logo-strip final-tv-strip")}</span>
+        </footer>
+      </article>
+    `;
+  },
+
+  finalFocusPlaceholderHtml(title, detailed = false) {
+    return `
+      <article class="final-focus-match ${detailed ? "detailed" : "compact"} placeholder">
+        <small>${H.escapeHtml(title)}</small>
+        <div class="final-focus-compact-teams">
+          <span><span class="flag-mini placeholder-flag"></span><strong>À définir</strong></span>
+          <b>vs</b>
+          <span><span class="flag-mini placeholder-flag"></span><strong>À définir</strong></span>
+        </div>
+      </article>
+    `;
+  },
+
+  finalFocusCompactDate(value) {
+    if (!value) return "à confirmer";
+    const formatted = H.formatDateTime(value) || "";
+    return formatted.split(",")[0] || formatted;
+  },
+
   finalBracketHtml(byStage) {
     const matchMap = this.finalBracketMatchMap(byStage);
-    return this.finalBracketVerticalHtml(matchMap);
+    const activeRound = this.activeFinalBracketRound(matchMap);
+    return this.finalFocusBracketHtml(matchMap, activeRound);
   },
 
   finalBracketColumnHtml(title, matches = [], sizeClass = "") {
@@ -10062,7 +10266,7 @@ const App = {
           </div>
           <div class="profile-account-actions">
             <button class="ghost-btn" id="profileInstallAppBtn" type="button">Installer l’app</button>
-            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.8.21</button>
+            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.8.22</button>
             <button class="danger-btn" id="profileLogoutBtn" type="button">Déconnexion</button>
           </div>
         </div>
