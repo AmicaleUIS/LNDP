@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — APP PRINCIPALE V1.8.17
+// LE NID DES PRONOS — APP PRINCIPALE V1.8.18
 // ============================================================
 
 const H = window.Helpers;
@@ -474,7 +474,7 @@ const App = {
           <div>
             <p class="eyebrow">Crédits cachés</p>
             <h2 id="creditsTitle">Le Nid des Pronos</h2>
-            <p class="muted">Version publique <strong>1.8.17</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
+            <p class="muted">Version publique <strong>1.8.18</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
           </div>
         </div>
         <div class="credits-grid">
@@ -491,7 +491,7 @@ const App = {
             <p><strong>1.0.5</strong> — dashboard mobile/desktop stabilisé, sans chevauchement des cartes.</p>
           </section>
           <section>
-            <h3>Évolutions V1.8.17</h3>
+            <h3>Évolutions V1.8.18</h3>
             <ul class="changelog-list">
               <li>Le super admin peut désactiver ou réactiver l’affichage du module préparation.</li>
               <li>Quand la préparation est désactivée, les matchs test disparaissent des matchs/pronos, classements par phase et règles.</li>
@@ -1405,12 +1405,14 @@ const App = {
   },
 
   getMyPrediction(matchId) {
-    return this.state.myPredictions.find((p) => p.match_id === matchId);
+    const targetId = String(matchId ?? "");
+    return this.state.myPredictions.find((p) => String(p.match_id) === targetId);
   },
 
   predictionsForMatch(matchId) {
-    const rows = this.state.visiblePredictions.filter((p) => p.match_id === matchId);
-    const mine = this.state.myPredictions.find((p) => p.match_id === matchId);
+    const targetId = String(matchId ?? "");
+    const rows = this.state.visiblePredictions.filter((p) => String(p.match_id) === targetId);
+    const mine = this.state.myPredictions.find((p) => String(p.match_id) === targetId);
     if (mine && !rows.some((row) => String(row.user_id) === String(this.state.session?.user?.id))) {
       return this.mergePredictionRows(rows, [{ ...mine, user_id: this.state.session?.user?.id, pseudo: this.state.profile?.pseudo }]);
     }
@@ -1439,8 +1441,8 @@ const App = {
   },
 
   isPreparationMatch(matchOrId) {
-    const match = typeof matchOrId === "string"
-      ? this.state.matches.find((m) => m.id === matchOrId)
+    const match = typeof matchOrId === "string" || typeof matchOrId === "number"
+      ? this.state.matches.find((m) => String(m.id) === String(matchOrId))
       : matchOrId;
     return Boolean(match?.is_test_match);
   },
@@ -3297,20 +3299,31 @@ const App = {
   },
 
 
+  setMatchPhaseIndexForMatch(match) {
+    if (!match) return false;
+    const groups = this.groupMatchesByPouleRound(this.upcomingPredictionMatches());
+    const groupIndex = groups.findIndex((group) => group.matches.some((item) => String(item.id) === String(match.id)));
+    if (groupIndex >= 0) {
+      this.state.matchPhaseIndex = groupIndex;
+      return true;
+    }
+    return false;
+  },
+
   async goToMatchPrediction(matchId, options = {}) {
-    const match = this.state.matches.find((item) => item.id === matchId);
+    const targetId = String(matchId ?? "");
+    const match = this.state.matches.find((item) => String(item.id) === targetId);
     if (!match) {
       await this.loadView("matches");
       setTimeout(() => {
-        this.scrollToMatch(matchId);
-        if (options.openPredictions) this.openPredictionsForMatch(matchId);
+        this.scrollToMatch(targetId);
+        if (options.openPredictions) this.openPredictionsForMatch(targetId);
       }, 150);
       return;
     }
 
-    const groups = this.groupMatchesByPouleRound(this.displayMatches());
-    const groupIndex = groups.findIndex((group) => group.matches.some((item) => item.id === match.id));
-    if (groupIndex >= 0) this.state.matchPhaseIndex = groupIndex;
+    this.state.matchesTab = "upcoming";
+    this.setMatchPhaseIndexForMatch(match);
 
     if (this.state.currentView !== "matches") {
       await this.loadView("matches");
@@ -3390,9 +3403,8 @@ const App = {
       return;
     }
 
-    const groups = this.groupMatchesByPouleRound(this.displayMatches());
-    const groupIndex = groups.findIndex((group) => group.matches.some((item) => item.id === match.id));
-    if (groupIndex >= 0) this.state.matchPhaseIndex = groupIndex;
+    this.state.matchesTab = "upcoming";
+    this.setMatchPhaseIndexForMatch(match);
 
     if (this.state.currentView !== "matches") {
       await this.loadView("matches");
@@ -4974,12 +4986,10 @@ const App = {
       <section class="toolbar-card compact-toolbar worldcup-final-toolbar">
         <div>
           <h3>Phase finale</h3>
-          <p class="muted">Un vrai tableau visuel : les seizièmes partent des ailes, puis le nid converge vers la grande finale.</p>
+          <p class="muted">Tableau lisible : chaque 8e reste placé entre ses deux 16èmes, puis les chemins convergent vers les quarts et la finale.</p>
         </div>
         <div class="final-bracket-toolbar-actions">
-          <button class="ghost-btn final-scroll-btn" type="button" data-final-scroll="left" aria-label="Voir la partie gauche">←</button>
           <span class="pill neutral">${totalFinalMatches} match${totalFinalMatches > 1 ? "s" : ""}</span>
-          <button class="ghost-btn final-scroll-btn" type="button" data-final-scroll="right" aria-label="Voir la partie droite">→</button>
         </div>
       </section>
       ${totalFinalMatches ? this.finalBracketHtml(byStage) : `<section class="card"><p class="muted">Aucune phase finale à afficher pour le moment.</p></section>`}
@@ -4990,7 +5000,7 @@ const App = {
 
   bindFinalBracketDrag() {
     const scroller = H.$("#finalBracketScroll");
-    if (!scroller || scroller.dataset.dragBound === "true") return;
+    if (!scroller || scroller.classList.contains("final-bracket-road-shell") || scroller.dataset.dragBound === "true") return;
     scroller.dataset.dragBound = "true";
 
     let isDown = false;
@@ -5088,6 +5098,47 @@ const App = {
       : this.finalBracketPlaceholderHtml(`${title} · M${number}`);
   },
 
+  finalBracketRoadLaneHtml(matchMap, lane, index = 0) {
+    return `
+      <div class="final-bracket-road-lane" data-r16="${H.escapeHtml(lane.r16)}">
+        <div class="road-node road-r32 top">${this.finalBracketMatchOrPlaceholder(matchMap, lane.r32[0], "16e")}</div>
+        <div class="road-flow-line" aria-hidden="true"><span></span></div>
+        <div class="road-node road-r16">${this.finalBracketMatchOrPlaceholder(matchMap, lane.r16, "8e")}</div>
+        <div class="road-flow-line" aria-hidden="true"><span></span></div>
+        <div class="road-node road-r32 bottom">${this.finalBracketMatchOrPlaceholder(matchMap, lane.r32[1], "16e")}</div>
+      </div>
+    `;
+  },
+
+  finalBracketRoadQuarterHtml(matchMap, block) {
+    const lanes = block.lanes || [];
+    return `
+      <article class="final-bracket-road-block">
+        <header class="final-bracket-road-block-head">
+          <strong>${H.escapeHtml(block.title)}</strong>
+          <small>${H.escapeHtml(block.subtitle)}</small>
+        </header>
+        <div class="final-bracket-road-lanes">
+          ${lanes.map((lane, index) => this.finalBracketRoadLaneHtml(matchMap, lane, index)).join("")}
+        </div>
+        <div class="road-quarter-join" aria-hidden="true"><span></span></div>
+        <div class="final-bracket-road-quarter">
+          ${this.finalBracketMatchOrPlaceholder(matchMap, block.qf, "Quart")}
+        </div>
+      </article>
+    `;
+  },
+
+  finalBracketRoadBlocks() {
+    const layout = H.finalBracketLayout?.() || { left: [], right: [] };
+    return [
+      { title: "Quart haut gauche", subtitle: "M73/M75 et M74/M77", lanes: layout.left.slice(0, 2), qf: 97, sf: 101 },
+      { title: "Quart bas gauche", subtitle: "M83/M84 et M81/M82", lanes: layout.left.slice(2, 4), qf: 98, sf: 101 },
+      { title: "Quart haut droit", subtitle: "M76/M78 et M79/M80", lanes: layout.right.slice(0, 2), qf: 99, sf: 102 },
+      { title: "Quart bas droit", subtitle: "M86/M88 et M85/M87", lanes: layout.right.slice(2, 4), qf: 100, sf: 102 }
+    ];
+  },
+
   finalBracketLaneHtml(matchMap, lane) {
     return `
       <div class="final-bracket-lane" data-r16="${lane.r16}">
@@ -5175,30 +5226,45 @@ const App = {
     const knownBracketMatches = matchMap.size;
     if (knownBracketMatches < 8) return this.legacyFinalBracketHtml(byStage);
 
-    const layout = H.finalBracketLayout?.() || { left: [], right: [] };
+    const blocks = this.finalBracketRoadBlocks();
+    const semiLeft = this.finalBracketMatchByNumber(matchMap, 101) || byStage.semi_final[0];
+    const semiRight = this.finalBracketMatchByNumber(matchMap, 102) || byStage.semi_final[1];
     const finalMatch = this.finalBracketMatchByNumber(matchMap, 104) || byStage.final[0];
     const thirdPlaceMatch = this.finalBracketMatchByNumber(matchMap, 103) || byStage.third_place[0];
 
     return `
-      <section class="final-bracket-shell final-bracket-tree-shell draggable-bracket" id="finalBracketScroll" aria-label="Tableau de la phase finale" tabindex="0">
+      <section class="final-bracket-shell final-bracket-road-shell" id="finalBracketScroll" aria-label="Tableau de la phase finale" tabindex="0">
         <div class="final-bracket-ribbon ribbon-left-a"></div>
         <div class="final-bracket-ribbon ribbon-left-b"></div>
         <div class="final-bracket-ribbon ribbon-right-a"></div>
         <div class="final-bracket-ribbon ribbon-right-b"></div>
 
-        ${this.finalBracketSideTreeHtml("left", layout.left, matchMap)}
-
-        <div class="final-bracket-center final-bracket-tree-center">
-          <div class="final-bracket-cup-card">
-            <span class="final-bracket-cup-emoji" aria-hidden="true">🏆</span>
-            <strong>Finale</strong>
-            <small>Le sommet du nid</small>
-          </div>
-          ${finalMatch ? this.finalBracketMatchHtml(finalMatch, "final-main official-match-104", "Grande finale · M104") : this.finalBracketPlaceholderHtml("Grande finale · M104")}
-          ${thirdPlaceMatch ? this.finalBracketMatchHtml(thirdPlaceMatch, "third-place official-match-103", "Petite finale · M103") : this.finalBracketPlaceholderHtml("Petite finale · M103")}
+        <div class="final-bracket-road-help">
+          <strong>Lecture du tableau</strong>
+          <span>Chaque bloc garde le 8e au milieu de ses deux 16èmes, puis les deux 8èmes descendent vers leur quart.</span>
         </div>
 
-        ${this.finalBracketSideTreeHtml("right", layout.right, matchMap)}
+        <div class="final-bracket-road-grid">
+          ${blocks.map((block) => this.finalBracketRoadQuarterHtml(matchMap, block)).join("")}
+        </div>
+
+        <section class="final-bracket-road-finals" aria-label="Dernier carré">
+          <div class="final-bracket-stage-title road-final-title">Dernier carré</div>
+          <div class="final-bracket-road-semis">
+            ${semiLeft ? this.finalBracketMatchHtml(semiLeft, "official-match-101", "Demi · M101") : this.finalBracketPlaceholderHtml("Demi · M101")}
+            ${semiRight ? this.finalBracketMatchHtml(semiRight, "official-match-102", "Demi · M102") : this.finalBracketPlaceholderHtml("Demi · M102")}
+          </div>
+          <div class="road-final-join" aria-hidden="true"><span></span></div>
+          <div class="final-bracket-road-final-card">
+            <div class="final-bracket-cup-card">
+              <span class="final-bracket-cup-emoji" aria-hidden="true">🏆</span>
+              <strong>Finale</strong>
+              <small>Le sommet du nid</small>
+            </div>
+            ${finalMatch ? this.finalBracketMatchHtml(finalMatch, "final-main official-match-104", "Grande finale · M104") : this.finalBracketPlaceholderHtml("Grande finale · M104")}
+            ${thirdPlaceMatch ? this.finalBracketMatchHtml(thirdPlaceMatch, "third-place official-match-103", "Petite finale · M103") : this.finalBracketPlaceholderHtml("Petite finale · M103")}
+          </div>
+        </section>
       </section>
     `;
   },
@@ -9790,7 +9856,7 @@ const App = {
           </div>
           <div class="profile-account-actions">
             <button class="ghost-btn" id="profileInstallAppBtn" type="button">Installer l’app</button>
-            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.8.17</button>
+            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.8.18</button>
             <button class="danger-btn" id="profileLogoutBtn" type="button">Déconnexion</button>
           </div>
         </div>
