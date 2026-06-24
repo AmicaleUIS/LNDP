@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — APP PRINCIPALE V1.8.20
+// LE NID DES PRONOS — APP PRINCIPALE V1.8.21
 // ============================================================
 
 const H = window.Helpers;
@@ -474,7 +474,7 @@ const App = {
           <div>
             <p class="eyebrow">Crédits cachés</p>
             <h2 id="creditsTitle">Le Nid des Pronos</h2>
-            <p class="muted">Version publique <strong>1.8.20</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
+            <p class="muted">Version publique <strong>1.8.21</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
           </div>
         </div>
         <div class="credits-grid">
@@ -491,7 +491,7 @@ const App = {
             <p><strong>1.0.5</strong> — dashboard mobile/desktop stabilisé, sans chevauchement des cartes.</p>
           </section>
           <section>
-            <h3>Évolutions V1.8.20</h3>
+            <h3>Évolutions V1.8.21</h3>
             <ul class="changelog-list">
               <li>Le super admin peut désactiver ou réactiver l’affichage du module préparation.</li>
               <li>Quand la préparation est désactivée, les matchs test disparaissent des matchs/pronos, classements par phase et règles.</li>
@@ -1239,7 +1239,7 @@ const App = {
 
 
   async loadVisiblePredictions() {
-    // V1.8.20 — IMPORTANT : Supabase REST renvoie 1000 lignes max par requête.
+    // V1.8.21 — IMPORTANT : Supabase REST renvoie 1000 lignes max par requête.
     // Le classement général est agrégé en base, mais les détails joueurs et le classement Famille
     // repartent des pronos visibles côté front. On pagine donc toute la vue, sinon les détails
     // s'arrêtent après les premiers paquets de matchs/joueurs.
@@ -5368,12 +5368,110 @@ const App = {
     `;
   },
 
+  finalBracketVerticalLaneHtml(matchMap, lane) {
+    return `
+      <div class="final-bracket-vertical-lane" data-r16="${H.escapeHtml(lane.r16)}">
+        <div class="final-bracket-vertical-r32">
+          ${this.finalBracketMatchOrPlaceholder(matchMap, lane.r32[0], "16e", "vertical-compact")}
+          ${this.finalBracketMatchOrPlaceholder(matchMap, lane.r32[1], "16e", "vertical-compact")}
+        </div>
+        <div class="final-bracket-vertical-link" aria-hidden="true"></div>
+        <div class="final-bracket-vertical-r16">
+          ${this.finalBracketMatchOrPlaceholder(matchMap, lane.r16, "8e", "vertical-compact")}
+        </div>
+      </div>
+    `;
+  },
+
+  finalBracketVerticalQuarterHtml(matchMap, block) {
+    const lanes = block.lanes || [];
+    return `
+      <article class="final-bracket-vertical-quarter">
+        <header class="final-bracket-vertical-quarter-head">
+          <strong>${H.escapeHtml(block.title)}</strong>
+          <small>${H.escapeHtml(block.subtitle)}</small>
+        </header>
+        <div class="final-bracket-vertical-quarter-body">
+          <div class="final-bracket-vertical-lanes">
+            ${lanes.map((lane) => this.finalBracketVerticalLaneHtml(matchMap, lane)).join("")}
+          </div>
+          <div class="final-bracket-vertical-qf">
+            ${this.finalBracketMatchOrPlaceholder(matchMap, block.qf, "Quart", "vertical-compact vertical-qf-card")}
+          </div>
+        </div>
+      </article>
+    `;
+  },
+
+  finalBracketVerticalSemiHtml(matchMap, title, blocks, semiNumber) {
+    return `
+      <section class="final-bracket-vertical-semi-block">
+        <header class="final-bracket-vertical-semi-head">
+          <strong>${H.escapeHtml(title)}</strong>
+          <span>${H.escapeHtml(blocks.map((block) => `M${block.qf}`).join(" + "))} → M${H.escapeHtml(semiNumber)}</span>
+        </header>
+        <div class="final-bracket-vertical-semi-body">
+          <div class="final-bracket-vertical-quarters">
+            ${blocks.map((block) => this.finalBracketVerticalQuarterHtml(matchMap, block)).join("")}
+          </div>
+          <div class="final-bracket-vertical-sf">
+            ${this.finalBracketMatchOrPlaceholder(matchMap, semiNumber, "Demi", "vertical-compact vertical-sf-card")}
+          </div>
+        </div>
+      </section>
+    `;
+  },
+
+  finalBracketVerticalBlocks() {
+    const layout = H.finalBracketLayout?.() || { left: [], right: [] };
+    return [
+      { title: "Chemin 1", subtitle: "M73/M75 → M90 · M74/M77 → M89", lanes: layout.left.slice(0, 2), qf: 97, sf: 101 },
+      { title: "Chemin 2", subtitle: "M83/M84 → M93 · M81/M82 → M94", lanes: layout.left.slice(2, 4), qf: 98, sf: 101 },
+      { title: "Chemin 3", subtitle: "M76/M78 → M91 · M79/M80 → M92", lanes: layout.right.slice(0, 2), qf: 99, sf: 102 },
+      { title: "Chemin 4", subtitle: "M86/M88 → M95 · M85/M87 → M96", lanes: layout.right.slice(2, 4), qf: 100, sf: 102 }
+    ];
+  },
+
+  finalBracketVerticalHtml(matchMap) {
+    const blocks = this.finalBracketVerticalBlocks();
+    return `
+      <section class="final-bracket-vertical-shell" id="finalBracketScroll" aria-label="Tableau vertical de la phase finale" tabindex="0">
+        <header class="final-bracket-vertical-head">
+          <div>
+            <strong>Tableau phase finale</strong>
+            <span>Lecture en hauteur : les 16èmes nourrissent les 8èmes, puis les quarts, les demies et la finale.</span>
+          </div>
+          <div class="final-bracket-vertical-pill">32 matchs</div>
+        </header>
+        <div class="final-bracket-vertical-labels" aria-hidden="true">
+          <span>16èmes</span>
+          <span>8èmes</span>
+          <span>Quarts</span>
+          <span>Demies</span>
+          <span>Finale</span>
+        </div>
+        <div class="final-bracket-vertical-main">
+          <div class="final-bracket-vertical-paths">
+            ${this.finalBracketVerticalSemiHtml(matchMap, "Demi-finale haute", blocks.slice(0, 2), 101)}
+            ${this.finalBracketVerticalSemiHtml(matchMap, "Demi-finale basse", blocks.slice(2, 4), 102)}
+          </div>
+          <aside class="final-bracket-vertical-finals" aria-label="Finales">
+            <div class="final-bracket-cup-card final-bracket-vertical-cup">
+              <span class="final-bracket-cup-emoji" aria-hidden="true">🏆</span>
+              <strong>FINALE</strong>
+              <small>19 juillet 2026</small>
+            </div>
+            ${this.finalBracketMatchOrPlaceholder(matchMap, 104, "Grande finale", "vertical-compact vertical-final-card")}
+            ${this.finalBracketMatchOrPlaceholder(matchMap, 103, "3e place", "vertical-compact vertical-third-card")}
+          </aside>
+        </div>
+      </section>
+    `;
+  },
+
   finalBracketHtml(byStage) {
     const matchMap = this.finalBracketMatchMap(byStage);
-    return `
-      ${this.officialFinalBracketDesktopHtml(matchMap)}
-      ${this.officialFinalBracketMobileHtml(matchMap)}
-    `;
+    return this.finalBracketVerticalHtml(matchMap);
   },
 
   finalBracketColumnHtml(title, matches = [], sizeClass = "") {
@@ -9964,7 +10062,7 @@ const App = {
           </div>
           <div class="profile-account-actions">
             <button class="ghost-btn" id="profileInstallAppBtn" type="button">Installer l’app</button>
-            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.8.20</button>
+            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.8.21</button>
             <button class="danger-btn" id="profileLogoutBtn" type="button">Déconnexion</button>
           </div>
         </div>
