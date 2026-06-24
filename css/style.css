@@ -18728,7 +18728,7 @@ body[data-current-view] {
 }
 
 /* ============================================================
-   V1.8.19 — Phase finale par emplacement + scroll propre
+   V1.8.20 — Phase finale par emplacement + scroll propre
    ============================================================ */
 .group-table tr.eliminated-zone {
   background: linear-gradient(90deg, rgba(239, 68, 68, .26), rgba(239, 68, 68, .10)) !important;
@@ -18935,7 +18935,7 @@ body[data-current-view] {
 }
 
 /* ============================================================
-   V1.8.19 — Phase finale lisible en blocs de continuité
+   V1.8.20 — Phase finale lisible en blocs de continuité
    ============================================================ */
 .final-bracket-road-shell {
   display: block !important;
@@ -19228,7 +19228,7 @@ body[data-current-view] {
 }
 
 /* =====================================================
-   V1.8.19 — Phase finale format officiel desktop/mobile
+   V1.8.20 — Phase finale format officiel desktop/mobile
    ===================================================== */
 .final-bracket-official {
   border: 1px solid rgba(255, 212, 59, 0.18);

@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — APP PRINCIPALE V1.8.19
+// LE NID DES PRONOS — APP PRINCIPALE V1.8.20
 // ============================================================
 
 const H = window.Helpers;
@@ -474,7 +474,7 @@ const App = {
           <div>
             <p class="eyebrow">Crédits cachés</p>
             <h2 id="creditsTitle">Le Nid des Pronos</h2>
-            <p class="muted">Version publique <strong>1.8.19</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
+            <p class="muted">Version publique <strong>1.8.20</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
           </div>
         </div>
         <div class="credits-grid">
@@ -491,7 +491,7 @@ const App = {
             <p><strong>1.0.5</strong> — dashboard mobile/desktop stabilisé, sans chevauchement des cartes.</p>
           </section>
           <section>
-            <h3>Évolutions V1.8.19</h3>
+            <h3>Évolutions V1.8.20</h3>
             <ul class="changelog-list">
               <li>Le super admin peut désactiver ou réactiver l’affichage du module préparation.</li>
               <li>Quand la préparation est désactivée, les matchs test disparaissent des matchs/pronos, classements par phase et règles.</li>
@@ -704,6 +704,34 @@ const App = {
   },
 
 
+  async selectAllRows(tableName, options = {}) {
+    const pageSize = Math.max(100, Math.min(Number(options.pageSize || 1000), 1000));
+    const orderColumn = options.orderColumn || "id";
+    const ascending = options.ascending !== false;
+    const rows = [];
+    let from = 0;
+
+    while (true) {
+      let query = window.sb
+        .from(tableName)
+        .select(options.select || "*");
+
+      if (orderColumn) {
+        query = query.order(orderColumn, { ascending });
+      }
+
+      const { data, error } = await query.range(from, from + pageSize - 1);
+      if (error) return { data: rows, error };
+
+      const page = data || [];
+      rows.push(...page);
+      if (page.length < pageSize) break;
+      from += pageSize;
+    }
+
+    return { data: rows, error: null };
+  },
+
   async loadProfile() {
     const userId = this.state.session.user.id;
     const { data, error } = await window.sb
@@ -795,10 +823,10 @@ const App = {
   },
 
   async loadPlayerScoreRows() {
-    const { data, error } = await window.sb
-      .from("v_leaderboard_overall")
-      .select("*")
-      .order("rank");
+    const { data, error } = await this.selectAllRows("v_leaderboard_overall", {
+      orderColumn: "rank",
+      pageSize: 1000
+    });
 
     if (error) {
       console.warn("Classement indisponible pour les fiches joueurs", error);
@@ -1211,9 +1239,14 @@ const App = {
 
 
   async loadVisiblePredictions() {
-    const { data, error } = await window.sb
-      .from("v_visible_predictions")
-      .select("*");
+    // V1.8.20 — IMPORTANT : Supabase REST renvoie 1000 lignes max par requête.
+    // Le classement général est agrégé en base, mais les détails joueurs et le classement Famille
+    // repartent des pronos visibles côté front. On pagine donc toute la vue, sinon les détails
+    // s'arrêtent après les premiers paquets de matchs/joueurs.
+    const { data, error } = await this.selectAllRows("v_visible_predictions", {
+      orderColumn: "prediction_id",
+      pageSize: 1000
+    });
 
     if (error) {
       console.warn("v_visible_predictions indisponible pour le moment", error);
@@ -1225,9 +1258,10 @@ const App = {
     // V1.8.12 — filet spécial live :
     // si la vue générale rate un prono sur un match en direct,
     // la vue dédiée v_live_visible_predictions le réinjecte.
-    const liveResult = await window.sb
-      .from("v_live_visible_predictions")
-      .select("*");
+    const liveResult = await this.selectAllRows("v_live_visible_predictions", {
+      orderColumn: "prediction_id",
+      pageSize: 1000
+    });
 
     if (!liveResult.error && Array.isArray(liveResult.data) && liveResult.data.length) {
       this.state.visiblePredictions = this.mergePredictionRows(this.state.visiblePredictions, liveResult.data);
@@ -9136,6 +9170,7 @@ const App = {
     await Promise.all([
       this.loadPublicProfiles(),
       this.loadPlayerScoreRows(),
+      this.loadVisiblePredictions(),
       this.loadWinnerPrediction().catch(() => null),
       this.loadSecondWinnerPrediction().catch(() => null),
       this.loadWinnerPredictionsForTeams(),
@@ -9929,7 +9964,7 @@ const App = {
           </div>
           <div class="profile-account-actions">
             <button class="ghost-btn" id="profileInstallAppBtn" type="button">Installer l’app</button>
-            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.8.19</button>
+            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.8.20</button>
             <button class="danger-btn" id="profileLogoutBtn" type="button">Déconnexion</button>
           </div>
         </div>
