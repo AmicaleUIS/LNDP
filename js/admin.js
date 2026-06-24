@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — ADMIN V1.8.16
+// LE NID DES PRONOS — ADMIN V1.8.17
 // ============================================================
 
 const H = window.Helpers;
@@ -84,7 +84,7 @@ const Admin = {
       p_category: category,
       p_details: details || {},
       p_metadata: {
-        app_version: "1.8.16",
+        app_version: "1.8.17",
         source: "admin_front"
       }
     });
@@ -2162,6 +2162,11 @@ const Admin = {
       const pb = this.matchAdminPriority(b);
       if (pa.bucket !== pb.bucket) return pa.bucket - pb.bucket;
 
+      if (a.stage !== "group" || b.stage !== "group") {
+        const bracketDiff = (H.officialBracketSortValue?.(a) || pa.kickoff) - (H.officialBracketSortValue?.(b) || pb.kickoff);
+        if (bracketDiff) return bracketDiff;
+      }
+
       // Les prochains matchs montent en haut. Les matchs terminés descendent en bas,
       // avec le plus récent en premier dans leur zone.
       if (pa.bucket >= 8) return pb.kickoff - pa.kickoff;
@@ -2809,7 +2814,7 @@ const Admin = {
 
     const { data, error } = await window.sb.rpc("admin_clean_start_preserve_predictions", { p_confirm: "DEPART PROPRE" });
     if (error) {
-      H.toast(error.message || "Reset classements impossible. Lance le patch SQL V1.3.39.", "error");
+      H.toast(error.message || "Reset classements impossible. Lance le patch SQL V1.8.17.", "error");
       return;
     }
 

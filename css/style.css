@@ -18726,3 +18726,210 @@ body[data-current-view] {
 .final-teams-grid select {
   width: 100%;
 }
+
+/* ============================================================
+   V1.8.17 — Phase finale par emplacement + scroll propre
+   ============================================================ */
+.group-table tr.eliminated-zone {
+  background: linear-gradient(90deg, rgba(239, 68, 68, .26), rgba(239, 68, 68, .10)) !important;
+}
+.group-table tr.eliminated-zone td {
+  border-color: rgba(248, 113, 113, .18) !important;
+}
+.group-table tr.eliminated-zone .group-rank,
+.group-table tr.eliminated-zone .group-team-name {
+  color: #fecaca;
+}
+.group-table tr.eliminated-zone .group-team-name {
+  text-decoration: line-through;
+  text-decoration-thickness: 2px;
+  text-decoration-color: rgba(248, 113, 113, .75);
+}
+
+.final-bracket-tree-shell {
+  display: grid !important;
+  grid-template-columns: max-content minmax(230px, 280px) max-content;
+  align-items: center;
+  gap: 22px;
+  width: max-content;
+  min-width: 100%;
+  padding: 18px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-snap-type: x proximity;
+  -webkit-overflow-scrolling: touch;
+}
+.final-bracket-tree-side {
+  display: grid !important;
+  grid-template-columns: max-content max-content max-content;
+  align-items: center;
+  gap: 18px;
+  min-width: max-content;
+}
+.final-bracket-tree-column {
+  min-width: 232px;
+}
+.final-bracket-lane-stack {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(218px, 236px));
+  gap: 12px;
+  align-items: stretch;
+}
+.final-bracket-lane {
+  position: relative;
+  display: grid;
+  grid-template-rows: auto 18px auto 18px auto;
+  align-items: center;
+  gap: 4px;
+  min-width: 218px;
+  padding: 8px;
+  border: 1px solid rgba(255, 255, 255, .08);
+  border-radius: 22px;
+  background: rgba(5, 18, 33, .34);
+}
+.final-bracket-lane::before {
+  content: "";
+  position: absolute;
+  top: 28%;
+  bottom: 28%;
+  left: 50%;
+  width: 2px;
+  transform: translateX(-50%);
+  background: linear-gradient(180deg, transparent, rgba(250, 204, 21, .42), transparent);
+  pointer-events: none;
+}
+.final-bracket-lane-connector {
+  position: relative;
+  min-height: 18px;
+}
+.final-bracket-lane-connector::after {
+  content: "";
+  position: absolute;
+  inset: 50% 18% auto 18%;
+  height: 1px;
+  background: rgba(250, 204, 21, .25);
+}
+.final-bracket-lane-slot {
+  position: relative;
+  z-index: 1;
+}
+.final-bracket-lane-slot.middle .final-bracket-match {
+  border-color: rgba(250, 204, 21, .38);
+  box-shadow: 0 16px 34px rgba(250, 204, 21, .08);
+}
+.final-bracket-quarter-stack {
+  display: grid;
+  gap: 84px;
+  padding-top: 106px;
+}
+.final-bracket-semi-stack {
+  display: flex;
+  align-items: center;
+  min-height: 620px;
+}
+.final-bracket-tree-center {
+  position: sticky;
+  left: 50%;
+  z-index: 4;
+  scroll-snap-align: center;
+}
+.final-bracket-tree-shell .final-bracket-match {
+  width: 220px !important;
+  min-width: 0 !important;
+  margin: 0;
+}
+.final-bracket-tree-shell .final-bracket-match::after {
+  display: none !important;
+}
+.final-bracket-tree-shell .final-bracket-stage-title {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  margin-bottom: 10px;
+  backdrop-filter: blur(8px);
+}
+.final-bracket-tree-shell .final-bracket-match-head span {
+  max-width: 138px;
+}
+.final-bracket-tree-shell .final-bracket-match-foot {
+  gap: 4px;
+}
+.final-bracket-tree-shell .final-bracket-team strong {
+  max-width: 132px;
+}
+.final-bracket-tree-side-right .final-bracket-quarter-stack,
+.final-bracket-tree-side-right .final-bracket-semi-stack {
+  justify-items: end;
+}
+
+@media (max-width: 1100px) {
+  .final-bracket-tree-shell {
+    grid-template-columns: max-content minmax(220px, 260px) max-content;
+    gap: 16px;
+    padding: 14px;
+  }
+  .final-bracket-lane-stack {
+    grid-template-columns: repeat(4, minmax(206px, 220px));
+  }
+  .final-bracket-tree-shell .final-bracket-match {
+    width: 206px !important;
+  }
+  .final-bracket-quarter-stack {
+    gap: 70px;
+    padding-top: 96px;
+  }
+  .final-bracket-semi-stack {
+    min-height: 590px;
+  }
+}
+
+@media (max-width: 760px) {
+  .worldcup-final-toolbar {
+    position: sticky;
+    top: 0;
+    z-index: 12;
+  }
+  .final-bracket-tree-shell {
+    display: flex !important;
+    align-items: stretch;
+    gap: 14px;
+    width: 100%;
+    min-width: 0;
+    padding: 12px 10px 18px;
+    overflow-x: auto;
+  }
+  .final-bracket-tree-side {
+    grid-template-columns: max-content max-content max-content;
+    gap: 12px;
+  }
+  .final-bracket-lane-stack {
+    grid-template-columns: repeat(4, 190px);
+    gap: 10px;
+  }
+  .final-bracket-tree-column {
+    min-width: 190px;
+  }
+  .final-bracket-tree-shell .final-bracket-match {
+    width: 184px !important;
+    padding: 10px;
+  }
+  .final-bracket-tree-center {
+    position: relative;
+    left: auto;
+    min-width: 210px;
+  }
+  .final-bracket-quarter-stack {
+    gap: 58px;
+    padding-top: 88px;
+  }
+  .final-bracket-semi-stack {
+    min-height: 550px;
+  }
+  .final-bracket-scroll-btn {
+    min-width: 44px;
+  }
+}
+.final-bracket-tree-center {
+  position: relative !important;
+  left: auto !important;
+}

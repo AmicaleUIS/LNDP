@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — APP PRINCIPALE V1.8.16
+// LE NID DES PRONOS — APP PRINCIPALE V1.8.17
 // ============================================================
 
 const H = window.Helpers;
@@ -474,7 +474,7 @@ const App = {
           <div>
             <p class="eyebrow">Crédits cachés</p>
             <h2 id="creditsTitle">Le Nid des Pronos</h2>
-            <p class="muted">Version publique <strong>1.8.16</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
+            <p class="muted">Version publique <strong>1.8.17</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
           </div>
         </div>
         <div class="credits-grid">
@@ -491,7 +491,7 @@ const App = {
             <p><strong>1.0.5</strong> — dashboard mobile/desktop stabilisé, sans chevauchement des cartes.</p>
           </section>
           <section>
-            <h3>Évolutions V1.8.16</h3>
+            <h3>Évolutions V1.8.17</h3>
             <ul class="changelog-list">
               <li>Le super admin peut désactiver ou réactiver l’affichage du module préparation.</li>
               <li>Quand la préparation est désactivée, les matchs test disparaissent des matchs/pronos, classements par phase et règles.</li>
@@ -690,10 +690,17 @@ const App = {
   },
 
   hasKnownMatchTeams(match = {}) {
-    const bad = (value = "") => /^(tbd|à déterminer|a determiner|1st group|2nd group|3rd group|winner|runner-up)/i.test(String(value || "").trim());
+    const bad = (value = "") => {
+      const label = String(value || "").trim();
+      return /^(tbd|à déterminer|a determiner|1st group|2nd group|3rd group|winner|runner-up|loser|vainqueur|perdant)/i.test(label)
+        || /^(m|match)\s*(7[3-9]|8[0-9]|9[0-9]|10[0-4])\b/i.test(label)
+        || /\b(à définir|a definir|to be decided|to be confirmed)\b/i.test(label);
+    };
     return Boolean(match.home_team_id && match.away_team_id)
       && !bad(match.home_team_name)
-      && !bad(match.away_team_name);
+      && !bad(match.away_team_name)
+      && !bad(match.home_team_short_name)
+      && !bad(match.away_team_short_name);
   },
 
 
@@ -3341,16 +3348,39 @@ const App = {
     setTimeout(() => target.classList.remove("match-card-highlight"), 1200);
   },
 
+  predictionCandidateSortValue(match = {}) {
+    const stageOrder = {
+      group: 0,
+      round_of_32: 1,
+      round_of_16: 2,
+      quarter_final: 3,
+      semi_final: 4,
+      third_place: 5,
+      final: 6
+    };
+    const stage = stageOrder[match.stage] ?? 99;
+    const pool = match.stage === "group" ? Number(match.pool_round || match.group_round || 99) : 99;
+    const bracket = match.stage === "group" ? 0 : (H.officialBracketSortValue?.(match) || this.finalBracketSortValue(match));
+    const kickoff = match?.kickoff_at ? new Date(match.kickoff_at).getTime() : 9999999999999;
+    return stage * 100000000000000 + pool * 1000000000000 + bracket * 1000000000 + kickoff;
+  },
+
+  sortPredictionCandidates(matches = []) {
+    return [...matches].sort((a, b) => this.predictionCandidateSortValue(a) - this.predictionCandidateSortValue(b));
+  },
+
   nearestMissingPredictionMatch() {
     const now = Date.now();
-    const missing = this.availablePredictionMatches()
+    const candidates = this.availablePredictionMatches()
+      .filter((match) => !["finished", "cancelled", "postponed"].includes(match.status))
       .filter((match) => new Date(match.kickoff_at || 0).getTime() > now)
-      .filter((match) => !this.getMyPrediction(match.id))
-      .sort((a, b) => new Date(a.kickoff_at || 0) - new Date(b.kickoff_at || 0));
+      .filter((match) => !this.getMyPrediction(match.id));
 
-    // Tant que des matchs de poule restent à pronostiquer,
-    // on ne saute jamais vers les 16e.
-    return missing.find((match) => match.stage === "group") || missing[0] || null;
+    const groupCandidates = this.sortPredictionCandidates(candidates.filter((match) => match.stage === "group"));
+
+    // Tant qu'il reste un vrai match de poule à pronostiquer,
+    // on ne saute jamais vers les 16e ni vers un placeholder de phase finale.
+    return groupCandidates[0] || this.sortPredictionCandidates(candidates)[0] || null;
   },
 
   async goToNearestMissingPrediction() {
@@ -3378,7 +3408,14 @@ const App = {
     return Object.values(grouped)
       .map((group) => ({
         ...group,
-        matches: group.matches.sort((a, b) => new Date(a.kickoff_at) - new Date(b.kickoff_at))
+        matches: group.matches.sort((a, b) => {
+          if (a.stage !== "group" || b.stage !== "group") {
+            return (H.officialBracketSortValue?.(a) || this.finalBracketSortValue(a))
+              - (H.officialBracketSortValue?.(b) || this.finalBracketSortValue(b))
+              || new Date(a.kickoff_at || 0) - new Date(b.kickoff_at || 0);
+          }
+          return new Date(a.kickoff_at || 0) - new Date(b.kickoff_at || 0);
+        })
       }))
       .sort((a, b) => a.order - b.order || new Date(a.matches[0]?.kickoff_at || 0) - new Date(b.matches[0]?.kickoff_at || 0));
   },
@@ -5001,16 +5038,7 @@ const App = {
   },
 
   finalBracketSortValue(match) {
-    const stageOrder = {
-      round_of_32: 1,
-      round_of_16: 2,
-      quarter_final: 3,
-      semi_final: 4,
-      third_place: 5,
-      final: 6
-    };
-    const kickoff = match?.kickoff_at ? new Date(match.kickoff_at).getTime() : 0;
-    return ((stageOrder[match?.stage] || 99) * 10000000000000) + kickoff;
+    return H.officialBracketSortValue?.(match) || 999999999999999;
   },
 
   finalBracketStages(finals = []) {
@@ -5028,7 +5056,8 @@ const App = {
     });
 
     Object.keys(stages).forEach((key) => {
-      stages[key] = stages[key].sort((a, b) => new Date(a.kickoff_at || 0) - new Date(b.kickoff_at || 0));
+      stages[key] = stages[key].sort((a, b) => this.finalBracketSortValue(a) - this.finalBracketSortValue(b)
+        || new Date(a.kickoff_at || 0) - new Date(b.kickoff_at || 0));
     });
 
     return stages;
@@ -5039,7 +5068,74 @@ const App = {
     return [matches.slice(0, midpoint), matches.slice(midpoint)];
   },
 
-  finalBracketHtml(byStage) {
+  finalBracketMatchMap(byStage = {}) {
+    const map = new Map();
+    Object.values(byStage).flat().forEach((match) => {
+      const number = H.officialBracketMatchNumber?.(match);
+      if (number && !map.has(number)) map.set(number, match);
+    });
+    return map;
+  },
+
+  finalBracketMatchByNumber(matchMap, number) {
+    return matchMap.get(Number(number)) || null;
+  },
+
+  finalBracketMatchOrPlaceholder(matchMap, number, title) {
+    const match = this.finalBracketMatchByNumber(matchMap, number);
+    return match
+      ? this.finalBracketMatchHtml(match, `official-match-${number}`, `${title} · M${number}`)
+      : this.finalBracketPlaceholderHtml(`${title} · M${number}`);
+  },
+
+  finalBracketLaneHtml(matchMap, lane) {
+    return `
+      <div class="final-bracket-lane" data-r16="${lane.r16}">
+        <div class="final-bracket-lane-slot top">${this.finalBracketMatchOrPlaceholder(matchMap, lane.r32[0], "16e")}</div>
+        <div class="final-bracket-lane-connector" aria-hidden="true"></div>
+        <div class="final-bracket-lane-slot middle">${this.finalBracketMatchOrPlaceholder(matchMap, lane.r16, "8e")}</div>
+        <div class="final-bracket-lane-connector" aria-hidden="true"></div>
+        <div class="final-bracket-lane-slot bottom">${this.finalBracketMatchOrPlaceholder(matchMap, lane.r32[1], "16e")}</div>
+      </div>
+    `;
+  },
+
+  finalBracketSideTreeHtml(side, lanes, matchMap) {
+    const quarterNumbers = [...new Set(lanes.map((lane) => lane.qf))];
+    const semiNumber = lanes[0]?.sf;
+    const lanesHtml = `
+      <div class="final-bracket-tree-column lane-tree-column">
+        <div class="final-bracket-stage-title">16èmes → 8èmes</div>
+        <div class="final-bracket-lane-stack">
+          ${lanes.map((lane) => this.finalBracketLaneHtml(matchMap, lane)).join("")}
+        </div>
+      </div>
+    `;
+    const quartersHtml = `
+      <div class="final-bracket-tree-column quarter-tree-column">
+        <div class="final-bracket-stage-title">Quarts</div>
+        <div class="final-bracket-quarter-stack">
+          ${quarterNumbers.map((number) => this.finalBracketMatchOrPlaceholder(matchMap, number, "Quart")).join("")}
+        </div>
+      </div>
+    `;
+    const semiHtml = `
+      <div class="final-bracket-tree-column semi-tree-column">
+        <div class="final-bracket-stage-title">Demi-finale</div>
+        <div class="final-bracket-semi-stack">
+          ${semiNumber ? this.finalBracketMatchOrPlaceholder(matchMap, semiNumber, "Demi") : this.finalBracketPlaceholderHtml("Demi-finale")}
+        </div>
+      </div>
+    `;
+
+    return `
+      <div class="final-bracket-side final-bracket-tree-side final-bracket-tree-side-${side}">
+        ${side === "left" ? `${lanesHtml}${quartersHtml}${semiHtml}` : `${semiHtml}${quartersHtml}${lanesHtml}`}
+      </div>
+    `;
+  },
+
+  legacyFinalBracketHtml(byStage) {
     const [r32Left, r32Right] = this.splitBracketSide(byStage.round_of_32);
     const [r16Left, r16Right] = this.splitBracketSide(byStage.round_of_16);
     const [qfLeft, qfRight] = this.splitBracketSide(byStage.quarter_final);
@@ -5049,18 +5145,12 @@ const App = {
 
     return `
       <section class="final-bracket-shell draggable-bracket" id="finalBracketScroll" aria-label="Tableau de la phase finale" tabindex="0">
-        <div class="final-bracket-ribbon ribbon-left-a"></div>
-        <div class="final-bracket-ribbon ribbon-left-b"></div>
-        <div class="final-bracket-ribbon ribbon-right-a"></div>
-        <div class="final-bracket-ribbon ribbon-right-b"></div>
-
         <div class="final-bracket-side final-bracket-side-left">
           ${this.finalBracketColumnHtml("Seizièmes", r32Left, "round32")}
           ${this.finalBracketColumnHtml("Huitièmes", r16Left, "round16")}
           ${this.finalBracketColumnHtml("Quarts", qfLeft, "quarter")}
           ${this.finalBracketColumnHtml("Demi-finale", sfLeft, "semi")}
         </div>
-
         <div class="final-bracket-center">
           <div class="final-bracket-cup-card">
             <span class="final-bracket-cup-emoji" aria-hidden="true">🏆</span>
@@ -5070,13 +5160,45 @@ const App = {
           ${finalMatch ? this.finalBracketMatchHtml(finalMatch, "final-main", "Grande finale") : this.finalBracketPlaceholderHtml("Grande finale")}
           ${thirdPlaceMatch ? this.finalBracketMatchHtml(thirdPlaceMatch, "third-place", "Petite finale") : this.finalBracketPlaceholderHtml("Petite finale")}
         </div>
-
         <div class="final-bracket-side final-bracket-side-right">
           ${this.finalBracketColumnHtml("Demi-finale", sfRight, "semi")}
           ${this.finalBracketColumnHtml("Quarts", qfRight, "quarter")}
           ${this.finalBracketColumnHtml("Huitièmes", r16Right, "round16")}
           ${this.finalBracketColumnHtml("Seizièmes", r32Right, "round32")}
         </div>
+      </section>
+    `;
+  },
+
+  finalBracketHtml(byStage) {
+    const matchMap = this.finalBracketMatchMap(byStage);
+    const knownBracketMatches = matchMap.size;
+    if (knownBracketMatches < 8) return this.legacyFinalBracketHtml(byStage);
+
+    const layout = H.finalBracketLayout?.() || { left: [], right: [] };
+    const finalMatch = this.finalBracketMatchByNumber(matchMap, 104) || byStage.final[0];
+    const thirdPlaceMatch = this.finalBracketMatchByNumber(matchMap, 103) || byStage.third_place[0];
+
+    return `
+      <section class="final-bracket-shell final-bracket-tree-shell draggable-bracket" id="finalBracketScroll" aria-label="Tableau de la phase finale" tabindex="0">
+        <div class="final-bracket-ribbon ribbon-left-a"></div>
+        <div class="final-bracket-ribbon ribbon-left-b"></div>
+        <div class="final-bracket-ribbon ribbon-right-a"></div>
+        <div class="final-bracket-ribbon ribbon-right-b"></div>
+
+        ${this.finalBracketSideTreeHtml("left", layout.left, matchMap)}
+
+        <div class="final-bracket-center final-bracket-tree-center">
+          <div class="final-bracket-cup-card">
+            <span class="final-bracket-cup-emoji" aria-hidden="true">🏆</span>
+            <strong>Finale</strong>
+            <small>Le sommet du nid</small>
+          </div>
+          ${finalMatch ? this.finalBracketMatchHtml(finalMatch, "final-main official-match-104", "Grande finale · M104") : this.finalBracketPlaceholderHtml("Grande finale · M104")}
+          ${thirdPlaceMatch ? this.finalBracketMatchHtml(thirdPlaceMatch, "third-place official-match-103", "Petite finale · M103") : this.finalBracketPlaceholderHtml("Petite finale · M103")}
+        </div>
+
+        ${this.finalBracketSideTreeHtml("right", layout.right, matchMap)}
       </section>
     `;
   },
@@ -9158,7 +9280,7 @@ const App = {
                   name: r.team_name
                 });
                 return `
-                  <tr class="${r.group_rank <= 2 ? "qual-zone" : r.group_rank === 3 ? "third-zone" : ""}">
+                  <tr class="${r.qualification_status === "eliminated" ? "eliminated-zone" : r.group_rank <= 2 ? "qual-zone" : r.group_rank === 3 ? "third-zone" : ""}">
                     <td class="group-rank">${r.group_rank}</td>
                     <td class="team-cell"><span class="group-team-inline">${flag}<span class="group-team-name">${H.escapeHtml(r.team_name)}</span></span></td>
                     <td>${r.played || 0}</td>
@@ -9668,7 +9790,7 @@ const App = {
           </div>
           <div class="profile-account-actions">
             <button class="ghost-btn" id="profileInstallAppBtn" type="button">Installer l’app</button>
-            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.8.16</button>
+            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.8.17</button>
             <button class="danger-btn" id="profileLogoutBtn" type="button">Déconnexion</button>
           </div>
         </div>
