@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — APP PRINCIPALE V1.8.18
+// LE NID DES PRONOS — APP PRINCIPALE V1.8.19
 // ============================================================
 
 const H = window.Helpers;
@@ -474,7 +474,7 @@ const App = {
           <div>
             <p class="eyebrow">Crédits cachés</p>
             <h2 id="creditsTitle">Le Nid des Pronos</h2>
-            <p class="muted">Version publique <strong>1.8.18</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
+            <p class="muted">Version publique <strong>1.8.19</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
           </div>
         </div>
         <div class="credits-grid">
@@ -491,7 +491,7 @@ const App = {
             <p><strong>1.0.5</strong> — dashboard mobile/desktop stabilisé, sans chevauchement des cartes.</p>
           </section>
           <section>
-            <h3>Évolutions V1.8.18</h3>
+            <h3>Évolutions V1.8.19</h3>
             <ul class="changelog-list">
               <li>Le super admin peut désactiver ou réactiver l’affichage du module préparation.</li>
               <li>Quand la préparation est désactivée, les matchs test disparaissent des matchs/pronos, classements par phase et règles.</li>
@@ -5091,11 +5091,11 @@ const App = {
     return matchMap.get(Number(number)) || null;
   },
 
-  finalBracketMatchOrPlaceholder(matchMap, number, title) {
+  finalBracketMatchOrPlaceholder(matchMap, number, title, extraClass = "") {
     const match = this.finalBracketMatchByNumber(matchMap, number);
     return match
-      ? this.finalBracketMatchHtml(match, `official-match-${number}`, `${title} · M${number}`)
-      : this.finalBracketPlaceholderHtml(`${title} · M${number}`);
+      ? this.finalBracketMatchHtml(match, `${extraClass} official-match-${number}`.trim(), `${title} · M${number}`)
+      : this.finalBracketPlaceholderHtml(`${title} · M${number}`, extraClass);
   },
 
   finalBracketRoadLaneHtml(matchMap, lane, index = 0) {
@@ -5221,51 +5221,124 @@ const App = {
     `;
   },
 
-  finalBracketHtml(byStage) {
-    const matchMap = this.finalBracketMatchMap(byStage);
-    const knownBracketMatches = matchMap.size;
-    if (knownBracketMatches < 8) return this.legacyFinalBracketHtml(byStage);
+  finalBracketColumnHtmlFromNumbers(title, numbers = [], matchMap, sizeClass = "", cardClass = "") {
+    return `
+      <div class="final-bracket-column ${sizeClass}">
+        <div class="final-bracket-stage-title">${H.escapeHtml(title)}</div>
+        <div class="final-bracket-match-stack">
+          ${numbers.map((number) => this.finalBracketMatchOrPlaceholder(matchMap, number, title, cardClass)).join("")}
+        </div>
+      </div>
+    `;
+  },
 
-    const blocks = this.finalBracketRoadBlocks();
-    const semiLeft = this.finalBracketMatchByNumber(matchMap, 101) || byStage.semi_final[0];
-    const semiRight = this.finalBracketMatchByNumber(matchMap, 102) || byStage.semi_final[1];
-    const finalMatch = this.finalBracketMatchByNumber(matchMap, 104) || byStage.final[0];
-    const thirdPlaceMatch = this.finalBracketMatchByNumber(matchMap, 103) || byStage.third_place[0];
+  officialFinalBracketDesktopHtml(matchMap) {
+    const leftR32 = [73, 75, 74, 77, 83, 84, 81, 82];
+    const rightR32 = [76, 78, 79, 80, 86, 88, 85, 87];
+    const leftR16 = [90, 89, 93, 94];
+    const rightR16 = [91, 92, 95, 96];
+    const leftQf = [97, 98];
+    const rightQf = [99, 100];
+    const semiLeft = [101];
+    const semiRight = [102];
+    const finalMatch = this.finalBracketMatchByNumber(matchMap, 104);
+    const thirdPlaceMatch = this.finalBracketMatchByNumber(matchMap, 103);
 
     return `
-      <section class="final-bracket-shell final-bracket-road-shell" id="finalBracketScroll" aria-label="Tableau de la phase finale" tabindex="0">
-        <div class="final-bracket-ribbon ribbon-left-a"></div>
-        <div class="final-bracket-ribbon ribbon-left-b"></div>
-        <div class="final-bracket-ribbon ribbon-right-a"></div>
-        <div class="final-bracket-ribbon ribbon-right-b"></div>
-
-        <div class="final-bracket-road-help">
-          <strong>Lecture du tableau</strong>
-          <span>Chaque bloc garde le 8e au milieu de ses deux 16èmes, puis les deux 8èmes descendent vers leur quart.</span>
+      <section class="final-bracket-official final-bracket-official-desktop" aria-label="Tableau officiel de la phase finale">
+        <div class="final-bracket-official-head">
+          <strong>Tableau phase finale</strong>
+          <span>Lecture classique : 16èmes → 8èmes → quarts → demies → finale.</span>
         </div>
-
-        <div class="final-bracket-road-grid">
-          ${blocks.map((block) => this.finalBracketRoadQuarterHtml(matchMap, block)).join("")}
-        </div>
-
-        <section class="final-bracket-road-finals" aria-label="Dernier carré">
-          <div class="final-bracket-stage-title road-final-title">Dernier carré</div>
-          <div class="final-bracket-road-semis">
-            ${semiLeft ? this.finalBracketMatchHtml(semiLeft, "official-match-101", "Demi · M101") : this.finalBracketPlaceholderHtml("Demi · M101")}
-            ${semiRight ? this.finalBracketMatchHtml(semiRight, "official-match-102", "Demi · M102") : this.finalBracketPlaceholderHtml("Demi · M102")}
+        <div class="final-bracket-official-body">
+          <div class="final-bracket-official-side left">
+            ${this.finalBracketColumnHtmlFromNumbers("16ᵉ", leftR32, matchMap, "round32", "desktop-compact")}
+            ${this.finalBracketColumnHtmlFromNumbers("8ᵉ", leftR16, matchMap, "round16", "desktop-compact")}
+            ${this.finalBracketColumnHtmlFromNumbers("Quarts", leftQf, matchMap, "quarter", "desktop-compact")}
+            ${this.finalBracketColumnHtmlFromNumbers("Demi-finale", semiLeft, matchMap, "semi", "desktop-compact")}
           </div>
-          <div class="road-final-join" aria-hidden="true"><span></span></div>
-          <div class="final-bracket-road-final-card">
-            <div class="final-bracket-cup-card">
+          <div class="final-bracket-official-center">
+            <div class="final-bracket-cup-card official-center-cup">
               <span class="final-bracket-cup-emoji" aria-hidden="true">🏆</span>
-              <strong>Finale</strong>
-              <small>Le sommet du nid</small>
+              <strong>FINALE</strong>
+              <small>19 juillet 2026</small>
             </div>
-            ${finalMatch ? this.finalBracketMatchHtml(finalMatch, "final-main official-match-104", "Grande finale · M104") : this.finalBracketPlaceholderHtml("Grande finale · M104")}
-            ${thirdPlaceMatch ? this.finalBracketMatchHtml(thirdPlaceMatch, "third-place official-match-103", "Petite finale · M103") : this.finalBracketPlaceholderHtml("Petite finale · M103")}
+            ${finalMatch ? this.finalBracketMatchHtml(finalMatch, "final-main desktop-compact", "Grande finale · M104") : this.finalBracketPlaceholderHtml("Grande finale · M104", "desktop-compact")}
+            ${thirdPlaceMatch ? this.finalBracketMatchHtml(thirdPlaceMatch, "third-place desktop-compact", "3ᵉ place · M103") : this.finalBracketPlaceholderHtml("3ᵉ place · M103", "desktop-compact")}
           </div>
-        </section>
+          <div class="final-bracket-official-side right">
+            ${this.finalBracketColumnHtmlFromNumbers("Demi-finale", semiRight, matchMap, "semi", "desktop-compact")}
+            ${this.finalBracketColumnHtmlFromNumbers("Quarts", rightQf, matchMap, "quarter", "desktop-compact")}
+            ${this.finalBracketColumnHtmlFromNumbers("8ᵉ", rightR16, matchMap, "round16", "desktop-compact")}
+            ${this.finalBracketColumnHtmlFromNumbers("16ᵉ", rightR32, matchMap, "round32", "desktop-compact")}
+          </div>
+        </div>
       </section>
+    `;
+  },
+
+  officialFinalBracketMobileHtml(matchMap) {
+    const leftR32 = [73, 75, 74, 77, 83, 84, 81, 82];
+    const rightR32 = [76, 78, 79, 80, 86, 88, 85, 87];
+    const leftR16 = [90, 89, 93, 94];
+    const rightR16 = [91, 92, 95, 96];
+    const leftQf = [97, 98];
+    const rightQf = [99, 100];
+    const finalMatch = this.finalBracketMatchByNumber(matchMap, 104);
+    const thirdPlaceMatch = this.finalBracketMatchByNumber(matchMap, 103);
+    const semiLeft = this.finalBracketMatchByNumber(matchMap, 101);
+    const semiRight = this.finalBracketMatchByNumber(matchMap, 102);
+
+    return `
+      <section class="final-bracket-official final-bracket-official-mobile" aria-label="Tableau mobile de la phase finale">
+        <div class="final-bracket-official-head mobile-head">
+          <strong>Tableau compact mobile</strong>
+          <span>Deux chemins lisibles, puis le dernier carré.</span>
+        </div>
+
+        <div class="final-bracket-mobile-half">
+          <div class="final-bracket-mobile-half-head">Partie gauche</div>
+          <div class="final-bracket-mobile-grid">
+            ${this.finalBracketColumnHtmlFromNumbers("16ᵉ", leftR32, matchMap, "round32", "mobile-compact")}
+            ${this.finalBracketColumnHtmlFromNumbers("8ᵉ", leftR16, matchMap, "round16", "mobile-compact")}
+            ${this.finalBracketColumnHtmlFromNumbers("Quarts", leftQf, matchMap, "quarter", "mobile-compact")}
+            <div class="final-bracket-column semi">
+              <div class="final-bracket-stage-title">Demi</div>
+              <div class="final-bracket-match-stack">
+                ${semiLeft ? this.finalBracketMatchHtml(semiLeft, "mobile-compact", "Demi · M101") : this.finalBracketPlaceholderHtml("Demi · M101", "mobile-compact")}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="final-bracket-mobile-finals">
+          ${finalMatch ? this.finalBracketMatchHtml(finalMatch, "final-main mobile-compact", "Finale · M104") : this.finalBracketPlaceholderHtml("Finale · M104", "mobile-compact")}
+          ${thirdPlaceMatch ? this.finalBracketMatchHtml(thirdPlaceMatch, "third-place mobile-compact", "3ᵉ place · M103") : this.finalBracketPlaceholderHtml("3ᵉ place · M103", "mobile-compact")}
+        </div>
+
+        <div class="final-bracket-mobile-half right-half">
+          <div class="final-bracket-mobile-half-head">Partie droite</div>
+          <div class="final-bracket-mobile-grid">
+            <div class="final-bracket-column semi">
+              <div class="final-bracket-stage-title">Demi</div>
+              <div class="final-bracket-match-stack">
+                ${semiRight ? this.finalBracketMatchHtml(semiRight, "mobile-compact", "Demi · M102") : this.finalBracketPlaceholderHtml("Demi · M102", "mobile-compact")}
+              </div>
+            </div>
+            ${this.finalBracketColumnHtmlFromNumbers("Quarts", rightQf, matchMap, "quarter", "mobile-compact")}
+            ${this.finalBracketColumnHtmlFromNumbers("8ᵉ", rightR16, matchMap, "round16", "mobile-compact")}
+            ${this.finalBracketColumnHtmlFromNumbers("16ᵉ", rightR32, matchMap, "round32", "mobile-compact")}
+          </div>
+        </div>
+      </section>
+    `;
+  },
+
+  finalBracketHtml(byStage) {
+    const matchMap = this.finalBracketMatchMap(byStage);
+    return `
+      ${this.officialFinalBracketDesktopHtml(matchMap)}
+      ${this.officialFinalBracketMobileHtml(matchMap)}
     `;
   },
 
@@ -5326,9 +5399,9 @@ const App = {
     `;
   },
 
-  finalBracketPlaceholderHtml(title = "Match") {
+  finalBracketPlaceholderHtml(title = "Match", extraClass = "") {
     return `
-      <article class="final-bracket-match placeholder">
+      <article class="final-bracket-match placeholder ${extraClass}">
         <div class="final-bracket-match-head">
           <span>${H.escapeHtml(title)}</span>
           <small>À confirmer</small>
@@ -9856,7 +9929,7 @@ const App = {
           </div>
           <div class="profile-account-actions">
             <button class="ghost-btn" id="profileInstallAppBtn" type="button">Installer l’app</button>
-            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.8.18</button>
+            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.8.19</button>
             <button class="danger-btn" id="profileLogoutBtn" type="button">Déconnexion</button>
           </div>
         </div>

@@ -18728,7 +18728,7 @@ body[data-current-view] {
 }
 
 /* ============================================================
-   V1.8.18 — Phase finale par emplacement + scroll propre
+   V1.8.19 — Phase finale par emplacement + scroll propre
    ============================================================ */
 .group-table tr.eliminated-zone {
   background: linear-gradient(90deg, rgba(239, 68, 68, .26), rgba(239, 68, 68, .10)) !important;
@@ -18935,7 +18935,7 @@ body[data-current-view] {
 }
 
 /* ============================================================
-   V1.8.18 — Phase finale lisible en blocs de continuité
+   V1.8.19 — Phase finale lisible en blocs de continuité
    ============================================================ */
 .final-bracket-road-shell {
   display: block !important;
@@ -19224,5 +19224,242 @@ body[data-current-view] {
 
   .final-bracket-road-final-card .final-bracket-cup-card {
     min-height: 0;
+  }
+}
+
+/* =====================================================
+   V1.8.19 — Phase finale format officiel desktop/mobile
+   ===================================================== */
+.final-bracket-official {
+  border: 1px solid rgba(255, 212, 59, 0.18);
+  border-radius: 28px;
+  background: linear-gradient(180deg, rgba(10, 28, 59, 0.96), rgba(6, 20, 45, 0.98));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.05), 0 14px 36px rgba(0,0,0,0.28);
+  padding: 18px;
+}
+.final-bracket-official + .final-bracket-official { margin-top: 16px; }
+.final-bracket-official-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  padding: 0 2px 14px;
+  margin-bottom: 14px;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+.final-bracket-official-head strong {
+  font-size: 1.08rem;
+  color: #fff;
+}
+.final-bracket-official-head span {
+  font-size: 0.95rem;
+  color: rgba(223,230,243,0.82);
+  text-align: right;
+}
+.final-bracket-official-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 260px minmax(0, 1fr);
+  gap: 14px;
+  align-items: center;
+}
+.final-bracket-official-side {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(110px, 1fr));
+  gap: 10px;
+  align-items: start;
+}
+.final-bracket-official-side .final-bracket-column {
+  min-width: 0;
+}
+.final-bracket-official-side .final-bracket-stage-title {
+  min-height: 34px;
+  font-size: 0.82rem;
+  padding: 8px 10px;
+}
+.final-bracket-official-side .final-bracket-match-stack {
+  gap: 10px;
+}
+.final-bracket-official-side .final-bracket-column.round16 .final-bracket-match-stack {
+  gap: 34px;
+  padding-top: 34px;
+}
+.final-bracket-official-side .final-bracket-column.quarter .final-bracket-match-stack {
+  gap: 126px;
+  padding-top: 100px;
+}
+.final-bracket-official-side .final-bracket-column.semi .final-bracket-match-stack {
+  padding-top: 246px;
+}
+.final-bracket-official-side.right {
+  grid-template-columns: repeat(4, minmax(110px, 1fr));
+}
+.final-bracket-official-center {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-self: center;
+}
+.official-center-cup {
+  min-height: 124px;
+}
+.final-bracket-match.desktop-compact {
+  padding: 10px 10px 9px;
+  min-height: 96px;
+  border-radius: 18px;
+}
+.final-bracket-match.desktop-compact .final-bracket-match-head {
+  margin-bottom: 6px;
+}
+.final-bracket-match.desktop-compact .final-bracket-match-head span {
+  font-size: 0.86rem;
+}
+.final-bracket-match.desktop-compact .final-bracket-match-head small,
+.final-bracket-match.desktop-compact .final-bracket-match-foot {
+  font-size: 0.72rem;
+}
+.final-bracket-match.desktop-compact .final-bracket-team strong {
+  font-size: 0.9rem;
+  line-height: 1.15;
+}
+.final-bracket-match.desktop-compact .final-bracket-score {
+  font-size: 0.9rem;
+  min-width: 28px;
+}
+.final-bracket-match.desktop-compact .final-bracket-match-foot {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  margin-top: 6px;
+}
+.final-bracket-official-mobile {
+  display: none;
+}
+.final-bracket-mobile-half {
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 20px;
+  background: rgba(255,255,255,0.03);
+  padding: 12px;
+}
+.final-bracket-mobile-half-head {
+  font-weight: 800;
+  color: #fff;
+  margin-bottom: 10px;
+}
+.final-bracket-mobile-grid {
+  display: grid;
+  grid-template-columns: 1.45fr 1.2fr 1fr 0.95fr;
+  gap: 8px;
+  align-items: start;
+}
+.final-bracket-mobile-finals {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin: 12px 0;
+}
+.final-bracket-match.mobile-compact {
+  padding: 8px 8px 7px;
+  min-height: 78px;
+  border-radius: 16px;
+}
+.final-bracket-match.mobile-compact .final-bracket-match-head {
+  margin-bottom: 5px;
+}
+.final-bracket-match.mobile-compact .final-bracket-match-head span {
+  font-size: 0.77rem;
+}
+.final-bracket-match.mobile-compact .final-bracket-match-head small {
+  font-size: 0.66rem;
+}
+.final-bracket-match.mobile-compact .final-bracket-team strong {
+  font-size: 0.76rem;
+  line-height: 1.1;
+}
+.final-bracket-match.mobile-compact .final-bracket-score {
+  font-size: 0.76rem;
+  min-width: 22px;
+}
+.final-bracket-match.mobile-compact .final-bracket-match-foot,
+.final-bracket-match.mobile-compact .final-bracket-tv {
+  display: none;
+}
+.final-bracket-match.mobile-compact .final-bracket-team .team-flag-img,
+.final-bracket-match.mobile-compact .final-bracket-team .flag-placeholder,
+.final-bracket-match.mobile-compact .flag-mini {
+  width: 14px;
+  height: 14px;
+}
+@media (max-width: 1390px) {
+  .final-bracket-official-body {
+    grid-template-columns: minmax(0, 1fr) 230px minmax(0, 1fr);
+  }
+  .final-bracket-official-side {
+    grid-template-columns: repeat(4, minmax(96px, 1fr));
+    gap: 8px;
+  }
+  .final-bracket-official-side .final-bracket-column.round16 .final-bracket-match-stack {
+    gap: 26px;
+    padding-top: 28px;
+  }
+  .final-bracket-official-side .final-bracket-column.quarter .final-bracket-match-stack {
+    gap: 110px;
+    padding-top: 92px;
+  }
+  .final-bracket-official-side .final-bracket-column.semi .final-bracket-match-stack {
+    padding-top: 232px;
+  }
+  .final-bracket-match.desktop-compact .final-bracket-team strong {
+    font-size: 0.84rem;
+  }
+}
+@media (max-width: 1100px) {
+  .final-bracket-official-desktop {
+    display: none;
+  }
+  .final-bracket-official-mobile {
+    display: block;
+  }
+}
+@media (max-width: 720px) {
+  .final-bracket-official {
+    padding: 14px;
+    border-radius: 22px;
+  }
+  .final-bracket-official-head,
+  .final-bracket-official-head.mobile-head {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .final-bracket-official-head span {
+    text-align: left;
+  }
+  .final-bracket-mobile-grid {
+    grid-template-columns: 1.35fr 1.15fr 0.95fr 0.9fr;
+    gap: 6px;
+  }
+  .final-bracket-mobile-finals {
+    grid-template-columns: 1fr;
+  }
+  .final-bracket-mobile-half {
+    padding: 10px;
+  }
+  .final-bracket-mobile-grid .final-bracket-stage-title {
+    font-size: 0.72rem;
+    padding: 6px 7px;
+    min-height: 30px;
+  }
+  .final-bracket-match.mobile-compact {
+    padding: 7px;
+    min-height: 72px;
+  }
+  .final-bracket-match.mobile-compact .final-bracket-team {
+    gap: 4px;
+  }
+  .final-bracket-match.mobile-compact .final-bracket-team strong {
+    font-size: 0.7rem;
+  }
+  .final-bracket-match.mobile-compact .final-bracket-match-head span {
+    font-size: 0.72rem;
   }
 }
