@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — ADMIN V1.8.27
+// LE NID DES PRONOS — ADMIN V1.8.28
 // ============================================================
 
 const H = window.Helpers;
@@ -84,7 +84,7 @@ const Admin = {
       p_category: category,
       p_details: details || {},
       p_metadata: {
-        app_version: "1.8.27",
+        app_version: "1.8.28",
         source: "admin_front"
       }
     });
@@ -3000,7 +3000,7 @@ const Admin = {
 
     const { data, error } = await window.sb.rpc("admin_clean_start_preserve_predictions", { p_confirm: "DEPART PROPRE" });
     if (error) {
-      H.toast(error.message || "Reset classements impossible. Lance le patch SQL V1.8.27.", "error");
+      H.toast(error.message || "Reset classements impossible. Lance le patch SQL V1.8.28.", "error");
       return;
     }
 

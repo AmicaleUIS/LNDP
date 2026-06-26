@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — APP PRINCIPALE V1.8.27
+// LE NID DES PRONOS — APP PRINCIPALE V1.8.28
 // ============================================================
 
 const H = window.Helpers;
@@ -475,7 +475,7 @@ const App = {
           <div>
             <p class="eyebrow">Crédits cachés</p>
             <h2 id="creditsTitle">Le Nid des Pronos</h2>
-            <p class="muted">Version publique <strong>1.8.27</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
+            <p class="muted">Version publique <strong>1.8.28</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
           </div>
         </div>
         <div class="credits-grid">
@@ -492,7 +492,7 @@ const App = {
             <p><strong>1.0.5</strong> — dashboard mobile/desktop stabilisé, sans chevauchement des cartes.</p>
           </section>
           <section>
-            <h3>Évolutions V1.8.27</h3>
+            <h3>Évolutions V1.8.28</h3>
             <ul class="changelog-list">
               <li>Le super admin peut désactiver ou réactiver l’affichage du module préparation.</li>
               <li>Quand la préparation est désactivée, les matchs test disparaissent des matchs/pronos, classements par phase et règles.</li>
@@ -1240,7 +1240,7 @@ const App = {
 
 
   async loadVisiblePredictions() {
-    // V1.8.27 — IMPORTANT : Supabase REST renvoie 1000 lignes max par requête.
+    // V1.8.28 — IMPORTANT : Supabase REST renvoie 1000 lignes max par requête.
     // Le classement général est agrégé en base, mais les détails joueurs et le classement Famille
     // repartent des pronos visibles côté front. On pagine donc toute la vue, sinon les détails
     // s'arrêtent après les premiers paquets de matchs/joueurs.
@@ -5058,6 +5058,7 @@ const App = {
     let touchStartY = 0;
     let touchStartLeft = 0;
     let touchDragging = false;
+    let touchLastDx = 0;
 
     const stop = () => {
       isDown = false;
@@ -5087,6 +5088,7 @@ const App = {
       touchStartY = touch.clientY;
       touchStartLeft = scroller.scrollLeft;
       touchDragging = false;
+      touchLastDx = 0;
     }, { passive: true });
 
     scroller.addEventListener("touchmove", (event) => {
@@ -5094,14 +5096,21 @@ const App = {
       const touch = event.touches[0];
       const dx = touch.clientX - touchStartX;
       const dy = touch.clientY - touchStartY;
+      touchLastDx = dx;
       if (!touchDragging && Math.abs(dx) > Math.abs(dy) + 6) touchDragging = true;
       if (!touchDragging) return;
       event.preventDefault();
       scroller.scrollLeft = touchStartLeft - dx;
     }, { passive: false });
 
-    scroller.addEventListener("touchend", () => { touchDragging = false; }, { passive: true });
-    scroller.addEventListener("touchcancel", () => { touchDragging = false; }, { passive: true });
+    scroller.addEventListener("touchend", () => {
+      if (touchDragging && Math.abs(touchLastDx) > 56) {
+        this.stepFinalBracket(touchLastDx < 0 ? 1 : -1);
+      }
+      touchDragging = false;
+      touchLastDx = 0;
+    }, { passive: true });
+    scroller.addEventListener("touchcancel", () => { touchDragging = false; touchLastDx = 0; }, { passive: true });
     scroller.addEventListener("pointerup", stop);
     scroller.addEventListener("pointercancel", stop);
     scroller.addEventListener("mouseleave", stop);
@@ -5124,6 +5133,18 @@ const App = {
     }, 70);
   },
 
+  stepFinalBracket(direction = 0) {
+    const configs = this.finalBracketRoundConfigs();
+    const currentRound = this.state.finalBracketActiveRound || H.$("#finalBracketScroll .final-focus-board")?.dataset?.activeRound || configs[0]?.key;
+    const currentIndex = Math.max(0, configs.findIndex((config) => config.key === currentRound));
+    const nextIndex = Math.min(configs.length - 1, Math.max(0, currentIndex + Number(direction || 0)));
+    const nextKey = configs[nextIndex]?.key || currentRound;
+    if (nextKey === currentRound) return;
+    this.state.finalBracketActiveRound = nextKey;
+    this.state.finalBracketSlideDirection = direction < 0 ? "left" : "right";
+    this.renderWorldCupFinals();
+  },
+
   bindFinalBracketControls() {
     const scroller = H.$("#finalBracketScroll");
     if (!scroller) return;
@@ -5132,14 +5153,8 @@ const App = {
       if (button.dataset.finalStepBound === "true") return;
       button.dataset.finalStepBound = "true";
       button.addEventListener("click", () => {
-        const configs = this.finalBracketRoundConfigs();
-        const currentRound = this.state.finalBracketActiveRound || scroller.querySelector(".final-focus-board")?.dataset?.activeRound || configs[0]?.key;
-        const currentIndex = Math.max(0, configs.findIndex((config) => config.key === currentRound));
         const direction = Number(button.dataset.finalStep || 0);
-        const nextIndex = Math.min(configs.length - 1, Math.max(0, currentIndex + direction));
-        this.state.finalBracketActiveRound = configs[nextIndex]?.key || currentRound;
-        this.state.finalBracketSlideDirection = direction < 0 ? "left" : "right";
-        this.renderWorldCupFinals();
+        this.stepFinalBracket(direction);
       });
     });
 
@@ -5680,23 +5695,35 @@ const App = {
     `;
   },
 
+  finalFocusWindowWidth(activeKey) {
+    const widths = {
+      round_of_32: 980,
+      round_of_16: 970,
+      quarter_final: 950,
+      semi_final: 930,
+      final: 920
+    };
+    return widths[activeKey] || 960;
+  },
+
   finalFocusBracketHtml(matchMap, activeRound) {
     const configs = this.finalBracketRoundConfigs();
     const activeConfig = configs.find((config) => config.key === activeRound) || configs[0];
     const activeIndex = Math.max(0, configs.findIndex((config) => config.key === activeConfig.key));
     const slideClass = this.state.finalBracketSlideDirection === "left" ? "slide-left" : this.state.finalBracketSlideDirection === "right" ? "slide-right" : "";
+    const visibleWindow = this.finalFocusWindowWidth(activeConfig.key);
     return `
       <section class="final-focus-shell final-tournament-shell ${slideClass}" aria-label="Tableau de la phase finale par tour">
         <header class="final-focus-head final-tournament-head">
           <div>
             <strong>${H.escapeHtml(activeConfig.title)}</strong>
-            <span>La colonne centrée s’ouvre en détail, les autres restent compactes. Les traits gardent le chemin des qualifiés jusqu’à la finale.</span>
+            <span>Jamais tout le tableau d’un coup : on voit une fenêtre de 3 colonnes, la colonne active s’ouvre en détail et les autres restent compactes. Les liaisons gardent le chemin des qualifiés.</span>
           </div>
           <span class="pill neutral">Vue active : ${H.escapeHtml(activeConfig.label)}</span>
         </header>
         <button type="button" class="final-tournament-nav final-tournament-nav-left" data-final-step="-1" ${activeIndex <= 0 ? "disabled" : ""} aria-label="Tour précédent">‹</button>
         <button type="button" class="final-tournament-nav final-tournament-nav-right" data-final-step="1" ${activeIndex >= configs.length - 1 ? "disabled" : ""} aria-label="Tour suivant">›</button>
-        <div class="final-tournament-window" id="finalBracketScroll" tabindex="0">
+        <div class="final-tournament-window" id="finalBracketScroll" tabindex="0" style="--focus-window-width:${visibleWindow}px;">
           <div class="final-focus-board final-tournament-board" data-active-round="${H.escapeHtml(activeConfig.key)}">
             ${configs.map((config, index) => this.finalFocusStageColumnHtml(matchMap, config, activeConfig.key, index)).join("")}
           </div>
@@ -10385,7 +10412,7 @@ const App = {
           </div>
           <div class="profile-account-actions">
             <button class="ghost-btn" id="profileInstallAppBtn" type="button">Installer l’app</button>
-            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.8.27</button>
+            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.8.28</button>
             <button class="danger-btn" id="profileLogoutBtn" type="button">Déconnexion</button>
           </div>
         </div>
