@@ -18728,7 +18728,7 @@ body[data-current-view] {
 }
 
 /* ============================================================
-   V1.8.24 — Phase finale par emplacement + scroll propre
+   V1.8.25 — Phase finale par emplacement + scroll propre
    ============================================================ */
 .group-table tr.eliminated-zone {
   background: linear-gradient(90deg, rgba(239, 68, 68, .26), rgba(239, 68, 68, .10)) !important;
@@ -18935,7 +18935,7 @@ body[data-current-view] {
 }
 
 /* ============================================================
-   V1.8.24 — Phase finale lisible en blocs de continuité
+   V1.8.25 — Phase finale lisible en blocs de continuité
    ============================================================ */
 .final-bracket-road-shell {
   display: block !important;
@@ -19228,7 +19228,7 @@ body[data-current-view] {
 }
 
 /* =====================================================
-   V1.8.24 — Phase finale format officiel desktop/mobile
+   V1.8.25 — Phase finale format officiel desktop/mobile
    ===================================================== */
 .final-bracket-official {
   border: 1px solid rgba(255, 212, 59, 0.18);
@@ -19465,7 +19465,7 @@ body[data-current-view] {
 }
 
 /* =====================================================
-   V1.8.24 — Phase finale verticale sans chevauchement
+   V1.8.25 — Phase finale verticale sans chevauchement
    ===================================================== */
 .final-bracket-vertical-shell {
   position: relative;
@@ -19763,7 +19763,7 @@ body[data-current-view] {
 }
 
 /* =====================================================
-   V1.8.24 — Phase finale par tour actif + messages éditables
+   V1.8.25 — Phase finale par tour actif + messages éditables
    ===================================================== */
 .final-focus-shell {
   border: 1px solid rgba(255, 212, 59, 0.22);
@@ -20039,7 +20039,7 @@ body[data-current-view] {
 }
 
 /* =====================================================
-   V1.8.24 — Phase finale : une seule rangée d'onglets + scroll mobile
+   V1.8.25 — Phase finale : une seule rangée d'onglets + scroll mobile
    ===================================================== */
 .final-focus-tabs {
   display: none !important;
@@ -20142,7 +20142,7 @@ body[data-current-view] {
 }
 
 /* =====================================================
-   V1.8.24 — Phase finale : colonnes compactes + vrai swipe mobile
+   V1.8.25 — Phase finale : colonnes compactes + vrai swipe mobile
    ===================================================== */
 .final-focus-shell {
   overflow-x: auto !important;

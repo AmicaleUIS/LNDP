@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — APP PRINCIPALE V1.8.24
+// LE NID DES PRONOS — APP PRINCIPALE V1.8.25
 // ============================================================
 
 const H = window.Helpers;
@@ -475,7 +475,7 @@ const App = {
           <div>
             <p class="eyebrow">Crédits cachés</p>
             <h2 id="creditsTitle">Le Nid des Pronos</h2>
-            <p class="muted">Version publique <strong>1.8.24</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
+            <p class="muted">Version publique <strong>1.8.25</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
           </div>
         </div>
         <div class="credits-grid">
@@ -492,7 +492,7 @@ const App = {
             <p><strong>1.0.5</strong> — dashboard mobile/desktop stabilisé, sans chevauchement des cartes.</p>
           </section>
           <section>
-            <h3>Évolutions V1.8.24</h3>
+            <h3>Évolutions V1.8.25</h3>
             <ul class="changelog-list">
               <li>Le super admin peut désactiver ou réactiver l’affichage du module préparation.</li>
               <li>Quand la préparation est désactivée, les matchs test disparaissent des matchs/pronos, classements par phase et règles.</li>
@@ -1240,7 +1240,7 @@ const App = {
 
 
   async loadVisiblePredictions() {
-    // V1.8.24 — IMPORTANT : Supabase REST renvoie 1000 lignes max par requête.
+    // V1.8.25 — IMPORTANT : Supabase REST renvoie 1000 lignes max par requête.
     // Le classement général est agrégé en base, mais les détails joueurs et le classement Famille
     // repartent des pronos visibles côté front. On pagine donc toute la vue, sinon les détails
     // s'arrêtent après les premiers paquets de matchs/joueurs.
@@ -5172,12 +5172,61 @@ const App = {
     return [matches.slice(0, midpoint), matches.slice(midpoint)];
   },
 
+  finalBracketStageChronologicalNumbers(stage) {
+    const map = {
+      round_of_32: [73, 76, 74, 75, 78, 77, 79, 80, 82, 81, 84, 83, 85, 88, 86, 87],
+      round_of_16: [90, 89, 91, 92, 93, 94, 95, 96],
+      quarter_final: [97, 98, 99, 100],
+      semi_final: [101, 102],
+      third_place: [103],
+      final: [104]
+    };
+    return map[stage] || [];
+  },
+
+  finalBracketStableMatchNumber(match, usedNumbers = new Set()) {
+    const direct = H.officialBracketMatchNumber?.(match);
+    if (direct && !usedNumbers.has(direct)) return direct;
+    return null;
+  },
+
   finalBracketMatchMap(byStage = {}) {
     const map = new Map();
+    const usedMatchKeys = new Set();
+    const matchKey = (match) => String(match?.id || `${match?.stage || ""}|${match?.kickoff_at || ""}|${match?.home_team_id || ""}|${match?.away_team_id || ""}`);
+
+    // 1) Priorité aux numéros explicites ou visibles dans les placeholders (M76, Match 76...).
     Object.values(byStage).flat().forEach((match) => {
-      const number = H.officialBracketMatchNumber?.(match);
-      if (number && !map.has(number)) map.set(number, match);
+      const number = this.finalBracketStableMatchNumber(match, map);
+      if (number && !map.has(number)) {
+        map.set(number, match);
+        usedMatchKeys.add(matchKey(match));
+      }
     });
+
+    // 2) Filet de sécurité : quand l'admin remplace les deux placeholders par deux vraies équipes,
+    // le texte ne contient plus “M76 / Match 76”. On réattribue alors les trous par ordre chronologique
+    // officiel du tour. Cela évite que M76, M78, etc. repassent en “À définir”.
+    Object.entries(byStage).forEach(([stage, matches]) => {
+      const officialNumbers = this.finalBracketStageChronologicalNumbers(stage);
+      if (!officialNumbers.length) return;
+      const freeNumbers = officialNumbers.filter((number) => !map.has(number));
+      if (!freeNumbers.length) return;
+
+      const unmatched = (matches || [])
+        .filter((match) => !usedMatchKeys.has(matchKey(match)))
+        .sort((a, b) => new Date(a.kickoff_at || 0) - new Date(b.kickoff_at || 0)
+          || String(a.id || "").localeCompare(String(b.id || "")));
+
+      unmatched.forEach((match, index) => {
+        const number = freeNumbers[index];
+        if (number && !map.has(number)) {
+          map.set(number, match);
+          usedMatchKeys.add(matchKey(match));
+        }
+      });
+    });
+
     return map;
   },
 
@@ -10315,7 +10364,7 @@ const App = {
           </div>
           <div class="profile-account-actions">
             <button class="ghost-btn" id="profileInstallAppBtn" type="button">Installer l’app</button>
-            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.8.24</button>
+            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.8.25</button>
             <button class="danger-btn" id="profileLogoutBtn" type="button">Déconnexion</button>
           </div>
         </div>
