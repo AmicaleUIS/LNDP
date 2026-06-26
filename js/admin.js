@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — ADMIN V1.8.25
+// LE NID DES PRONOS — ADMIN V1.8.27
 // ============================================================
 
 const H = window.Helpers;
@@ -84,7 +84,7 @@ const Admin = {
       p_category: category,
       p_details: details || {},
       p_metadata: {
-        app_version: "1.8.25",
+        app_version: "1.8.27",
         source: "admin_front"
       }
     });
@@ -533,6 +533,121 @@ const Admin = {
         </div>
       </details>
     `;
+  },
+
+  finalBracketNumber(match = {}) {
+    return H.officialBracketMatchNumber?.(match) || null;
+  },
+
+  finalBracketMatchMap(matches = this.state.matches || []) {
+    const map = new Map();
+    (matches || []).forEach((match) => {
+      const number = this.finalBracketNumber(match);
+      if (number && !map.has(number)) map.set(number, match);
+    });
+    return map;
+  },
+
+  scoreNumber(value) {
+    const number = Number(value);
+    return Number.isFinite(number) ? number : null;
+  },
+
+  finalBracketWinnerTeamId(match = {}) {
+    if (!match || match.status !== "finished") return null;
+    if (match.winner_team_id) return match.winner_team_id;
+    const home = this.scoreNumber(match.home_score);
+    const away = this.scoreNumber(match.away_score);
+    if (home === null || away === null) return null;
+    if (home > away) return match.home_team_id || null;
+    if (away > home) return match.away_team_id || null;
+    return null;
+  },
+
+  finalBracketLoserTeamId(match = {}) {
+    if (!match || match.status !== "finished") return null;
+    const winner = this.finalBracketWinnerTeamId(match);
+    if (!winner) return null;
+    if (String(winner) === String(match.home_team_id)) return match.away_team_id || null;
+    if (String(winner) === String(match.away_team_id)) return match.home_team_id || null;
+    return null;
+  },
+
+  finalBracketQualifiedTeamId(match = {}, mode = "winner") {
+    return mode === "loser"
+      ? this.finalBracketLoserTeamId(match)
+      : this.finalBracketWinnerTeamId(match);
+  },
+
+  async propagateFinalBracketTeams(source = "manual") {
+    const progression = H.finalBracketProgressionMap?.() || {};
+    const order = H.finalBracketProgressionOrder?.() || Object.keys(progression).map(Number).sort((a, b) => a - b);
+    if (!order.length) return 0;
+
+    const matchMap = this.finalBracketMatchMap();
+    let changedCount = 0;
+
+    for (const targetNumber of order) {
+      const rule = progression[targetNumber];
+      const target = matchMap.get(Number(targetNumber));
+      if (!rule || !target) continue;
+
+      const [sourceA, sourceB] = rule.sources || [];
+      const matchA = matchMap.get(Number(sourceA));
+      const matchB = matchMap.get(Number(sourceB));
+      if (!matchA || !matchB) continue;
+
+      const nextHomeId = this.finalBracketQualifiedTeamId(matchA, rule.use);
+      const nextAwayId = this.finalBracketQualifiedTeamId(matchB, rule.use);
+      if (!nextHomeId || !nextAwayId) continue;
+
+      const alreadyOk = String(target.home_team_id || "") === String(nextHomeId)
+        && String(target.away_team_id || "") === String(nextAwayId);
+      if (alreadyOk) continue;
+
+      const payload = {
+        home_team_id: nextHomeId,
+        away_team_id: nextAwayId
+      };
+
+      const { error } = await window.sb
+        .from("matches")
+        .update(payload)
+        .eq("id", target.id);
+
+      if (error) {
+        console.warn("Propagation phase finale impossible", { targetNumber, sourceA, sourceB, error });
+        continue;
+      }
+
+      target.home_team_id = nextHomeId;
+      target.away_team_id = nextAwayId;
+      changedCount += 1;
+
+      if (this.isSuperAdmin()) {
+        await this.logAdminAction("auto_propagate_final_bracket", "match", {
+          source,
+          target_match_number: targetNumber,
+          from_matches: [sourceA, sourceB],
+          propagation_mode: rule.use,
+          home_team_id: nextHomeId,
+          away_team_id: nextAwayId
+        }).catch(() => {});
+      }
+    }
+
+    if (changedCount) {
+      H.toast(`${changedCount} match${changedCount > 1 ? "s" : ""} de phase finale mis à jour automatiquement`, "success");
+    }
+
+    return changedCount;
+  },
+
+  async reloadAndPropagateFinalBracket(source = "manual") {
+    await this.loadMatches();
+    const changed = await this.propagateFinalBracketTeams(source);
+    if (changed) await this.loadMatches();
+    return changed;
   },
 
 
@@ -2520,6 +2635,7 @@ const Admin = {
       home_score: homeScore,
       away_score: awayScore
     });
+    await this.reloadAndPropagateFinalBracket("quick_score");
     H.toast(status === "finished" ? "Score enregistré et match terminé" : "Match enregistré", "success");
     await this.reloadAll();
   },
@@ -2542,7 +2658,7 @@ const Admin = {
             const canScore = this.canScoreMatch(match);
             const scoreDisabled = canScore ? "" : "disabled";
             return `
-              <article class="admin-row match-admin-row status-${H.escapeHtml(match.status || "scheduled")}" data-match-id="${match.id}" data-kickoff-at="${H.escapeHtml(match.kickoff_at || "")}">
+              <article class="admin-row match-admin-row status-${H.escapeHtml(match.status || "scheduled")}" data-match-id="${match.id}" data-home-team-id="${match.home_team_id}" data-away-team-id="${match.away_team_id}" data-stage="${match.stage}" data-kickoff-at="${H.escapeHtml(match.kickoff_at || "")}">
                 <div class="admin-main">
                   <strong>${H.matchFlagHtml(match, "home")} ${H.escapeHtml(match.home_team_name)} - ${H.matchFlagHtml(match, "away")} ${H.escapeHtml(match.away_team_name)}</strong>
                   <small>${H.formatDateTime(match.kickoff_at)} · ${H.shortPoolRoundLabel(match)} · ${H.statusLabel(match.status)} · <span class="admin-location-line">${H.matchLocationHtml(match, true)}</span></small>
@@ -2589,7 +2705,7 @@ const Admin = {
     const status = row.querySelector(".match-status").value;
     const homeScore = homeScoreRaw === "" ? null : Number(homeScoreRaw);
     const awayScore = awayScoreRaw === "" ? null : Number(awayScoreRaw);
-    const winnerTeamId = row.querySelector(".match-winner").value || null;
+    let winnerTeamId = row.querySelector(".match-winner").value || null;
     const infoPayload = this.matchInfoPayloadFromRow(row, "match");
     const effectiveKickoffAt = infoPayload.kickoff_at || row.dataset.kickoffAt;
     const isDemoMatch = row.dataset.isLiveDemoMatch === "true";
@@ -2607,9 +2723,23 @@ const Admin = {
 
     const homeTeamSelect = row.querySelector(".match-home-team-id");
     const awayTeamSelect = row.querySelector(".match-away-team-id");
+    const effectiveHomeTeamId = homeTeamSelect?.value || row.dataset.homeTeamId || null;
+    const effectiveAwayTeamId = awayTeamSelect?.value || row.dataset.awayTeamId || null;
+
+    if (homeScore !== null && awayScore !== null) {
+      if (homeScore > awayScore) winnerTeamId = effectiveHomeTeamId || winnerTeamId;
+      if (awayScore > homeScore) winnerTeamId = effectiveAwayTeamId || winnerTeamId;
+      if (homeScore === awayScore && row.dataset.stage === "group") winnerTeamId = null;
+    }
+
+    if (status === "finished" && row.dataset.stage !== "group" && homeScore === awayScore && !winnerTeamId) {
+      H.toast("Choisis le qualifié pour ce match à élimination directe.", "error");
+      return;
+    }
+
     const manualTeamPayload = {};
-    if (homeTeamSelect) manualTeamPayload.home_team_id = homeTeamSelect.value || null;
-    if (awayTeamSelect) manualTeamPayload.away_team_id = awayTeamSelect.value || null;
+    if (homeTeamSelect) manualTeamPayload.home_team_id = effectiveHomeTeamId;
+    if (awayTeamSelect) manualTeamPayload.away_team_id = effectiveAwayTeamId;
 
     const payload = {
       status,
@@ -2638,6 +2768,7 @@ const Admin = {
       home_score: homeScore,
       away_score: awayScore
     });
+    await this.reloadAndPropagateFinalBracket("match_admin");
     H.toast("Match mis à jour", "success");
     await this.reloadAll();
   },
@@ -2869,7 +3000,7 @@ const Admin = {
 
     const { data, error } = await window.sb.rpc("admin_clean_start_preserve_predictions", { p_confirm: "DEPART PROPRE" });
     if (error) {
-      H.toast(error.message || "Reset classements impossible. Lance le patch SQL V1.8.25.", "error");
+      H.toast(error.message || "Reset classements impossible. Lance le patch SQL V1.8.27.", "error");
       return;
     }
 

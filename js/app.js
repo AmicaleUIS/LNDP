@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — APP PRINCIPALE V1.8.25
+// LE NID DES PRONOS — APP PRINCIPALE V1.8.27
 // ============================================================
 
 const H = window.Helpers;
@@ -475,7 +475,7 @@ const App = {
           <div>
             <p class="eyebrow">Crédits cachés</p>
             <h2 id="creditsTitle">Le Nid des Pronos</h2>
-            <p class="muted">Version publique <strong>1.8.25</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
+            <p class="muted">Version publique <strong>1.8.27</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
           </div>
         </div>
         <div class="credits-grid">
@@ -492,7 +492,7 @@ const App = {
             <p><strong>1.0.5</strong> — dashboard mobile/desktop stabilisé, sans chevauchement des cartes.</p>
           </section>
           <section>
-            <h3>Évolutions V1.8.25</h3>
+            <h3>Évolutions V1.8.27</h3>
             <ul class="changelog-list">
               <li>Le super admin peut désactiver ou réactiver l’affichage du module préparation.</li>
               <li>Quand la préparation est désactivée, les matchs test disparaissent des matchs/pronos, classements par phase et règles.</li>
@@ -1240,7 +1240,7 @@ const App = {
 
 
   async loadVisiblePredictions() {
-    // V1.8.25 — IMPORTANT : Supabase REST renvoie 1000 lignes max par requête.
+    // V1.8.27 — IMPORTANT : Supabase REST renvoie 1000 lignes max par requête.
     // Le classement général est agrégé en base, mais les détails joueurs et le classement Famille
     // repartent des pronos visibles côté front. On pagine donc toute la vue, sinon les détails
     // s'arrêtent après les premiers paquets de matchs/joueurs.
@@ -5115,20 +5115,34 @@ const App = {
     if (!activeRound) return;
 
     window.setTimeout(() => {
-      const activeStage = scroller.querySelector(`.final-focus-stage.stage-${CSS.escape(activeRound)}`);
+      const safeRound = window.CSS?.escape ? CSS.escape(activeRound) : String(activeRound).replace(/[^a-z0-9_-]/gi, "");
+      const activeStage = scroller.querySelector(`.final-focus-stage.stage-${safeRound}`);
       if (!activeStage) return;
-      const isSmallScreen = window.matchMedia?.("(max-width: 900px)")?.matches;
       const maxLeft = Math.max(0, scroller.scrollWidth - scroller.clientWidth);
-      const desiredLeft = isSmallScreen
-        ? activeStage.offsetLeft - 14
-        : Math.max(0, activeStage.offsetLeft - 24);
+      const desiredLeft = activeStage.offsetLeft - Math.max(0, (scroller.clientWidth - activeStage.offsetWidth) / 2);
       scroller.scrollTo({ left: Math.min(maxLeft, Math.max(0, desiredLeft)), behavior: "smooth" });
-    }, 40);
+    }, 70);
   },
 
   bindFinalBracketControls() {
     const scroller = H.$("#finalBracketScroll");
     if (!scroller) return;
+
+    H.$$('[data-final-step]').forEach((button) => {
+      if (button.dataset.finalStepBound === "true") return;
+      button.dataset.finalStepBound = "true";
+      button.addEventListener("click", () => {
+        const configs = this.finalBracketRoundConfigs();
+        const currentRound = this.state.finalBracketActiveRound || scroller.querySelector(".final-focus-board")?.dataset?.activeRound || configs[0]?.key;
+        const currentIndex = Math.max(0, configs.findIndex((config) => config.key === currentRound));
+        const direction = Number(button.dataset.finalStep || 0);
+        const nextIndex = Math.min(configs.length - 1, Math.max(0, currentIndex + direction));
+        this.state.finalBracketActiveRound = configs[nextIndex]?.key || currentRound;
+        this.state.finalBracketSlideDirection = direction < 0 ? "left" : "right";
+        this.renderWorldCupFinals();
+      });
+    });
+
     H.$$('[data-final-scroll]').forEach((button) => {
       if (button.dataset.finalScrollBound === "true") return;
       button.dataset.finalScrollBound = "true";
@@ -5669,35 +5683,42 @@ const App = {
   finalFocusBracketHtml(matchMap, activeRound) {
     const configs = this.finalBracketRoundConfigs();
     const activeConfig = configs.find((config) => config.key === activeRound) || configs[0];
+    const activeIndex = Math.max(0, configs.findIndex((config) => config.key === activeConfig.key));
+    const slideClass = this.state.finalBracketSlideDirection === "left" ? "slide-left" : this.state.finalBracketSlideDirection === "right" ? "slide-right" : "";
     return `
-      <section class="final-focus-shell" id="finalBracketScroll" aria-label="Tableau de la phase finale par tour" tabindex="0">
-        <header class="final-focus-head">
+      <section class="final-focus-shell final-tournament-shell ${slideClass}" aria-label="Tableau de la phase finale par tour">
+        <header class="final-focus-head final-tournament-head">
           <div>
             <strong>${H.escapeHtml(activeConfig.title)}</strong>
-            <span>Cartes détaillées pour le tour sélectionné. Les autres tours restent compacts pour garder le chemin jusqu’à la finale.</span>
+            <span>La colonne centrée s’ouvre en détail, les autres restent compactes. Les traits gardent le chemin des qualifiés jusqu’à la finale.</span>
           </div>
           <span class="pill neutral">Vue active : ${H.escapeHtml(activeConfig.label)}</span>
         </header>
-        <div class="final-focus-board" data-active-round="${H.escapeHtml(activeRound)}">
-          ${configs.map((config) => this.finalFocusStageColumnHtml(matchMap, config, activeRound)).join("")}
+        <button type="button" class="final-tournament-nav final-tournament-nav-left" data-final-step="-1" ${activeIndex <= 0 ? "disabled" : ""} aria-label="Tour précédent">‹</button>
+        <button type="button" class="final-tournament-nav final-tournament-nav-right" data-final-step="1" ${activeIndex >= configs.length - 1 ? "disabled" : ""} aria-label="Tour suivant">›</button>
+        <div class="final-tournament-window" id="finalBracketScroll" tabindex="0">
+          <div class="final-focus-board final-tournament-board" data-active-round="${H.escapeHtml(activeConfig.key)}">
+            ${configs.map((config, index) => this.finalFocusStageColumnHtml(matchMap, config, activeConfig.key, index)).join("")}
+          </div>
         </div>
       </section>
     `;
   },
 
-  finalFocusStageColumnHtml(matchMap, config, activeRound) {
+  finalFocusStageColumnHtml(matchMap, config, activeRound, stageIndex = 0) {
     const isActive = config.key === activeRound;
+    const complete = this.isFinalRoundComplete(matchMap, config);
     return `
-      <section class="final-focus-stage ${isActive ? "is-active" : "is-compact"} stage-${H.escapeHtml(config.key)}" aria-label="${H.escapeHtml(config.title)}">
+      <section class="final-focus-stage ${isActive ? "is-active" : "is-compact"} stage-${H.escapeHtml(config.key)}" data-stage-index="${stageIndex}" aria-label="${H.escapeHtml(config.title)}">
         <button type="button" class="final-focus-stage-title ${isActive ? "active" : ""}" data-final-round="${H.escapeHtml(config.key)}" aria-selected="${isActive ? "true" : "false"}">
           <span>${H.escapeHtml(config.label)}</span>
-          <small>${this.isFinalRoundComplete(matchMap, config) ? "terminé" : H.escapeHtml(config.shortLabel)}</small>
+          <small>${complete ? "terminé" : H.escapeHtml(config.shortLabel)}</small>
         </button>
         <div class="final-focus-stage-grid">
           ${config.numbers.map((number, index) => {
             const rowStart = config.rowStart(index);
             const span = config.rowSpan;
-            return `<div class="final-focus-slot" style="grid-row:${rowStart} / span ${span};">
+            return `<div class="final-focus-slot slot-m${number}" data-match-number="${number}" style="grid-row:${rowStart} / span ${span};">
               ${this.finalFocusMatchCardHtml(matchMap, number, config, isActive)}
             </div>`;
           }).join("")}
@@ -5756,9 +5777,9 @@ const App = {
       <article class="final-focus-match ${detailed ? "detailed" : "compact"} placeholder">
         <small>${H.escapeHtml(title)}</small>
         <div class="final-focus-compact-teams">
-          <span><span class="flag-mini placeholder-flag"></span><strong>À définir</strong></span>
+          <span><span class="flag-mini placeholder-flag"></span><strong>Équipe pas encore éclose</strong></span>
           <b>vs</b>
-          <span><span class="flag-mini placeholder-flag"></span><strong>À définir</strong></span>
+          <span><span class="flag-mini placeholder-flag"></span><strong>Équipe pas encore éclose</strong></span>
         </div>
       </article>
     `;
@@ -10364,7 +10385,7 @@ const App = {
           </div>
           <div class="profile-account-actions">
             <button class="ghost-btn" id="profileInstallAppBtn" type="button">Installer l’app</button>
-            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.8.25</button>
+            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.8.27</button>
             <button class="danger-btn" id="profileLogoutBtn" type="button">Déconnexion</button>
           </div>
         </div>

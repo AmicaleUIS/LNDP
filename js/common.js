@@ -646,6 +646,35 @@ function finalBracketLayout() {
   };
 }
 
+function finalBracketProgressionMap() {
+  return {
+    90: { sources: [73, 75], use: "winner" },
+    89: { sources: [74, 77], use: "winner" },
+    93: { sources: [83, 84], use: "winner" },
+    94: { sources: [81, 82], use: "winner" },
+    91: { sources: [76, 78], use: "winner" },
+    92: { sources: [79, 80], use: "winner" },
+    95: { sources: [86, 88], use: "winner" },
+    96: { sources: [85, 87], use: "winner" },
+    97: { sources: [90, 89], use: "winner" },
+    98: { sources: [93, 94], use: "winner" },
+    99: { sources: [91, 92], use: "winner" },
+    100: { sources: [95, 96], use: "winner" },
+    101: { sources: [97, 98], use: "winner" },
+    102: { sources: [99, 100], use: "winner" },
+    103: { sources: [101, 102], use: "loser" },
+    104: { sources: [101, 102], use: "winner" }
+  };
+}
+
+function finalBracketProgressionOrder() {
+  return [90, 89, 93, 94, 91, 92, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104];
+}
+
+function finalBracketProgressionRule(number) {
+  return finalBracketProgressionMap()[Number(number)] || null;
+}
+
 function resultIcon(row) {
   if (!row || row.points_total === null || row.points_total === undefined) return "";
   if (row.is_exact_score) return icon("target", "Score exact");
@@ -666,6 +695,9 @@ window.Helpers = {
   officialBracketSortValue,
   officialBracketDisplayOrder,
   finalBracketLayout,
+  finalBracketProgressionMap,
+  finalBracketProgressionOrder,
+  finalBracketProgressionRule,
   poolRoundLabel,
   shortPoolRoundLabel,
   groupMatchesByPouleRound,
