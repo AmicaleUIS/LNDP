@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — APP PRINCIPALE V1.8.28
+// LE NID DES PRONOS — APP PRINCIPALE V1.8.29
 // ============================================================
 
 const H = window.Helpers;
@@ -475,7 +475,7 @@ const App = {
           <div>
             <p class="eyebrow">Crédits cachés</p>
             <h2 id="creditsTitle">Le Nid des Pronos</h2>
-            <p class="muted">Version publique <strong>1.8.28</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
+            <p class="muted">Version publique <strong>1.8.29</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
           </div>
         </div>
         <div class="credits-grid">
@@ -492,7 +492,7 @@ const App = {
             <p><strong>1.0.5</strong> — dashboard mobile/desktop stabilisé, sans chevauchement des cartes.</p>
           </section>
           <section>
-            <h3>Évolutions V1.8.28</h3>
+            <h3>Évolutions V1.8.29</h3>
             <ul class="changelog-list">
               <li>Le super admin peut désactiver ou réactiver l’affichage du module préparation.</li>
               <li>Quand la préparation est désactivée, les matchs test disparaissent des matchs/pronos, classements par phase et règles.</li>
@@ -1240,7 +1240,7 @@ const App = {
 
 
   async loadVisiblePredictions() {
-    // V1.8.28 — IMPORTANT : Supabase REST renvoie 1000 lignes max par requête.
+    // V1.8.29 — IMPORTANT : Supabase REST renvoie 1000 lignes max par requête.
     // Le classement général est agrégé en base, mais les détails joueurs et le classement Famille
     // repartent des pronos visibles côté front. On pagine donc toute la vue, sinon les détails
     // s'arrêtent après les premiers paquets de matchs/joueurs.
@@ -5710,29 +5710,31 @@ const App = {
     const configs = this.finalBracketRoundConfigs();
     const activeConfig = configs.find((config) => config.key === activeRound) || configs[0];
     const activeIndex = Math.max(0, configs.findIndex((config) => config.key === activeConfig.key));
+    const startIndex = Math.min(Math.max(0, activeIndex - 1), Math.max(0, configs.length - 3));
+    const visibleConfigs = configs.slice(startIndex, startIndex + 3);
     const slideClass = this.state.finalBracketSlideDirection === "left" ? "slide-left" : this.state.finalBracketSlideDirection === "right" ? "slide-right" : "";
-    const visibleWindow = this.finalFocusWindowWidth(activeConfig.key);
+    const rowCount = this.finalFocusVisibleRowCount(startIndex);
     return `
       <section class="final-focus-shell final-tournament-shell ${slideClass}" aria-label="Tableau de la phase finale par tour">
         <header class="final-focus-head final-tournament-head">
           <div>
             <strong>${H.escapeHtml(activeConfig.title)}</strong>
-            <span>Jamais tout le tableau d’un coup : on voit une fenêtre de 3 colonnes, la colonne active s’ouvre en détail et les autres restent compactes. Les liaisons gardent le chemin des qualifiés.</span>
+            <span>Vue façon tableau final : trois colonnes maximum, la colonne active en détail, les autres en repère compact.</span>
           </div>
           <span class="pill neutral">Vue active : ${H.escapeHtml(activeConfig.label)}</span>
         </header>
-        <button type="button" class="final-tournament-nav final-tournament-nav-left" data-final-step="-1" ${activeIndex <= 0 ? "disabled" : ""} aria-label="Tour précédent">‹</button>
-        <button type="button" class="final-tournament-nav final-tournament-nav-right" data-final-step="1" ${activeIndex >= configs.length - 1 ? "disabled" : ""} aria-label="Tour suivant">›</button>
-        <div class="final-tournament-window" id="finalBracketScroll" tabindex="0" style="--focus-window-width:${visibleWindow}px;">
-          <div class="final-focus-board final-tournament-board" data-active-round="${H.escapeHtml(activeConfig.key)}">
-            ${configs.map((config, index) => this.finalFocusStageColumnHtml(matchMap, config, activeConfig.key, index)).join("")}
+        <button type="button" class="final-tournament-nav final-tournament-nav-left" data-final-step="-1" ${activeIndex <= 0 ? "disabled" : ""} aria-label="Tour précédent"><span>‹</span><small>Préc.</small></button>
+        <button type="button" class="final-tournament-nav final-tournament-nav-right" data-final-step="1" ${activeIndex >= configs.length - 1 ? "disabled" : ""} aria-label="Tour suivant"><span>›</span><small>Suiv.</small></button>
+        <div class="final-tournament-window" id="finalBracketScroll" tabindex="0">
+          <div class="final-focus-board final-tournament-board" data-active-round="${H.escapeHtml(activeConfig.key)}" data-window-start="${startIndex}" style="--final-visible-rows:${rowCount};">
+            ${visibleConfigs.map((config, localIndex) => this.finalFocusStageColumnHtml(matchMap, config, activeConfig.key, startIndex + localIndex, startIndex)).join("")}
           </div>
         </div>
       </section>
     `;
   },
 
-  finalFocusStageColumnHtml(matchMap, config, activeRound, stageIndex = 0) {
+  finalFocusStageColumnHtml(matchMap, config, activeRound, stageIndex = 0, windowStart = 0) {
     const isActive = config.key === activeRound;
     const complete = this.isFinalRoundComplete(matchMap, config);
     return `
@@ -5743,9 +5745,8 @@ const App = {
         </button>
         <div class="final-focus-stage-grid">
           ${config.numbers.map((number, index) => {
-            const rowStart = config.rowStart(index);
-            const span = config.rowSpan;
-            return `<div class="final-focus-slot slot-m${number}" data-match-number="${number}" style="grid-row:${rowStart} / span ${span};">
+            const placement = this.finalFocusVisiblePlacement(config.key, index, windowStart, number);
+            return `<div class="final-focus-slot slot-m${number}" data-match-number="${number}" style="grid-row:${placement.rowStart} / span ${placement.rowSpan};">
               ${this.finalFocusMatchCardHtml(matchMap, number, config, isActive)}
             </div>`;
           }).join("")}
@@ -5754,15 +5755,37 @@ const App = {
     `;
   },
 
+  finalFocusVisibleRowCount(windowStart = 0) {
+    if (windowStart <= 0) return 16;
+    if (windowStart === 1) return 8;
+    return 4;
+  },
+
+  finalFocusVisiblePlacement(stageKey, index, windowStart = 0, number = null) {
+    if (windowStart <= 0) {
+      const config = this.finalBracketRoundConfigs().find((item) => item.key === stageKey);
+      return { rowStart: config?.rowStart?.(index) || 1, rowSpan: config?.rowSpan || 1 };
+    }
+    if (windowStart === 1) {
+      if (stageKey === "round_of_16") return { rowStart: index + 1, rowSpan: 1 };
+      if (stageKey === "quarter_final") return { rowStart: index * 2 + 1, rowSpan: 2 };
+      if (stageKey === "semi_final") return { rowStart: index * 4 + 1, rowSpan: 4 };
+    }
+    if (stageKey === "quarter_final") return { rowStart: index + 1, rowSpan: 1 };
+    if (stageKey === "semi_final") return { rowStart: index * 2 + 1, rowSpan: 2 };
+    if (stageKey === "final") return { rowStart: Number(number) === 103 ? 3 : 1, rowSpan: 2 };
+    return { rowStart: index + 1, rowSpan: 1 };
+  },
+
   finalFocusMatchCardHtml(matchMap, number, config, detailed) {
     const match = this.finalBracketMatchByNumber(matchMap, number);
-    const title = `${config.shortLabel} · M${number}`;
+    const title = Number(number) === 103 ? "Petite finale · M103" : Number(number) === 104 ? "Finale · M104" : `${config.shortLabel} · M${number}`;
     if (!match) return this.finalFocusPlaceholderHtml(title, detailed);
 
     const isScored = match.status === "finished" || match.status === "live";
     const score = isScored ? H.scoreText(match.home_score, match.away_score) : "vs";
-    const home = match.home_team_name || "À déterminer";
-    const away = match.away_team_name || "À déterminer";
+    const home = this.finalFocusDisplayTeamName(match.home_team_name, number);
+    const away = this.finalFocusDisplayTeamName(match.away_team_name, number);
     const date = H.formatDateTime(match.kickoff_at);
     const compactDate = this.finalFocusCompactDate(match.kickoff_at);
     const location = [match.city, match.venue].filter(Boolean).join(" · ");
@@ -5797,6 +5820,15 @@ const App = {
         </footer>
       </article>
     `;
+  },
+
+  finalFocusDisplayTeamName(name, number = null) {
+    const clean = String(name || "").trim();
+    if (!clean) return "Équipe pas encore éclose";
+    if (/^à\s*d[ée]finir$/i.test(clean)) return "Équipe pas encore éclose";
+    if (/match\s*\d+\s*[—-]\s*[ée]quipe/i.test(clean)) return "Équipe pas encore éclose";
+    if (number && new RegExp(`^M?${Number(number)}[AB]?$`, "i").test(clean)) return "Équipe pas encore éclose";
+    return clean;
   },
 
   finalFocusPlaceholderHtml(title, detailed = false) {
@@ -5853,8 +5885,9 @@ const App = {
     const title = customTitle || H.stageLabel(match.stage);
     const date = H.formatDateTime(match.kickoff_at);
     const location = [match.city, match.venue].filter(Boolean).join(" · ");
-    const home = match.home_team_name || "À déterminer";
-    const away = match.away_team_name || "À déterminer";
+    const bracketNumber = H.officialBracketMatchNumber?.(match);
+    const home = this.finalFocusDisplayTeamName(match.home_team_name, bracketNumber);
+    const away = this.finalFocusDisplayTeamName(match.away_team_name, bracketNumber);
 
     return `
       <article class="final-bracket-match ${match.status || "scheduled"} ${extraClass}">
@@ -10412,7 +10445,7 @@ const App = {
           </div>
           <div class="profile-account-actions">
             <button class="ghost-btn" id="profileInstallAppBtn" type="button">Installer l’app</button>
-            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.8.28</button>
+            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.8.29</button>
             <button class="danger-btn" id="profileLogoutBtn" type="button">Déconnexion</button>
           </div>
         </div>
