@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — ADMIN V1.8.35
+// LE NID DES PRONOS — ADMIN V1.8.36
 // ============================================================
 
 const H = window.Helpers;
@@ -32,6 +32,8 @@ const Admin = {
     graphMockPreviewEnabled: false,
     homeProgressIncludeTestMatches: false,
     liveDemoMatchEnabled: false,
+    championFirstBonusPoints: 100,
+    championSecondBonusPoints: 50,
     auditLogs: [],
     healthSnapshot: null,
     healthError: null,
@@ -86,7 +88,7 @@ const Admin = {
       p_category: category,
       p_details: details || {},
       p_metadata: {
-        app_version: "1.8.35",
+        app_version: "1.8.36",
         source: "admin_front"
       }
     });
@@ -156,6 +158,7 @@ const Admin = {
     H.$("#toggleGraphMockPreviewBtn")?.addEventListener("click", () => this.toggleGraphMockPreview());
     H.$("#toggleHomeProgressTestMatchesBtn")?.addEventListener("click", () => this.toggleHomeProgressTestMatches());
     H.$("#toggleLiveDemoMatchBtn")?.addEventListener("click", () => this.toggleLiveDemoMatch());
+    H.$("#saveChampionBonusPointsBtn")?.addEventListener("click", () => this.saveChampionBonusPoints());
     this.ensureLiveDemoControls();
     H.$("#fullLaunchResetBtn")?.addEventListener("click", () => this.fullLaunchReset());
     H.$("#cleanStartPreservePredictionsBtn")?.addEventListener("click", () => this.cleanStartPreservePredictions());
@@ -814,6 +817,21 @@ const Admin = {
     return Boolean(value);
   },
 
+  settingNumber(value, fallback = 0) {
+    if (value === undefined || value === null) return fallback;
+    if (typeof value === "number") return Number.isFinite(value) ? value : fallback;
+    if (typeof value === "string") {
+      const parsed = Number(value.replace(",", "."));
+      return Number.isFinite(parsed) ? parsed : fallback;
+    }
+    if (value && typeof value === "object") {
+      const raw = value.points ?? value.value ?? value.amount ?? value.enabled;
+      return this.settingNumber(raw, fallback);
+    }
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : fallback;
+  },
+
 
   async loadOwlMessagesAdmin() {
     if (!this.isSuperAdmin()) {
@@ -858,7 +876,7 @@ const Admin = {
       .in("message_id", messageIds);
 
     if (error) {
-      console.warn("Résultats de sondage Hibou indisponibles : lance le patch SQL V1.8.35", error);
+      console.warn("Résultats de sondage Hibou indisponibles : lance le patch SQL V1.8.36", error);
       this.state.owlPollResults = [];
       return;
     }
@@ -882,7 +900,7 @@ const Admin = {
       .in("message_id", messageIds);
 
     if (error) {
-      console.warn("Détail des votes Hibou indisponible : lance le patch SQL V1.8.35", error);
+      console.warn("Détail des votes Hibou indisponible : lance le patch SQL V1.8.36", error);
       this.state.owlPollVoteDetails = [];
       return;
     }
@@ -894,7 +912,7 @@ const Admin = {
     const { data, error } = await window.sb
       .from("app_settings")
       .select("key,value")
-      .in("key", ["family_mode_enabled", "preparation_module_enabled", "graph_preview_test_matches_enabled", "graph_mock_preview_enabled", "home_progress_include_test_matches", "live_demo_match_enabled", "login_owl_message"]);
+      .in("key", ["family_mode_enabled", "preparation_module_enabled", "graph_preview_test_matches_enabled", "graph_mock_preview_enabled", "home_progress_include_test_matches", "live_demo_match_enabled", "login_owl_message", "champion_bonus_initial_points", "champion_bonus_second_points"]);
 
     if (error) {
       console.warn("Paramètres app indisponibles", error);
@@ -904,6 +922,8 @@ const Admin = {
       this.state.graphMockPreviewEnabled = false;
       this.state.homeProgressIncludeTestMatches = false;
       this.state.liveDemoMatchEnabled = false;
+      this.state.championFirstBonusPoints = 100;
+      this.state.championSecondBonusPoints = 50;
       this.state.loginOwlMessage = null;
       return;
     }
@@ -916,6 +936,8 @@ const Admin = {
     this.state.graphMockPreviewEnabled = this.settingBoolean(settings.graph_mock_preview_enabled, false);
     this.state.homeProgressIncludeTestMatches = this.settingBoolean(settings.home_progress_include_test_matches, false);
     this.state.liveDemoMatchEnabled = this.settingBoolean(settings.live_demo_match_enabled, false);
+    this.state.championFirstBonusPoints = Math.max(0, Math.round(this.settingNumber(settings.champion_bonus_initial_points, 100)));
+    this.state.championSecondBonusPoints = Math.max(0, Math.round(this.settingNumber(settings.champion_bonus_second_points, 50)));
     this.state.loginOwlMessage = settings.login_owl_message || null;
   },
 
@@ -2204,7 +2226,7 @@ Je m’en remets au Hibou">${H.escapeHtml(this.owlPollOptionsText(msg))}</textar
       : window.sb.from("owl_messages").insert(payload);
     const { error } = await request;
     if (error) {
-      H.toast(error.message || "Impossible d’enregistrer le message. Lance le patch SQL V1.8.35.", "error");
+      H.toast(error.message || "Impossible d’enregistrer le message. Lance le patch SQL V1.8.36.", "error");
       return;
     }
 
@@ -3071,6 +3093,9 @@ Je m’en remets au Hibou">${H.escapeHtml(this.owlPollOptionsText(msg))}</textar
     const homeProgressToggle = H.$("#toggleHomeProgressTestMatchesBtn");
     const liveDemoStatus = H.$("#liveDemoMatchStatusText");
     const liveDemoToggle = H.$("#toggleLiveDemoMatchBtn");
+    const championFirstInput = H.$("#championFirstBonusPointsInput");
+    const championSecondInput = H.$("#championSecondBonusPointsInput");
+    const championBonusStatus = H.$("#championBonusPointsStatusText");
 
     if (prepStatus) {
       prepStatus.innerHTML = prepEnabled
@@ -3132,6 +3157,12 @@ Je m’en remets au Hibou">${H.escapeHtml(this.owlPollOptionsText(msg))}</textar
       liveDemoToggle.classList.toggle("ghost-btn", !liveDemoMatchEnabled);
     }
 
+    if (championFirstInput && document.activeElement !== championFirstInput) championFirstInput.value = String(this.state.championFirstBonusPoints ?? 100);
+    if (championSecondInput && document.activeElement !== championSecondInput) championSecondInput.value = String(this.state.championSecondBonusPoints ?? 50);
+    if (championBonusStatus) {
+      championBonusStatus.innerHTML = `<strong>${Number(this.state.championFirstBonusPoints ?? 100)} pts</strong> avant compétition · <strong>${Number(this.state.championSecondBonusPoints ?? 50)} pts</strong> avant phase finale. Les classements suivent ce réglage dès que le patch SQL est lancé.`;
+    }
+
     this.renderLiveDemoScoreInjectBox();
 
     if (!select) return;
@@ -3148,6 +3179,32 @@ Je m’en remets au Hibou">${H.escapeHtml(this.owlPollOptionsText(msg))}</textar
     }).join("");
 
     if (list) list.innerHTML = "";
+  },
+
+  async saveChampionBonusPoints() {
+    const first = Math.max(0, Math.min(500, Math.round(Number(H.$("#championFirstBonusPointsInput")?.value ?? 100))));
+    const second = Math.max(0, Math.min(500, Math.round(Number(H.$("#championSecondBonusPointsInput")?.value ?? 50))));
+    if (!Number.isFinite(first) || !Number.isFinite(second)) {
+      H.toast("Entre deux nombres de points valides.", "error");
+      return;
+    }
+
+    const { error } = await window.sb.rpc("admin_set_champion_bonus_points", {
+      p_initial_points: first,
+      p_second_points: second
+    });
+
+    if (error) {
+      H.toast(error.message || "Impossible d’enregistrer les points bonus. Lance le patch SQL V1.8.36.", "error");
+      return;
+    }
+
+    this.state.championFirstBonusPoints = first;
+    this.state.championSecondBonusPoints = second;
+    await this.loadFamilyModeSetting();
+    this.renderBackups();
+    await this.logAdminAction("set_champion_bonus_points", "settings", { initial_points: first, second_points: second });
+    H.toast(`Bonus champion réglés : ${first} pts / ${second} pts`, "success");
   },
 
   async createBackup() {
@@ -3203,7 +3260,7 @@ Je m’en remets au Hibou">${H.escapeHtml(this.owlPollOptionsText(msg))}</textar
 
     const { data, error } = await window.sb.rpc("admin_clean_start_preserve_predictions", { p_confirm: "DEPART PROPRE" });
     if (error) {
-      H.toast(error.message || "Reset classements impossible. Lance le patch SQL V1.8.35.", "error");
+      H.toast(error.message || "Reset classements impossible. Lance le patch SQL V1.8.36.", "error");
       return;
     }
 

@@ -1,5 +1,5 @@
 -- ============================================================
--- LE NID DES PRONOS — PATCH V1.8.35
+-- LE NID DES PRONOS — PATCH V1.8.36
 -- Sondages Hibou : détail nominatif des votes
 -- ============================================================
 -- Permet d'afficher, côté joueur et côté admin, qui a voté quoi

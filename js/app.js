@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — APP PRINCIPALE V1.8.35
+// LE NID DES PRONOS — APP PRINCIPALE V1.8.36
 // ============================================================
 
 const H = window.Helpers;
@@ -478,7 +478,7 @@ const App = {
           <div>
             <p class="eyebrow">Crédits cachés</p>
             <h2 id="creditsTitle">Le Nid des Pronos</h2>
-            <p class="muted">Version publique <strong>1.8.35</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
+            <p class="muted">Version publique <strong>1.8.36</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
           </div>
         </div>
         <div class="credits-grid">
@@ -495,7 +495,7 @@ const App = {
             <p><strong>1.0.5</strong> — dashboard mobile/desktop stabilisé, sans chevauchement des cartes.</p>
           </section>
           <section>
-            <h3>Évolutions V1.8.35</h3>
+            <h3>Évolutions V1.8.36</h3>
             <ul class="changelog-list">
               <li>Le super admin peut désactiver ou réactiver l’affichage du module préparation.</li>
               <li>Quand la préparation est désactivée, les matchs test disparaissent des matchs/pronos, classements par phase et règles.</li>
@@ -628,7 +628,8 @@ const App = {
           <article><strong>Bon résultat</strong><span>Tu trouves le bon sens du match : victoire, nul ou défaite, même si le score n’est pas exact.</span><b>+3 pts</b></article>
           <article><strong>Bon écart</strong><span>Tu ne trouves pas forcément le score, mais tu trouves le bon écart de buts. Exemple : tu pronostiques 2-0 et le match finit 3-1.</span><b>+1 pt</b></article>
           <article><strong>Phase finale</strong><span>Dans un match couperet, l’important est aussi de deviner quel oiseau reste perché. Si tu choisis la bonne équipe qualifiée, même après prolongation ou tirs au but, tu gagnes le bonus.</span><b>+2 pts</b></article>
-          <article><strong>Champion du monde</strong><span>Ton grand favori, choisi avant le début de la Coupe du monde, soulève le trophée à la fin.</span><b>+100 pts</b></article>
+          <article><strong>Champion du monde</strong><span>Ton grand favori, choisi avant le début de la Coupe du monde, soulève le trophée à la fin.</span><b>+${this.championFirstBonusPoints()} pts</b></article>
+          <article><strong>2e choix champion</strong><span>Avant la phase finale, tu peux remettre une pièce sur le futur champion. Bonus plus petit, mais toujours piquant.</span><b>+${this.championSecondBonusPoints()} pts</b></article>
           ${preparationEnabled ? `<article><strong>Matchs test</strong><span>France–Côte d’Ivoire et France–Irlande du Nord servent uniquement à tester le nid avant le vrai envol.</span><b>0 pt classement</b></article>` : ""}
         </div>
         ${preparationEnabled ? `
@@ -862,7 +863,7 @@ const App = {
     const { data, error } = await window.sb
       .from("app_settings")
       .select("key,value")
-      .in("key", ["family_mode_enabled", "preparation_module_enabled", "graph_preview_test_matches_enabled", "graph_mock_preview_enabled", "home_progress_include_test_matches", "live_demo_match_enabled", "login_owl_message"]);
+      .in("key", ["family_mode_enabled", "preparation_module_enabled", "graph_preview_test_matches_enabled", "graph_mock_preview_enabled", "home_progress_include_test_matches", "live_demo_match_enabled", "login_owl_message", "champion_bonus_initial_points", "champion_bonus_second_points"]);
 
     if (error) {
       console.warn("Paramètres app indisponibles", error);
@@ -920,7 +921,7 @@ const App = {
       .in("message_id", ids);
 
     if (error) {
-      console.warn("Votes de sondage Hibou indisponibles : lance le patch SQL V1.8.35", error);
+      console.warn("Votes de sondage Hibou indisponibles : lance le patch SQL V1.8.36", error);
       this.state.owlPollVotes = {};
       return;
     }
@@ -968,7 +969,7 @@ const App = {
       .in("message_id", ids);
 
     if (error) {
-      console.warn("Détail des votes Hibou indisponible : lance le patch SQL V1.8.35", error);
+      console.warn("Détail des votes Hibou indisponible : lance le patch SQL V1.8.36", error);
       return;
     }
 
@@ -1131,7 +1132,7 @@ const App = {
       .upsert({ message_id: message.id, user_id: this.state.session?.user?.id, option_key: optionKey }, { onConflict: "message_id,user_id" });
 
     if (error) {
-      H.toast(error.message || "Vote impossible. Lance le patch SQL V1.8.35.", "error");
+      H.toast(error.message || "Vote impossible. Lance le patch SQL V1.8.36.", "error");
       return;
     }
 
@@ -1299,6 +1300,28 @@ const App = {
     if (typeof value === "string") return value === "true";
     if (value && typeof value === "object" && "enabled" in value) return Boolean(value.enabled);
     return Boolean(value);
+  },
+
+  appSettingNumberFromValue(value, fallback = 0) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : fallback;
+  },
+
+  appSettingNumber(key, fallback = 0) {
+    const value = this.state.appSettings?.[key];
+    if (value === undefined || value === null) return fallback;
+    if (typeof value === "number") return Number.isFinite(value) ? value : fallback;
+    if (typeof value === "string") return this.appSettingNumberFromValue(value.replace(",", "."), fallback);
+    if (value && typeof value === "object") return this.appSettingNumberFromValue(value.points ?? value.value ?? value.amount, fallback);
+    return this.appSettingNumberFromValue(value, fallback);
+  },
+
+  championFirstBonusPoints() {
+    return Math.max(0, Math.round(this.appSettingNumber("champion_bonus_initial_points", 100)));
+  },
+
+  championSecondBonusPoints() {
+    return Math.max(0, Math.round(this.appSettingNumber("champion_bonus_second_points", 50)));
   },
 
   isLiveDemoMatch(match = null) {
@@ -1474,7 +1497,7 @@ const App = {
 
 
   async loadVisiblePredictions() {
-    // V1.8.35 — IMPORTANT : Supabase REST renvoie 1000 lignes max par requête.
+    // V1.8.36 — IMPORTANT : Supabase REST renvoie 1000 lignes max par requête.
     // Le classement général est agrégé en base, mais les détails joueurs et le classement Famille
     // repartent des pronos visibles côté front. On pagine donc toute la vue, sinon les détails
     // s'arrêtent après les premiers paquets de matchs/joueurs.
@@ -2160,7 +2183,7 @@ const App = {
     await this.loadPlayerScoreRows().catch(() => {});
     this.syncAchievementNotifications();
     this.scheduleAchievementResync();
-    H.toast("2e champion enregistré : +50 points si ça passe !", "success");
+    H.toast(`2e champion enregistré : +${this.championSecondBonusPoints()} points si ça passe !`, "success");
     await this.renderProfile();
   },
 
@@ -5276,8 +5299,16 @@ const App = {
       if (button.dataset.finalRoundBound === "true") return;
       button.dataset.finalRoundBound = "true";
       button.addEventListener("click", () => {
-        this.state.finalBracketActiveRound = button.dataset.finalRound || null;
-        this.renderWorldCupFinals();
+        this.setFinalBracketRound(button.dataset.finalRound || null);
+      });
+    });
+
+    H.$$('[data-final-stage-round]').forEach((stage) => {
+      if (stage.dataset.finalStageRoundBound === "true") return;
+      stage.dataset.finalStageRoundBound = "true";
+      stage.addEventListener("click", (event) => {
+        if (event.target.closest("button, a, input, select, textarea")) return;
+        this.setFinalBracketRound(stage.dataset.finalStageRound || null);
       });
     });
   },
@@ -5367,6 +5398,18 @@ const App = {
       const desiredLeft = activeStage.offsetLeft - Math.max(0, (scroller.clientWidth - activeStage.offsetWidth) / 2);
       scroller.scrollTo({ left: Math.min(maxLeft, Math.max(0, desiredLeft)), behavior: "smooth" });
     }, 70);
+  },
+
+  setFinalBracketRound(roundKey = null) {
+    const configs = this.finalBracketRoundConfigs();
+    const targetIndex = configs.findIndex((config) => config.key === roundKey);
+    if (targetIndex < 0) return;
+    const currentRound = this.state.finalBracketActiveRound || H.$("#finalBracketScroll .final-focus-board")?.dataset?.activeRound || configs[0]?.key;
+    const currentIndex = Math.max(0, configs.findIndex((config) => config.key === currentRound));
+    if (configs[targetIndex]?.key === currentRound) return;
+    this.state.finalBracketActiveRound = configs[targetIndex].key;
+    this.state.finalBracketSlideDirection = targetIndex < currentIndex ? "left" : "right";
+    this.renderWorldCupFinals();
   },
 
   stepFinalBracket(direction = 0) {
@@ -5959,8 +6002,6 @@ const App = {
           </div>
           <span class="pill neutral">Vue active : ${H.escapeHtml(activeConfig.label)}</span>
         </header>
-        <button type="button" class="final-tournament-nav final-tournament-nav-left" data-final-step="-1" ${activeIndex <= 0 ? "disabled" : ""} aria-label="Tour précédent"><span>‹</span><small>Préc.</small></button>
-        <button type="button" class="final-tournament-nav final-tournament-nav-right" data-final-step="1" ${activeIndex >= configs.length - 1 ? "disabled" : ""} aria-label="Tour suivant"><span>›</span><small>Suiv.</small></button>
         <div class="final-tournament-window" id="finalBracketScroll" tabindex="0">
           <div class="final-focus-board final-tournament-board" data-active-round="${H.escapeHtml(activeConfig.key)}" data-window-start="${startIndex}" style="--final-visible-rows:${rowCount};">
             ${visibleConfigs.map((config, localIndex) => this.finalFocusStageColumnHtml(matchMap, config, activeConfig.key, startIndex + localIndex, startIndex)).join("")}
@@ -5974,7 +6015,7 @@ const App = {
     const isActive = config.key === activeRound;
     const complete = this.isFinalRoundComplete(matchMap, config);
     return `
-      <section class="final-focus-stage ${isActive ? "is-active" : "is-compact"} stage-${H.escapeHtml(config.key)}" data-stage-index="${stageIndex}" aria-label="${H.escapeHtml(config.title)}">
+      <section class="final-focus-stage ${isActive ? "is-active" : "is-compact"} stage-${H.escapeHtml(config.key)}" data-stage-index="${stageIndex}" data-final-stage-round="${H.escapeHtml(config.key)}" aria-label="${H.escapeHtml(config.title)}">
         <button type="button" class="final-focus-stage-title ${isActive ? "active" : ""}" data-final-round="${H.escapeHtml(config.key)}" aria-selected="${isActive ? "true" : "false"}">
           <span>${H.escapeHtml(config.label)}</span>
           <small>${complete ? "terminé" : H.escapeHtml(config.shortLabel)}</small>
@@ -6025,6 +6066,7 @@ const App = {
     const date = H.formatDateTime(match.kickoff_at);
     const compactDate = this.finalFocusCompactDate(match.kickoff_at);
     const location = [match.city, match.venue].filter(Boolean).join(" · ");
+    const pronoMeta = this.finalFocusPredictionMetaHtml(match, detailed);
 
     if (!detailed) {
       return `
@@ -6035,6 +6077,7 @@ const App = {
             <b>${H.escapeHtml(score)}</b>
             <span>${H.matchFlagHtml(match, "away")}<strong>${H.escapeHtml(away)}</strong></span>
           </div>
+          ${pronoMeta}
         </article>
       `;
     }
@@ -6050,11 +6093,41 @@ const App = {
           <b>${H.escapeHtml(score)}</b>
           <div>${H.matchFlagHtml(match, "away")}<strong>${H.escapeHtml(away)}</strong></div>
         </div>
+        ${pronoMeta}
         <footer>
           <span>${location ? H.escapeHtml(location) : "Lieu à confirmer"}</span>
           <span>${H.icon("tv")} ${H.tvChannelLogosHtml(this.matchTvChannel(match), "tv-logo-strip final-tv-strip")}</span>
         </footer>
       </article>
+    `;
+  },
+
+  finalFocusPredictionMetaHtml(match, detailed = false) {
+    if (!match?.id) return "";
+    const prediction = this.getMyPrediction(match.id);
+    const predictionText = prediction
+      ? `${Number(prediction.home_score_pred ?? 0)}-${Number(prediction.away_score_pred ?? 0)}`
+      : "non posé";
+    const resultText = ["finished", "live"].includes(match.status)
+      ? H.scoreText(match.home_score, match.away_score)
+      : "à venir";
+    const pointsRow = prediction && ["finished", "live"].includes(match.status)
+      ? (this.predictionForDisplay(this.myPointsForMatch(match.id) || prediction, match) || prediction)
+      : null;
+    const pointsText = pointsRow?.points_total !== undefined && pointsRow?.points_total !== null
+      ? `${Number(pointsRow.points_total || 0)} pt${Number(pointsRow.points_total || 0) > 1 ? "s" : ""}`
+      : "";
+
+    if (!detailed) {
+      return `<div class="final-focus-mini-meta"><span>Prono ${H.escapeHtml(predictionText)}</span><span>Rés. ${H.escapeHtml(resultText)}</span></div>`;
+    }
+
+    return `
+      <div class="final-focus-prono-strip">
+        <span><small>Ton prono</small><strong>${H.escapeHtml(predictionText)}</strong></span>
+        <span><small>Résultat réel</small><strong>${H.escapeHtml(resultText)}</strong></span>
+        ${pointsText ? `<span><small>Points</small><strong>${H.escapeHtml(pointsText)}</strong></span>` : ""}
+      </div>
     `;
   },
 
@@ -10682,7 +10755,7 @@ const App = {
           </div>
           <div class="profile-account-actions">
             <button class="ghost-btn" id="profileInstallAppBtn" type="button">Installer l’app</button>
-            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.8.35</button>
+            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.8.36</button>
             <button class="danger-btn" id="profileLogoutBtn" type="button">Déconnexion</button>
           </div>
         </div>
@@ -10763,7 +10836,7 @@ const App = {
         <div class="card-title-row">
           <div>
             <h3>${H.icon("trophy")} Mon champion du monde</h3>
-            <p class="muted">Choisis l’équipe qui remportera ${H.escapeHtml(competitionName)}. Si elle gagne la finale : <strong>+100 points</strong>.</p>
+            <p class="muted">Choisis l’équipe qui remportera ${H.escapeHtml(competitionName)}. Si elle gagne la finale : <strong>+${this.championFirstBonusPoints()} points</strong>.</p>
           </div>
           <span class="pill ${championLocked ? "danger" : "success"}">${championLocked ? "Verrouillé" : "Ouvert"}</span>
         </div>
@@ -10815,7 +10888,7 @@ const App = {
         <div class="card-title-row">
           <div>
             <h3>${H.icon("trophy")} Mon 2e champion après les poules</h3>
-            <p class="muted">${secondChampionAfterGroups ? "Les poules sont terminées : seuls les qualifiés restent disponibles." : "Avant la fin des poules, toutes les équipes de la compétition restent disponibles. La liste sera resserrée aux qualifiés après mise à jour."} Ce choix vaut <strong>+50 points</strong> et ne remplace pas ton champion initial.</p>
+            <p class="muted">${secondChampionAfterGroups ? "Les poules sont terminées : seuls les qualifiés restent disponibles." : "Avant la fin des poules, toutes les équipes de la compétition restent disponibles. La liste sera resserrée aux qualifiés après mise à jour."} Ce choix vaut <strong>+${this.championSecondBonusPoints()} points</strong> et ne remplace pas ton champion initial.</p>
           </div>
           <span class="pill ${secondChampionOpen ? "success" : "danger"}">${secondChampionOpen ? "Ouvert" : "Verrouillé"}</span>
         </div>
@@ -10857,7 +10930,7 @@ const App = {
               ${H.flagImgHtml({ flagUrl: selectedSecondWinner.flag_url, countryCode: selectedSecondWinner.country_code, shortName: selectedSecondWinner.short_name, name: selectedSecondWinner.name })}
               <div>
                 <strong>${H.escapeHtml(selectedSecondWinner.name)}</strong>
-                <small>2e choix bonus enregistré · +50 pts si cette équipe gagne.</small>
+                <small>2e choix bonus enregistré · +${this.championSecondBonusPoints()} pts si cette équipe gagne.</small>
               </div>
             </div>
           ` : `<p class="muted">Aucun 2e champion choisi pour l’instant.</p>`}
