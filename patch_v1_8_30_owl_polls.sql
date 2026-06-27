@@ -1,8 +1,8 @@
 -- ============================================================
--- LE NID DES PRONOS — PATCH V1.8.30
+-- LE NID DES PRONOS — PATCH V1.8.30 COMPLET CORRIGÉ
 -- Sondages multi-choix dans les messages du Hibou masqué
+-- Version sans GROUP BY dans la vue des résultats
 -- ============================================================
--- À lancer dans Supabase SQL Editor avant de publier les fichiers V1.8.30.
 
 alter table public.owl_messages
   add column if not exists poll_enabled boolean not null default false,
@@ -12,6 +12,7 @@ alter table public.owl_messages
 
 alter table public.owl_messages
   drop constraint if exists owl_messages_poll_options_array;
+
 alter table public.owl_messages
   add constraint owl_messages_poll_options_array
   check (jsonb_typeof(poll_options) = 'array');
@@ -61,8 +62,8 @@ with check (
       and (om.poll_end_at is null or om.poll_end_at >= now())
       and exists (
         select 1
-        from jsonb_array_elements(om.poll_options) opt
-        where opt->>'key' = option_key
+        from jsonb_array_elements(coalesce(om.poll_options, '[]'::jsonb)) as opt(option_item)
+        where opt.option_item->>'key' = option_key
       )
   )
 );
@@ -74,25 +75,23 @@ for update
 to authenticated
 using (user_id = auth.uid() or public.is_super_admin())
 with check (
-  (
-    public.is_super_admin()
-    or (
-      user_id = auth.uid()
-      and exists (
-        select 1
-        from public.owl_messages om
-        where om.id = message_id
-          and om.enabled = true
-          and om.show_in_history = true
-          and om.poll_enabled = true
-          and om.start_at <= now()
-          and (om.poll_end_at is null or om.poll_end_at >= now())
-          and exists (
-            select 1
-            from jsonb_array_elements(om.poll_options) opt
-            where opt->>'key' = option_key
-          )
-      )
+  public.is_super_admin()
+  or (
+    user_id = auth.uid()
+    and exists (
+      select 1
+      from public.owl_messages om
+      where om.id = message_id
+        and om.enabled = true
+        and om.show_in_history = true
+        and om.poll_enabled = true
+        and om.start_at <= now()
+        and (om.poll_end_at is null or om.poll_end_at >= now())
+        and exists (
+          select 1
+          from jsonb_array_elements(coalesce(om.poll_options, '[]'::jsonb)) as opt(option_item)
+          where opt.option_item->>'key' = option_key
+        )
     )
   )
 );
@@ -106,6 +105,9 @@ using (public.is_super_admin());
 
 grant select, insert, update, delete on public.owl_message_votes to authenticated;
 
+-- Vue admin corrigée : aucun GROUP BY, donc aucun conflit opt.value.
+drop view if exists public.v_admin_owl_poll_results;
+
 create or replace view public.v_admin_owl_poll_results as
 select
   om.id as message_id,
@@ -113,16 +115,17 @@ select
   om.poll_question,
   om.poll_options,
   om.poll_end_at,
-  opt->>'key' as option_key,
-  opt->>'label' as option_label,
-  count(v.id)::integer as votes_count
+  opt.option_item->>'key' as option_key,
+  coalesce(opt.option_item->>'label', opt.option_item->>'key') as option_label,
+  (
+    select count(*)::integer
+    from public.owl_message_votes v
+    where v.message_id = om.id
+      and v.option_key = opt.option_item->>'key'
+  ) as votes_count
 from public.owl_messages om
-cross join lateral jsonb_array_elements(coalesce(om.poll_options, '[]'::jsonb)) opt
-left join public.owl_message_votes v
-  on v.message_id = om.id
- and v.option_key = opt->>'key'
-where om.poll_enabled = true
-group by om.id, om.title, om.poll_question, om.poll_options, om.poll_end_at, option_key, option_label;
+cross join lateral jsonb_array_elements(coalesce(om.poll_options, '[]'::jsonb)) as opt(option_item)
+where om.poll_enabled = true;
 
 grant select on public.v_admin_owl_poll_results to authenticated;
 
@@ -137,4 +140,4 @@ begin
   end;
 end $$;
 
-select 'patch_v1_8_30_owl_polls_ready' as check_name;
+select 'patch_v1_8_30_owl_polls_complet_corrige_ready' as check_name;
