@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — APP PRINCIPALE V1.8.29
+// LE NID DES PRONOS — APP PRINCIPALE V1.8.31
 // ============================================================
 
 const H = window.Helpers;
@@ -23,6 +23,7 @@ const App = {
     blockedUserIds: new Set(),
     appSettings: {},
     owlMessages: [],
+    owlPollVotes: {},
     publicProfiles: [],
     playerScoreRows: [],
     winnerPredictions: [],
@@ -475,7 +476,7 @@ const App = {
           <div>
             <p class="eyebrow">Crédits cachés</p>
             <h2 id="creditsTitle">Le Nid des Pronos</h2>
-            <p class="muted">Version publique <strong>1.8.29</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
+            <p class="muted">Version publique <strong>1.8.31</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
           </div>
         </div>
         <div class="credits-grid">
@@ -492,7 +493,7 @@ const App = {
             <p><strong>1.0.5</strong> — dashboard mobile/desktop stabilisé, sans chevauchement des cartes.</p>
           </section>
           <section>
-            <h3>Évolutions V1.8.29</h3>
+            <h3>Évolutions V1.8.31</h3>
             <ul class="changelog-list">
               <li>Le super admin peut désactiver ou réactiver l’affichage du module préparation.</li>
               <li>Quand la préparation est désactivée, les matchs test disparaissent des matchs/pronos, classements par phase et règles.</li>
@@ -875,7 +876,7 @@ const App = {
     const nowIso = new Date().toISOString();
     const { data, error } = await window.sb
       .from("owl_messages")
-      .select("id,title,body,importance,start_at,end_at,duration_days,enabled,show_in_history,created_at,updated_at")
+      .select("id,title,body,importance,start_at,end_at,duration_days,enabled,show_in_history,poll_enabled,poll_question,poll_options,poll_end_at,created_at,updated_at")
       .eq("enabled", true)
       .eq("show_in_history", true)
       .lte("start_at", nowIso)
@@ -889,6 +890,32 @@ const App = {
     }
 
     this.state.owlMessages = data || [];
+    await this.loadMyOwlPollVotes();
+  },
+
+  async loadMyOwlPollVotes() {
+    const ids = (this.state.owlMessages || [])
+      .filter((message) => message.poll_enabled)
+      .map((message) => message.id)
+      .filter(Boolean);
+    if (!ids.length || !this.state.session?.user?.id) {
+      this.state.owlPollVotes = {};
+      return;
+    }
+
+    const { data, error } = await window.sb
+      .from("owl_message_votes")
+      .select("message_id,option_key,created_at,updated_at")
+      .eq("user_id", this.state.session.user.id)
+      .in("message_id", ids);
+
+    if (error) {
+      console.warn("Votes de sondage Hibou indisponibles : lance le patch SQL V1.8.31", error);
+      this.state.owlPollVotes = {};
+      return;
+    }
+
+    this.state.owlPollVotes = Object.fromEntries((data || []).map((vote) => [String(vote.message_id), vote]));
   },
 
 
@@ -929,6 +956,69 @@ const App = {
     window.setTimeout(() => this.openLoginOwlMessageModal(message, key), 180);
   },
 
+  owlPollOpen(message = {}) {
+    if (!message.poll_enabled) return false;
+    if (!Array.isArray(message.poll_options) || message.poll_options.length < 2) return false;
+    const end = message.poll_end_at ? new Date(message.poll_end_at).getTime() : 0;
+    return !end || Date.now() <= end;
+  },
+
+  owlPollHtml(message = {}) {
+    if (!message.poll_enabled || !Array.isArray(message.poll_options) || message.poll_options.length < 2) return "";
+    const vote = this.state.owlPollVotes?.[String(message.id)];
+    const isOpen = this.owlPollOpen(message);
+    const status = vote ? "vote enregistré" : (isOpen ? "vote ouvert" : "sondage terminé");
+    return `
+      <section class="login-owl-poll" data-owl-poll-message-id="${H.escapeHtml(message.id || "")}">
+        <div class="login-owl-poll-head">
+          <strong>📊 ${H.escapeHtml(message.poll_question || "Sondage du Hibou")}</strong>
+          <small>${H.escapeHtml(status)}${message.poll_end_at ? ` · fin ${H.formatDateTime(message.poll_end_at)}` : ""}</small>
+        </div>
+        <div class="login-owl-poll-options">
+          ${message.poll_options.map((option) => {
+            const selected = vote && String(vote.option_key) === String(option.key);
+            return `<button type="button" class="login-owl-poll-option ${selected ? "selected" : ""}" data-owl-poll-option="${H.escapeHtml(option.key)}" ${!isOpen ? "disabled" : ""}>
+              <span>${H.escapeHtml(option.label || option.key)}</span>
+              ${selected ? `<b>✓ voté</b>` : `<b>choisir</b>`}
+            </button>`;
+          }).join("")}
+        </div>
+        <p class="muted tiny-note">${vote ? "Tu peux changer ton vote tant que le sondage est ouvert." : "Un seul vote par joueur, modifiable jusqu’à la fin du sondage."}</p>
+      </section>
+    `;
+  },
+
+  async voteOwlPoll(message, optionKey, modal) {
+    if (!message?.id || !optionKey) return;
+    if (!this.owlPollOpen(message)) {
+      H.toast("Le sondage est terminé, le Hibou a refermé l’urne.", "error");
+      return;
+    }
+
+    const { error } = await window.sb
+      .from("owl_message_votes")
+      .upsert({ message_id: message.id, user_id: this.state.session?.user?.id, option_key: optionKey }, { onConflict: "message_id,user_id" });
+
+    if (error) {
+      H.toast(error.message || "Vote impossible. Lance le patch SQL V1.8.31.", "error");
+      return;
+    }
+
+    this.state.owlPollVotes[String(message.id)] = { message_id: message.id, option_key: optionKey };
+    const pollRoot = H.$(".login-owl-poll", modal);
+    if (pollRoot) pollRoot.outerHTML = this.owlPollHtml(message);
+    this.bindOwlPollButtons(modal, message);
+    H.toast("Vote enregistré dans le nid 🦉", "success");
+  },
+
+  bindOwlPollButtons(modal, message) {
+    H.$$('[data-owl-poll-option]', modal).forEach((button) => {
+      if (button.dataset.owlPollBound === "true") return;
+      button.dataset.owlPollBound = "true";
+      button.addEventListener("click", async () => this.voteOwlPoll(message, button.dataset.owlPollOption, modal));
+    });
+  },
+
   openLoginOwlMessageModal(message, storageKey) {
     if (document.querySelector(".login-owl-message-modal")) return;
     const importance = message.importance || "info";
@@ -953,8 +1043,12 @@ const App = {
       </div>
     `;
     document.body.appendChild(modal);
+    this.bindOwlPollButtons(modal, message);
     const close = () => {
-      try { localStorage.setItem(storageKey, "dismissed"); } catch (error) {}
+      const mustVoteFirst = message.poll_enabled && this.owlPollOpen(message) && !this.state.owlPollVotes?.[String(message.id)];
+      if (!mustVoteFirst) {
+        try { localStorage.setItem(storageKey, "dismissed"); } catch (error) {}
+      }
       modal.remove();
     };
     H.$("#closeLoginOwlMessageBtn", modal)?.addEventListener("click", close);
@@ -1240,7 +1334,7 @@ const App = {
 
 
   async loadVisiblePredictions() {
-    // V1.8.29 — IMPORTANT : Supabase REST renvoie 1000 lignes max par requête.
+    // V1.8.31 — IMPORTANT : Supabase REST renvoie 1000 lignes max par requête.
     // Le classement général est agrégé en base, mais les détails joueurs et le classement Famille
     // repartent des pronos visibles côté front. On pagine donc toute la vue, sinon les détails
     // s'arrêtent après les premiers paquets de matchs/joueurs.
@@ -10445,7 +10539,7 @@ const App = {
           </div>
           <div class="profile-account-actions">
             <button class="ghost-btn" id="profileInstallAppBtn" type="button">Installer l’app</button>
-            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.8.29</button>
+            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.8.31</button>
             <button class="danger-btn" id="profileLogoutBtn" type="button">Déconnexion</button>
           </div>
         </div>

@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — ADMIN V1.8.29
+// LE NID DES PRONOS — ADMIN V1.8.31
 // ============================================================
 
 const H = window.Helpers;
@@ -24,6 +24,7 @@ const Admin = {
     appSettings: {},
     loginOwlMessage: null,
     owlMessages: [],
+    owlPollResults: [],
     familyModeEnabled: false,
     preparationModuleEnabled: true,
     graphPreviewTestMatchesEnabled: false,
@@ -84,7 +85,7 @@ const Admin = {
       p_category: category,
       p_details: details || {},
       p_metadata: {
-        app_version: "1.8.29",
+        app_version: "1.8.31",
         source: "admin_front"
       }
     });
@@ -816,6 +817,7 @@ const Admin = {
   async loadOwlMessagesAdmin() {
     if (!this.isSuperAdmin()) {
       this.state.owlMessages = [];
+      this.state.owlPollResults = [];
       return;
     }
 
@@ -828,10 +830,36 @@ const Admin = {
     if (error) {
       console.warn("Historique Hibou indisponible : lance le patch SQL V1.6.4", error);
       this.state.owlMessages = [];
+      this.state.owlPollResults = [];
       return;
     }
 
     this.state.owlMessages = data || [];
+    await this.loadOwlPollResultsAdmin();
+  },
+
+  async loadOwlPollResultsAdmin() {
+    const messageIds = (this.state.owlMessages || [])
+      .filter((message) => message.poll_enabled)
+      .map((message) => message.id)
+      .filter(Boolean);
+    if (!messageIds.length) {
+      this.state.owlPollResults = [];
+      return;
+    }
+
+    const { data, error } = await window.sb
+      .from("v_admin_owl_poll_results")
+      .select("*")
+      .in("message_id", messageIds);
+
+    if (error) {
+      console.warn("Résultats de sondage Hibou indisponibles : lance le patch SQL V1.8.31", error);
+      this.state.owlPollResults = [];
+      return;
+    }
+
+    this.state.owlPollResults = data || [];
   },
 
   async loadFamilyModeSetting() {
@@ -1935,6 +1963,49 @@ const Admin = {
     return "Tout le monde";
   },
 
+  normalizeOwlPollOptions(rawValue = "") {
+    return String(rawValue || "")
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .slice(0, 8)
+      .map((label, index) => ({ key: `choice_${index + 1}`, label }));
+  },
+
+  owlPollOptionsText(message = {}) {
+    const options = Array.isArray(message.poll_options) ? message.poll_options : [];
+    return options.map((option) => option?.label || option?.text || "").filter(Boolean).join("\n");
+  },
+
+  owlPollResultsForMessage(messageId) {
+    return (this.state.owlPollResults || []).filter((row) => String(row.message_id) === String(messageId));
+  },
+
+  owlPollAdminSummaryHtml(message = {}) {
+    if (!message.poll_enabled) return "";
+    const options = Array.isArray(message.poll_options) ? message.poll_options : [];
+    const results = this.owlPollResultsForMessage(message.id);
+    const countFor = (key) => Number((results.find((row) => String(row.option_key) === String(key)) || {}).votes_count || 0);
+    const total = results.reduce((sum, row) => sum + Number(row.votes_count || 0), 0);
+    const closed = message.poll_end_at && new Date(message.poll_end_at).getTime() < Date.now();
+    return `
+      <div class="admin-owl-poll-summary">
+        <div class="admin-owl-poll-summary-head">
+          <strong>📊 ${H.escapeHtml(message.poll_question || "Sondage du Hibou")}</strong>
+          <span class="pill ${closed ? "neutral" : "success"}">${closed ? "Sondage terminé" : "Sondage ouvert"}</span>
+        </div>
+        <small class="muted">${total} vote(s)${message.poll_end_at ? ` · fin ${H.formatDateTime(message.poll_end_at)}` : ""}</small>
+        <div class="admin-owl-poll-bars">
+          ${options.length ? options.map((option) => {
+            const votes = countFor(option.key);
+            const pct = total ? Math.round((votes / total) * 100) : 0;
+            return `<div class="admin-owl-poll-bar-row"><span>${H.escapeHtml(option.label || option.key)}</span><b>${votes}</b><div><i style="width:${pct}%"></i></div><em>${pct}%</em></div>`;
+          }).join("") : `<p class="muted">Aucun choix configuré.</p>`}
+        </div>
+      </div>
+    `;
+  },
+
 
 
   owlLoginMessageAdminHtml() {
@@ -1968,9 +2039,20 @@ const Admin = {
             <label><span>Durée en jours</span><input type="number" name="duration_days" min="0.04" step="0.04" value="${H.escapeHtml(String(durationDays || 1))}" required></label>
           </div>
           <label><span>Message</span><textarea name="body" rows="8" maxlength="4000" placeholder="Ex : Le Hibou masqué rappelle que les 16èmes arrivent. Pas de panique, juste des plumes." required>${H.escapeHtml(msg.body || msg.message || "")}</textarea><small class="muted">Maximum 4000 caractères. Le Hibou masqué peut enfin faire son discours.</small></label>
+          <div class="admin-owl-poll-editor">
+            <label class="check-line"><input type="checkbox" name="poll_enabled" ${msg.poll_enabled ? "checked" : ""}> Ajouter un sondage à ce message</label>
+            <div class="grid two">
+              <label><span>Question du sondage</span><input name="poll_question" maxlength="180" value="${H.escapeHtml(msg.poll_question || "")}" placeholder="Ex : Validez-vous le nouveau barème champion ?"></label>
+              <label><span>Date et heure de fin du sondage</span><input type="datetime-local" name="poll_end_at" value="${H.escapeHtml(msg.poll_end_at ? this.datetimeLocalValue(msg.poll_end_at) : "")}"></label>
+            </div>
+            <label><span>Choix de réponse</span><textarea name="poll_options" rows="5" maxlength="1200" placeholder="Un choix par ligne. Exemple :
+Oui, on passe à 30 / 15
+Non, on garde 100 / 50
+Je m’en remets au Hibou">${H.escapeHtml(this.owlPollOptionsText(msg))}</textarea><small class="muted">Un choix par ligne. Tu peux faire Oui/Non, 3 choix, 4 choix, etc. Maximum 8 choix.</small></label>
+          </div>
           <div class="grid two">
             <label class="check-line"><input type="checkbox" name="enabled" ${msg.enabled === false ? "" : "checked"}> Activer / planifier ce message</label>
-            <label class="check-line"><input type="checkbox" name="show_in_history" checked> Afficher dans le bouton “Messages du Hibou”</label>
+            <label class="check-line"><input type="checkbox" name="show_in_history" ${msg.show_in_history === false ? "" : "checked"}> Afficher dans le bouton “Messages du Hibou”</label>
           </div>
           <div class="admin-chat-actions">
             <button class="primary-btn" id="owlMessageSubmitBtn" type="submit">Créer le message</button>
@@ -1990,6 +2072,7 @@ const Admin = {
                 <strong>${H.escapeHtml(message.title || "Message du Hibou masqué")}</strong>
                 <small>${H.escapeHtml(message.importance || "info")} · début ${H.formatDateTime(message.start_at || message.created_at)}${message.end_at ? ` · fin ${H.formatDateTime(message.end_at)}` : ""}</small>
                 <p>${H.escapeHtml(String(message.body || "").slice(0, 260))}${String(message.body || "").length > 260 ? "…" : ""}</p>
+                ${this.owlPollAdminSummaryHtml(message)}
               </div>
               <div class="admin-owl-message-actions">
                 <span class="pill ${message.enabled ? "success" : "neutral"}">${message.enabled ? "Actif/planifié" : "Inactif"}</span>
@@ -2019,6 +2102,10 @@ const Admin = {
     const startDate = startLocal ? new Date(startLocal) : new Date();
     const durationDays = Math.max(0.04, Number(formData.get("duration_days") || 1));
     const endDate = new Date(startDate.getTime() + durationDays * 24 * 60 * 60 * 1000);
+    const pollEnabled = formData.get("poll_enabled") === "on";
+    const pollOptions = this.normalizeOwlPollOptions(formData.get("poll_options") || "");
+    const pollEndLocal = String(formData.get("poll_end_at") || "").trim();
+    const pollEndDate = pollEndLocal ? new Date(pollEndLocal) : endDate;
     const payload = {
       enabled: formData.get("enabled") === "on",
       show_in_history: formData.get("show_in_history") === "on",
@@ -2027,12 +2114,27 @@ const Admin = {
       importance: String(formData.get("importance") || "info"),
       start_at: startDate.toISOString(),
       end_at: endDate.toISOString(),
-      duration_days: durationDays
+      duration_days: durationDays,
+      poll_enabled: pollEnabled,
+      poll_question: pollEnabled ? String(formData.get("poll_question") || "").trim() : null,
+      poll_options: pollEnabled ? pollOptions : [],
+      poll_end_at: pollEnabled ? pollEndDate.toISOString() : null
     };
 
     if (!payload.body) {
       H.toast("Le Hibou refuse de hululer dans le vide.", "error");
       return;
+    }
+
+    if (payload.poll_enabled) {
+      if (!payload.poll_question) {
+        H.toast("Ajoute une question de sondage, sinon le Nid va voter dans le brouillard.", "error");
+        return;
+      }
+      if (!payload.poll_options || payload.poll_options.length < 2) {
+        H.toast("Un sondage doit avoir au moins 2 choix.", "error");
+        return;
+      }
     }
 
     const messageId = String(formData.get("message_id") || "").trim();
@@ -2041,7 +2143,7 @@ const Admin = {
       : window.sb.from("owl_messages").insert(payload);
     const { error } = await request;
     if (error) {
-      H.toast(error.message || "Impossible d’enregistrer le message. Lance le patch SQL V1.6.4.", "error");
+      H.toast(error.message || "Impossible d’enregistrer le message. Lance le patch SQL V1.8.31.", "error");
       return;
     }
 
@@ -2070,6 +2172,10 @@ const Admin = {
     form.elements.start_at.value = this.datetimeLocalValue(message.start_at || message.created_at || new Date());
     form.elements.duration_days.value = String(Math.max(0.04, durationDays || 1));
     form.elements.body.value = message.body || message.message || "";
+    if (form.elements.poll_enabled) form.elements.poll_enabled.checked = Boolean(message.poll_enabled);
+    if (form.elements.poll_question) form.elements.poll_question.value = message.poll_question || "";
+    if (form.elements.poll_options) form.elements.poll_options.value = this.owlPollOptionsText(message);
+    if (form.elements.poll_end_at) form.elements.poll_end_at.value = message.poll_end_at ? this.datetimeLocalValue(message.poll_end_at) : "";
     form.elements.enabled.checked = message.enabled !== false;
     form.elements.show_in_history.checked = message.show_in_history !== false;
     H.$("#owlMessageSubmitBtn", form).textContent = "Enregistrer les modifications";
@@ -2453,6 +2559,17 @@ const Admin = {
       });
     });
 
+    H.$$(".quick-reset-scheduled-btn", root).forEach((button) => {
+      button.addEventListener("click", (event) => {
+        const row = event.currentTarget.closest(".quick-score-card");
+        row.querySelector(".quick-status").value = "scheduled";
+        row.querySelector(".quick-home-score").value = "";
+        row.querySelector(".quick-away-score").value = "";
+        row.querySelector(".quick-winner").value = "";
+        this.saveQuickScore(row);
+      });
+    });
+
     H.$$(".quick-save-btn", root).forEach((button) => {
       button.addEventListener("click", (event) => this.saveQuickScore(event.currentTarget.closest(".quick-score-card")));
     });
@@ -2478,7 +2595,7 @@ const Admin = {
     `;
 
     return `
-      <article class="quick-score-card status-${H.escapeHtml(match.status || "scheduled")}" data-match-id="${match.id}" data-home-team-id="${match.home_team_id}" data-away-team-id="${match.away_team_id}" data-stage="${match.stage}" data-is-test-match="${match.is_test_match ? "true" : "false"}" data-is-live-demo-match="${this.isLiveDemoMatch(match) ? "true" : "false"}" data-kickoff-at="${H.escapeHtml(match.kickoff_at || "")}">
+      <article class="quick-score-card status-${H.escapeHtml(match.status || "scheduled")}" data-match-id="${match.id}" data-home-team-id="${match.home_team_id}" data-away-team-id="${match.away_team_id}" data-stage="${match.stage}" data-current-status="${H.escapeHtml(match.status || "scheduled")}" data-is-test-match="${match.is_test_match ? "true" : "false"}" data-is-live-demo-match="${this.isLiveDemoMatch(match) ? "true" : "false"}" data-kickoff-at="${H.escapeHtml(match.kickoff_at || "")}">
         <div class="quick-score-head">
           <div>
             <strong>${H.matchFlagHtml(match, "home")} ${H.escapeHtml(match.home_team_name)} <span>vs</span> ${H.matchFlagHtml(match, "away")} ${H.escapeHtml(match.away_team_name)}</strong>
@@ -2528,6 +2645,7 @@ const Admin = {
         ${this.matchInfoEditorHtml(match, "quick")}
 
         <div class="quick-score-actions">
+          ${match.status === "live" ? `<button type="button" class="ghost-btn quick-reset-scheduled-btn">Remettre à venir</button>` : ""}
           <button type="button" class="ghost-btn quick-live-btn" ${scoreDisabled}>En direct</button>
           <button type="button" class="primary-btn quick-finish-btn" ${scoreDisabled}>Sauver + terminé</button>
           <button type="button" class="ghost-btn quick-save-btn">Sauver</button>
@@ -2565,8 +2683,8 @@ const Admin = {
 
   async saveQuickScore(row, forceFinished = false) {
     const matchId = row.dataset.matchId;
-    const homeScore = this.getScoreValue(row, ".quick-home-score");
-    const awayScore = this.getScoreValue(row, ".quick-away-score");
+    let homeScore = this.getScoreValue(row, ".quick-home-score");
+    let awayScore = this.getScoreValue(row, ".quick-away-score");
     const status = forceFinished ? "finished" : row.querySelector(".quick-status").value;
     const stage = row.dataset.stage;
     const infoPayload = this.matchInfoPayloadFromRow(row, "quick");
@@ -2574,6 +2692,12 @@ const Admin = {
     const isDemoMatch = row.dataset.isLiveDemoMatch === "true";
     const canScore = isDemoMatch || this.canScoreMatch(effectiveKickoffAt);
     let winnerTeamId = row.querySelector(".quick-winner").value || null;
+    const resetToScheduled = status === "scheduled";
+    if (resetToScheduled) {
+      homeScore = null;
+      awayScore = null;
+      winnerTeamId = null;
+    }
 
     if (!canScore && ["live", "finished"].includes(status)) {
       H.toast("Ce match n'a pas encore commencé : impossible de le passer en direct ou terminé.", "error");
@@ -2636,7 +2760,7 @@ const Admin = {
       away_score: awayScore
     });
     await this.reloadAndPropagateFinalBracket("quick_score");
-    H.toast(status === "finished" ? "Score enregistré et match terminé" : "Match enregistré", "success");
+    H.toast(resetToScheduled ? "Match remis à venir" : status === "finished" ? "Score enregistré et match terminé" : "Match enregistré", "success");
     await this.reloadAll();
   },
 
@@ -2658,7 +2782,7 @@ const Admin = {
             const canScore = this.canScoreMatch(match);
             const scoreDisabled = canScore ? "" : "disabled";
             return `
-              <article class="admin-row match-admin-row status-${H.escapeHtml(match.status || "scheduled")}" data-match-id="${match.id}" data-home-team-id="${match.home_team_id}" data-away-team-id="${match.away_team_id}" data-stage="${match.stage}" data-kickoff-at="${H.escapeHtml(match.kickoff_at || "")}">
+              <article class="admin-row match-admin-row status-${H.escapeHtml(match.status || "scheduled")}" data-match-id="${match.id}" data-home-team-id="${match.home_team_id}" data-away-team-id="${match.away_team_id}" data-stage="${match.stage}" data-current-status="${H.escapeHtml(match.status || "scheduled")}" data-kickoff-at="${H.escapeHtml(match.kickoff_at || "")}">
                 <div class="admin-main">
                   <strong>${H.matchFlagHtml(match, "home")} ${H.escapeHtml(match.home_team_name)} - ${H.matchFlagHtml(match, "away")} ${H.escapeHtml(match.away_team_name)}</strong>
                   <small>${H.formatDateTime(match.kickoff_at)} · ${H.shortPoolRoundLabel(match)} · ${H.statusLabel(match.status)} · <span class="admin-location-line">${H.matchLocationHtml(match, true)}</span></small>
@@ -2677,6 +2801,7 @@ const Admin = {
                     <option value="${match.away_team_id}" ${match.winner_team_id === match.away_team_id ? "selected" : ""}>${H.escapeHtml(match.away_team_name)}</option>
                   </select>
                   ${this.tvChannelTogglesHtml(match, "match")}
+                  ${match.status === "live" ? `<button type="button" class="ghost-btn reset-match-scheduled-btn">Remettre à venir</button>` : ""}
                   <button class="primary-btn save-match-btn">Sauver</button>
                   <button class="ghost-btn recalc-match-btn">Recalculer</button>
                 </div>
@@ -2691,6 +2816,17 @@ const Admin = {
       btn.addEventListener("click", (event) => this.saveMatch(event.currentTarget.closest(".match-admin-row")));
     });
 
+    H.$$(".reset-match-scheduled-btn", root).forEach((btn) => {
+      btn.addEventListener("click", (event) => {
+        const row = event.currentTarget.closest(".match-admin-row");
+        row.querySelector(".match-status").value = "scheduled";
+        row.querySelector(".match-home-score").value = "";
+        row.querySelector(".match-away-score").value = "";
+        row.querySelector(".match-winner").value = "";
+        this.saveMatch(row);
+      });
+    });
+
     H.$$(".recalc-match-btn", root).forEach((btn) => {
       btn.addEventListener("click", (event) => this.recalcMatch(event.currentTarget.closest(".match-admin-row").dataset.matchId));
     });
@@ -2703,13 +2839,19 @@ const Admin = {
     const homeScoreRaw = row.querySelector(".match-home-score").value;
     const awayScoreRaw = row.querySelector(".match-away-score").value;
     const status = row.querySelector(".match-status").value;
-    const homeScore = homeScoreRaw === "" ? null : Number(homeScoreRaw);
-    const awayScore = awayScoreRaw === "" ? null : Number(awayScoreRaw);
+    let homeScore = homeScoreRaw === "" ? null : Number(homeScoreRaw);
+    let awayScore = awayScoreRaw === "" ? null : Number(awayScoreRaw);
     let winnerTeamId = row.querySelector(".match-winner").value || null;
     const infoPayload = this.matchInfoPayloadFromRow(row, "match");
     const effectiveKickoffAt = infoPayload.kickoff_at || row.dataset.kickoffAt;
     const isDemoMatch = row.dataset.isLiveDemoMatch === "true";
     const canScore = isDemoMatch || this.canScoreMatch(effectiveKickoffAt);
+    const resetToScheduled = status === "scheduled";
+    if (resetToScheduled) {
+      homeScore = null;
+      awayScore = null;
+      winnerTeamId = null;
+    }
 
     if (!canScore && ["live", "finished"].includes(status)) {
       H.toast("Ce match n'a pas encore commencé : impossible de le passer en direct ou terminé.", "error");
@@ -2769,7 +2911,7 @@ const Admin = {
       away_score: awayScore
     });
     await this.reloadAndPropagateFinalBracket("match_admin");
-    H.toast("Match mis à jour", "success");
+    H.toast(resetToScheduled ? "Match remis à venir" : "Match mis à jour", "success");
     await this.reloadAll();
   },
 
@@ -3000,7 +3142,7 @@ const Admin = {
 
     const { data, error } = await window.sb.rpc("admin_clean_start_preserve_predictions", { p_confirm: "DEPART PROPRE" });
     if (error) {
-      H.toast(error.message || "Reset classements impossible. Lance le patch SQL V1.8.29.", "error");
+      H.toast(error.message || "Reset classements impossible. Lance le patch SQL V1.8.31.", "error");
       return;
     }
 
