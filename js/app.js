@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — APP PRINCIPALE V1.8.33
+// LE NID DES PRONOS — APP PRINCIPALE V1.8.34
 // ============================================================
 
 const H = window.Helpers;
@@ -25,6 +25,7 @@ const App = {
     owlMessages: [],
     owlPollVotes: {},
     owlPollResults: {},
+    owlPollVoteDetails: {},
     publicProfiles: [],
     playerScoreRows: [],
     winnerPredictions: [],
@@ -477,7 +478,7 @@ const App = {
           <div>
             <p class="eyebrow">Crédits cachés</p>
             <h2 id="creditsTitle">Le Nid des Pronos</h2>
-            <p class="muted">Version publique <strong>1.8.33</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
+            <p class="muted">Version publique <strong>1.8.34</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
           </div>
         </div>
         <div class="credits-grid">
@@ -494,7 +495,7 @@ const App = {
             <p><strong>1.0.5</strong> — dashboard mobile/desktop stabilisé, sans chevauchement des cartes.</p>
           </section>
           <section>
-            <h3>Évolutions V1.8.33</h3>
+            <h3>Évolutions V1.8.34</h3>
             <ul class="changelog-list">
               <li>Le super admin peut désactiver ou réactiver l’affichage du module préparation.</li>
               <li>Quand la préparation est désactivée, les matchs test disparaissent des matchs/pronos, classements par phase et règles.</li>
@@ -511,6 +512,7 @@ const App = {
       </div>
     `;
     document.body.appendChild(modal);
+    messages.filter((message) => message.poll_enabled).forEach((message) => this.bindOwlPollButtons(modal, message));
     const close = () => modal.remove();
     H.$("#closeCreditsBtn", modal).addEventListener("click", close);
     modal.addEventListener("click", (event) => { if (event.target === modal) close(); });
@@ -639,6 +641,7 @@ const App = {
       </div>
     `;
     document.body.appendChild(modal);
+    messages.filter((message) => message.poll_enabled).forEach((message) => this.bindOwlPollButtons(modal, message));
     const close = () => modal.remove();
     H.$("#closeRulesBtn", modal)?.addEventListener("click", close);
     modal.addEventListener("click", (event) => { if (event.target === modal) close(); });
@@ -893,6 +896,7 @@ const App = {
     this.state.owlMessages = data || [];
     await this.loadMyOwlPollVotes();
     await this.loadOwlPollResults();
+    await this.loadOwlPollVoteDetails();
   },
 
   owlPollMessageIds() {
@@ -916,7 +920,7 @@ const App = {
       .in("message_id", ids);
 
     if (error) {
-      console.warn("Votes de sondage Hibou indisponibles : lance le patch SQL V1.8.33", error);
+      console.warn("Votes de sondage Hibou indisponibles : lance le patch SQL V1.8.34", error);
       this.state.owlPollVotes = {};
       return;
     }
@@ -949,6 +953,33 @@ const App = {
       previous[key].push(row);
     }
     this.state.owlPollResults = previous;
+  },
+
+  async loadOwlPollVoteDetails(messageIds = null) {
+    const ids = Array.isArray(messageIds) && messageIds.length ? messageIds.filter(Boolean) : this.owlPollMessageIds();
+    if (!ids.length) {
+      this.state.owlPollVoteDetails = {};
+      return;
+    }
+
+    const { data, error } = await window.sb
+      .from("v_owl_poll_vote_details")
+      .select("message_id,option_key,option_label,user_id,pseudo,voted_at")
+      .in("message_id", ids);
+
+    if (error) {
+      console.warn("Détail des votes Hibou indisponible : lance le patch SQL V1.8.34", error);
+      return;
+    }
+
+    const previous = messageIds ? { ...(this.state.owlPollVoteDetails || {}) } : {};
+    ids.forEach((id) => { delete previous[String(id)]; });
+    for (const row of data || []) {
+      const key = String(row.message_id);
+      if (!previous[key]) previous[key] = [];
+      previous[key].push(row);
+    }
+    this.state.owlPollVoteDetails = previous;
   },
 
 
@@ -1006,6 +1037,46 @@ const App = {
     }));
   },
 
+  owlPollVoteDetailsForMessage(message = {}) {
+    return (this.state.owlPollVoteDetails?.[String(message.id)] || [])
+      .slice()
+      .sort((a, b) => String(a.pseudo || "").localeCompare(String(b.pseudo || ""), "fr"));
+  },
+
+  owlPollVotersHtml(message = {}, showDetails = false) {
+    if (!showDetails) {
+      return `<p class="muted tiny-note">Vote d’abord pour ouvrir le grimoire des plumes et voir qui a voté quoi.</p>`;
+    }
+    const details = this.owlPollVoteDetailsForMessage(message);
+    const options = Array.isArray(message.poll_options) ? message.poll_options : [];
+    const byOption = new Map();
+    details.forEach((row) => {
+      const key = String(row.option_key || "");
+      if (!byOption.has(key)) byOption.set(key, []);
+      byOption.get(key).push(row);
+    });
+    return `
+      <details class="login-owl-poll-voters">
+        <summary>Voir qui a voté quoi 🕵️‍♂️</summary>
+        <div class="login-owl-poll-voters-list">
+          ${options.map((option) => {
+            const voters = byOption.get(String(option.key)) || [];
+            return `<div class="login-owl-poll-voter-group">
+              <strong>${H.escapeHtml(option.label || option.key)}</strong>
+              ${voters.length ? `<ul>${voters.map((vote) => `<li>${H.escapeHtml(vote.pseudo || "Joueur mystère")}</li>`).join("")}</ul>` : `<small>Aucun hibou posé ici.</small>`}
+            </div>`;
+          }).join("")}
+        </div>
+      </details>
+    `;
+  },
+
+  owlPollRootSelector(message = {}) {
+    const id = String(message?.id || "");
+    const safeId = window.CSS?.escape ? CSS.escape(id) : id.replace(/[^a-zA-Z0-9_-]/g, "");
+    return `.login-owl-poll[data-owl-poll-message-id="${safeId}"]`;
+  },
+
   owlPollTotalVotes(message = {}) {
     return this.owlPollResultsForMessage(message).reduce((sum, row) => sum + Number(row.votes || 0), 0);
   },
@@ -1039,6 +1110,7 @@ const App = {
           }).join("")}
         </div>
         <p class="muted tiny-note">${showResults ? "Résultats visibles après ton vote. Tu peux encore changer tant que le sondage est ouvert." : "Un seul vote par joueur, modifiable jusqu’à la fin du sondage."}</p>
+        ${this.owlPollVotersHtml(message, showResults)}
       </section>
     `;
   },
@@ -1055,20 +1127,22 @@ const App = {
       .upsert({ message_id: message.id, user_id: this.state.session?.user?.id, option_key: optionKey }, { onConflict: "message_id,user_id" });
 
     if (error) {
-      H.toast(error.message || "Vote impossible. Lance le patch SQL V1.8.33.", "error");
+      H.toast(error.message || "Vote impossible. Lance le patch SQL V1.8.34.", "error");
       return;
     }
 
     this.state.owlPollVotes[String(message.id)] = { message_id: message.id, option_key: optionKey };
     await this.loadOwlPollResults([message.id]);
-    const pollRoot = H.$(".login-owl-poll", modal);
+    await this.loadOwlPollVoteDetails([message.id]);
+    const pollRoot = H.$(this.owlPollRootSelector(message), modal) || H.$(".login-owl-poll", modal);
     if (pollRoot) pollRoot.outerHTML = this.owlPollHtml(message);
     this.bindOwlPollButtons(modal, message);
     H.toast("Vote enregistré dans le nid 🦉", "success");
   },
 
   bindOwlPollButtons(modal, message) {
-    H.$$('[data-owl-poll-option]', modal).forEach((button) => {
+    const root = H.$(this.owlPollRootSelector(message), modal) || modal;
+    H.$$('[data-owl-poll-option]', root).forEach((button) => {
       if (button.dataset.owlPollBound === "true") return;
       button.dataset.owlPollBound = "true";
       button.addEventListener("click", async () => this.voteOwlPoll(message, button.dataset.owlPollOption, modal));
@@ -1160,6 +1234,7 @@ const App = {
       </div>
     `;
     document.body.appendChild(modal);
+    messages.filter((message) => message.poll_enabled).forEach((message) => this.bindOwlPollButtons(modal, message));
     const close = () => modal.remove();
     H.$("#closeOwlMessagesHistoryBtn", modal)?.addEventListener("click", close);
     modal.addEventListener("click", (event) => { if (event.target === modal) close(); });
@@ -1391,7 +1466,7 @@ const App = {
 
 
   async loadVisiblePredictions() {
-    // V1.8.33 — IMPORTANT : Supabase REST renvoie 1000 lignes max par requête.
+    // V1.8.34 — IMPORTANT : Supabase REST renvoie 1000 lignes max par requête.
     // Le classement général est agrégé en base, mais les détails joueurs et le classement Famille
     // repartent des pronos visibles côté front. On pagine donc toute la vue, sinon les détails
     // s'arrêtent après les premiers paquets de matchs/joueurs.
@@ -3150,6 +3225,7 @@ const App = {
     `;
 
     document.body.appendChild(modal);
+    messages.filter((message) => message.poll_enabled).forEach((message) => this.bindOwlPollButtons(modal, message));
     const close = () => modal.remove();
     H.$("#closeHomePredictionsXBtn", modal)?.addEventListener("click", close);
     H.$("#closeHomePredictionsBtn", modal)?.addEventListener("click", close);
@@ -5057,6 +5133,7 @@ const App = {
     `;
 
     document.body.appendChild(modal);
+    messages.filter((message) => message.poll_enabled).forEach((message) => this.bindOwlPollButtons(modal, message));
     const close = () => modal.remove();
     H.$("#closeRecordDetailXBtn", modal)?.addEventListener("click", close);
     modal.addEventListener("click", (event) => { if (event.target === modal) close(); });
@@ -10123,6 +10200,7 @@ const App = {
       </div>
     `;
     document.body.appendChild(modal);
+    messages.filter((message) => message.poll_enabled).forEach((message) => this.bindOwlPollButtons(modal, message));
     const close = () => modal.remove();
     modal.querySelector(".modal-close")?.addEventListener("click", close);
     modal.addEventListener("click", (event) => { if (event.target === modal) close(); });
@@ -10596,7 +10674,7 @@ const App = {
           </div>
           <div class="profile-account-actions">
             <button class="ghost-btn" id="profileInstallAppBtn" type="button">Installer l’app</button>
-            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.8.33</button>
+            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.8.34</button>
             <button class="danger-btn" id="profileLogoutBtn" type="button">Déconnexion</button>
           </div>
         </div>

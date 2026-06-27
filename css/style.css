@@ -18728,7 +18728,7 @@ body[data-current-view] {
 }
 
 /* ============================================================
-   V1.8.33 — Phase finale par emplacement + scroll propre
+   V1.8.34 — Phase finale par emplacement + scroll propre
    ============================================================ */
 .group-table tr.eliminated-zone {
   background: linear-gradient(90deg, rgba(239, 68, 68, .26), rgba(239, 68, 68, .10)) !important;
@@ -18935,7 +18935,7 @@ body[data-current-view] {
 }
 
 /* ============================================================
-   V1.8.33 — Phase finale lisible en blocs de continuité
+   V1.8.34 — Phase finale lisible en blocs de continuité
    ============================================================ */
 .final-bracket-road-shell {
   display: block !important;
@@ -19228,7 +19228,7 @@ body[data-current-view] {
 }
 
 /* =====================================================
-   V1.8.33 — Phase finale format officiel desktop/mobile
+   V1.8.34 — Phase finale format officiel desktop/mobile
    ===================================================== */
 .final-bracket-official {
   border: 1px solid rgba(255, 212, 59, 0.18);
@@ -19465,7 +19465,7 @@ body[data-current-view] {
 }
 
 /* =====================================================
-   V1.8.33 — Phase finale verticale sans chevauchement
+   V1.8.34 — Phase finale verticale sans chevauchement
    ===================================================== */
 .final-bracket-vertical-shell {
   position: relative;
@@ -19763,7 +19763,7 @@ body[data-current-view] {
 }
 
 /* =====================================================
-   V1.8.33 — Phase finale par tour actif + messages éditables
+   V1.8.34 — Phase finale par tour actif + messages éditables
    ===================================================== */
 .final-focus-shell {
   border: 1px solid rgba(255, 212, 59, 0.22);
@@ -20039,7 +20039,7 @@ body[data-current-view] {
 }
 
 /* =====================================================
-   V1.8.33 — Phase finale : une seule rangée d'onglets + scroll mobile
+   V1.8.34 — Phase finale : une seule rangée d'onglets + scroll mobile
    ===================================================== */
 .final-focus-tabs {
   display: none !important;
@@ -20142,7 +20142,7 @@ body[data-current-view] {
 }
 
 /* =====================================================
-   V1.8.33 — Phase finale : colonnes compactes + vrai swipe mobile
+   V1.8.34 — Phase finale : colonnes compactes + vrai swipe mobile
    ===================================================== */
 .final-focus-shell {
   overflow-x: auto !important;
@@ -20297,7 +20297,7 @@ body[data-current-view] {
 }
 
 /* =====================================================
-   V1.8.33 — Phase finale bracket horizontal animé
+   V1.8.34 — Phase finale bracket horizontal animé
    ===================================================== */
 .final-tournament-shell.final-focus-shell {
   position: relative;
@@ -20557,7 +20557,7 @@ body[data-current-view] {
 }
 
 /* =====================================================
-   V1.8.33 — Refonte phase finale fenêtre 3 colonnes
+   V1.8.34 — Refonte phase finale fenêtre 3 colonnes
    ===================================================== */
 .final-tournament-shell.final-focus-shell {
   overflow: hidden !important;
@@ -20777,7 +20777,7 @@ body[data-current-view] {
 }
 
 /* =====================================================
-   V1.8.33 — Phase finale : fenêtre 3 colonnes, mobile 2 colonnes, liaisons propres
+   V1.8.34 — Phase finale : fenêtre 3 colonnes, mobile 2 colonnes, liaisons propres
    ===================================================== */
 .final-tournament-shell.final-focus-shell {
   padding: 18px 58px 24px !important;
@@ -21008,7 +21008,7 @@ body[data-current-view] {
 }
 
 /* =====================================================
-   V1.8.33 — Sondages du Hibou masqué
+   V1.8.34 — Sondages du Hibou masqué
    ===================================================== */
 .admin-owl-poll-editor {
   border: 1px solid rgba(250, 204, 21, 0.18);
@@ -21150,7 +21150,7 @@ body[data-current-view] {
 }
 
 /* =====================================================
-   V1.8.33 — Sondages joueurs : résultats après vote
+   V1.8.34 — Sondages joueurs : résultats après vote
    ===================================================== */
 .login-owl-poll-options.has-results {
   gap: 10px;
@@ -21205,4 +21205,87 @@ body[data-current-view] {
 }
 .login-owl-poll-option.selected .login-owl-poll-result-bar::before {
   background: linear-gradient(90deg, rgba(7,17,31,.75), rgba(30,41,59,.62));
+}
+
+/* =====================================================
+   V1.8.34 — Sondages : détail des votes + historique
+   ===================================================== */
+.login-owl-poll-voters,
+.admin-owl-poll-voters {
+  margin-top: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  border-radius: 16px;
+  background: rgba(15, 23, 42, 0.34);
+  overflow: hidden;
+}
+.login-owl-poll-voters summary,
+.admin-owl-poll-voters summary {
+  cursor: pointer;
+  padding: 10px 12px;
+  font-weight: 800;
+  color: #fde68a;
+  list-style: none;
+}
+.login-owl-poll-voters summary::-webkit-details-marker,
+.admin-owl-poll-voters summary::-webkit-details-marker {
+  display: none;
+}
+.login-owl-poll-voters summary::after,
+.admin-owl-poll-voters summary::after {
+  content: "›";
+  float: right;
+  transition: transform .18s ease;
+}
+.login-owl-poll-voters[open] summary::after,
+.admin-owl-poll-voters[open] summary::after {
+  transform: rotate(90deg);
+}
+.login-owl-poll-voters-list,
+.admin-owl-poll-voters-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 10px;
+  padding: 0 12px 12px;
+}
+.login-owl-poll-voter-group,
+.admin-owl-poll-voter-group {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  padding: 10px;
+  background: rgba(2, 6, 23, 0.34);
+}
+.login-owl-poll-voter-group strong,
+.admin-owl-poll-voter-group strong {
+  display: block;
+  margin-bottom: 7px;
+  color: #e2e8f0;
+}
+.login-owl-poll-voter-group ul,
+.admin-owl-poll-voter-group ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 5px;
+}
+.login-owl-poll-voter-group li,
+.admin-owl-poll-voter-group li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 999px;
+  background: rgba(250, 204, 21, 0.10);
+  color: #f8fafc;
+  font-size: .82rem;
+}
+.admin-owl-poll-voter-group li small,
+.login-owl-poll-voter-group small,
+.admin-owl-poll-voter-group small {
+  color: rgba(226, 232, 240, 0.68);
+  font-size: .72rem;
+}
+.owl-message-history-item .login-owl-poll {
+  margin-top: 12px;
 }

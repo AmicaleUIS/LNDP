@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — ADMIN V1.8.33
+// LE NID DES PRONOS — ADMIN V1.8.34
 // ============================================================
 
 const H = window.Helpers;
@@ -25,6 +25,7 @@ const Admin = {
     loginOwlMessage: null,
     owlMessages: [],
     owlPollResults: [],
+    owlPollVoteDetails: [],
     familyModeEnabled: false,
     preparationModuleEnabled: true,
     graphPreviewTestMatchesEnabled: false,
@@ -85,7 +86,7 @@ const Admin = {
       p_category: category,
       p_details: details || {},
       p_metadata: {
-        app_version: "1.8.33",
+        app_version: "1.8.34",
         source: "admin_front"
       }
     });
@@ -818,6 +819,7 @@ const Admin = {
     if (!this.isSuperAdmin()) {
       this.state.owlMessages = [];
       this.state.owlPollResults = [];
+      this.state.owlPollVoteDetails = [];
       return;
     }
 
@@ -831,11 +833,13 @@ const Admin = {
       console.warn("Historique Hibou indisponible : lance le patch SQL V1.6.4", error);
       this.state.owlMessages = [];
       this.state.owlPollResults = [];
+      this.state.owlPollVoteDetails = [];
       return;
     }
 
     this.state.owlMessages = data || [];
     await this.loadOwlPollResultsAdmin();
+    await this.loadOwlPollVoteDetailsAdmin();
   },
 
   async loadOwlPollResultsAdmin() {
@@ -854,12 +858,36 @@ const Admin = {
       .in("message_id", messageIds);
 
     if (error) {
-      console.warn("Résultats de sondage Hibou indisponibles : lance le patch SQL V1.8.33", error);
+      console.warn("Résultats de sondage Hibou indisponibles : lance le patch SQL V1.8.34", error);
       this.state.owlPollResults = [];
       return;
     }
 
     this.state.owlPollResults = data || [];
+  },
+
+  async loadOwlPollVoteDetailsAdmin() {
+    const messageIds = (this.state.owlMessages || [])
+      .filter((message) => message.poll_enabled)
+      .map((message) => message.id)
+      .filter(Boolean);
+    if (!messageIds.length) {
+      this.state.owlPollVoteDetails = [];
+      return;
+    }
+
+    const { data, error } = await window.sb
+      .from("v_owl_poll_vote_details")
+      .select("*")
+      .in("message_id", messageIds);
+
+    if (error) {
+      console.warn("Détail des votes Hibou indisponible : lance le patch SQL V1.8.34", error);
+      this.state.owlPollVoteDetails = [];
+      return;
+    }
+
+    this.state.owlPollVoteDetails = data || [];
   },
 
   async loadFamilyModeSetting() {
@@ -1981,6 +2009,38 @@ const Admin = {
     return (this.state.owlPollResults || []).filter((row) => String(row.message_id) === String(messageId));
   },
 
+  owlPollVoteDetailsForMessage(messageId) {
+    return (this.state.owlPollVoteDetails || [])
+      .filter((row) => String(row.message_id) === String(messageId))
+      .slice()
+      .sort((a, b) => String(a.pseudo || "").localeCompare(String(b.pseudo || ""), "fr"));
+  },
+
+  owlPollVoteDetailsHtml(message = {}) {
+    const options = Array.isArray(message.poll_options) ? message.poll_options : [];
+    const details = this.owlPollVoteDetailsForMessage(message.id);
+    const byOption = new Map();
+    details.forEach((row) => {
+      const key = String(row.option_key || "");
+      if (!byOption.has(key)) byOption.set(key, []);
+      byOption.get(key).push(row);
+    });
+    return `
+      <details class="admin-owl-poll-voters">
+        <summary>Voir qui a voté quoi 🕵️‍♂️</summary>
+        <div class="admin-owl-poll-voters-grid">
+          ${options.map((option) => {
+            const voters = byOption.get(String(option.key)) || [];
+            return `<div class="admin-owl-poll-voter-group">
+              <strong>${H.escapeHtml(option.label || option.key)}</strong>
+              ${voters.length ? `<ul>${voters.map((vote) => `<li><span>${H.escapeHtml(vote.pseudo || "Joueur")}</span><small>${vote.voted_at ? H.formatDateTime(vote.voted_at) : ""}</small></li>`).join("")}</ul>` : `<small>Aucun vote.</small>`}
+            </div>`;
+          }).join("")}
+        </div>
+      </details>
+    `;
+  },
+
   owlPollAdminSummaryHtml(message = {}) {
     if (!message.poll_enabled) return "";
     const options = Array.isArray(message.poll_options) ? message.poll_options : [];
@@ -2002,6 +2062,7 @@ const Admin = {
             return `<div class="admin-owl-poll-bar-row"><span>${H.escapeHtml(option.label || option.key)}</span><b>${votes}</b><div><i style="width:${pct}%"></i></div><em>${pct}%</em></div>`;
           }).join("") : `<p class="muted">Aucun choix configuré.</p>`}
         </div>
+        ${this.owlPollVoteDetailsHtml(message)}
       </div>
     `;
   },
@@ -2143,7 +2204,7 @@ Je m’en remets au Hibou">${H.escapeHtml(this.owlPollOptionsText(msg))}</textar
       : window.sb.from("owl_messages").insert(payload);
     const { error } = await request;
     if (error) {
-      H.toast(error.message || "Impossible d’enregistrer le message. Lance le patch SQL V1.8.33.", "error");
+      H.toast(error.message || "Impossible d’enregistrer le message. Lance le patch SQL V1.8.34.", "error");
       return;
     }
 
@@ -3142,7 +3203,7 @@ Je m’en remets au Hibou">${H.escapeHtml(this.owlPollOptionsText(msg))}</textar
 
     const { data, error } = await window.sb.rpc("admin_clean_start_preserve_predictions", { p_confirm: "DEPART PROPRE" });
     if (error) {
-      H.toast(error.message || "Reset classements impossible. Lance le patch SQL V1.8.33.", "error");
+      H.toast(error.message || "Reset classements impossible. Lance le patch SQL V1.8.34.", "error");
       return;
     }
 
