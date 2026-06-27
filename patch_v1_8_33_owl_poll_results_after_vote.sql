@@ -1,5 +1,5 @@
 -- ============================================================
--- LE NID DES PRONOS — PATCH V1.8.34
+-- LE NID DES PRONOS — PATCH V1.8.35
 -- Sondages Hibou : résultats visibles côté joueurs après vote
 -- ============================================================
 -- Aucun changement de table nécessaire.

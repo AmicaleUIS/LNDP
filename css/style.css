@@ -18728,7 +18728,7 @@ body[data-current-view] {
 }
 
 /* ============================================================
-   V1.8.34 — Phase finale par emplacement + scroll propre
+   V1.8.35 — Phase finale par emplacement + scroll propre
    ============================================================ */
 .group-table tr.eliminated-zone {
   background: linear-gradient(90deg, rgba(239, 68, 68, .26), rgba(239, 68, 68, .10)) !important;
@@ -18935,7 +18935,7 @@ body[data-current-view] {
 }
 
 /* ============================================================
-   V1.8.34 — Phase finale lisible en blocs de continuité
+   V1.8.35 — Phase finale lisible en blocs de continuité
    ============================================================ */
 .final-bracket-road-shell {
   display: block !important;
@@ -19228,7 +19228,7 @@ body[data-current-view] {
 }
 
 /* =====================================================
-   V1.8.34 — Phase finale format officiel desktop/mobile
+   V1.8.35 — Phase finale format officiel desktop/mobile
    ===================================================== */
 .final-bracket-official {
   border: 1px solid rgba(255, 212, 59, 0.18);
@@ -19465,7 +19465,7 @@ body[data-current-view] {
 }
 
 /* =====================================================
-   V1.8.34 — Phase finale verticale sans chevauchement
+   V1.8.35 — Phase finale verticale sans chevauchement
    ===================================================== */
 .final-bracket-vertical-shell {
   position: relative;
@@ -19763,7 +19763,7 @@ body[data-current-view] {
 }
 
 /* =====================================================
-   V1.8.34 — Phase finale par tour actif + messages éditables
+   V1.8.35 — Phase finale par tour actif + messages éditables
    ===================================================== */
 .final-focus-shell {
   border: 1px solid rgba(255, 212, 59, 0.22);
@@ -20039,7 +20039,7 @@ body[data-current-view] {
 }
 
 /* =====================================================
-   V1.8.34 — Phase finale : une seule rangée d'onglets + scroll mobile
+   V1.8.35 — Phase finale : une seule rangée d'onglets + scroll mobile
    ===================================================== */
 .final-focus-tabs {
   display: none !important;
@@ -20142,7 +20142,7 @@ body[data-current-view] {
 }
 
 /* =====================================================
-   V1.8.34 — Phase finale : colonnes compactes + vrai swipe mobile
+   V1.8.35 — Phase finale : colonnes compactes + vrai swipe mobile
    ===================================================== */
 .final-focus-shell {
   overflow-x: auto !important;
@@ -20297,7 +20297,7 @@ body[data-current-view] {
 }
 
 /* =====================================================
-   V1.8.34 — Phase finale bracket horizontal animé
+   V1.8.35 — Phase finale bracket horizontal animé
    ===================================================== */
 .final-tournament-shell.final-focus-shell {
   position: relative;
@@ -20557,7 +20557,7 @@ body[data-current-view] {
 }
 
 /* =====================================================
-   V1.8.34 — Refonte phase finale fenêtre 3 colonnes
+   V1.8.35 — Refonte phase finale fenêtre 3 colonnes
    ===================================================== */
 .final-tournament-shell.final-focus-shell {
   overflow: hidden !important;
@@ -20777,7 +20777,7 @@ body[data-current-view] {
 }
 
 /* =====================================================
-   V1.8.34 — Phase finale : fenêtre 3 colonnes, mobile 2 colonnes, liaisons propres
+   V1.8.35 — Phase finale : fenêtre 3 colonnes, mobile 2 colonnes, liaisons propres
    ===================================================== */
 .final-tournament-shell.final-focus-shell {
   padding: 18px 58px 24px !important;
@@ -21008,7 +21008,7 @@ body[data-current-view] {
 }
 
 /* =====================================================
-   V1.8.34 — Sondages du Hibou masqué
+   V1.8.35 — Sondages du Hibou masqué
    ===================================================== */
 .admin-owl-poll-editor {
   border: 1px solid rgba(250, 204, 21, 0.18);
@@ -21150,7 +21150,7 @@ body[data-current-view] {
 }
 
 /* =====================================================
-   V1.8.34 — Sondages joueurs : résultats après vote
+   V1.8.35 — Sondages joueurs : résultats après vote
    ===================================================== */
 .login-owl-poll-options.has-results {
   gap: 10px;
@@ -21208,7 +21208,7 @@ body[data-current-view] {
 }
 
 /* =====================================================
-   V1.8.34 — Sondages : détail des votes + historique
+   V1.8.35 — Sondages : détail des votes + historique
    ===================================================== */
 .login-owl-poll-voters,
 .admin-owl-poll-voters {
@@ -21288,4 +21288,28 @@ body[data-current-view] {
 }
 .owl-message-history-item .login-owl-poll {
   margin-top: 12px;
+}
+
+/* =====================================================
+   V1.8.35 — Sondages affichés dans le grimoire Hibou
+   ===================================================== */
+.owl-message-history-item .owl-poll-history-inline {
+  margin-top: 14px;
+  border-color: rgba(250, 204, 21, 0.34);
+  background:
+    radial-gradient(circle at top left, rgba(250, 204, 21, 0.16), transparent 42%),
+    rgba(15, 23, 42, 0.42);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.06), 0 12px 26px rgba(0,0,0,0.18);
+}
+.owl-message-history-item .owl-poll-history-inline .login-owl-poll-head strong {
+  color: #fde68a;
+}
+.owl-message-history-item .owl-poll-history-inline .login-owl-poll-voters {
+  border-color: rgba(250,204,21,0.24);
+}
+.owl-message-history-item .owl-poll-history-inline .login-owl-poll-voters summary {
+  background: rgba(250,204,21,0.08);
+}
+.owl-message-history-item .owl-poll-history-inline .login-owl-poll-voters[open] summary {
+  border-bottom: 1px solid rgba(250,204,21,0.14);
 }
