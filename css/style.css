@@ -22824,3 +22824,49 @@ body[data-current-view] {
     min-height: auto !important;
   }
 }
+
+
+/* =====================================================
+   V1.9.7 — Réalignement du tableau phase finale
+   Les cartes intermédiaires doivent rester centrées entre les tours précédents,
+   tout en conservant l’ouverture complète des cartes détaillées.
+   ===================================================== */
+.final-tournament-board .final-focus-stage-grid {
+  align-items: stretch !important;
+}
+
+.final-tournament-board .final-focus-slot {
+  display: flex !important;
+  align-items: center !important;
+  align-self: stretch !important;
+  min-height: 0 !important;
+  overflow: visible !important;
+}
+
+.final-tournament-board .final-focus-slot .final-focus-match {
+  width: 100% !important;
+}
+
+.final-tournament-board .final-focus-slot.is-expanded-slot {
+  display: flex !important;
+  align-items: stretch !important;
+  align-self: stretch !important;
+  min-height: 420px !important;
+}
+
+.final-tournament-board .final-focus-slot.is-expanded-slot .final-focus-match.expanded {
+  height: 100% !important;
+  min-height: 420px !important;
+  justify-content: flex-start !important;
+}
+
+.final-tournament-board[data-window-start="2"] .final-focus-slot.is-expanded-slot,
+.final-tournament-board[data-window-start="2"] .final-focus-slot.is-expanded-slot .final-focus-match.expanded {
+  min-height: 380px !important;
+}
+
+@media (min-width: 901px) {
+  .final-tournament-board[data-window-start="0"] { --final-row-height: 112px !important; }
+  .final-tournament-board[data-window-start="1"] { --final-row-height: 122px !important; }
+  .final-tournament-board[data-window-start="2"] { --final-row-height: 132px !important; }
+}
