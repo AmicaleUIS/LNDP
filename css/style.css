@@ -21490,7 +21490,7 @@ body[data-current-view] {
 }
 
 /* =====================================================
-   V1.9.4 — Phase finale desktop : 3 colonnes pleines, clic partout, liaisons simples
+   V1.9.5 — Phase finale desktop : 3 colonnes pleines, clic partout, liaisons simples
    ===================================================== */
 @media (min-width: 901px) {
   .final-tournament-shell.final-focus-shell {
@@ -21664,7 +21664,7 @@ body[data-current-view] {
 }
 
 /* =====================================================
-   V1.9.4 — Correctifs phase finale desktop + admin rouge/or
+   V1.9.5 — Correctifs phase finale desktop + admin rouge/or
    ===================================================== */
 .nav-list .admin-link,
 .mobile-menu-panel .mobile-admin-link {
@@ -21790,7 +21790,7 @@ body[data-current-view] {
 
 
 /* =====================================================
-   V1.9.4 — Phase finale : cartes compactes + ouverture au clic, sans traits
+   V1.9.5 — Phase finale : cartes compactes + ouverture au clic, sans traits
    ===================================================== */
 .final-tournament-board .final-focus-slot::before,
 .final-tournament-board .final-focus-slot::after,
@@ -21981,7 +21981,7 @@ body[data-current-view] {
 }
 
 /* =====================================================
-   V1.9.4 — Phase finale : nettoyage total traits + clic fiable
+   V1.9.5 — Phase finale : nettoyage total traits + clic fiable
    ===================================================== */
 .final-tournament-shell,
 .final-tournament-window,
@@ -22091,7 +22091,7 @@ body[data-current-view] {
 }
 
 /* =====================================================
-   V1.9.4 — Accueil compact + graphs zoom/focus
+   V1.9.5 — Accueil compact + graphs zoom/focus
    ===================================================== */
 .home-dashboard-hero-split {
   display: grid !important;
@@ -22224,7 +22224,7 @@ body[data-current-view] {
 }
 
 /* =====================================================
-   V1.9.4 — Graphs : zoom progressif + navigation temporelle
+   V1.9.5 — Graphs : zoom progressif + navigation temporelle
    ===================================================== */
 .evolution-card[data-evolution-level] .card-title-row {
   align-items: flex-start;
@@ -22358,7 +22358,7 @@ body[data-current-view] {
 }
 
 /* =====================================================
-   V1.9.4 — Graphs matchs simultanés + cartes phase finale compactes
+   V1.9.5 — Graphs matchs simultanés + cartes phase finale compactes
    ===================================================== */
 .final-focus-mini-meta {
   align-items: center;
@@ -22413,7 +22413,7 @@ body[data-current-view] {
 }
 
 /* =====================================================
-   V1.9.4 — Phase finale : finale centrée, petite finale plus basse
+   V1.9.5 — Phase finale : finale centrée, petite finale plus basse
    ===================================================== */
 @media (min-width: 901px) {
   .final-tournament-board[data-window-start="2"] .stage-final .final-focus-stage-grid {
@@ -22429,7 +22429,7 @@ body[data-current-view] {
 }
 
 /* =====================================================
-   V1.9.4 — Phase finale : écart entre cartes + clic prioritaire
+   V1.9.5 — Phase finale : écart entre cartes + clic prioritaire
    ===================================================== */
 .final-tournament-board .final-focus-stage-grid {
   gap: 14px !important;
@@ -22490,7 +22490,7 @@ body[data-current-view] {
 }
 
 /* =====================================================
-   V1.9.4 — Finale centrée + coupe + prono direct dans carte ouverte
+   V1.9.5 — Finale centrée + coupe + prono direct dans carte ouverte
    ===================================================== */
 .final-focus-admin-score {
   display: none !important;
@@ -22635,5 +22635,84 @@ body[data-current-view] {
   }
   .final-focus-prediction-editor-head {
     display: grid;
+  }
+}
+
+/* =====================================================
+   V1.9.5 — Phase finale : cartes ouvertes non coupées + détails 16èmes + capsule propre
+   ===================================================== */
+.final-tournament-window:has(.is-expanded-slot),
+.final-tournament-shell:has(.is-expanded-slot) {
+  overflow: visible !important;
+  max-height: none !important;
+}
+.final-tournament-board.final-focus-board {
+  grid-auto-rows: var(--final-row-height, 122px) !important;
+}
+.final-tournament-board .final-focus-stage-grid {
+  grid-auto-rows: var(--final-row-height, 122px) !important;
+  align-items: stretch !important;
+}
+.final-tournament-board .final-focus-slot.is-expanded-slot {
+  align-self: stretch !important;
+  z-index: 90 !important;
+  overflow: visible !important;
+  padding-block: 4px !important;
+}
+.final-tournament-board .final-focus-slot.is-expanded-slot .final-focus-match.expanded {
+  height: 100% !important;
+  min-height: 0 !important;
+  overflow: visible !important;
+  display: flex !important;
+  flex-direction: column;
+  justify-content: flex-start;
+  gap: 8px;
+}
+.final-tournament-board .final-focus-slot.is-expanded-slot .final-focus-card-head,
+.final-tournament-board .final-focus-slot.is-expanded-slot .final-focus-detailed-teams,
+.final-tournament-board .final-focus-slot.is-expanded-slot .final-focus-prono-strip,
+.final-tournament-board .final-focus-slot.is-expanded-slot .final-focus-expanded-info,
+.final-tournament-board .final-focus-slot.is-expanded-slot .final-focus-prediction-editor {
+  flex: 0 0 auto;
+}
+/* Les 16èmes doivent aussi afficher le lieu/diffusion quand on ouvre la carte */
+.final-tournament-board .stage-round_of_32.is-active .final-focus-match.expanded footer,
+.final-tournament-board .stage-round_of_32.is-active .final-focus-match.expanded .final-focus-expanded-info,
+.final-tournament-board .stage-round_of_32.is-active .final-focus-match.expanded .final-focus-location,
+.final-tournament-board .stage-round_of_32.is-active .final-focus-match.expanded .final-focus-tv {
+  display: grid !important;
+}
+.final-tournament-board .stage-round_of_32.is-active .final-focus-match.expanded .final-focus-expanded-info {
+  grid-template-columns: minmax(0, 1.35fr) minmax(0, .75fr) !important;
+  border-top: 1px solid rgba(148,163,184,.16) !important;
+  padding-top: 8px !important;
+  margin-top: 2px !important;
+}
+.final-focus-expanded-info {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1.35fr) minmax(0, .75fr);
+}
+.final-focus-prediction-editor {
+  max-height: none !important;
+  overflow: visible !important;
+}
+.final-focus-stage-title small:empty {
+  display: none !important;
+}
+@media (min-width: 901px) {
+  .final-tournament-board[data-window-start="0"] { --final-row-height: 118px !important; }
+  .final-tournament-board[data-window-start="1"] { --final-row-height: 128px !important; }
+  .final-tournament-board[data-window-start="2"] { --final-row-height: 136px !important; }
+  .final-tournament-board[data-window-start="0"] .final-focus-slot.is-expanded-slot { min-height: 430px !important; }
+  .final-tournament-board[data-window-start="1"] .final-focus-slot.is-expanded-slot { min-height: 430px !important; }
+  .final-tournament-board[data-window-start="2"] .final-focus-slot.is-expanded-slot { min-height: 390px !important; }
+  .final-tournament-window:has(.is-expanded-slot) {
+    padding-bottom: 34px !important;
+  }
+  .final-tournament-shell:has(.is-expanded-slot) {
+    padding-bottom: 42px !important;
+  }
+  .final-tournament-board[data-window-start="0"] .stage-round_of_32.is-active .final-focus-match.expanded {
+    padding: 12px 14px !important;
   }
 }

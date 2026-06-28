@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — APP PRINCIPALE V1.9.4
+// LE NID DES PRONOS — APP PRINCIPALE V1.9.5
 // ============================================================
 
 const H = window.Helpers;
@@ -482,7 +482,7 @@ const App = {
           <div>
             <p class="eyebrow">Crédits cachés</p>
             <h2 id="creditsTitle">Le Nid des Pronos</h2>
-            <p class="muted">Version publique <strong>1.9.4</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
+            <p class="muted">Version publique <strong>1.9.5</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
           </div>
         </div>
         <div class="credits-grid">
@@ -499,7 +499,7 @@ const App = {
             <p><strong>1.0.5</strong> — dashboard mobile/desktop stabilisé, sans chevauchement des cartes.</p>
           </section>
           <section>
-            <h3>Évolutions V1.9.4</h3>
+            <h3>Évolutions V1.9.5</h3>
             <ul class="changelog-list">
               <li>Le super admin peut désactiver ou réactiver l’affichage du module préparation.</li>
               <li>Quand la préparation est désactivée, les matchs test disparaissent des matchs/pronos, classements par phase et règles.</li>
@@ -923,7 +923,7 @@ const App = {
       .in("message_id", ids);
 
     if (error) {
-      console.warn("Votes de sondage Hibou indisponibles : lance le patch SQL V1.9.4", error);
+      console.warn("Votes de sondage Hibou indisponibles : lance le patch SQL V1.9.5", error);
       this.state.owlPollVotes = {};
       return;
     }
@@ -971,7 +971,7 @@ const App = {
       .in("message_id", ids);
 
     if (error) {
-      console.warn("Détail des votes Hibou indisponible : lance le patch SQL V1.9.4", error);
+      console.warn("Détail des votes Hibou indisponible : lance le patch SQL V1.9.5", error);
       return;
     }
 
@@ -1134,7 +1134,7 @@ const App = {
       .upsert({ message_id: message.id, user_id: this.state.session?.user?.id, option_key: optionKey }, { onConflict: "message_id,user_id" });
 
     if (error) {
-      H.toast(error.message || "Vote impossible. Lance le patch SQL V1.9.4.", "error");
+      H.toast(error.message || "Vote impossible. Lance le patch SQL V1.9.5.", "error");
       return;
     }
 
@@ -1498,7 +1498,7 @@ const App = {
 
 
   async loadVisiblePredictions() {
-    // V1.9.4 — IMPORTANT : Supabase REST renvoie 1000 lignes max par requête.
+    // V1.9.5 — IMPORTANT : Supabase REST renvoie 1000 lignes max par requête.
     // Le classement général est agrégé en base, mais les détails joueurs et le classement Famille
     // repartent des pronos visibles côté front. On pagine donc toute la vue, sinon les détails
     // s'arrêtent après les premiers paquets de matchs/joueurs.
@@ -6046,7 +6046,7 @@ const App = {
           const complete = this.isFinalRoundComplete(matchMap, config);
           return `<button type="button" class="${activeRound === config.key ? "active" : ""} ${complete ? "is-complete" : ""}" data-final-round="${H.escapeHtml(config.key)}" role="tab" aria-selected="${activeRound === config.key ? "true" : "false"}">
             <span>${H.escapeHtml(config.label)}</span>
-            ${complete ? `<small>terminé</small>` : `<small>${H.escapeHtml(config.shortLabel)}</small>`}
+            ${complete ? `<small>terminé</small>` : String(config.shortLabel || "").toLowerCase() !== String(config.label || "").toLowerCase() ? `<small>${H.escapeHtml(config.shortLabel)}</small>` : ""}
           </button>`;
         }).join("")}
       </div>
@@ -6098,9 +6098,11 @@ const App = {
     const rowsHtml = config.numbers.map((number, index) => {
       const placement = this.finalFocusVisiblePlacement(config.key, index, windowStart, number);
       const isExpanded = isActive && Number(number) === expandedNumber;
+      const baseSpan = Number(placement.rowSpan || 1);
+      const expandedSpan = windowStart <= 0 ? 4 : windowStart === 1 ? 4 : 3;
       const rowStart = Number(placement.rowStart || 1) + expandedShift;
-      const rowSpan = isExpanded ? Math.max(Number(placement.rowSpan || 1), 2) : Number(placement.rowSpan || 1);
-      if (isExpanded) expandedShift += 1;
+      const rowSpan = isExpanded ? Math.max(baseSpan, expandedSpan) : baseSpan;
+      if (isExpanded) expandedShift += Math.max(0, rowSpan - baseSpan);
       return `<div class="final-focus-slot slot-m${number} ${isExpanded ? "is-expanded-slot" : ""}" data-match-number="${number}" data-final-round-target="${H.escapeHtml(config.key)}" style="grid-row:${rowStart} / span ${rowSpan};">
         ${this.finalFocusMatchCardHtml(matchMap, number, config, { activeColumn: isActive, expanded: isExpanded })}
       </div>`;
@@ -6116,7 +6118,7 @@ const App = {
         aria-label="${H.escapeHtml(config.title)}">
         <button type="button" class="final-focus-stage-title ${isActive ? "active" : ""}" data-final-round="${H.escapeHtml(config.key)}" aria-selected="${isActive ? "true" : "false"}">
           <span>${H.escapeHtml(config.label)}</span>
-          <small>${complete ? "terminé" : H.escapeHtml(config.shortLabel)}</small>
+          ${complete ? `<small>terminé</small>` : String(config.shortLabel || "").toLowerCase() !== String(config.label || "").toLowerCase() ? `<small>${H.escapeHtml(config.shortLabel)}</small>` : ""}
         </button>
         <div class="final-focus-stage-grid" data-final-round-target="${H.escapeHtml(config.key)}">
           ${rowsHtml}
@@ -11125,7 +11127,7 @@ const App = {
           </div>
           <div class="profile-account-actions">
             <button class="ghost-btn" id="profileInstallAppBtn" type="button">Installer l’app</button>
-            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.9.4</button>
+            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.9.5</button>
             <button class="danger-btn" id="profileLogoutBtn" type="button">Déconnexion</button>
           </div>
         </div>
