@@ -21490,7 +21490,7 @@ body[data-current-view] {
 }
 
 /* =====================================================
-   V1.8.37 — Phase finale desktop : 3 colonnes pleines, clic partout, liaisons simples
+   V1.8.38 — Phase finale desktop : 3 colonnes pleines, clic partout, liaisons simples
    ===================================================== */
 @media (min-width: 901px) {
   .final-tournament-shell.final-focus-shell {
@@ -21660,5 +21660,130 @@ body[data-current-view] {
   @keyframes finalSlideLeft37 {
     from { opacity: .62; transform: translateX(-56px); }
     to { opacity: 1; transform: translateX(0); }
+  }
+}
+
+/* =====================================================
+   V1.8.38 — Correctifs phase finale desktop + admin rouge/or
+   ===================================================== */
+.nav-list .admin-link,
+.mobile-menu-panel .mobile-admin-link {
+  border-color: rgba(248, 113, 113, 0.45) !important;
+  background:
+    linear-gradient(135deg, rgba(127, 29, 29, 0.72), rgba(180, 83, 9, 0.55) 52%, rgba(250, 204, 21, 0.18)) !important;
+  color: #fff7ed !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.10), 0 0 0 1px rgba(250,204,21,.10), 0 12px 28px rgba(127,29,29,.20) !important;
+}
+.nav-list .admin-link:hover,
+.mobile-menu-panel .mobile-admin-link:hover {
+  border-color: rgba(250, 204, 21, 0.65) !important;
+  background: linear-gradient(135deg, rgba(185, 28, 28, 0.88), rgba(217, 119, 6, 0.72), rgba(250, 204, 21, 0.28)) !important;
+}
+
+@media (min-width: 901px) {
+  .final-tournament-shell.final-focus-shell {
+    padding: 18px 18px 24px !important;
+  }
+  .final-tournament-window {
+    overflow: hidden !important;
+  }
+  .final-tournament-board.final-focus-board {
+    gap: 30px !important;
+    padding: 8px 8px 16px !important;
+  }
+
+  /* 3 colonnes mieux remplies, mais sans étouffer les cartes */
+  .final-tournament-board[data-window-start="0"][data-active-round="round_of_32"] { grid-template-columns: minmax(0,1.36fr) minmax(0,1.00fr) minmax(0,.88fr) !important; }
+  .final-tournament-board[data-window-start="0"][data-active-round="round_of_16"] { grid-template-columns: minmax(0,.96fr) minmax(0,1.36fr) minmax(0,.92fr) !important; }
+  .final-tournament-board[data-window-start="1"][data-active-round="quarter_final"] { grid-template-columns: minmax(0,.98fr) minmax(0,1.34fr) minmax(0,.98fr) !important; }
+  .final-tournament-board[data-window-start="2"][data-active-round="semi_final"] { grid-template-columns: minmax(0,1.00fr) minmax(0,1.30fr) minmax(0,1.05fr) !important; }
+  .final-tournament-board[data-window-start="2"][data-active-round="final"] { grid-template-columns: minmax(0,.94fr) minmax(0,1.02fr) minmax(0,1.34fr) !important; }
+
+  /* Les 16èmes étaient trop hauts pour la ligne : on simplifie sans perdre prono/résultat */
+  .final-tournament-board[data-window-start="0"] { --final-row-height: 128px; }
+  .final-tournament-board[data-window-start="1"] { --final-row-height: 122px; }
+  .final-tournament-board[data-window-start="2"] { --final-row-height: 132px; }
+
+  .final-tournament-board .stage-round_of_32.is-active .final-focus-match.detailed {
+    min-height: 108px !important;
+    padding: 10px 12px !important;
+  }
+  .final-tournament-board .stage-round_of_32.is-active .final-focus-match.detailed header {
+    margin-bottom: 6px !important;
+  }
+  .final-tournament-board .stage-round_of_32.is-active .final-focus-detailed-teams {
+    margin: 6px 0 !important;
+  }
+  .final-tournament-board .stage-round_of_32.is-active .final-focus-match.detailed footer {
+    display: none !important;
+  }
+  .final-tournament-board .stage-round_of_32.is-active .final-focus-prono-strip {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 8px !important;
+    margin-top: 6px !important;
+  }
+  .final-tournament-board .stage-round_of_32.is-active .final-focus-prono-strip span {
+    padding: 7px 8px !important;
+  }
+
+  .final-tournament-board .final-focus-stage.is-compact .final-focus-match.compact,
+  .final-tournament-board .final-focus-stage:not(.is-active) .final-focus-match.detailed {
+    min-height: 76px !important;
+    padding: 9px 10px !important;
+  }
+  .final-tournament-board .final-focus-mini-meta {
+    margin-top: 7px !important;
+  }
+
+  /* Remise à zéro des anciens traits, puis liaisons simples : milieu source -> milieu match suivant */
+  .final-tournament-board .final-focus-slot::before,
+  .final-tournament-board .final-focus-slot::after,
+  .final-tournament-board .final-focus-stage-grid::after {
+    display: none !important;
+    content: none !important;
+  }
+  .final-tournament-board .final-focus-stage:not(:last-child) .final-focus-slot::after {
+    display: block !important;
+    content: "" !important;
+    position: absolute;
+    top: 50% !important;
+    right: -30px !important;
+    width: 30px !important;
+    height: 2px !important;
+    border: 0 !important;
+    border-radius: 999px !important;
+    background: linear-gradient(90deg, rgba(250,204,21,.58), rgba(148,163,184,.62)) !important;
+    transform-origin: left center !important;
+    pointer-events: none !important;
+    z-index: 0 !important;
+  }
+  .final-tournament-board .final-focus-stage:not(:last-child) .final-focus-slot:nth-child(odd)::after {
+    transform: rotate(26deg) !important;
+  }
+  .final-tournament-board .final-focus-stage:not(:last-child) .final-focus-slot:nth-child(even)::after {
+    transform: rotate(-26deg) !important;
+  }
+
+  /* Pour les derniers tours, le décalage vertical est moins fort */
+  .final-tournament-board[data-window-start="1"] .final-focus-stage:not(:last-child) .final-focus-slot::after {
+    right: -30px !important;
+    width: 30px !important;
+  }
+  .final-tournament-board[data-window-start="1"] .final-focus-stage:not(:last-child) .final-focus-slot:nth-child(odd)::after {
+    transform: rotate(18deg) !important;
+  }
+  .final-tournament-board[data-window-start="1"] .final-focus-stage:not(:last-child) .final-focus-slot:nth-child(even)::after {
+    transform: rotate(-18deg) !important;
+  }
+  .final-tournament-board[data-window-start="2"] .final-focus-stage:not(:last-child) .final-focus-slot::after {
+    transform: rotate(0deg) !important;
+  }
+
+  .final-tournament-board .final-focus-stage {
+    outline: none;
+  }
+  .final-tournament-board .final-focus-stage:focus-visible {
+    box-shadow: 0 0 0 3px rgba(250,204,21,.24);
+    border-radius: 24px;
   }
 }

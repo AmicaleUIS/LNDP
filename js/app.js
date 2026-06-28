@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — APP PRINCIPALE V1.8.37
+// LE NID DES PRONOS — APP PRINCIPALE V1.8.38
 // ============================================================
 
 const H = window.Helpers;
@@ -478,7 +478,7 @@ const App = {
           <div>
             <p class="eyebrow">Crédits cachés</p>
             <h2 id="creditsTitle">Le Nid des Pronos</h2>
-            <p class="muted">Version publique <strong>1.8.37</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
+            <p class="muted">Version publique <strong>1.8.38</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
           </div>
         </div>
         <div class="credits-grid">
@@ -495,7 +495,7 @@ const App = {
             <p><strong>1.0.5</strong> — dashboard mobile/desktop stabilisé, sans chevauchement des cartes.</p>
           </section>
           <section>
-            <h3>Évolutions V1.8.37</h3>
+            <h3>Évolutions V1.8.38</h3>
             <ul class="changelog-list">
               <li>Le super admin peut désactiver ou réactiver l’affichage du module préparation.</li>
               <li>Quand la préparation est désactivée, les matchs test disparaissent des matchs/pronos, classements par phase et règles.</li>
@@ -512,7 +512,6 @@ const App = {
       </div>
     `;
     document.body.appendChild(modal);
-    messages.filter((message) => message.poll_enabled).forEach((message) => this.bindOwlPollButtons(modal, message));
     const close = () => modal.remove();
     H.$("#closeCreditsBtn", modal).addEventListener("click", close);
     modal.addEventListener("click", (event) => { if (event.target === modal) close(); });
@@ -642,7 +641,6 @@ const App = {
       </div>
     `;
     document.body.appendChild(modal);
-    messages.filter((message) => message.poll_enabled).forEach((message) => this.bindOwlPollButtons(modal, message));
     const close = () => modal.remove();
     H.$("#closeRulesBtn", modal)?.addEventListener("click", close);
     modal.addEventListener("click", (event) => { if (event.target === modal) close(); });
@@ -921,7 +919,7 @@ const App = {
       .in("message_id", ids);
 
     if (error) {
-      console.warn("Votes de sondage Hibou indisponibles : lance le patch SQL V1.8.37", error);
+      console.warn("Votes de sondage Hibou indisponibles : lance le patch SQL V1.8.38", error);
       this.state.owlPollVotes = {};
       return;
     }
@@ -969,7 +967,7 @@ const App = {
       .in("message_id", ids);
 
     if (error) {
-      console.warn("Détail des votes Hibou indisponible : lance le patch SQL V1.8.37", error);
+      console.warn("Détail des votes Hibou indisponible : lance le patch SQL V1.8.38", error);
       return;
     }
 
@@ -1132,7 +1130,7 @@ const App = {
       .upsert({ message_id: message.id, user_id: this.state.session?.user?.id, option_key: optionKey }, { onConflict: "message_id,user_id" });
 
     if (error) {
-      H.toast(error.message || "Vote impossible. Lance le patch SQL V1.8.37.", "error");
+      H.toast(error.message || "Vote impossible. Lance le patch SQL V1.8.38.", "error");
       return;
     }
 
@@ -1243,7 +1241,6 @@ const App = {
       </div>
     `;
     document.body.appendChild(modal);
-    messages.filter((message) => message.poll_enabled).forEach((message) => this.bindOwlPollButtons(modal, message));
     const close = () => modal.remove();
     H.$("#closeOwlMessagesHistoryBtn", modal)?.addEventListener("click", close);
     modal.addEventListener("click", (event) => { if (event.target === modal) close(); });
@@ -1497,7 +1494,7 @@ const App = {
 
 
   async loadVisiblePredictions() {
-    // V1.8.37 — IMPORTANT : Supabase REST renvoie 1000 lignes max par requête.
+    // V1.8.38 — IMPORTANT : Supabase REST renvoie 1000 lignes max par requête.
     // Le classement général est agrégé en base, mais les détails joueurs et le classement Famille
     // repartent des pronos visibles côté front. On pagine donc toute la vue, sinon les détails
     // s'arrêtent après les premiers paquets de matchs/joueurs.
@@ -3256,7 +3253,6 @@ const App = {
     `;
 
     document.body.appendChild(modal);
-    messages.filter((message) => message.poll_enabled).forEach((message) => this.bindOwlPollButtons(modal, message));
     const close = () => modal.remove();
     H.$("#closeHomePredictionsXBtn", modal)?.addEventListener("click", close);
     H.$("#closeHomePredictionsBtn", modal)?.addEventListener("click", close);
@@ -3655,20 +3651,10 @@ const App = {
   },
 
   predictionCandidateSortValue(match = {}) {
-    const stageOrder = {
-      group: 0,
-      round_of_32: 1,
-      round_of_16: 2,
-      quarter_final: 3,
-      semi_final: 4,
-      third_place: 5,
-      final: 6
-    };
-    const stage = stageOrder[match.stage] ?? 99;
-    const pool = match.stage === "group" ? Number(match.pool_round || match.group_round || 99) : 99;
-    const bracket = match.stage === "group" ? 0 : (H.officialBracketSortValue?.(match) || this.finalBracketSortValue(match));
     const kickoff = match?.kickoff_at ? new Date(match.kickoff_at).getTime() : 9999999999999;
-    return stage * 100000000000000 + pool * 1000000000000 + bracket * 1000000000 + kickoff;
+    if (match.stage !== "group") return kickoff;
+    const pool = Number(match.pool_round || match.group_round || 99);
+    return pool * 1000000000000 + kickoff;
   },
 
   sortPredictionCandidates(matches = []) {
@@ -3713,14 +3699,9 @@ const App = {
     return Object.values(grouped)
       .map((group) => ({
         ...group,
-        matches: group.matches.sort((a, b) => {
-          if (a.stage !== "group" || b.stage !== "group") {
-            return (H.officialBracketSortValue?.(a) || this.finalBracketSortValue(a))
-              - (H.officialBracketSortValue?.(b) || this.finalBracketSortValue(b))
-              || new Date(a.kickoff_at || 0) - new Date(b.kickoff_at || 0);
-          }
-          return new Date(a.kickoff_at || 0) - new Date(b.kickoff_at || 0);
-        })
+        matches: group.matches.sort((a, b) => new Date(a.kickoff_at || 0) - new Date(b.kickoff_at || 0)
+          || (H.officialBracketSortValue?.(a) || this.finalBracketSortValue(a))
+          - (H.officialBracketSortValue?.(b) || this.finalBracketSortValue(b)))
       }))
       .sort((a, b) => a.order - b.order || new Date(a.matches[0]?.kickoff_at || 0) - new Date(b.matches[0]?.kickoff_at || 0));
   },
@@ -5164,7 +5145,6 @@ const App = {
     `;
 
     document.body.appendChild(modal);
-    messages.filter((message) => message.poll_enabled).forEach((message) => this.bindOwlPollButtons(modal, message));
     const close = () => modal.remove();
     H.$("#closeRecordDetailXBtn", modal)?.addEventListener("click", close);
     modal.addEventListener("click", (event) => { if (event.target === modal) close(); });
@@ -5303,36 +5283,26 @@ const App = {
       });
     });
 
+    const scroller = H.$("#finalBracketScroll");
+    if (scroller && scroller.dataset.finalDelegationBound !== "true") {
+      scroller.dataset.finalDelegationBound = "true";
+      scroller.addEventListener("click", (event) => {
+        if (event.target.closest("button, a, input, select, textarea")) return;
+        const target = event.target.closest("[data-final-round-target], [data-final-stage-round]");
+        const round = target?.dataset?.finalRoundTarget || target?.dataset?.finalStageRound;
+        if (round) this.setFinalBracketRound(round);
+      });
+    }
+
     H.$$('[data-final-stage-round]').forEach((stage) => {
       if (stage.dataset.finalStageRoundBound === "true") return;
       stage.dataset.finalStageRoundBound = "true";
       const activateStage = () => this.setFinalBracketRound(stage.dataset.finalStageRound || null);
-      stage.addEventListener("click", (event) => {
-        if (event.target.closest("button, a, input, select, textarea")) return;
-        activateStage();
-      });
       stage.addEventListener("keydown", (event) => {
         if (event.key !== "Enter" && event.key !== " ") return;
         event.preventDefault();
         activateStage();
       });
-    });
-
-    H.$$('[data-final-round-target]').forEach((node) => {
-      if (node.dataset.finalRoundTargetBound === "true") return;
-      node.dataset.finalRoundTargetBound = "true";
-      const activate = () => this.setFinalBracketRound(node.dataset.finalRoundTarget || null);
-      node.addEventListener("click", (event) => {
-        if (event.target.closest("button, a, input, select, textarea")) return;
-        activate();
-      });
-      if (node.matches('.final-focus-stage')) {
-        node.addEventListener("keydown", (event) => {
-          if (event.key !== "Enter" && event.key !== " ") return;
-          event.preventDefault();
-          activate();
-        });
-      }
     });
   },
 
@@ -10310,7 +10280,6 @@ const App = {
       </div>
     `;
     document.body.appendChild(modal);
-    messages.filter((message) => message.poll_enabled).forEach((message) => this.bindOwlPollButtons(modal, message));
     const close = () => modal.remove();
     modal.querySelector(".modal-close")?.addEventListener("click", close);
     modal.addEventListener("click", (event) => { if (event.target === modal) close(); });
@@ -10784,7 +10753,7 @@ const App = {
           </div>
           <div class="profile-account-actions">
             <button class="ghost-btn" id="profileInstallAppBtn" type="button">Installer l’app</button>
-            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.8.37</button>
+            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.8.38</button>
             <button class="danger-btn" id="profileLogoutBtn" type="button">Déconnexion</button>
           </div>
         </div>
