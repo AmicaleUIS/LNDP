@@ -5290,6 +5290,7 @@ const App = {
     this.bindFinalBracketControls();
     this.bindPredictionForms();
     this.scrollFinalBracketToActiveRound();
+    this.refreshFinalBracketConnectors();
   },
 
   bindFinalBracketRoundTabs() {
@@ -5524,6 +5525,85 @@ const App = {
         const maxLeft = Math.max(0, scroller.scrollWidth - scroller.clientWidth);
         const target = direction < 0 ? 0 : maxLeft;
         scroller.scrollTo({ left: target, behavior: "smooth" });
+      });
+    });
+  },
+
+
+  refreshFinalBracketConnectors() {
+    const board = H.$("#finalBracketScroll .final-tournament-board");
+    if (!board) return;
+
+    const draw = () => this.drawFinalBracketConnectors(board);
+    window.requestAnimationFrame(draw);
+    window.setTimeout(draw, 140);
+
+    if (window && !this._finalBracketConnectorResizeBound) {
+      this._finalBracketConnectorResizeBound = true;
+      window.addEventListener("resize", () => {
+        window.clearTimeout(this._finalBracketConnectorResizeTimer);
+        this._finalBracketConnectorResizeTimer = window.setTimeout(() => {
+          const latestBoard = H.$("#finalBracketScroll .final-tournament-board");
+          if (latestBoard) this.drawFinalBracketConnectors(latestBoard);
+        }, 90);
+      });
+    }
+  },
+
+  drawFinalBracketConnectors(board) {
+    if (!board) return;
+    board.querySelector(".final-focus-connectors")?.remove();
+
+    const stages = Array.from(board.querySelectorAll(".final-focus-stage"));
+    if (stages.length < 2) return;
+
+    const width = Math.ceil(board.clientWidth || board.scrollWidth || 0);
+    const height = Math.ceil(board.scrollHeight || board.clientHeight || 0);
+    if (!width || !height) return;
+
+    const ns = "http://www.w3.org/2000/svg";
+    const svg = document.createElementNS(ns, "svg");
+    svg.classList.add("final-focus-connectors");
+    svg.setAttribute("aria-hidden", "true");
+    svg.setAttribute("width", String(width));
+    svg.setAttribute("height", String(height));
+    svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
+    board.prepend(svg);
+
+    const boardRect = board.getBoundingClientRect();
+    const addLine = (sourceEl, targetEl) => {
+      if (!sourceEl || !targetEl) return;
+      const sourceRect = sourceEl.getBoundingClientRect();
+      const targetRect = targetEl.getBoundingClientRect();
+      const x1 = sourceRect.right - boardRect.left;
+      const y1 = sourceRect.top + sourceRect.height / 2 - boardRect.top;
+      const x2 = targetRect.left - boardRect.left;
+      const y2 = targetRect.top + targetRect.height / 2 - boardRect.top;
+      const path = document.createElementNS(ns, "path");
+      const dx = Math.max(28, (x2 - x1) * 0.35);
+      path.setAttribute("d", `M ${x1} ${y1} C ${x1 + dx} ${y1}, ${x2 - dx} ${y2}, ${x2} ${y2}`);
+      path.setAttribute("class", "final-focus-connector-line");
+      svg.appendChild(path);
+    };
+
+    stages.forEach((stage, stageIndex) => {
+      const nextStage = stages[stageIndex + 1];
+      if (!nextStage) return;
+      const stageKey = stage.dataset.finalStageRound || "";
+      const nextKey = nextStage.dataset.finalStageRound || "";
+      const sourceCards = Array.from(stage.querySelectorAll(".final-focus-slot > .final-focus-match"));
+      const targetCards = Array.from(nextStage.querySelectorAll(".final-focus-slot > .final-focus-match"));
+      if (!sourceCards.length || !targetCards.length) return;
+
+      if (stageKey === "semi_final" && nextKey === "final") {
+        const finalCard = targetCards[0];
+        sourceCards.forEach((card) => addLine(card, finalCard));
+        return;
+      }
+
+      sourceCards.forEach((card, index) => {
+        const targetCard = targetCards[Math.floor(index / 2)];
+        addLine(card, targetCard);
       });
     });
   },
@@ -6118,7 +6198,7 @@ const App = {
         aria-label="${H.escapeHtml(config.title)}">
         <button type="button" class="final-focus-stage-title ${isActive ? "active" : ""}" data-final-round="${H.escapeHtml(config.key)}" aria-selected="${isActive ? "true" : "false"}">
           <span>${H.escapeHtml(config.label)}</span>
-          ${complete ? `<small>terminé</small>` : String(config.shortLabel || "").toLowerCase() !== String(config.label || "").toLowerCase() ? `<small>${H.escapeHtml(config.shortLabel)}</small>` : ""}
+          ${complete ? `<small>terminé</small>` : ""}
         </button>
         <div class="final-focus-stage-grid" data-final-round-target="${H.escapeHtml(config.key)}">
           ${rowsHtml}

@@ -22870,3 +22870,52 @@ body[data-current-view] {
   .final-tournament-board[data-window-start="1"] { --final-row-height: 122px !important; }
   .final-tournament-board[data-window-start="2"] { --final-row-height: 132px !important; }
 }
+
+
+/* =====================================================
+   V1.9.8 — Connecteurs SVG + libellés propres
+   ===================================================== */
+.final-tournament-board {
+  position: relative !important;
+  isolation: isolate;
+}
+
+.final-tournament-board .final-focus-stage,
+.final-tournament-board .final-focus-stage-grid,
+.final-tournament-board .final-focus-slot,
+.final-tournament-board .final-focus-match {
+  position: relative;
+  z-index: 2;
+}
+
+.final-tournament-board .final-focus-stage::before,
+.final-tournament-board .final-focus-stage::after,
+.final-tournament-board .final-focus-stage-grid::before,
+.final-tournament-board .final-focus-stage-grid::after,
+.final-tournament-board .final-focus-slot::before,
+.final-tournament-board .final-focus-slot::after {
+  content: none !important;
+  display: none !important;
+}
+
+.final-focus-connectors {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  overflow: visible;
+  z-index: 1;
+}
+
+.final-focus-connector-line {
+  fill: none;
+  stroke: rgba(245, 189, 48, 0.95);
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  filter: drop-shadow(0 0 4px rgba(245, 189, 48, 0.35));
+}
+
+.final-focus-stage-title small:empty {
+  display: none !important;
+}
