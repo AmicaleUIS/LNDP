@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — APP PRINCIPALE V1.9.3
+// LE NID DES PRONOS — APP PRINCIPALE V1.9.4
 // ============================================================
 
 const H = window.Helpers;
@@ -482,7 +482,7 @@ const App = {
           <div>
             <p class="eyebrow">Crédits cachés</p>
             <h2 id="creditsTitle">Le Nid des Pronos</h2>
-            <p class="muted">Version publique <strong>1.9.3</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
+            <p class="muted">Version publique <strong>1.9.4</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
           </div>
         </div>
         <div class="credits-grid">
@@ -499,7 +499,7 @@ const App = {
             <p><strong>1.0.5</strong> — dashboard mobile/desktop stabilisé, sans chevauchement des cartes.</p>
           </section>
           <section>
-            <h3>Évolutions V1.9.3</h3>
+            <h3>Évolutions V1.9.4</h3>
             <ul class="changelog-list">
               <li>Le super admin peut désactiver ou réactiver l’affichage du module préparation.</li>
               <li>Quand la préparation est désactivée, les matchs test disparaissent des matchs/pronos, classements par phase et règles.</li>
@@ -923,7 +923,7 @@ const App = {
       .in("message_id", ids);
 
     if (error) {
-      console.warn("Votes de sondage Hibou indisponibles : lance le patch SQL V1.9.3", error);
+      console.warn("Votes de sondage Hibou indisponibles : lance le patch SQL V1.9.4", error);
       this.state.owlPollVotes = {};
       return;
     }
@@ -971,7 +971,7 @@ const App = {
       .in("message_id", ids);
 
     if (error) {
-      console.warn("Détail des votes Hibou indisponible : lance le patch SQL V1.9.3", error);
+      console.warn("Détail des votes Hibou indisponible : lance le patch SQL V1.9.4", error);
       return;
     }
 
@@ -1134,7 +1134,7 @@ const App = {
       .upsert({ message_id: message.id, user_id: this.state.session?.user?.id, option_key: optionKey }, { onConflict: "message_id,user_id" });
 
     if (error) {
-      H.toast(error.message || "Vote impossible. Lance le patch SQL V1.9.3.", "error");
+      H.toast(error.message || "Vote impossible. Lance le patch SQL V1.9.4.", "error");
       return;
     }
 
@@ -1498,7 +1498,7 @@ const App = {
 
 
   async loadVisiblePredictions() {
-    // V1.9.3 — IMPORTANT : Supabase REST renvoie 1000 lignes max par requête.
+    // V1.9.4 — IMPORTANT : Supabase REST renvoie 1000 lignes max par requête.
     // Le classement général est agrégé en base, mais les détails joueurs et le classement Famille
     // repartent des pronos visibles côté front. On pagine donc toute la vue, sinon les détails
     // s'arrêtent après les premiers paquets de matchs/joueurs.
@@ -5288,6 +5288,7 @@ const App = {
     this.bindFinalBracketRoundTabs();
     this.bindFinalBracketDrag();
     this.bindFinalBracketControls();
+    this.bindPredictionForms();
     this.scrollFinalBracketToActiveRound();
   },
 
@@ -6143,8 +6144,10 @@ const App = {
     if (stageKey === "quarter_final") return { rowStart: index + 1, rowSpan: 1 };
     if (stageKey === "semi_final") return { rowStart: index * 2 + 1, rowSpan: 2 };
     if (stageKey === "final") {
-      // Finale centrée entre les deux demies, petite finale nettement plus bas.
-      return { rowStart: Number(number) === 103 ? 4 : 2, rowSpan: 1 };
+      // Finale vraiment centrée entre les deux demies, petite finale nettement plus bas.
+      return Number(number) === 103
+        ? { rowStart: 4, rowSpan: 1 }
+        : { rowStart: 2, rowSpan: 2 };
     }
     return { rowStart: index + 1, rowSpan: 1 };
   },
@@ -6166,6 +6169,9 @@ const App = {
     const tvHtml = H.tvChannelLogosHtml(this.matchTvChannel(match), "tv-logo-strip final-tv-strip");
     const pronoMeta = this.finalFocusPredictionMetaHtml(match, expanded, tvHtml);
     const cardClass = expanded ? "expanded detailed" : `compact ${activeColumn ? "active-compact" : "side-compact"}`;
+    const cupHtml = Number(number) === 104
+      ? `<div class="final-focus-cup-above" aria-hidden="true"><img src="assets/icons/coupe.png" alt=""></div>`
+      : "";
 
     return `
       <article class="final-focus-match ${cardClass} ${match.status || "scheduled"}"
@@ -6174,6 +6180,7 @@ const App = {
         role="button"
         tabindex="0"
         aria-expanded="${expanded ? "true" : "false"}">
+        ${cupHtml}
         <header class="final-focus-card-head">
           <strong>${H.escapeHtml(title)}</strong>
           <small>${H.escapeHtml(expanded ? date : compactDate)}</small>
@@ -6184,23 +6191,68 @@ const App = {
           <span>${H.matchFlagHtml(match, "away")}<strong>${H.escapeHtml(away)}</strong></span>
         </div>
         ${pronoMeta}
-        ${expanded ? `<footer class="final-focus-card-foot is-expanded">
-          <span class="final-focus-location">${location ? H.escapeHtml(location) : "Lieu à confirmer"}</span>
-          <span class="final-focus-tv">${H.icon("tv")} ${tvHtml}</span>
-        </footer>` : ""}
-        ${expanded ? this.finalFocusAdminScoreShortcutHtml(match) : ""}
+        ${expanded ? this.finalFocusExpandedInfoHtml(match, tvHtml) : ""}
+        ${expanded ? this.finalFocusPredictionEditorHtml(match) : ""}
       </article>
     `;
   },
 
-  finalFocusAdminScoreShortcutHtml(match) {
-    if (!this.isScoreAdmin?.() || !match?.id) return "";
+  finalFocusExpandedInfoHtml(match, tvHtml = "") {
+    const country = match.country || match.country_name || match.host_country || match.location_country || "";
+    const locationParts = [country, match.city, match.venue].filter(Boolean);
+    const location = locationParts.join(" · ") || [match.city, match.venue].filter(Boolean).join(" · ") || "Lieu à confirmer";
     return `
-      <div class="final-focus-admin-score">
-        <span>Score admin</span>
-        <a class="ghost-btn small" href="admin.html#scores" title="Ouvrir l’admin pour modifier le score">Modifier le score</a>
-      </div>
+      <footer class="final-focus-card-foot is-expanded final-focus-expanded-info">
+        <span class="final-focus-location"><small>Lieu</small><strong>${H.escapeHtml(location)}</strong></span>
+        <span class="final-focus-tv"><small>Diffusion</small><strong>${tvHtml || "À confirmer"}</strong></span>
+      </footer>
     `;
+  },
+
+  finalFocusPredictionEditorHtml(match) {
+    if (!match?.id) return "";
+    const locked = H.isKickoffPassed(match.kickoff_at);
+    const myPrediction = this.getMyPrediction(match.id);
+    if (locked) {
+      return `<div class="final-focus-prediction-editor is-locked">${H.icon("lock")} Pronostic verrouillé depuis le coup d’envoi.</div>`;
+    }
+    return `
+      <form class="prediction-form final-focus-prediction-editor" data-match-id="${H.escapeHtml(match.id)}" data-final-phase="true">
+        <div class="final-focus-prediction-editor-head">
+          <strong>Poser mon prono</strong>
+          <small>Auto-save dès que le score et le qualifié sont remplis.</small>
+        </div>
+        <div class="prediction-inputs final-focus-prediction-inputs">
+          <label>
+            <small>${H.escapeHtml(match.home_team_short_name || match.home_team_name || "Équipe A")}</small>
+            <input type="number" min="0" step="1" name="home_score_pred" value="${myPrediction?.home_score_pred ?? ""}" required>
+          </label>
+          <span class="dash">-</span>
+          <label>
+            <small>${H.escapeHtml(match.away_team_short_name || match.away_team_name || "Équipe B")}</small>
+            <input type="number" min="0" step="1" name="away_score_pred" value="${myPrediction?.away_score_pred ?? ""}" required>
+          </label>
+        </div>
+        <label class="qualified-select final-focus-qualified-select">
+          <small>Qualifié</small>
+          <select name="qualified_team_pred" required>
+            <option value="">Choisir</option>
+            <option value="${H.escapeHtml(match.home_team_id || "")}" ${myPrediction?.qualified_team_pred === match.home_team_id ? "selected" : ""}>${H.escapeHtml(match.home_team_name || "Équipe A")}</option>
+            <option value="${H.escapeHtml(match.away_team_id || "")}" ${myPrediction?.qualified_team_pred === match.away_team_id ? "selected" : ""}>${H.escapeHtml(match.away_team_name || "Équipe B")}</option>
+          </select>
+        </label>
+        <div class="prediction-actions final-focus-prediction-actions">
+          ${myPrediction ? this.myPredictionInlineHtml(myPrediction) : `<span class="muted">Aucun prono posé</span>`}
+          <button class="ghost-btn small" type="submit">Enregistrer</button>
+        </div>
+        <div class="prediction-autosave-status" aria-live="polite"></div>
+        <div class="my-prono-result-slot">${this.myPredictionResultHtml(match, myPrediction)}</div>
+      </form>
+    `;
+  },
+
+  finalFocusAdminScoreShortcutHtml(match) {
+    return "";
   },
 
   finalFocusPredictionMetaHtml(match, detailed = false, tvHtml = "") {
@@ -11073,7 +11125,7 @@ const App = {
           </div>
           <div class="profile-account-actions">
             <button class="ghost-btn" id="profileInstallAppBtn" type="button">Installer l’app</button>
-            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.9.3</button>
+            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.9.4</button>
             <button class="danger-btn" id="profileLogoutBtn" type="button">Déconnexion</button>
           </div>
         </div>
