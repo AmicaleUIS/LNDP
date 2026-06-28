@@ -6251,6 +6251,9 @@ const App = {
     const tvHtml = H.tvChannelLogosHtml(this.matchTvChannel(match), "tv-logo-strip final-tv-strip");
     const pronoMeta = this.finalFocusPredictionMetaHtml(match, expanded, tvHtml);
     const cardClass = expanded ? "expanded detailed" : `compact ${activeColumn ? "active-compact" : "side-compact"}`;
+    const homeCode = this.finalFocusTeamCode(match, "home", number);
+    const awayCode = this.finalFocusTeamCode(match, "away", number);
+    const mobileDate = this.finalFocusMobileDate(match.kickoff_at);
     const cupHtml = Number(number) === 104
       ? `<div class="final-focus-cup-above" aria-hidden="true"><img src="assets/icons/coupe.png" alt=""></div>`
       : "";
@@ -6265,12 +6268,12 @@ const App = {
         ${cupHtml}
         <header class="final-focus-card-head">
           <strong>${H.escapeHtml(title)}</strong>
-          <small>${H.escapeHtml(expanded ? date : compactDate)}</small>
+          <small><span class="final-date-full">${H.escapeHtml(expanded ? date : compactDate)}</span><span class="final-date-mobile">${H.escapeHtml(mobileDate)}</span></small>
         </header>
         <div class="${expanded ? "final-focus-detailed-teams" : "final-focus-compact-teams"}">
-          <span>${H.matchFlagHtml(match, "home")}<strong>${H.escapeHtml(home)}</strong></span>
+          <span>${H.matchFlagHtml(match, "home")}<strong class="team-name-full">${H.escapeHtml(home)}</strong><strong class="team-name-code">${H.escapeHtml(homeCode)}</strong></span>
           <b>${H.escapeHtml(score)}</b>
-          <span>${H.matchFlagHtml(match, "away")}<strong>${H.escapeHtml(away)}</strong></span>
+          <span>${H.matchFlagHtml(match, "away")}<strong class="team-name-full">${H.escapeHtml(away)}</strong><strong class="team-name-code">${H.escapeHtml(awayCode)}</strong></span>
         </div>
         ${pronoMeta}
         ${expanded ? this.finalFocusExpandedInfoHtml(match, tvHtml) : ""}
@@ -6366,6 +6369,30 @@ const App = {
     `;
   },
 
+  finalFocusMobileDate(value) {
+    if (!value) return "--/--";
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return "--/--";
+    return date.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" });
+  },
+
+  finalFocusTeamCode(match, side = "home", number = null) {
+    const prefix = side === "away" ? "away" : "home";
+    const raw = match?.[`${prefix}_team_short_name`]
+      || match?.[`${prefix}_team_code`]
+      || match?.[`${prefix}_team_trigram`]
+      || match?.[`${prefix}_team_name`]
+      || "";
+    const clean = this.finalFocusDisplayTeamName(raw, number);
+    if (!clean || /équipe pas encore éclose/i.test(clean)) return "---";
+    const normalized = String(clean)
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^A-Za-z]/g, "")
+      .toUpperCase();
+    return (normalized || "---").slice(0, 3).padEnd(3, "-");
+  },
+
   finalFocusDisplayTeamName(name, number = null) {
     const clean = String(name || "").trim();
     if (!clean) return "Équipe pas encore éclose";
@@ -6388,12 +6415,12 @@ const App = {
         aria-expanded="${expanded ? "true" : "false"}">
         <header class="final-focus-card-head">
           <strong>${H.escapeHtml(title)}</strong>
-          <small>À confirmer</small>
+          <small><span class="final-date-full">À confirmer</span><span class="final-date-mobile">--/--</span></small>
         </header>
         <div class="${expanded ? "final-focus-detailed-teams" : "final-focus-compact-teams"}">
-          <span><span class="flag-mini placeholder-flag"></span><strong>Équipe pas encore éclose</strong></span>
+          <span><span class="flag-mini placeholder-flag"></span><strong class="team-name-full">Équipe pas encore éclose</strong><strong class="team-name-code">---</strong></span>
           <b>vs</b>
-          <span><span class="flag-mini placeholder-flag"></span><strong>Équipe pas encore éclose</strong></span>
+          <span><span class="flag-mini placeholder-flag"></span><strong class="team-name-full">Équipe pas encore éclose</strong><strong class="team-name-code">---</strong></span>
         </div>
         <div class="final-focus-mini-meta"><span>Prono non posé</span><span>Rés. à venir</span></div>
         ${expanded ? `<footer class="final-focus-card-foot is-expanded"><span>Lieu à confirmer</span></footer>` : ""}

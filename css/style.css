@@ -22873,7 +22873,7 @@ body[data-current-view] {
 
 
 /* =====================================================
-   V1.9.8 — Connecteurs SVG + libellés propres
+   V1.9.9 — Connecteurs SVG + libellés propres
    ===================================================== */
 .final-tournament-board {
   position: relative !important;
@@ -22918,4 +22918,212 @@ body[data-current-view] {
 
 .final-focus-stage-title small:empty {
   display: none !important;
+}
+
+
+/* =====================================================
+   V1.9.9 — Mobile phase finale UX : cartes compactes lisibles
+   Desktop conservé, sauf finale légèrement descendue.
+   ===================================================== */
+.team-name-code,
+.final-date-mobile {
+  display: none;
+}
+
+@media (min-width: 901px) {
+  .final-tournament-board[data-window-start="2"] .stage-final .slot-m104 {
+    transform: translateY(22px);
+  }
+}
+
+@media (max-width: 900px) {
+  .final-focus-shell.final-tournament-shell {
+    padding: 12px 8px 18px !important;
+    overflow: visible !important;
+  }
+  .final-tournament-head {
+    margin-bottom: 10px !important;
+    padding-inline: 2px !important;
+  }
+  .final-tournament-head span:not(.pill) {
+    font-size: .78rem !important;
+    line-height: 1.25;
+  }
+  .final-tournament-head .pill {
+    display: none !important;
+  }
+  .final-tournament-window {
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow-x: auto !important;
+    overflow-y: visible !important;
+    padding: 6px 6px 22px !important;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+  }
+  .final-tournament-board.final-focus-board {
+    width: max-content !important;
+    min-width: 0 !important;
+    gap: 16px !important;
+    padding: 8px 14px 18px !important;
+    align-items: start !important;
+  }
+
+  .final-tournament-board[data-window-start="0"] { --final-row-height: 94px !important; }
+  .final-tournament-board[data-window-start="1"] { --final-row-height: 102px !important; }
+  .final-tournament-board[data-window-start="2"] { --final-row-height: 112px !important; }
+
+  .final-tournament-board[data-window-start="0"][data-active-round="round_of_32"] { grid-template-columns: 210px 150px 142px !important; }
+  .final-tournament-board[data-window-start="0"][data-active-round="round_of_16"] { grid-template-columns: 138px 220px 148px !important; }
+  .final-tournament-board[data-window-start="1"][data-active-round="quarter_final"] { grid-template-columns: 148px 220px 152px !important; }
+  .final-tournament-board[data-window-start="2"][data-active-round="semi_final"] { grid-template-columns: 152px 220px 168px !important; }
+  .final-tournament-board[data-window-start="2"][data-active-round="final"] { grid-template-columns: 148px 166px 226px !important; }
+
+  .final-tournament-board .final-focus-stage {
+    scroll-snap-align: center;
+  }
+  .final-tournament-board .final-focus-stage-grid {
+    grid-template-rows: repeat(var(--final-visible-rows, 16), minmax(var(--final-row-height, 94px), auto)) !important;
+    grid-auto-rows: minmax(var(--final-row-height, 94px), auto) !important;
+    row-gap: 12px !important;
+    min-height: calc((var(--final-visible-rows, 16) * var(--final-row-height, 94px)) + ((var(--final-visible-rows, 16) - 1) * 12px)) !important;
+    align-items: stretch !important;
+  }
+  .final-tournament-board .final-focus-slot {
+    align-items: center !important;
+    align-self: stretch !important;
+    min-height: 0 !important;
+  }
+  .final-tournament-board .final-focus-stage-title {
+    min-height: 36px !important;
+    padding: 7px 8px !important;
+    margin-bottom: 10px !important;
+    font-size: .82rem !important;
+    letter-spacing: .04em !important;
+  }
+  .final-tournament-board .final-focus-stage-title small {
+    display: none !important;
+  }
+
+  .final-tournament-board .final-focus-match.compact {
+    min-height: 72px !important;
+    padding: 8px 9px !important;
+    border-radius: 16px !important;
+  }
+  .final-tournament-board .final-focus-stage.is-active .final-focus-match.compact.active-compact {
+    min-height: 84px !important;
+    padding: 9px 10px !important;
+  }
+  .final-tournament-board .final-focus-stage.is-compact .final-focus-match.compact.side-compact {
+    min-height: 68px !important;
+    padding: 7px 8px !important;
+  }
+  .final-focus-match.compact .final-focus-card-head {
+    margin-bottom: 6px !important;
+  }
+  .final-focus-match.compact .final-focus-card-head strong {
+    font-size: .95rem !important;
+    line-height: 1 !important;
+  }
+  .final-focus-match.compact .final-focus-card-head small {
+    font-size: .72rem !important;
+    max-width: 52px;
+  }
+  .final-focus-match.compact .final-date-full {
+    display: none !important;
+  }
+  .final-focus-match.compact .final-date-mobile {
+    display: inline !important;
+  }
+  .final-focus-match.expanded .final-date-mobile {
+    display: none !important;
+  }
+
+  .final-focus-match.compact .final-focus-compact-teams {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    align-items: center;
+    gap: 5px !important;
+    margin-bottom: 6px !important;
+  }
+  .final-focus-match.compact .final-focus-compact-teams span {
+    display: inline-flex !important;
+    align-items: center;
+    gap: 4px !important;
+    min-width: 0;
+  }
+  .final-focus-match.compact .final-focus-compact-teams span:last-child {
+    justify-content: flex-end;
+  }
+  .final-focus-match.compact .team-name-full {
+    display: none !important;
+  }
+  .final-focus-match.compact .team-name-code {
+    display: inline !important;
+    font-size: .82rem !important;
+    line-height: 1;
+    letter-spacing: .03em;
+    color: #f8fafc;
+  }
+  .final-focus-match.side-compact .team-name-code {
+    font-size: .72rem !important;
+  }
+  .final-focus-match.compact .final-focus-compact-teams b {
+    font-size: .72rem !important;
+    color: #facc15;
+  }
+  .final-focus-match.compact .team-flag-img,
+  .final-focus-match.compact .flag-placeholder,
+  .final-focus-match.compact .flag-mini {
+    width: 20px !important;
+    height: 14px !important;
+    flex: 0 0 auto;
+  }
+  .final-focus-match.side-compact .team-flag-img,
+  .final-focus-match.side-compact .flag-placeholder,
+  .final-focus-match.side-compact .flag-mini {
+    width: 18px !important;
+    height: 13px !important;
+  }
+
+  .final-focus-match.compact .final-focus-mini-meta {
+    display: flex !important;
+    gap: 4px !important;
+    margin-top: 3px !important;
+  }
+  .final-focus-match.compact .final-focus-mini-meta span {
+    font-size: .64rem !important;
+    line-height: 1;
+    padding: 4px 6px !important;
+    max-width: 68px;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+  .final-focus-match.compact .final-focus-mini-tv {
+    display: none !important;
+  }
+
+  .final-tournament-board .final-focus-match.expanded {
+    min-height: 360px !important;
+    padding: 12px 12px !important;
+  }
+  .final-tournament-board .final-focus-slot.is-expanded-slot,
+  .final-tournament-board .final-focus-slot.is-expanded-slot .final-focus-match.expanded {
+    min-height: 380px !important;
+  }
+  .final-focus-match.expanded .team-name-code {
+    display: none !important;
+  }
+  .final-focus-match.expanded .team-name-full {
+    display: inline !important;
+  }
+
+  .final-focus-connectors {
+    overflow: visible !important;
+  }
+  .final-focus-connector-line {
+    stroke-width: 2 !important;
+    stroke: rgba(245, 189, 48, .88) !important;
+  }
 }
