@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — APP PRINCIPALE V1.9.1
+// LE NID DES PRONOS — APP PRINCIPALE V1.9.2
 // ============================================================
 
 const H = window.Helpers;
@@ -482,7 +482,7 @@ const App = {
           <div>
             <p class="eyebrow">Crédits cachés</p>
             <h2 id="creditsTitle">Le Nid des Pronos</h2>
-            <p class="muted">Version publique <strong>1.9.1</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
+            <p class="muted">Version publique <strong>1.9.2</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
           </div>
         </div>
         <div class="credits-grid">
@@ -499,7 +499,7 @@ const App = {
             <p><strong>1.0.5</strong> — dashboard mobile/desktop stabilisé, sans chevauchement des cartes.</p>
           </section>
           <section>
-            <h3>Évolutions V1.9.1</h3>
+            <h3>Évolutions V1.9.2</h3>
             <ul class="changelog-list">
               <li>Le super admin peut désactiver ou réactiver l’affichage du module préparation.</li>
               <li>Quand la préparation est désactivée, les matchs test disparaissent des matchs/pronos, classements par phase et règles.</li>
@@ -923,7 +923,7 @@ const App = {
       .in("message_id", ids);
 
     if (error) {
-      console.warn("Votes de sondage Hibou indisponibles : lance le patch SQL V1.9.1", error);
+      console.warn("Votes de sondage Hibou indisponibles : lance le patch SQL V1.9.2", error);
       this.state.owlPollVotes = {};
       return;
     }
@@ -971,7 +971,7 @@ const App = {
       .in("message_id", ids);
 
     if (error) {
-      console.warn("Détail des votes Hibou indisponible : lance le patch SQL V1.9.1", error);
+      console.warn("Détail des votes Hibou indisponible : lance le patch SQL V1.9.2", error);
       return;
     }
 
@@ -1134,7 +1134,7 @@ const App = {
       .upsert({ message_id: message.id, user_id: this.state.session?.user?.id, option_key: optionKey }, { onConflict: "message_id,user_id" });
 
     if (error) {
-      H.toast(error.message || "Vote impossible. Lance le patch SQL V1.9.1.", "error");
+      H.toast(error.message || "Vote impossible. Lance le patch SQL V1.9.2.", "error");
       return;
     }
 
@@ -1498,7 +1498,7 @@ const App = {
 
 
   async loadVisiblePredictions() {
-    // V1.9.1 — IMPORTANT : Supabase REST renvoie 1000 lignes max par requête.
+    // V1.9.2 — IMPORTANT : Supabase REST renvoie 1000 lignes max par requête.
     // Le classement général est agrégé en base, mais les détails joueurs et le classement Famille
     // repartent des pronos visibles côté front. On pagine donc toute la vue, sinon les détails
     // s'arrêtent après les premiers paquets de matchs/joueurs.
@@ -6081,32 +6081,12 @@ const App = {
     `;
   },
 
-  finalFocusSortedNumbers(matchMap, config) {
-    const numbers = [...(config?.numbers || [])];
-    const originalIndex = new Map(numbers.map((number, index) => [Number(number), index]));
-    return numbers.sort((a, b) => {
-      const matchA = this.finalBracketMatchByNumber(matchMap, a);
-      const matchB = this.finalBracketMatchByNumber(matchMap, b);
-      const timeA = matchA?.kickoff_at ? new Date(matchA.kickoff_at).getTime() : Number.POSITIVE_INFINITY;
-      const timeB = matchB?.kickoff_at ? new Date(matchB.kickoff_at).getTime() : Number.POSITIVE_INFINITY;
-      if (timeA !== timeB) return timeA - timeB;
-      return (originalIndex.get(Number(a)) || 0) - (originalIndex.get(Number(b)) || 0);
-    });
-  },
-
-  finalFocusCardTitle(number, config) {
-    if (Number(number) === 103) return "Petite finale";
-    if (Number(number) === 104) return "Finale";
-    return config?.shortLabel || config?.label || "Match";
-  },
-
   finalFocusStageColumnHtml(matchMap, config, activeRound, stageIndex = 0, windowStart = 0) {
     const isActive = config.key === activeRound;
     const complete = this.isFinalRoundComplete(matchMap, config);
     const expandedNumber = Number(this.state.finalBracketExpandedMatchNumber || 0);
-    const displayNumbers = this.finalFocusSortedNumbers(matchMap, config);
     let expandedShift = 0;
-    const rowsHtml = displayNumbers.map((number, index) => {
+    const rowsHtml = config.numbers.map((number, index) => {
       const placement = this.finalFocusVisiblePlacement(config.key, index, windowStart, number);
       const isExpanded = isActive && Number(number) === expandedNumber;
       const rowStart = Number(placement.rowStart || 1) + expandedShift;
@@ -6154,7 +6134,10 @@ const App = {
     }
     if (stageKey === "quarter_final") return { rowStart: index + 1, rowSpan: 1 };
     if (stageKey === "semi_final") return { rowStart: index * 2 + 1, rowSpan: 2 };
-    if (stageKey === "final") return { rowStart: Number(number) === 103 ? 3 : 1, rowSpan: 2 };
+    if (stageKey === "final") {
+      // Finale centrée entre les deux demies, petite finale nettement plus bas.
+      return { rowStart: Number(number) === 103 ? 4 : 2, rowSpan: 1 };
+    }
     return { rowStart: index + 1, rowSpan: 1 };
   },
 
@@ -6162,7 +6145,7 @@ const App = {
     const activeColumn = typeof view === "boolean" ? Boolean(view) : Boolean(view?.activeColumn);
     const expanded = typeof view === "boolean" ? false : Boolean(view?.expanded);
     const match = this.finalBracketMatchByNumber(matchMap, number);
-    const title = this.finalFocusCardTitle(number, config);
+    const title = Number(number) === 103 ? "Petite finale" : Number(number) === 104 ? "Finale" : `${config.shortLabel}`;
     if (!match) return this.finalFocusPlaceholderHtml(title, { activeColumn, expanded, number });
 
     const isScored = match.status === "finished" || match.status === "live";
@@ -6172,8 +6155,8 @@ const App = {
     const date = H.formatDateTime(match.kickoff_at);
     const compactDate = this.finalFocusCompactDateTime(match.kickoff_at);
     const location = [match.city, match.venue].filter(Boolean).join(" · ");
-    const pronoMeta = this.finalFocusPredictionMetaHtml(match, expanded);
     const tvHtml = H.tvChannelLogosHtml(this.matchTvChannel(match), "tv-logo-strip final-tv-strip");
+    const pronoMeta = this.finalFocusPredictionMetaHtml(match, expanded, tvHtml);
     const cardClass = expanded ? "expanded detailed" : `compact ${activeColumn ? "active-compact" : "side-compact"}`;
 
     return `
@@ -6212,7 +6195,7 @@ const App = {
     `;
   },
 
-  finalFocusPredictionMetaHtml(match, detailed = false) {
+  finalFocusPredictionMetaHtml(match, detailed = false, tvHtml = "") {
     if (!match?.id) return "";
     const prediction = this.getMyPrediction(match.id);
     const predictionText = prediction
@@ -6229,8 +6212,7 @@ const App = {
       : "";
 
     if (!detailed) {
-      const tvHtml = H.tvChannelLogosHtml(this.matchTvChannel(match), "tv-logo-strip final-tv-strip final-mini-tv-strip");
-      return `<div class="final-focus-mini-meta"><span>Prono ${H.escapeHtml(predictionText)}</span><span>Rés. ${H.escapeHtml(resultText)}</span><span class="final-focus-mini-tv">${tvHtml}</span></div>`;
+      return `<div class="final-focus-mini-meta"><span>Prono ${H.escapeHtml(predictionText)}</span><span>Rés. ${H.escapeHtml(resultText)}</span>${tvHtml ? `<span class="final-focus-mini-tv">${tvHtml}</span>` : ""}</div>`;
     }
 
     return `
@@ -6277,9 +6259,15 @@ const App = {
     `;
   },
 
+  finalFocusCompactDate(value) {
+    if (!value) return "à confirmer";
+    const formatted = H.formatDateTime(value) || "";
+    return formatted.split(",")[0] || formatted;
+  },
+
   finalFocusCompactDateTime(value) {
     if (!value) return "à confirmer";
-    return H.formatDateTime(value) || "à confirmer";
+    return H.formatDateTime(value) || this.finalFocusCompactDate(value);
   },
 
   finalBracketHtml(byStage) {
@@ -8178,7 +8166,7 @@ const App = {
       .sort((a, b) => new Date(a.match.kickoff_at || 0) - new Date(b.match.kickoff_at || 0));
 
     const periodKey = (date, match = null) => {
-      if (mode === "match") return `${match?.kickoff_at || date || ""}|${match?.id || ""}`;
+      if (mode === "match") return `${match?.kickoff_at || date || ""}`;
       const d = new Date(date);
       return d.toISOString().slice(0, 10);
     };
@@ -8186,7 +8174,7 @@ const App = {
     const periodMeta = new Map();
     const periods = [...new Set(finishedRows.map(({ match }) => {
       const key = periodKey(match.kickoff_at, match);
-      if (!periodMeta.has(key)) periodMeta.set(key, this.evolutionMatchSnapshotMeta(match));
+      this.registerEvolutionPeriodMeta(periodMeta, key, match);
       return key;
     }))].sort();
     const totalsByUser = new Map();
@@ -8229,7 +8217,7 @@ const App = {
       });
       return {
         key,
-        label: periodLabel(key, periodMeta.get(key)?.match),
+        label: periodMeta.get(key)?.label || periodLabel(key, periodMeta.get(key)?.match),
         matchMeta: periodMeta.get(key),
         totals: new Map(playerIds.map((userId) => [userId, valueForUser(userId, cumulative.get(userId) || 0, cumulativeCounts.get(userId) || 0)]))
       };
@@ -8337,9 +8325,41 @@ const App = {
       label: this.evolutionMatchSnapshotLabel(match),
       result: ["finished", "live"].includes(match.status) ? H.scoreText(match.home_score, match.away_score) : "à venir",
       date: H.formatShortDate(match.kickoff_at) || "",
+      dateTime: H.formatDateTime(match.kickoff_at) || "",
       home: match.home_team_name || "Équipe A",
       away: match.away_team_name || "Équipe B"
     };
+  },
+
+  evolutionMatchGroupLabel(matches = [], fallback = "Match") {
+    const list = (matches || []).filter(Boolean);
+    if (list.length <= 1) return list[0] ? this.evolutionMatchSnapshotLabel(list[0]) : fallback;
+    const first = list[0];
+    const when = H.formatDateTime(first.kickoff_at) || H.formatShortDate(first.kickoff_at) || fallback;
+    return `${when} · ${list.length} matchs`;
+  },
+
+  registerEvolutionPeriodMeta(periodMeta, key, match = null) {
+    if (!periodMeta || !key || !match) return;
+    const current = periodMeta.get(key) || { matches: [], _matchIds: new Set() };
+    current.matches ||= [];
+    current._matchIds ||= new Set(current.matches.map((item) => String(item?.id || `${item?.kickoff_at || ""}|${item?.home_team_name || ""}|${item?.away_team_name || ""}`)));
+    const matchId = String(match.id || `${match.kickoff_at || ""}|${match.home_team_name || ""}|${match.away_team_name || ""}`);
+    if (!current._matchIds.has(matchId)) {
+      current.matches.push(match);
+      current._matchIds.add(matchId);
+    }
+    const first = current.matches[0] || match;
+    const base = this.evolutionMatchSnapshotMeta(first) || {};
+    periodMeta.set(key, {
+      ...base,
+      matches: current.matches,
+      _matchIds: current._matchIds,
+      label: this.evolutionMatchGroupLabel(current.matches, base.label || "Match"),
+      result: current.matches.length > 1 ? `${current.matches.length} matchs` : base.result,
+      date: base.date,
+      dateTime: base.dateTime
+    });
   },
 
   evolutionMatchDetailsHtml(series = {}, attrName = "data-evolution-mode") {
@@ -8349,12 +8369,16 @@ const App = {
       <div class="evolution-match-strip" aria-label="Détail des matchs affichés">
         ${windowInfo.snapshots.map((snapshot) => {
           const meta = snapshot.matchMeta || {};
-          const match = meta.match;
+          const matches = Array.isArray(meta.matches) && meta.matches.length ? meta.matches : (meta.match ? [meta.match] : []);
           return `
-            <article class="evolution-match-chip">
+            <article class="evolution-match-chip ${matches.length > 1 ? "has-stacked-matches" : ""}">
               <strong>${H.escapeHtml(meta.label || snapshot.label || "Match")}</strong>
-              <span>${match ? `${H.matchFlagHtml(match, "home")} ${H.escapeHtml(meta.home || "")} <b>${H.escapeHtml(meta.result || "vs")}</b> ${H.matchFlagHtml(match, "away")} ${H.escapeHtml(meta.away || "")}` : H.escapeHtml(snapshot.label || "Match")}</span>
-              ${meta.date ? `<small>${H.escapeHtml(meta.date)}</small>` : ""}
+              <div class="evolution-match-chip-stack">
+                ${matches.length ? matches.map((match) => `
+                  <span>${H.matchFlagHtml(match, "home")} ${H.escapeHtml(match.home_team_name || "Équipe A")} <b>${H.escapeHtml(["finished", "live"].includes(match.status) ? H.scoreText(match.home_score, match.away_score) : "vs")}</b> ${H.matchFlagHtml(match, "away")} ${H.escapeHtml(match.away_team_name || "Équipe B")}</span>
+                `).join("") : `<span>${H.escapeHtml(snapshot.label || "Match")}</span>`}
+              </div>
+              ${meta.dateTime || meta.date ? `<small>${H.escapeHtml(meta.dateTime || meta.date)}</small>` : ""}
             </article>
           `;
         }).join("")}
@@ -8598,7 +8622,7 @@ const App = {
       .sort((a, b) => new Date(a.match.kickoff_at || 0) - new Date(b.match.kickoff_at || 0));
 
     const periodKey = (date, match = null) => {
-      if (mode === "match") return `${match?.kickoff_at || date || ""}|${match?.id || ""}`;
+      if (mode === "match") return `${match?.kickoff_at || date || ""}`;
       const d = new Date(date);
       return d.toISOString().slice(0, 10);
     };
@@ -8606,7 +8630,7 @@ const App = {
     const periodMeta = new Map();
     const periods = [...new Set(finishedRows.map(({ match }) => {
       const key = periodKey(match.kickoff_at, match);
-      if (!periodMeta.has(key)) periodMeta.set(key, this.evolutionMatchSnapshotMeta(match));
+      this.registerEvolutionPeriodMeta(periodMeta, key, match);
       return key;
     }))].sort();
     const totalsByUser = new Map();
@@ -8646,7 +8670,7 @@ const App = {
         cumulative.set(userId, (cumulative.get(userId) || 0) + (periodPoints.get(userId) || 0));
         cumulativeCounts.set(userId, (cumulativeCounts.get(userId) || 0) + (periodCounts.get(userId) || 0));
       });
-      return { key, label: periodLabel(key, periodMeta.get(key)?.match), matchMeta: periodMeta.get(key), totals: new Map(playerIds.map((userId) => [userId, valueForUser(userId, cumulative.get(userId) || 0, cumulativeCounts.get(userId) || 0)])) };
+      return { key, label: periodMeta.get(key)?.label || periodLabel(key, periodMeta.get(key)?.match), matchMeta: periodMeta.get(key), totals: new Map(playerIds.map((userId) => [userId, valueForUser(userId, cumulative.get(userId) || 0, cumulativeCounts.get(userId) || 0)])) };
     });
     const finalTotals = new Map(playerIds.map((userId) => [userId, snapshots[snapshots.length - 1]?.totals.get(userId) || 0]));
     return { playerIds, snapshots, totalsByUser: finalTotals, valueMode };
@@ -9078,7 +9102,7 @@ const App = {
       .sort((a, b) => new Date(a.match.kickoff_at || 0) - new Date(b.match.kickoff_at || 0));
 
     const periodKey = (date, match = null) => {
-      if (mode === "match") return `${match?.kickoff_at || date || ""}|${match?.id || ""}`;
+      if (mode === "match") return `${match?.kickoff_at || date || ""}`;
       const d = new Date(date);
       return d.toISOString().slice(0, 10);
     };
@@ -9087,7 +9111,7 @@ const App = {
 
     const periods = [...new Set(rows.map(({ match }) => {
       const key = periodKey(match.kickoff_at, match);
-      if (!periodMeta.has(key)) periodMeta.set(key, this.evolutionMatchSnapshotMeta(match));
+      this.registerEvolutionPeriodMeta(periodMeta, key, match);
       return key;
     }))].sort();
     const teamMeta = new Map();
@@ -9136,7 +9160,7 @@ const App = {
         cumulative.set(id, (cumulative.get(id) || 0) + (periodPoints.get(id) || 0));
         cumulativeCounts.set(id, (cumulativeCounts.get(id) || 0) + (periodCounts.get(id) || 0));
       });
-      return { key, label: periodLabel(key, periodMeta.get(key)?.match), matchMeta: periodMeta.get(key), totals: new Map(playerIds.map((id) => [id, valueForTeam(id, cumulative.get(id) || 0, cumulativeCounts.get(id) || 0)])) };
+      return { key, label: periodMeta.get(key)?.label || periodLabel(key, periodMeta.get(key)?.match), matchMeta: periodMeta.get(key), totals: new Map(playerIds.map((id) => [id, valueForTeam(id, cumulative.get(id) || 0, cumulativeCounts.get(id) || 0)])) };
     });
 
     const totalsByUser = new Map(playerIds.map((id) => [id, snapshots[snapshots.length - 1]?.totals.get(id) || 0]));
@@ -11041,7 +11065,7 @@ const App = {
           </div>
           <div class="profile-account-actions">
             <button class="ghost-btn" id="profileInstallAppBtn" type="button">Installer l’app</button>
-            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.9.1</button>
+            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.9.2</button>
             <button class="danger-btn" id="profileLogoutBtn" type="button">Déconnexion</button>
           </div>
         </div>

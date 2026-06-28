@@ -21490,7 +21490,7 @@ body[data-current-view] {
 }
 
 /* =====================================================
-   V1.9.1 — Phase finale desktop : 3 colonnes pleines, clic partout, liaisons simples
+   V1.9.2 — Phase finale desktop : 3 colonnes pleines, clic partout, liaisons simples
    ===================================================== */
 @media (min-width: 901px) {
   .final-tournament-shell.final-focus-shell {
@@ -21664,7 +21664,7 @@ body[data-current-view] {
 }
 
 /* =====================================================
-   V1.9.1 — Correctifs phase finale desktop + admin rouge/or
+   V1.9.2 — Correctifs phase finale desktop + admin rouge/or
    ===================================================== */
 .nav-list .admin-link,
 .mobile-menu-panel .mobile-admin-link {
@@ -21790,7 +21790,7 @@ body[data-current-view] {
 
 
 /* =====================================================
-   V1.9.1 — Phase finale : cartes compactes + ouverture au clic, sans traits
+   V1.9.2 — Phase finale : cartes compactes + ouverture au clic, sans traits
    ===================================================== */
 .final-tournament-board .final-focus-slot::before,
 .final-tournament-board .final-focus-slot::after,
@@ -21981,7 +21981,7 @@ body[data-current-view] {
 }
 
 /* =====================================================
-   V1.9.1 — Phase finale : nettoyage total traits + clic fiable
+   V1.9.2 — Phase finale : nettoyage total traits + clic fiable
    ===================================================== */
 .final-tournament-shell,
 .final-tournament-window,
@@ -22091,7 +22091,7 @@ body[data-current-view] {
 }
 
 /* =====================================================
-   V1.9.1 — Accueil compact + graphs zoom/focus
+   V1.9.2 — Accueil compact + graphs zoom/focus
    ===================================================== */
 .home-dashboard-hero-split {
   display: grid !important;
@@ -22224,7 +22224,7 @@ body[data-current-view] {
 }
 
 /* =====================================================
-   V1.9.1 — Graphs : zoom progressif + navigation temporelle
+   V1.9.2 — Graphs : zoom progressif + navigation temporelle
    ===================================================== */
 .evolution-card[data-evolution-level] .card-title-row {
   align-items: flex-start;
@@ -22358,52 +22358,72 @@ body[data-current-view] {
 }
 
 /* =====================================================
-   V1.9.1 — Phase finale : cartes compactes date/heure + TV
+   V1.9.2 — Graphs matchs simultanés + cartes phase finale compactes
    ===================================================== */
 .final-focus-mini-meta {
-  display: grid !important;
-  grid-template-columns: minmax(0, auto) minmax(0, auto) minmax(34px, auto);
   align-items: center;
-  gap: 6px !important;
-}
-.final-focus-mini-meta span {
-  min-height: 26px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+  flex-wrap: nowrap;
 }
 .final-focus-mini-meta .final-focus-mini-tv {
-  padding: 3px 6px !important;
-  min-width: 36px;
-}
-.final-focus-mini-tv-strip,
-.final-focus-mini-meta .tv-logo-strip {
-  display: inline-flex !important;
+  display: inline-flex;
   align-items: center;
-  justify-content: center;
   gap: 3px;
+  min-width: 42px;
+  max-width: 74px;
+  padding: 3px 5px;
 }
-.final-focus-mini-tv-strip .tv-logo,
-.final-focus-mini-meta .tv-logo {
-  max-height: 18px !important;
-  width: auto !important;
-  display: block !important;
+.final-focus-mini-meta .final-focus-mini-tv .tv-logo-strip,
+.final-focus-mini-meta .final-focus-mini-tv .tv-logo-list {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  max-width: 68px;
+  overflow: hidden;
+}
+.final-focus-mini-meta .final-focus-mini-tv img,
+.final-focus-mini-meta .final-focus-mini-tv .tv-logo-img {
+  width: 18px !important;
+  height: 18px !important;
+  object-fit: contain;
 }
 .final-focus-match.compact .final-focus-card-head small {
-  white-space: nowrap;
-  font-size: .72rem;
+  max-width: 50%;
+  text-align: right;
 }
 .final-focus-match.compact .final-focus-card-head strong {
   white-space: nowrap;
 }
+.evolution-match-chip.has-stacked-matches {
+  border-color: rgba(250,204,21,.28);
+}
+.evolution-match-chip-stack {
+  display: grid;
+  gap: 5px;
+}
+.evolution-match-chip.has-stacked-matches .evolution-match-chip-stack span {
+  padding: 5px 7px;
+  border-radius: 11px;
+  background: rgba(15,23,42,.46);
+  border: 1px solid rgba(148,163,184,.12);
+}
+.evolution-match-chip.has-stacked-matches strong::after {
+  content: " · simultanés";
+  color: rgba(226,232,240,.58);
+  font-size: .68rem;
+}
+
+/* =====================================================
+   V1.9.2 — Phase finale : finale centrée, petite finale plus basse
+   ===================================================== */
 @media (min-width: 901px) {
-  .final-tournament-board[data-window-start="0"] { --final-row-height: 96px !important; }
-  .final-tournament-board[data-window-start="1"] { --final-row-height: 104px !important; }
-  .final-tournament-board[data-window-start="2"] { --final-row-height: 116px !important; }
-  .final-tournament-board .final-focus-stage.is-active .final-focus-match.compact.active-compact {
-    min-height: 82px !important;
+  .final-tournament-board[data-window-start="2"] .stage-final .final-focus-stage-grid {
+    grid-template-rows: repeat(4, var(--final-row-height, 128px)) !important;
   }
-  .final-tournament-board .final-focus-stage.is-compact .final-focus-match.compact.side-compact {
-    min-height: 58px !important;
+  .final-tournament-board[data-window-start="2"] .stage-final .slot-m104 {
+    align-self: center;
+  }
+  .final-tournament-board[data-window-start="2"] .stage-final .slot-m103 {
+    align-self: end;
+    margin-top: 18px;
   }
 }
