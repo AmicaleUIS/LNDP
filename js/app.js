@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — APP PRINCIPALE V1.9.2
+// LE NID DES PRONOS — APP PRINCIPALE V1.9.3
 // ============================================================
 
 const H = window.Helpers;
@@ -482,7 +482,7 @@ const App = {
           <div>
             <p class="eyebrow">Crédits cachés</p>
             <h2 id="creditsTitle">Le Nid des Pronos</h2>
-            <p class="muted">Version publique <strong>1.9.2</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
+            <p class="muted">Version publique <strong>1.9.3</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
           </div>
         </div>
         <div class="credits-grid">
@@ -499,7 +499,7 @@ const App = {
             <p><strong>1.0.5</strong> — dashboard mobile/desktop stabilisé, sans chevauchement des cartes.</p>
           </section>
           <section>
-            <h3>Évolutions V1.9.2</h3>
+            <h3>Évolutions V1.9.3</h3>
             <ul class="changelog-list">
               <li>Le super admin peut désactiver ou réactiver l’affichage du module préparation.</li>
               <li>Quand la préparation est désactivée, les matchs test disparaissent des matchs/pronos, classements par phase et règles.</li>
@@ -923,7 +923,7 @@ const App = {
       .in("message_id", ids);
 
     if (error) {
-      console.warn("Votes de sondage Hibou indisponibles : lance le patch SQL V1.9.2", error);
+      console.warn("Votes de sondage Hibou indisponibles : lance le patch SQL V1.9.3", error);
       this.state.owlPollVotes = {};
       return;
     }
@@ -971,7 +971,7 @@ const App = {
       .in("message_id", ids);
 
     if (error) {
-      console.warn("Détail des votes Hibou indisponible : lance le patch SQL V1.9.2", error);
+      console.warn("Détail des votes Hibou indisponible : lance le patch SQL V1.9.3", error);
       return;
     }
 
@@ -1134,7 +1134,7 @@ const App = {
       .upsert({ message_id: message.id, user_id: this.state.session?.user?.id, option_key: optionKey }, { onConflict: "message_id,user_id" });
 
     if (error) {
-      H.toast(error.message || "Vote impossible. Lance le patch SQL V1.9.2.", "error");
+      H.toast(error.message || "Vote impossible. Lance le patch SQL V1.9.3.", "error");
       return;
     }
 
@@ -1498,7 +1498,7 @@ const App = {
 
 
   async loadVisiblePredictions() {
-    // V1.9.2 — IMPORTANT : Supabase REST renvoie 1000 lignes max par requête.
+    // V1.9.3 — IMPORTANT : Supabase REST renvoie 1000 lignes max par requête.
     // Le classement général est agrégé en base, mais les détails joueurs et le classement Famille
     // repartent des pronos visibles côté front. On pagine donc toute la vue, sinon les détails
     // s'arrêtent après les premiers paquets de matchs/joueurs.
@@ -5308,6 +5308,8 @@ const App = {
 
         const matchCard = event.target.closest("[data-final-match-toggle]");
         if (matchCard) {
+          event.preventDefault();
+          event.stopPropagation();
           const round = matchCard.closest("[data-final-stage-round]")?.dataset?.finalStageRound || matchCard.dataset.finalRoundTarget;
           const currentRound = this.state.finalBracketActiveRound || scroller.querySelector(".final-focus-board")?.dataset?.activeRound;
           if (round && round !== currentRound) {
@@ -5324,8 +5326,12 @@ const App = {
 
         const target = event.target.closest("[data-final-round-target], [data-final-stage-round]");
         const round = target?.dataset?.finalRoundTarget || target?.dataset?.finalStageRound;
-        if (round) this.setFinalBracketRound(round);
-      });
+        if (round) {
+          event.preventDefault();
+          event.stopPropagation();
+          this.setFinalBracketRound(round);
+        }
+      }, true);
     }
 
     H.$$('[data-final-match-toggle]').forEach((card) => {
@@ -5404,6 +5410,7 @@ const App = {
     scroller.addEventListener("pointerdown", (event) => {
       if (event.pointerType && event.pointerType !== "mouse") return;
       if (event.target.closest("button, a, input, select, textarea")) return;
+      if (event.target.closest("[data-final-match-toggle], [data-final-stage-round], [data-final-round-target]")) return;
       isDown = true;
       startX = event.clientX;
       startScrollLeft = scroller.scrollLeft;
@@ -5490,6 +5497,7 @@ const App = {
     const nextKey = configs[nextIndex]?.key || currentRound;
     if (nextKey === currentRound) return;
     this.state.finalBracketActiveRound = nextKey;
+    this.state.finalBracketExpandedMatchNumber = null;
     this.state.finalBracketSlideDirection = direction < 0 ? "left" : "right";
     this.renderWorldCupFinals();
   },
@@ -11065,7 +11073,7 @@ const App = {
           </div>
           <div class="profile-account-actions">
             <button class="ghost-btn" id="profileInstallAppBtn" type="button">Installer l’app</button>
-            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.9.2</button>
+            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.9.3</button>
             <button class="danger-btn" id="profileLogoutBtn" type="button">Déconnexion</button>
           </div>
         </div>
