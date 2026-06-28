@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — APP PRINCIPALE V1.8.40
+// LE NID DES PRONOS — APP PRINCIPALE V1.8.41
 // ============================================================
 
 const H = window.Helpers;
@@ -74,6 +74,8 @@ const App = {
     leaderboardPhaseIndex: 0,
     teamLeaderboardPhaseIndex: 0,
     leaderboardEvolutionMode: "day",
+    evolutionZoomMap: {},
+    evolutionFocusMap: {},
     rankSentinelQueue: [],
     rankSentinelModalOpen: false,
     rankSentinelLastSnapshot: null,
@@ -479,7 +481,7 @@ const App = {
           <div>
             <p class="eyebrow">Crédits cachés</p>
             <h2 id="creditsTitle">Le Nid des Pronos</h2>
-            <p class="muted">Version publique <strong>1.8.40</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
+            <p class="muted">Version publique <strong>1.8.41</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
           </div>
         </div>
         <div class="credits-grid">
@@ -496,7 +498,7 @@ const App = {
             <p><strong>1.0.5</strong> — dashboard mobile/desktop stabilisé, sans chevauchement des cartes.</p>
           </section>
           <section>
-            <h3>Évolutions V1.8.40</h3>
+            <h3>Évolutions V1.8.41</h3>
             <ul class="changelog-list">
               <li>Le super admin peut désactiver ou réactiver l’affichage du module préparation.</li>
               <li>Quand la préparation est désactivée, les matchs test disparaissent des matchs/pronos, classements par phase et règles.</li>
@@ -920,7 +922,7 @@ const App = {
       .in("message_id", ids);
 
     if (error) {
-      console.warn("Votes de sondage Hibou indisponibles : lance le patch SQL V1.8.40", error);
+      console.warn("Votes de sondage Hibou indisponibles : lance le patch SQL V1.8.41", error);
       this.state.owlPollVotes = {};
       return;
     }
@@ -968,7 +970,7 @@ const App = {
       .in("message_id", ids);
 
     if (error) {
-      console.warn("Détail des votes Hibou indisponible : lance le patch SQL V1.8.40", error);
+      console.warn("Détail des votes Hibou indisponible : lance le patch SQL V1.8.41", error);
       return;
     }
 
@@ -1131,7 +1133,7 @@ const App = {
       .upsert({ message_id: message.id, user_id: this.state.session?.user?.id, option_key: optionKey }, { onConflict: "message_id,user_id" });
 
     if (error) {
-      H.toast(error.message || "Vote impossible. Lance le patch SQL V1.8.40.", "error");
+      H.toast(error.message || "Vote impossible. Lance le patch SQL V1.8.41.", "error");
       return;
     }
 
@@ -1495,7 +1497,7 @@ const App = {
 
 
   async loadVisiblePredictions() {
-    // V1.8.40 — IMPORTANT : Supabase REST renvoie 1000 lignes max par requête.
+    // V1.8.41 — IMPORTANT : Supabase REST renvoie 1000 lignes max par requête.
     // Le classement général est agrégé en base, mais les détails joueurs et le classement Famille
     // repartent des pronos visibles côté front. On pagine donc toute la vue, sinon les détails
     // s'arrêtent après les premiers paquets de matchs/joueurs.
@@ -1685,7 +1687,10 @@ const App = {
 
     if (viewName === "home") await this.renderHome();
     if (viewName === "matches") await this.renderMatches();
-    if (viewName === "worldcup") await this.renderWorldCup();
+    if (viewName === "worldcup") {
+      this.state.worldcupTab = "finals";
+      await this.renderWorldCup();
+    }
     if (viewName === "leaderboard") await this.renderLeaderboard();
     if (viewName === "teams") await this.renderTeamsPage();
     if (viewName === "achievements") await this.renderAchievements();
@@ -2255,8 +2260,8 @@ const App = {
 
     root.innerHTML = `
       <section class="home-dashboard-screen" aria-label="Tableau de bord accueil">
-        <section class="hero-card home-dashboard-hero">
-          <div>
+        <section class="hero-card home-dashboard-hero home-dashboard-hero-split">
+          <div class="home-hero-main">
             <p class="eyebrow">${H.icon("nest")} Bienvenue dans le nid</p>
             <h2>Fais tes scores avant le coup d’envoi.</h2>
             <p class="muted">Les pronos des autres restent cachés jusqu’au début du match. Pas de copie, que du flair.</p>
@@ -2272,10 +2277,16 @@ const App = {
               <small class="home-prono-progress-note">${this.homeProgressIncludeTestMatches() ? "Matchs test inclus dans cette progression" : "Matchs officiels uniquement"}</small>
             </div>
             <div class="home-hero-actions">
-              <button class="ghost-btn rules-home-btn" id="rulesHomeBtn" type="button">${H.icon("list")} Règles & points</button>
-              <button class="ghost-btn owl-messages-home-btn" id="owlMessagesHomeBtn" type="button">${H.icon("diffusion")} Messages du Hibou</button>
+              <button class="ghost-btn rules-home-btn home-hero-equal-btn" id="rulesHomeBtn" type="button">${H.icon("list")} Règles & points</button>
+              <button class="ghost-btn owl-messages-home-btn home-hero-equal-btn" id="owlMessagesHomeBtn" type="button">${H.icon("diffusion")} Messages du Hibou</button>
             </div>
           </div>
+          <aside class="home-hero-final-card">
+            <p class="eyebrow">${H.icon("worldcup")} Phase finale</p>
+            <strong>Le tableau est lancé</strong>
+            <span>Accède directement aux 16èmes, 8èmes, quarts, demies et finale.</span>
+            <button class="primary-btn" type="button" data-action="go-worldcup-finals">Voir la phase finale</button>
+          </aside>
         </section>
 
         <section class="home-dashboard-grid">
@@ -2342,6 +2353,10 @@ const App = {
       } else {
         this.loadView("leaderboard");
       }
+    });
+    H.$('[data-action="go-worldcup-finals"]', root)?.addEventListener("click", async () => {
+      this.state.worldcupTab = "finals";
+      await this.loadView("worldcup");
     });
     H.$("#homeRecordsBtn", root)?.addEventListener("click", () => {
       this.state.achievementsTab = "records";
@@ -8203,6 +8218,34 @@ const App = {
   },
 
 
+  evolutionFocusKey(attrName = "data-evolution-mode") {
+    return String(attrName || "data-evolution-mode").replace(/^data-/, "").replace(/-mode$/, "");
+  },
+
+  evolutionZoomFor(attrName = "data-evolution-mode") {
+    const key = this.evolutionFocusKey(attrName);
+    const value = Number(this.state.evolutionZoomMap?.[key] || 1);
+    return Math.min(2, Math.max(0.7, value || 1));
+  },
+
+  evolutionFocusFor(attrName = "data-evolution-mode") {
+    const key = this.evolutionFocusKey(attrName);
+    return this.state.evolutionFocusMap?.[key] || "";
+  },
+
+  setEvolutionZoom(attrName = "data-evolution-mode", delta = 0) {
+    const key = this.evolutionFocusKey(attrName);
+    this.state.evolutionZoomMap ||= {};
+    const current = this.evolutionZoomFor(attrName);
+    this.state.evolutionZoomMap[key] = Math.min(2, Math.max(0.7, Math.round((current + Number(delta || 0)) * 10) / 10));
+  },
+
+  setEvolutionFocus(attrName = "data-evolution-mode", id = "") {
+    const key = this.evolutionFocusKey(attrName);
+    this.state.evolutionFocusMap ||= {};
+    this.state.evolutionFocusMap[key] = String(id || "");
+  },
+
   evolutionColor(index = 0) {
     const palette = [
       "#facc15", "#38bdf8", "#a78bfa", "#fb7185",
@@ -8212,11 +8255,12 @@ const App = {
     return palette[Math.abs(Number(index || 0)) % palette.length];
   },
 
-  evolutionChartSvg(series) {
+  evolutionChartSvg(series, { zoom = 1, focusId = "" } = {}) {
     const { playerIds, snapshots } = series;
     if (!playerIds.length || !snapshots.length) return "";
-    const width = 760;
-    const height = 300;
+    const safeZoom = Math.min(2, Math.max(0.7, Number(zoom || 1)));
+    const width = Math.round(760 * safeZoom);
+    const height = Math.round(300 * safeZoom);
     const pad = { left: 46, right: 22, top: 24, bottom: 42 };
     const graphW = width - pad.left - pad.right;
     const graphH = height - pad.top - pad.bottom;
@@ -8226,17 +8270,22 @@ const App = {
     const yTicks = [0, Math.ceil(maxPoints / 2), maxPoints];
     const unitLabel = series.valueMode === "average" ? " pts/match" : " pts";
 
-    const lines = playerIds.map((userId, index) => {
-      const source = series.mockProfiles?.get(userId) || this.state.playerScoreRows.find((row) => row.user_id === userId || row.id === userId);
-      const profile = this.profileForUser(userId, source);
+    const renderIds = focusId
+      ? [...playerIds.filter((id) => String(id) !== String(focusId)), ...playerIds.filter((id) => String(id) === String(focusId))]
+      : playerIds;
+    const lines = renderIds.map((userId) => {
+      const index = Math.max(0, playerIds.findIndex((id) => String(id) === String(userId)));
       const color = this.evolutionColor(index);
+      const isFocused = focusId && String(userId) === String(focusId);
       const points = snapshots.map((snapshot, i) => `${x(i).toFixed(1)},${y(snapshot.totals.get(userId) || 0).toFixed(1)}`).join(" ");
       const last = snapshots[snapshots.length - 1];
       const lastX = x(snapshots.length - 1);
       const lastY = y(last.totals.get(userId) || 0);
       return `
-        <polyline class="evolution-line" points="${points}" fill="none" stroke="${color}" style="stroke:${color}" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
-        <circle class="evolution-dot" cx="${lastX.toFixed(1)}" cy="${lastY.toFixed(1)}" r="5" fill="${color}" style="fill:${color}" />
+        <g class="evolution-series ${isFocused ? "is-focused" : focusId ? "is-dimmed" : ""}" data-evolution-series="${H.escapeHtml(String(userId))}">
+          <polyline class="evolution-line" points="${points}" fill="none" stroke="${color}" style="stroke:${color}" stroke-width="${isFocused ? 6 : 4}" stroke-linecap="round" stroke-linejoin="round" />
+          <circle class="evolution-dot" cx="${lastX.toFixed(1)}" cy="${lastY.toFixed(1)}" r="${isFocused ? 6.5 : 5}" fill="${color}" style="fill:${color}" />
+        </g>
       `;
     }).join("");
 
@@ -8734,7 +8783,36 @@ const App = {
   },
 
 
+  async refreshEvolutionOwner(attrName = "data-evolution-mode") {
+    const key = this.evolutionFocusKey(attrName);
+    if (key === "player-evolution") return this.renderPlayerLeaderboard();
+    if (key === "team-evolution") return this.renderTeamLeaderboard();
+    if (key === "family-evolution") return this.renderFamilyLeaderboard();
+    if (key === "family-team-evolution") return this.renderFamilyLeaderboard();
+    return this.renderLeaderboardEvolution();
+  },
+
   bindEmbeddedEvolutionControls(root = document) {
+    H.$$('[data-evolution-zoom]', root).forEach((btn) => {
+      if (btn.dataset.evolutionZoomBound === "true") return;
+      btn.dataset.evolutionZoomBound = "true";
+      btn.addEventListener("click", async () => {
+        this.setEvolutionZoom(btn.dataset.evolutionZoomTarget || "data-evolution-mode", Number(btn.dataset.evolutionZoom || 0));
+        await this.refreshEvolutionOwner(btn.dataset.evolutionZoomTarget || "data-evolution-mode");
+      });
+    });
+
+    H.$$('[data-evolution-focus]', root).forEach((btn) => {
+      if (btn.dataset.evolutionFocusBound === "true") return;
+      btn.dataset.evolutionFocusBound = "true";
+      btn.addEventListener("click", async () => {
+        const target = btn.dataset.evolutionFocusTarget || "data-evolution-mode";
+        const next = String(this.evolutionFocusFor(target)) === String(btn.dataset.evolutionFocus) ? "" : btn.dataset.evolutionFocus;
+        this.setEvolutionFocus(target, next);
+        await this.refreshEvolutionOwner(target);
+      });
+    });
+
     H.$$('[data-player-evolution-mode]', root).forEach((btn) => {
       btn.addEventListener("click", async () => {
         this.state.leaderboardEvolutionMode = btn.dataset.playerEvolutionMode;
@@ -8792,11 +8870,18 @@ const App = {
             ${series.isMock ? `<p class="graph-preview-note">${H.icon("info")} Maquette graph active : données fictives, aucun impact sur Supabase.</p>` : ""}
             ${!series.isMock && this.graphPreviewTestMatchesEnabled() ? `<p class="graph-preview-note">${H.icon("info")} Prévisualisation admin active : les matchs test sont inclus dans ce graph.</p>` : ""}
           </div>
-          ${this.evolutionModeControls(mode, attrName)}
+          <div class="evolution-toolbar">
+            ${this.evolutionModeControls(mode, attrName)}
+            <div class="evolution-zoom-controls" aria-label="Zoom du graphique">
+              <button type="button" data-evolution-zoom="-0.1" data-evolution-zoom-target="${H.escapeHtml(attrName)}" aria-label="Dézoomer">−</button>
+              <span>${Math.round(this.evolutionZoomFor(attrName) * 100)}%</span>
+              <button type="button" data-evolution-zoom="0.1" data-evolution-zoom-target="${H.escapeHtml(attrName)}" aria-label="Zoomer">+</button>
+            </div>
+          </div>
         </div>
         ${series.playerIds.length ? `
           <div class="evolution-layout">
-            <div class="evolution-chart-wrap">${this.evolutionChartSvg(series)}</div>
+            <div class="evolution-chart-wrap">${this.evolutionChartSvg(series, { zoom: this.evolutionZoomFor(attrName), focusId: this.evolutionFocusFor(attrName) })}</div>
             <div class="evolution-legend">
               ${series.playerIds.map((userId, index) => {
                 const source = series.mockProfiles?.get(userId) || this.state.playerScoreRows.find((row) => row.user_id === userId || row.id === userId);
@@ -8804,11 +8889,11 @@ const App = {
                 const color = this.evolutionColor(index);
                 const total = latestSnapshot?.totals.get(userId) || 0;
                 return `
-                  <div class="evolution-player" style="--player-color:${color}">
+                  <button type="button" class="evolution-player ${String(this.evolutionFocusFor(attrName)) === String(userId) ? "active" : ""}" style="--player-color:${color}" data-evolution-focus="${H.escapeHtml(String(userId))}" data-evolution-focus-target="${H.escapeHtml(attrName)}">
                     ${H.profileBadgeHtml(profile, "profile-badge mini")}
                     <div><strong>${H.escapeHtml(profile.pseudo)}</strong><small>${H.escapeHtml(profile.office_team_name || "Sans team")}</small></div>
                     <span>${Number(total || 0).toFixed(series.valueMode === "average" ? 2 : 0)}${series.valueMode === "average" ? " pts/match" : " pts"}</span>
-                  </div>`;
+                  </button>`;
               }).join("")}
             </div>
           </div>
@@ -10841,7 +10926,7 @@ const App = {
           </div>
           <div class="profile-account-actions">
             <button class="ghost-btn" id="profileInstallAppBtn" type="button">Installer l’app</button>
-            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.8.40</button>
+            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.8.41</button>
             <button class="danger-btn" id="profileLogoutBtn" type="button">Déconnexion</button>
           </div>
         </div>
