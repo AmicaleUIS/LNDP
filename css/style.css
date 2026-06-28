@@ -21490,7 +21490,7 @@ body[data-current-view] {
 }
 
 /* =====================================================
-   V1.8.41 — Phase finale desktop : 3 colonnes pleines, clic partout, liaisons simples
+   V1.9.0 — Phase finale desktop : 3 colonnes pleines, clic partout, liaisons simples
    ===================================================== */
 @media (min-width: 901px) {
   .final-tournament-shell.final-focus-shell {
@@ -21664,7 +21664,7 @@ body[data-current-view] {
 }
 
 /* =====================================================
-   V1.8.41 — Correctifs phase finale desktop + admin rouge/or
+   V1.9.0 — Correctifs phase finale desktop + admin rouge/or
    ===================================================== */
 .nav-list .admin-link,
 .mobile-menu-panel .mobile-admin-link {
@@ -21790,7 +21790,7 @@ body[data-current-view] {
 
 
 /* =====================================================
-   V1.8.41 — Phase finale : cartes compactes + ouverture au clic, sans traits
+   V1.9.0 — Phase finale : cartes compactes + ouverture au clic, sans traits
    ===================================================== */
 .final-tournament-board .final-focus-slot::before,
 .final-tournament-board .final-focus-slot::after,
@@ -21981,7 +21981,7 @@ body[data-current-view] {
 }
 
 /* =====================================================
-   V1.8.41 — Phase finale : nettoyage total traits + clic fiable
+   V1.9.0 — Phase finale : nettoyage total traits + clic fiable
    ===================================================== */
 .final-tournament-shell,
 .final-tournament-window,
@@ -22091,7 +22091,7 @@ body[data-current-view] {
 }
 
 /* =====================================================
-   V1.8.41 — Accueil compact + graphs zoom/focus
+   V1.9.0 — Accueil compact + graphs zoom/focus
    ===================================================== */
 .home-dashboard-hero-split {
   display: grid !important;
@@ -22221,4 +22221,138 @@ body[data-current-view] {
 }
 .evolution-series.is-focused .evolution-dot {
   stroke-width: 4;
+}
+
+/* =====================================================
+   V1.9.0 — Graphs : zoom progressif + navigation temporelle
+   ===================================================== */
+.evolution-card[data-evolution-level] .card-title-row {
+  align-items: flex-start;
+}
+.evolution-level-inline {
+  color: #facc15;
+  font-weight: 950;
+}
+.evolution-level-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(250,204,21,.22);
+  background: linear-gradient(135deg, rgba(250,204,21,.12), rgba(15,23,42,.58));
+  color: #facc15;
+  font-weight: 950;
+  white-space: nowrap;
+}
+.evolution-level-pill small {
+  color: rgba(226,232,240,.72);
+  font-size: .72rem;
+}
+.evolution-step-controls span {
+  min-width: 76px !important;
+}
+.evolution-pan-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px;
+  border-radius: 999px;
+  border: 1px solid rgba(148,163,184,.18);
+  background: rgba(15,23,42,.42);
+}
+.evolution-pan-controls button {
+  min-width: 34px;
+  height: 32px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,.12);
+  background: rgba(255,255,255,.06);
+  color: #e2e8f0;
+  font-weight: 950;
+  cursor: pointer;
+}
+.evolution-pan-controls button:hover:not(:disabled),
+.evolution-pan-controls button:focus-visible:not(:disabled) {
+  background: linear-gradient(135deg, #facc15, #f59e0b);
+  color: #07111f;
+}
+.evolution-pan-controls button:disabled {
+  opacity: .35;
+  cursor: not-allowed;
+}
+.evolution-pan-controls span {
+  min-width: 70px;
+  text-align: center;
+  color: rgba(226,232,240,.78);
+  font-size: .76rem;
+  font-weight: 900;
+}
+.evolution-card[data-evolution-level="0"] .evolution-svg {
+  min-width: 720px;
+}
+.evolution-card[data-evolution-level="1"] .evolution-svg {
+  min-width: 780px;
+}
+.evolution-card[data-evolution-level="2"] .evolution-svg,
+.evolution-card[data-evolution-level="3"] .evolution-svg {
+  min-width: 850px;
+}
+.evolution-card[data-evolution-level="2"] .evolution-dot,
+.evolution-card[data-evolution-level="3"] .evolution-dot {
+  filter: drop-shadow(0 0 4px rgba(250,204,21,.18));
+}
+.evolution-match-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 8px;
+  margin-top: 10px;
+}
+.evolution-match-chip {
+  padding: 9px 10px;
+  border-radius: 16px;
+  border: 1px solid rgba(250,204,21,.16);
+  background: linear-gradient(180deg, rgba(15,23,42,.72), rgba(15,23,42,.45));
+}
+.evolution-match-chip strong,
+.evolution-match-chip span,
+.evolution-match-chip small {
+  display: block;
+}
+.evolution-match-chip strong {
+  color: #facc15;
+  font-size: .8rem;
+  margin-bottom: 4px;
+}
+.evolution-match-chip span {
+  color: #e2e8f0;
+  font-size: .78rem;
+  font-weight: 850;
+}
+.evolution-match-chip b {
+  color: #facc15;
+  margin: 0 4px;
+}
+.evolution-match-chip small {
+  color: rgba(226,232,240,.62);
+  margin-top: 3px;
+  font-size: .7rem;
+}
+.evolution-match-chip .team-flag-img,
+.evolution-match-chip .flag-mini,
+.evolution-match-chip .flag-placeholder {
+  width: 18px;
+  height: 18px;
+  vertical-align: -4px;
+  margin-right: 4px;
+}
+@media (max-width: 920px) {
+  .evolution-toolbar {
+    justify-content: flex-start;
+  }
+  .evolution-pan-controls span {
+    min-width: 58px;
+  }
+  .evolution-layout {
+    grid-template-columns: 1fr;
+  }
 }

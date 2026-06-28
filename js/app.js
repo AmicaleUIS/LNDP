@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — APP PRINCIPALE V1.8.41
+// LE NID DES PRONOS — APP PRINCIPALE V1.9.0
 // ============================================================
 
 const H = window.Helpers;
@@ -75,6 +75,7 @@ const App = {
     teamLeaderboardPhaseIndex: 0,
     leaderboardEvolutionMode: "day",
     evolutionZoomMap: {},
+    evolutionWindowMap: {},
     evolutionFocusMap: {},
     rankSentinelQueue: [],
     rankSentinelModalOpen: false,
@@ -481,7 +482,7 @@ const App = {
           <div>
             <p class="eyebrow">Crédits cachés</p>
             <h2 id="creditsTitle">Le Nid des Pronos</h2>
-            <p class="muted">Version publique <strong>1.8.41</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
+            <p class="muted">Version publique <strong>1.9.0</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
           </div>
         </div>
         <div class="credits-grid">
@@ -498,7 +499,7 @@ const App = {
             <p><strong>1.0.5</strong> — dashboard mobile/desktop stabilisé, sans chevauchement des cartes.</p>
           </section>
           <section>
-            <h3>Évolutions V1.8.41</h3>
+            <h3>Évolutions V1.9.0</h3>
             <ul class="changelog-list">
               <li>Le super admin peut désactiver ou réactiver l’affichage du module préparation.</li>
               <li>Quand la préparation est désactivée, les matchs test disparaissent des matchs/pronos, classements par phase et règles.</li>
@@ -922,7 +923,7 @@ const App = {
       .in("message_id", ids);
 
     if (error) {
-      console.warn("Votes de sondage Hibou indisponibles : lance le patch SQL V1.8.41", error);
+      console.warn("Votes de sondage Hibou indisponibles : lance le patch SQL V1.9.0", error);
       this.state.owlPollVotes = {};
       return;
     }
@@ -970,7 +971,7 @@ const App = {
       .in("message_id", ids);
 
     if (error) {
-      console.warn("Détail des votes Hibou indisponible : lance le patch SQL V1.8.41", error);
+      console.warn("Détail des votes Hibou indisponible : lance le patch SQL V1.9.0", error);
       return;
     }
 
@@ -1133,7 +1134,7 @@ const App = {
       .upsert({ message_id: message.id, user_id: this.state.session?.user?.id, option_key: optionKey }, { onConflict: "message_id,user_id" });
 
     if (error) {
-      H.toast(error.message || "Vote impossible. Lance le patch SQL V1.8.41.", "error");
+      H.toast(error.message || "Vote impossible. Lance le patch SQL V1.9.0.", "error");
       return;
     }
 
@@ -1497,7 +1498,7 @@ const App = {
 
 
   async loadVisiblePredictions() {
-    // V1.8.41 — IMPORTANT : Supabase REST renvoie 1000 lignes max par requête.
+    // V1.9.0 — IMPORTANT : Supabase REST renvoie 1000 lignes max par requête.
     // Le classement général est agrégé en base, mais les détails joueurs et le classement Famille
     // repartent des pronos visibles côté front. On pagine donc toute la vue, sinon les détails
     // s'arrêtent après les premiers paquets de matchs/joueurs.
@@ -6423,7 +6424,8 @@ const App = {
     const target = H.$("#playerLeaderboardRows", root);
     if (!target) return;
     if (mode.startsWith("evolution")) {
-      const evolutionMode = this.state.leaderboardEvolutionMode === "week" ? "week" : "day";
+      const attrName = "data-player-evolution-mode";
+      const evolutionMode = this.evolutionDataModeFor(attrName);
       const valueMode = mode === "evolution_average" ? "average" : "points";
       const useMockGraph = this.graphMockPreviewEnabled();
       const series = useMockGraph ? this.mockEvolutionSeries(evolutionMode, valueMode) : this.playerEvolutionSeries(evolutionMode, { valueMode });
@@ -6431,7 +6433,7 @@ const App = {
         title: valueMode === "average" ? "Évolution · moyenne par match" : "Évolution · classement général",
         description: valueMode === "average" ? "Moyenne cumulée : points ÷ matchs pronostiqués." : "Points cumulés des meilleurs joueurs.",
         mode: evolutionMode,
-        attrName: "data-player-evolution-mode",
+        attrName,
         emptyText: "Pas encore assez de matchs terminés pour dessiner l’évolution générale."
       });
       this.bindEmbeddedEvolutionControls(target);
@@ -8040,7 +8042,8 @@ const App = {
     `;
 
     if (isEvolution) {
-      const evolutionMode = this.state.teamLeaderboardEvolutionMode === "week" ? "week" : "day";
+      const attrName = "data-team-evolution-mode";
+      const evolutionMode = this.evolutionDataModeFor(attrName);
       const series = this.graphMockPreviewEnabled()
         ? this.mockTeamEvolutionSeries(evolutionMode, false, evolutionValueMode)
         : this.teamEvolutionSeries(evolutionMode, false, evolutionValueMode);
@@ -8154,27 +8157,25 @@ const App = {
       )
       .sort((a, b) => new Date(a.match.kickoff_at || 0) - new Date(b.match.kickoff_at || 0));
 
-    const periodKey = (date) => {
+    const periodKey = (date, match = null) => {
+      if (mode === "match") return `${match?.kickoff_at || date || ""}|${match?.id || ""}`;
       const d = new Date(date);
-      if (mode === "week") {
-        const monday = new Date(d);
-        const day = monday.getDay() || 7;
-        monday.setHours(0, 0, 0, 0);
-        monday.setDate(monday.getDate() - day + 1);
-        return monday.toISOString().slice(0, 10);
-      }
       return d.toISOString().slice(0, 10);
     };
-    const periodLabel = (key) => mode === "week" ? `Semaine du ${H.formatShortDate(key)}` : H.formatShortDate(key);
-
-    const periods = [...new Set(finishedRows.map(({ match }) => periodKey(match.kickoff_at)))].sort();
+    const periodLabel = (key, match = null) => mode === "match" ? this.evolutionMatchSnapshotLabel(match) : H.formatShortDate(key);
+    const periodMeta = new Map();
+    const periods = [...new Set(finishedRows.map(({ match }) => {
+      const key = periodKey(match.kickoff_at, match);
+      if (!periodMeta.has(key)) periodMeta.set(key, this.evolutionMatchSnapshotMeta(match));
+      return key;
+    }))].sort();
     const totalsByUser = new Map();
     const countsByUser = new Map();
     const pointsByPeriod = new Map(periods.map((key) => [key, new Map()]));
     const countsByPeriod = new Map(periods.map((key) => [key, new Map()]));
 
     finishedRows.forEach(({ prediction, match }) => {
-      const key = periodKey(match.kickoff_at);
+      const key = periodKey(match.kickoff_at, match);
       const map = pointsByPeriod.get(key);
       const countMap = countsByPeriod.get(key);
       map.set(prediction.user_id, (map.get(prediction.user_id) || 0) + Number(prediction.points_total || 0));
@@ -8208,7 +8209,8 @@ const App = {
       });
       return {
         key,
-        label: periodLabel(key),
+        label: periodLabel(key, periodMeta.get(key)?.match),
+        matchMeta: periodMeta.get(key),
         totals: new Map(playerIds.map((userId) => [userId, valueForUser(userId, cumulative.get(userId) || 0, cumulativeCounts.get(userId) || 0)]))
       };
     });
@@ -8222,10 +8224,47 @@ const App = {
     return String(attrName || "data-evolution-mode").replace(/^data-/, "").replace(/-mode$/, "");
   },
 
-  evolutionZoomFor(attrName = "data-evolution-mode") {
+  evolutionZoomLevelFor(attrName = "data-evolution-mode") {
     const key = this.evolutionFocusKey(attrName);
-    const value = Number(this.state.evolutionZoomMap?.[key] || 1);
-    return Math.min(2, Math.max(0.7, value || 1));
+    const value = Number(this.state.evolutionZoomMap?.[key] ?? 0);
+    return Math.min(3, Math.max(0, Number.isFinite(value) ? Math.round(value) : 0));
+  },
+
+  evolutionZoomFor(attrName = "data-evolution-mode") {
+    // Compat : on garde le nom de l'ancienne fonction, mais il renvoie maintenant un niveau 0 → 3.
+    return this.evolutionZoomLevelFor(attrName);
+  },
+
+  evolutionZoomMeta(level = 0) {
+    const metas = [
+      { level: 0, label: "Vue générale", short: "Général", visible: Infinity, detail: "Toute l’évolution depuis le début." },
+      { level: 1, label: "Vue rapprochée", short: "Zoom 1", visible: 14, detail: "Fenêtre plus lisible sur les derniers points." },
+      { level: 2, label: "Vue précise", short: "Zoom 2", visible: 8, detail: "Encore moins de points, plus de relief." },
+      { level: 3, label: "Détail match par match", short: "Matchs", visible: 5, detail: "Chaque point correspond à un match terminé." }
+    ];
+    return metas[Math.min(3, Math.max(0, Number(level || 0)))] || metas[0];
+  },
+
+  evolutionDataModeFor(attrName = "data-evolution-mode") {
+    return this.evolutionZoomLevelFor(attrName) >= 3 ? "match" : "day";
+  },
+
+  evolutionWindowOffsetFor(attrName = "data-evolution-mode") {
+    const key = this.evolutionFocusKey(attrName);
+    const value = Number(this.state.evolutionWindowMap?.[key]);
+    return Number.isFinite(value) ? Math.max(0, Math.round(value)) : null;
+  },
+
+  setEvolutionWindowOffset(attrName = "data-evolution-mode", offset = 0) {
+    const key = this.evolutionFocusKey(attrName);
+    this.state.evolutionWindowMap ||= {};
+    this.state.evolutionWindowMap[key] = Math.max(0, Math.round(Number(offset || 0)));
+  },
+
+  setEvolutionWindowStep(attrName = "data-evolution-mode", delta = 0, series = null) {
+    const windowInfo = series ? this.evolutionVisibleWindow(series, attrName) : { maxStart: 0, start: this.evolutionWindowOffsetFor(attrName) || 0 };
+    const next = Math.min(windowInfo.maxStart || 0, Math.max(0, (windowInfo.start || 0) + Number(delta || 0)));
+    this.setEvolutionWindowOffset(attrName, next);
   },
 
   evolutionFocusFor(attrName = "data-evolution-mode") {
@@ -8236,14 +8275,71 @@ const App = {
   setEvolutionZoom(attrName = "data-evolution-mode", delta = 0) {
     const key = this.evolutionFocusKey(attrName);
     this.state.evolutionZoomMap ||= {};
-    const current = this.evolutionZoomFor(attrName);
-    this.state.evolutionZoomMap[key] = Math.min(2, Math.max(0.7, Math.round((current + Number(delta || 0)) * 10) / 10));
+    this.state.evolutionWindowMap ||= {};
+    const current = this.evolutionZoomLevelFor(attrName);
+    this.state.evolutionZoomMap[key] = Math.min(3, Math.max(0, current + Math.sign(Number(delta || 0))));
+    delete this.state.evolutionWindowMap[key];
   },
 
   setEvolutionFocus(attrName = "data-evolution-mode", id = "") {
     const key = this.evolutionFocusKey(attrName);
     this.state.evolutionFocusMap ||= {};
     this.state.evolutionFocusMap[key] = String(id || "");
+  },
+
+  evolutionVisibleWindow(series = {}, attrName = "data-evolution-mode") {
+    const snapshots = series.snapshots || [];
+    const level = this.evolutionZoomLevelFor(attrName);
+    const meta = this.evolutionZoomMeta(level);
+    const visibleCount = Number.isFinite(meta.visible) ? Math.min(meta.visible, snapshots.length) : snapshots.length;
+    const maxStart = Math.max(0, snapshots.length - Math.max(1, visibleCount));
+    const stored = this.evolutionWindowOffsetFor(attrName);
+    const start = Math.min(maxStart, Math.max(0, stored === null ? maxStart : stored));
+    const end = visibleCount >= snapshots.length ? snapshots.length : start + visibleCount;
+    return { level, meta, start, end, maxStart, visibleCount, snapshots: snapshots.slice(start, end) };
+  },
+
+  evolutionMatchSnapshotLabel(match = null) {
+    if (!match) return "Match";
+    const number = H.officialBracketMatchNumber?.(match);
+    if (number) return `M${number}`;
+    const day = H.formatShortDate(match.kickoff_at) || "Match";
+    const home = String(match.home_team_short_name || match.home_team_name || "").slice(0, 3);
+    const away = String(match.away_team_short_name || match.away_team_name || "").slice(0, 3);
+    return `${day}${home && away ? ` · ${home}-${away}` : ""}`;
+  },
+
+  evolutionMatchSnapshotMeta(match = null) {
+    if (!match) return null;
+    return {
+      match_id: match.id,
+      match,
+      label: this.evolutionMatchSnapshotLabel(match),
+      result: ["finished", "live"].includes(match.status) ? H.scoreText(match.home_score, match.away_score) : "à venir",
+      date: H.formatShortDate(match.kickoff_at) || "",
+      home: match.home_team_name || "Équipe A",
+      away: match.away_team_name || "Équipe B"
+    };
+  },
+
+  evolutionMatchDetailsHtml(series = {}, attrName = "data-evolution-mode") {
+    const windowInfo = this.evolutionVisibleWindow(series, attrName);
+    if (windowInfo.level < 3 || !windowInfo.snapshots.length) return "";
+    return `
+      <div class="evolution-match-strip" aria-label="Détail des matchs affichés">
+        ${windowInfo.snapshots.map((snapshot) => {
+          const meta = snapshot.matchMeta || {};
+          const match = meta.match;
+          return `
+            <article class="evolution-match-chip">
+              <strong>${H.escapeHtml(meta.label || snapshot.label || "Match")}</strong>
+              <span>${match ? `${H.matchFlagHtml(match, "home")} ${H.escapeHtml(meta.home || "")} <b>${H.escapeHtml(meta.result || "vs")}</b> ${H.matchFlagHtml(match, "away")} ${H.escapeHtml(meta.away || "")}` : H.escapeHtml(snapshot.label || "Match")}</span>
+              ${meta.date ? `<small>${H.escapeHtml(meta.date)}</small>` : ""}
+            </article>
+          `;
+        }).join("")}
+      </div>
+    `;
   },
 
   evolutionColor(index = 0) {
@@ -8255,20 +8351,28 @@ const App = {
     return palette[Math.abs(Number(index || 0)) % palette.length];
   },
 
-  evolutionChartSvg(series, { zoom = 1, focusId = "" } = {}) {
-    const { playerIds, snapshots } = series;
+  evolutionChartSvg(series, { zoom = 0, focusId = "", attrName = "data-evolution-mode" } = {}) {
+    const { playerIds } = series;
+    const windowInfo = this.evolutionVisibleWindow(series, attrName);
+    const snapshots = windowInfo.snapshots;
     if (!playerIds.length || !snapshots.length) return "";
-    const safeZoom = Math.min(2, Math.max(0.7, Number(zoom || 1)));
-    const width = Math.round(760 * safeZoom);
-    const height = Math.round(300 * safeZoom);
-    const pad = { left: 46, right: 22, top: 24, bottom: 42 };
+
+    const level = windowInfo.level;
+    const width = level === 0 ? 840 : level === 1 ? 900 : level === 2 ? 940 : 980;
+    const height = level === 0 ? 310 : level === 1 ? 330 : level === 2 ? 350 : 370;
+    const pad = { left: 58, right: 26, top: 26, bottom: level >= 3 ? 58 : 44 };
     const graphW = width - pad.left - pad.right;
     const graphH = height - pad.top - pad.bottom;
-    const maxPoints = Math.max(1, ...snapshots.flatMap((snapshot) => playerIds.map((userId) => snapshot.totals.get(userId) || 0)));
+    const visibleValues = snapshots.flatMap((snapshot) => playerIds.map((userId) => Number(snapshot.totals.get(userId) || 0)));
+    const maxPointsRaw = Math.max(1, ...visibleValues);
+    const minPointsRaw = Math.min(...visibleValues, 0);
+    const dynamicMin = level >= 2 && maxPointsRaw > 10 ? Math.max(0, Math.floor(Math.min(...visibleValues) * 0.92)) : 0;
+    const minPoints = series.valueMode === "average" ? Math.max(0, Math.floor(dynamicMin * 10) / 10) : dynamicMin;
+    const maxPoints = maxPointsRaw <= minPoints ? minPoints + 1 : Math.ceil(maxPointsRaw + Math.max(1, (maxPointsRaw - minPoints) * 0.08));
     const x = (index) => pad.left + (snapshots.length === 1 ? graphW / 2 : (index / (snapshots.length - 1)) * graphW);
-    const y = (value) => pad.top + graphH - (Number(value || 0) / maxPoints) * graphH;
-    const yTicks = [0, Math.ceil(maxPoints / 2), maxPoints];
-    const unitLabel = series.valueMode === "average" ? " pts/match" : " pts";
+    const y = (value) => pad.top + graphH - ((Number(value || 0) - minPoints) / Math.max(1, maxPoints - minPoints)) * graphH;
+    const middleTick = series.valueMode === "average" ? Math.round(((minPoints + maxPoints) / 2) * 100) / 100 : Math.round((minPoints + maxPoints) / 2);
+    const yTicks = [...new Set([minPoints, middleTick, maxPoints])];
 
     const renderIds = focusId
       ? [...playerIds.filter((id) => String(id) !== String(focusId)), ...playerIds.filter((id) => String(id) === String(focusId))]
@@ -8284,23 +8388,24 @@ const App = {
       return `
         <g class="evolution-series ${isFocused ? "is-focused" : focusId ? "is-dimmed" : ""}" data-evolution-series="${H.escapeHtml(String(userId))}">
           <polyline class="evolution-line" points="${points}" fill="none" stroke="${color}" style="stroke:${color}" stroke-width="${isFocused ? 6 : 4}" stroke-linecap="round" stroke-linejoin="round" />
-          <circle class="evolution-dot" cx="${lastX.toFixed(1)}" cy="${lastY.toFixed(1)}" r="${isFocused ? 6.5 : 5}" fill="${color}" style="fill:${color}" />
+          ${level >= 2 ? snapshots.map((snapshot, i) => `<circle class="evolution-dot ${i === snapshots.length - 1 ? "is-last" : ""}" cx="${x(i).toFixed(1)}" cy="${y(snapshot.totals.get(userId) || 0).toFixed(1)}" r="${isFocused ? 5.8 : 4.6}" fill="${color}" style="fill:${color}" />`).join("") : `<circle class="evolution-dot" cx="${lastX.toFixed(1)}" cy="${lastY.toFixed(1)}" r="${isFocused ? 6.5 : 5}" fill="${color}" style="fill:${color}" />`}
         </g>
       `;
     }).join("");
 
     const xLabels = snapshots.map((snapshot, index) => {
-      const shouldShow = snapshots.length <= 7 || index === 0 || index === snapshots.length - 1 || index % Math.ceil(snapshots.length / 5) === 0;
-      return shouldShow ? `<text class="evolution-axis-label" x="${x(index).toFixed(1)}" y="${height - 14}" text-anchor="middle">${H.escapeHtml(snapshot.label.replace("Semaine du ", "S. "))}</text>` : "";
+      const shouldShow = snapshots.length <= 8 || index === 0 || index === snapshots.length - 1 || index % Math.ceil(snapshots.length / 6) === 0;
+      const label = level >= 3 && snapshot.matchMeta ? snapshot.matchMeta.label : snapshot.label;
+      return shouldShow ? `<text class="evolution-axis-label" x="${x(index).toFixed(1)}" y="${height - 18}" text-anchor="middle">${H.escapeHtml(String(label || "").replace("Semaine du ", "S. "))}</text>` : "";
     }).join("");
 
     const yGrid = yTicks.map((tick) => `
       <line class="evolution-grid" x1="${pad.left}" x2="${width - pad.right}" y1="${y(tick).toFixed(1)}" y2="${y(tick).toFixed(1)}" />
-      <text class="evolution-axis-label" x="${pad.left - 10}" y="${(y(tick) + 4).toFixed(1)}" text-anchor="end">${tick}</text>
+      <text class="evolution-axis-label" x="${pad.left - 10}" y="${(y(tick) + 4).toFixed(1)}" text-anchor="end">${series.valueMode === "average" ? Number(tick).toFixed(1) : tick}</text>
     `).join("");
 
     return `
-      <svg class="evolution-svg" viewBox="0 0 ${width} ${height}" role="img" aria-label="Évolution des points">
+      <svg class="evolution-svg evolution-svg-level-${level}" viewBox="0 0 ${width} ${height}" role="img" aria-label="Évolution des points">
         ${yGrid}
         ${lines}
         ${xLabels}
@@ -8472,26 +8577,25 @@ const App = {
       .filter(({ prediction, match }) => allowedIds.has(String(prediction.user_id)) && match?.status === "finished" && !this.isLiveDemoMatch(match) && this.graphEvolutionCanUseMatch(match) && prediction.points_total !== null && prediction.points_total !== undefined)
       .sort((a, b) => new Date(a.match.kickoff_at || 0) - new Date(b.match.kickoff_at || 0));
 
-    const periodKey = (date) => {
+    const periodKey = (date, match = null) => {
+      if (mode === "match") return `${match?.kickoff_at || date || ""}|${match?.id || ""}`;
       const d = new Date(date);
-      if (mode === "week") {
-        const monday = new Date(d);
-        const day = monday.getDay() || 7;
-        monday.setHours(0, 0, 0, 0);
-        monday.setDate(monday.getDate() - day + 1);
-        return monday.toISOString().slice(0, 10);
-      }
       return d.toISOString().slice(0, 10);
     };
-    const periodLabel = (key) => mode === "week" ? `Semaine du ${H.formatShortDate(key)}` : H.formatShortDate(key);
-    const periods = [...new Set(finishedRows.map(({ match }) => periodKey(match.kickoff_at)))].sort();
+    const periodLabel = (key, match = null) => mode === "match" ? this.evolutionMatchSnapshotLabel(match) : H.formatShortDate(key);
+    const periodMeta = new Map();
+    const periods = [...new Set(finishedRows.map(({ match }) => {
+      const key = periodKey(match.kickoff_at, match);
+      if (!periodMeta.has(key)) periodMeta.set(key, this.evolutionMatchSnapshotMeta(match));
+      return key;
+    }))].sort();
     const totalsByUser = new Map();
     const countsByUser = new Map();
     const pointsByPeriod = new Map(periods.map((key) => [key, new Map()]));
     const countsByPeriod = new Map(periods.map((key) => [key, new Map()]));
 
     finishedRows.forEach(({ prediction, match }) => {
-      const key = periodKey(match.kickoff_at);
+      const key = periodKey(match.kickoff_at, match);
       const map = pointsByPeriod.get(key);
       const countMap = countsByPeriod.get(key);
       map.set(prediction.user_id, (map.get(prediction.user_id) || 0) + Number(prediction.points_total || 0));
@@ -8522,7 +8626,7 @@ const App = {
         cumulative.set(userId, (cumulative.get(userId) || 0) + (periodPoints.get(userId) || 0));
         cumulativeCounts.set(userId, (cumulativeCounts.get(userId) || 0) + (periodCounts.get(userId) || 0));
       });
-      return { key, label: periodLabel(key), totals: new Map(playerIds.map((userId) => [userId, valueForUser(userId, cumulative.get(userId) || 0, cumulativeCounts.get(userId) || 0)])) };
+      return { key, label: periodLabel(key, periodMeta.get(key)?.match), matchMeta: periodMeta.get(key), totals: new Map(playerIds.map((userId) => [userId, valueForUser(userId, cumulative.get(userId) || 0, cumulativeCounts.get(userId) || 0)])) };
     });
     const finalTotals = new Map(playerIds.map((userId) => [userId, snapshots[snapshots.length - 1]?.totals.get(userId) || 0]));
     return { playerIds, snapshots, totalsByUser: finalTotals, valueMode };
@@ -8596,7 +8700,8 @@ const App = {
         </div>`;
 
       if (isEvolution) {
-        const evolutionMode = this.state.familyTeamLeaderboardEvolutionMode === "week" ? "week" : "day";
+        const attrName = "data-family-team-evolution-mode";
+        const evolutionMode = this.evolutionDataModeFor(attrName);
         const series = this.graphMockPreviewEnabled()
           ? this.mockTeamEvolutionSeries(evolutionMode, true, evolutionValueMode)
           : this.teamEvolutionSeries(evolutionMode, true, evolutionValueMode);
@@ -8608,7 +8713,7 @@ const App = {
               title: evolutionValueMode === "average" ? "Évolution moyenne · team Famille" : "Évolution points · team Famille",
               description: evolutionValueMode === "average" ? "Moyenne cumulée par match pronostiqué dans chaque team Famille." : "Points cumulés par team dans le classement Famille.",
               mode: evolutionMode,
-              attrName: "data-family-team-evolution-mode",
+              attrName,
               emptyText: "Pas encore assez de matchs terminés pour dessiner l’évolution des teams Famille."
             })}
           </section>`;
@@ -8665,7 +8770,8 @@ const App = {
       </div>`;
 
     if (mode.startsWith("evolution")) {
-      const evolutionMode = this.state.familyLeaderboardEvolutionMode === "week" ? "week" : "day";
+      const attrName = "data-family-evolution-mode";
+      const evolutionMode = this.evolutionDataModeFor(attrName);
       const valueMode = mode === "evolution_average" ? "average" : "points";
       const series = this.graphMockPreviewEnabled() ? this.mockEvolutionSeries(evolutionMode, valueMode) : this.familyEvolutionSeries(evolutionMode, valueMode);
       root.innerHTML = `
@@ -8676,7 +8782,7 @@ const App = {
             title: valueMode === "average" ? "Évolution moyenne · Famille" : "Évolution général · Famille",
             description: valueMode === "average" ? "Moyenne cumulée : points ÷ matchs pronostiqués." : "Points cumulés des meilleurs joueurs Famille.",
             mode: evolutionMode,
-            attrName: "data-family-evolution-mode",
+            attrName,
             emptyText: "Pas encore assez de matchs terminés pour dessiner l’évolution Famille."
           })}
         </section>`;
@@ -8748,7 +8854,7 @@ const App = {
     const snapshots = increments.map((row, index) => {
       const d = new Date(base);
       d.setDate(base.getDate() + index);
-      const label = mode === "week" && index >= 3 ? "Semaine maquette 2" : `Jour test ${index + 1}`;
+      const label = mode === "match" ? `Match test ${index + 1}` : `Jour test ${index + 1}`;
 
       row.forEach((points, playerIndex) => {
         const id = playerIds[playerIndex];
@@ -8802,6 +8908,19 @@ const App = {
       });
     });
 
+    H.$$('[data-evolution-pan]', root).forEach((btn) => {
+      if (btn.dataset.evolutionPanBound === "true") return;
+      btn.dataset.evolutionPanBound = "true";
+      btn.addEventListener("click", async () => {
+        const target = btn.dataset.evolutionPanTarget || "data-evolution-mode";
+        const start = Number(btn.dataset.evolutionPanStart || 0);
+        const max = Number(btn.dataset.evolutionPanMax || 0);
+        const delta = Number(btn.dataset.evolutionPan || 0);
+        this.setEvolutionWindowOffset(target, Math.min(Math.max(0, max), Math.max(0, start + delta)));
+        await this.refreshEvolutionOwner(target);
+      });
+    });
+
     H.$$('[data-evolution-focus]', root).forEach((btn) => {
       if (btn.dataset.evolutionFocusBound === "true") return;
       btn.dataset.evolutionFocusBound = "true";
@@ -8844,10 +8963,12 @@ const App = {
 
 
   evolutionModeControls(mode, attrName = "data-evolution-mode") {
+    const level = this.evolutionZoomLevelFor(attrName);
+    const meta = this.evolutionZoomMeta(level);
     return `
-      <div class="segmented small">
-        <button class="${mode === "day" ? "active" : ""}" ${attrName}="day">Jour</button>
-        <button class="${mode === "week" ? "active" : ""}" ${attrName}="week">Semaine</button>
+      <div class="evolution-level-pill" title="${H.escapeHtml(meta.detail)}">
+        <strong>${H.escapeHtml(meta.short)}</strong>
+        <small>${level + 1}/4</small>
       </div>
     `;
   },
@@ -8861,27 +8982,36 @@ const App = {
     compact = true
   } = {}) {
     const latestSnapshot = series.snapshots[series.snapshots.length - 1];
+    const windowInfo = this.evolutionVisibleWindow(series, attrName);
+    const level = this.evolutionZoomLevelFor(attrName);
+    const meta = this.evolutionZoomMeta(level);
+    const panStep = Math.max(1, Math.floor((windowInfo.visibleCount || 1) * 0.7));
     return `
-      <section class="card evolution-card embedded-evolution-card ${compact ? "compact-evolution-card" : ""}">
+      <section class="card evolution-card embedded-evolution-card ${compact ? "compact-evolution-card" : ""}" data-evolution-level="${level}">
         <div class="card-title-row">
           <div>
             <h3>${H.escapeHtml(title)}</h3>
-            <p class="muted">${H.escapeHtml(description)}</p>
+            <p class="muted">${H.escapeHtml(description)} <strong class="evolution-level-inline">${H.escapeHtml(meta.label)}</strong></p>
             ${series.isMock ? `<p class="graph-preview-note">${H.icon("info")} Maquette graph active : données fictives, aucun impact sur Supabase.</p>` : ""}
             ${!series.isMock && this.graphPreviewTestMatchesEnabled() ? `<p class="graph-preview-note">${H.icon("info")} Prévisualisation admin active : les matchs test sont inclus dans ce graph.</p>` : ""}
           </div>
           <div class="evolution-toolbar">
             ${this.evolutionModeControls(mode, attrName)}
-            <div class="evolution-zoom-controls" aria-label="Zoom du graphique">
-              <button type="button" data-evolution-zoom="-0.1" data-evolution-zoom-target="${H.escapeHtml(attrName)}" aria-label="Dézoomer">−</button>
-              <span>${Math.round(this.evolutionZoomFor(attrName) * 100)}%</span>
-              <button type="button" data-evolution-zoom="0.1" data-evolution-zoom-target="${H.escapeHtml(attrName)}" aria-label="Zoomer">+</button>
+            <div class="evolution-zoom-controls evolution-step-controls" aria-label="Zoom du graphique">
+              <button type="button" data-evolution-zoom="-1" data-evolution-zoom-target="${H.escapeHtml(attrName)}" aria-label="Niveau précédent">−</button>
+              <span>${H.escapeHtml(meta.short)}</span>
+              <button type="button" data-evolution-zoom="1" data-evolution-zoom-target="${H.escapeHtml(attrName)}" aria-label="Niveau suivant">+</button>
+            </div>
+            <div class="evolution-pan-controls" aria-label="Naviguer dans la période affichée">
+              <button type="button" data-evolution-pan="-${panStep}" data-evolution-pan-target="${H.escapeHtml(attrName)}" data-evolution-pan-start="${windowInfo.start}" data-evolution-pan-max="${windowInfo.maxStart}" ${windowInfo.start <= 0 ? "disabled" : ""} aria-label="Voir plus ancien">←</button>
+              <span>${windowInfo.snapshots.length ? `${windowInfo.start + 1}-${windowInfo.end}/${series.snapshots.length}` : "0/0"}</span>
+              <button type="button" data-evolution-pan="${panStep}" data-evolution-pan-target="${H.escapeHtml(attrName)}" data-evolution-pan-start="${windowInfo.start}" data-evolution-pan-max="${windowInfo.maxStart}" ${windowInfo.start >= windowInfo.maxStart ? "disabled" : ""} aria-label="Voir plus récent">→</button>
             </div>
           </div>
         </div>
         ${series.playerIds.length ? `
           <div class="evolution-layout">
-            <div class="evolution-chart-wrap">${this.evolutionChartSvg(series, { zoom: this.evolutionZoomFor(attrName), focusId: this.evolutionFocusFor(attrName) })}</div>
+            <div class="evolution-chart-wrap">${this.evolutionChartSvg(series, { zoom: level, focusId: this.evolutionFocusFor(attrName), attrName })}${this.evolutionMatchDetailsHtml(series, attrName)}</div>
             <div class="evolution-legend">
               ${series.playerIds.map((userId, index) => {
                 const source = series.mockProfiles?.get(userId) || this.state.playerScoreRows.find((row) => row.user_id === userId || row.id === userId);
@@ -8927,20 +9057,19 @@ const App = {
       )
       .sort((a, b) => new Date(a.match.kickoff_at || 0) - new Date(b.match.kickoff_at || 0));
 
-    const periodKey = (date) => {
+    const periodKey = (date, match = null) => {
+      if (mode === "match") return `${match?.kickoff_at || date || ""}|${match?.id || ""}`;
       const d = new Date(date);
-      if (mode === "week") {
-        const monday = new Date(d);
-        const day = monday.getDay() || 7;
-        monday.setHours(0, 0, 0, 0);
-        monday.setDate(monday.getDate() - day + 1);
-        return monday.toISOString().slice(0, 10);
-      }
       return d.toISOString().slice(0, 10);
     };
-    const periodLabel = (key) => mode === "week" ? `Semaine du ${H.formatShortDate(key)}` : H.formatShortDate(key);
+    const periodLabel = (key, match = null) => mode === "match" ? this.evolutionMatchSnapshotLabel(match) : H.formatShortDate(key);
+    const periodMeta = new Map();
 
-    const periods = [...new Set(rows.map(({ match }) => periodKey(match.kickoff_at)))].sort();
+    const periods = [...new Set(rows.map(({ match }) => {
+      const key = periodKey(match.kickoff_at, match);
+      if (!periodMeta.has(key)) periodMeta.set(key, this.evolutionMatchSnapshotMeta(match));
+      return key;
+    }))].sort();
     const teamMeta = new Map();
     const totalsByTeamRaw = new Map();
     const countsByTeamRaw = new Map();
@@ -8960,7 +9089,7 @@ const App = {
         badge_shape: "rounded"
       });
       if (!teamSizes.has(teamId)) teamSizes.set(teamId, 1);
-      const key = periodKey(match.kickoff_at);
+      const key = periodKey(match.kickoff_at, match);
       const map = pointsByPeriod.get(key);
       const countMap = countsByPeriod.get(key);
       const points = Number(prediction.points_total || 0);
@@ -8987,7 +9116,7 @@ const App = {
         cumulative.set(id, (cumulative.get(id) || 0) + (periodPoints.get(id) || 0));
         cumulativeCounts.set(id, (cumulativeCounts.get(id) || 0) + (periodCounts.get(id) || 0));
       });
-      return { key, label: periodLabel(key), totals: new Map(playerIds.map((id) => [id, valueForTeam(id, cumulative.get(id) || 0, cumulativeCounts.get(id) || 0)])) };
+      return { key, label: periodLabel(key, periodMeta.get(key)?.match), matchMeta: periodMeta.get(key), totals: new Map(playerIds.map((id) => [id, valueForTeam(id, cumulative.get(id) || 0, cumulativeCounts.get(id) || 0)])) };
     });
 
     const totalsByUser = new Map(playerIds.map((id) => [id, snapshots[snapshots.length - 1]?.totals.get(id) || 0]));
@@ -9012,7 +9141,7 @@ const App = {
 
     const cumulative = new Map(teamIds.map((id) => [id, 0]));
     const snapshots = increments.map((row, index) => {
-      const label = mode === "week" && index >= 3 ? "Semaine maquette 2" : `Jour test ${index + 1}`;
+      const label = mode === "match" ? `Match test ${index + 1}` : `Jour test ${index + 1}`;
       row.forEach((points, teamIndex) => {
         const id = teamIds[teamIndex];
         cumulative.set(id, (cumulative.get(id) || 0) + points);
@@ -9042,53 +9171,19 @@ const App = {
   async renderLeaderboardEvolution() {
     await this.loadPlayerScoreRows();
     const root = H.$("#leaderboardContent");
-    const mode = this.state.leaderboardEvolutionMode === "week" ? "week" : "day";
+    const attrName = "data-evolution-mode";
+    const mode = this.evolutionDataModeFor(attrName);
     const useMockGraph = this.graphMockPreviewEnabled();
     const series = useMockGraph ? this.mockEvolutionSeries(mode, "points") : this.playerEvolutionSeries(mode, { valueMode: "points" });
-    const latestSnapshot = series.snapshots[series.snapshots.length - 1];
-
-    root.innerHTML = `
-      <section class="card evolution-card">
-        <div class="card-title-row">
-          <div>
-            <h3>Évolution du nid</h3>
-            <p class="muted">Les courbes montrent les points cumulés des 8 meilleurs joueurs au fil des matchs terminés.</p>
-            ${useMockGraph ? `<p class="graph-preview-note">${H.icon("info")} Maquette graph active : données fictives, aucun impact sur Supabase.</p>` : ""}
-            ${!useMockGraph && this.graphPreviewTestMatchesEnabled() ? `<p class="graph-preview-note">${H.icon("info")} Prévisualisation admin active : les matchs test sont inclus dans ce graph.</p>` : ""}
-          </div>
-          <div class="segmented small">
-            <button class="${mode === "day" ? "active" : ""}" data-evolution-mode="day">Jour</button>
-            <button class="${mode === "week" ? "active" : ""}" data-evolution-mode="week">Semaine</button>
-          </div>
-        </div>
-        ${series.playerIds.length ? `
-          <div class="evolution-layout">
-            <div class="evolution-chart-wrap">${this.evolutionChartSvg(series)}</div>
-            <div class="evolution-legend">
-              ${series.playerIds.map((userId, index) => {
-                const source = series.mockProfiles?.get(userId) || this.state.playerScoreRows.find((row) => row.user_id === userId);
-                const profile = this.profileForUser(userId, source);
-                const color = this.evolutionColor(index);
-                const total = latestSnapshot?.totals.get(userId) || 0;
-                return `
-                  <div class="evolution-player" style="--player-color:${color}">
-                    ${H.profileBadgeHtml(profile, "profile-badge mini")}
-                    <div><strong>${H.escapeHtml(profile.pseudo)}</strong><small>${H.escapeHtml(profile.office_team_name || "Sans team")}</small></div>
-                    <span>${total} pts</span>
-                  </div>`;
-              }).join("")}
-            </div>
-          </div>
-        ` : `<p class="muted">Pas assez de matchs terminés pour dessiner l’évolution du nid.</p>`}
-      </section>
-    `;
-
-    H.$$('[data-evolution-mode]').forEach((btn) => {
-      btn.addEventListener("click", async () => {
-        this.state.leaderboardEvolutionMode = btn.dataset.evolutionMode;
-        await this.renderLeaderboardEvolution();
-      });
+    root.innerHTML = this.evolutionBlockHtml(series, {
+      title: "Évolution du nid",
+      description: "Les courbes montrent les points cumulés des meilleurs joueurs au fil du tournoi.",
+      mode,
+      attrName,
+      emptyText: "Pas assez de matchs terminés pour dessiner l’évolution du nid.",
+      compact: false
     });
+    this.bindEmbeddedEvolutionControls(root);
   },
 
 
@@ -10926,7 +11021,7 @@ const App = {
           </div>
           <div class="profile-account-actions">
             <button class="ghost-btn" id="profileInstallAppBtn" type="button">Installer l’app</button>
-            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.8.41</button>
+            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.9.0</button>
             <button class="danger-btn" id="profileLogoutBtn" type="button">Déconnexion</button>
           </div>
         </div>
