@@ -1,611 +1,333 @@
--- ============================================================
--- LE NID DES PRONOS — OUTIL DEMO PDF FINAL
--- Crée un joueur fictif qui a pronostiqué toute la compétition.
--- Permet de prévisualiser le Bilan PDF : scores, badges, records, graphs.
---
--- UTILISATION :
--- 1) Installer les fonctions ci-dessous dans Supabase SQL Editor.
--- 2) Créer le joueur démo :
---      select public.admin_create_pdf_demo_player(true);
---
---    true  = marque temporairement les matchs comme terminés avec des scores fictifs
---            pour avoir immédiatement des points, badges, records et graphiques.
---    false = crée seulement les pronos, sans toucher aux matchs.
---
--- 3) Tester dans Admin > Bilan PDF avec le joueur :
---      Hibou Démo PDF
---
--- 4) Nettoyer totalement après test :
---      select public.admin_delete_pdf_demo_player(true);
---
---    true restaure les scores/statuts de matchs sauvegardés au moment de la création.
---
--- IMPORTANT :
--- - Les horaires, lieux, équipes, diffuseurs TV et infos de match ne sont pas modifiés.
--- - Si tu utilises true, ne modifie pas les scores/statuts réels entre la création et le nettoyage,
---   sinon le nettoyage remettra les statuts/scores comme avant le test.
--- ============================================================
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Admin — Le Nid des Pronos</title>
+  <meta name="theme-color" content="#07111f">
+  <link rel="manifest" href="manifest.json?v=1.8.41">
+  <link rel="icon" href="assets/icons/icon-192.png">
+  <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png">
+  <link rel="stylesheet" href="css/style.css?v=1.8.41">
+</head>
+<body>
+  <div class="admin-shell">
+    <aside class="admin-sidebar">
+      <a class="brand-lockup" href="app.html">
+        <img src="assets/icons/icon-192.png" alt="Icône Le Nid des Pronos">
+        <div>
+          <h1>Admin<br>du Nid</h1>
+          <p>Mode gestion</p>
+        </div>
+      </a>
 
-create extension if not exists pgcrypto;
+      <nav class="admin-nav" id="adminNav" aria-label="Navigation admin">
+        <button class="admin-nav-btn active" type="button" data-admin-section="quick">
+          <img class="owl-icon" src="assets/icons/owl-png/admin.png" alt="" aria-hidden="true" loading="lazy"><span>Saisie rapide</span>
+        </button>
+        <button class="admin-nav-btn" type="button" data-admin-section="teams">
+          <img class="owl-icon" src="assets/icons/owl-png/classements.png" alt="" aria-hidden="true" loading="lazy"><span>Équipes</span>
+        </button>
+        <button class="admin-nav-btn" type="button" data-admin-section="messages">
+          <img class="owl-icon" src="assets/icons/owl-png/diffusion.png" alt="" aria-hidden="true" loading="lazy"><span>Messages</span>
+        </button>
+        <button class="admin-nav-btn" type="button" data-admin-section="scores">
+          <img class="owl-icon" src="assets/icons/owl-png/score-exact.png" alt="" aria-hidden="true" loading="lazy"><span>Scores</span>
+        </button>
+        <button class="admin-nav-btn" type="button" data-admin-section="backups">
+          <img class="owl-icon" src="assets/icons/owl-png/verrouille.png" alt="" aria-hidden="true" loading="lazy"><span>Sauvegardes</span>
+        </button>
+        <button class="admin-nav-btn" type="button" data-admin-section="health">
+          <img class="owl-icon" src="assets/icons/owl-png/sante.png" alt="" aria-hidden="true" loading="lazy" onerror="this.onerror=null;this.src='assets/icons/owl-png/admin.png';"><span>Santé du Nid</span>
+        </button>
+        <button class="admin-nav-btn" type="button" data-admin-section="audit">
+          <img class="owl-icon" src="assets/icons/owl-png/journal.png" alt="" aria-hidden="true" loading="lazy" onerror="this.onerror=null;this.src='assets/icons/owl-png/admin.png';"><span>Journal</span>
+        </button>
+        <button class="admin-nav-btn" type="button" data-admin-section="final-report">
+          <img class="owl-icon" src="assets/icons/owl-png/bilan.png" alt="" aria-hidden="true" loading="lazy" onerror="this.onerror=null;this.src='assets/icons/owl-png/admin.png';"><span>Bilan PDF</span>
+        </button>
+        <button class="admin-nav-btn" type="button" data-admin-section="users">
+          <img class="owl-icon" src="assets/icons/owl-png/profil.png" alt="" aria-hidden="true" loading="lazy"><span>Joueurs</span>
+        </button>
+        <button class="admin-nav-btn" type="button" data-admin-section="family">
+          <img class="owl-icon" src="assets/icons/owl-png/famille.png" alt="" aria-hidden="true" loading="lazy"><span>Famille</span>
+        </button>
+      </nav>
 
--- Table de snapshot technique, utilisée uniquement pour restaurer les statuts/scores après test.
-create table if not exists public.pdf_demo_match_snapshot (
-  match_id uuid primary key,
-  status text,
-  home_score integer,
-  away_score integer,
-  winner_team_id uuid,
-  captured_at timestamptz not null default now()
-);
+      <div class="admin-sidebar-footer">
+        <a class="ghost-btn admin-sidebar-action" href="app.html"><img class="owl-icon" src="assets/icons/owl-png/accueil.png" alt="" aria-hidden="true" loading="lazy"><span>Retour app</span></a>
+        <button class="ghost-btn admin-sidebar-action" id="refreshAdmin" type="button"><img class="owl-icon" src="assets/icons/owl-png/en-direct.png" alt="" aria-hidden="true" loading="lazy"><span>Rafraîchir</span></button>
+        <button class="danger-btn admin-sidebar-action" id="logoutBtn" type="button"><img class="owl-icon" src="assets/icons/owl-png/verrouille.png" alt="" aria-hidden="true" loading="lazy"><span>Déconnexion</span></button>
+      </div>
+    </aside>
 
--- ----------------------------------------------------------------
--- Fonction 1 : création / recréation du joueur démo PDF.
--- ----------------------------------------------------------------
-create or replace function public.admin_create_pdf_demo_player(
-  p_finish_matches boolean default true
-)
-returns jsonb
-language plpgsql
-security definer
-set search_path = public, auth
-as $$
-declare
-  demo_user_id uuid := '00000000-0000-4000-8000-000000001300'::uuid;
-  demo_email text := 'demo-pdf@le-nid.local';
-  demo_pseudo text := 'Hibou Démo PDF';
-  demo_team_id uuid;
-  demo_competition_id uuid;
-  demo_champion_team_id uuid;
-  inserted_predictions int := 0;
-begin
-  if not public.is_super_admin() then
-    raise exception 'Réservé au super admin';
-  end if;
+    <main class="admin-main-area">
+      <header class="admin-header admin-page-header">
+        <div>
+          <p class="eyebrow">Administration · v1.8.41</p>
+          <h1 id="adminPageTitle"><img class="owl-icon title-icon" src="assets/icons/owl-png/admin.png" alt="" aria-hidden="true" loading="lazy"> Saisie rapide des scores</h1>
+          <p class="muted" id="adminPageSubtitle">Prochains matchs en haut, scores manuels, classement recalculé automatiquement.</p>
+        </div>
+        <button class="mobile-menu-toggle admin-mobile-menu-toggle" id="adminMobileMenuToggle" type="button" aria-label="Ouvrir le menu admin" aria-controls="adminMobileMenuPanel" aria-expanded="false">
+          <span></span><span></span><span></span>
+        </button>
+      </header>
 
-  -- Team de rattachement : on prend la première team existante.
-  select id
-  into demo_team_id
-  from public.office_teams
-  order by name asc nulls last
-  limit 1;
+      <div class="admin-container admin-container-narrow">
+        <section class="card admin-section active" data-section-panel="quick">
+          <div class="card-title-row">
+            <div>
+              <h2><img class="owl-icon title-icon" src="assets/icons/owl-png/admin.png" alt="" aria-hidden="true" loading="lazy"> Saisie rapide des scores</h2>
+              <p class="muted">Pensé pour mobile : prochains matchs en haut, matchs validés en bas, groupes par journée de poule / 16èmes / 8èmes / quarts / demies / finale.</p>
+            </div>
+            <div class="segmented-control" id="quickScoreFilters" aria-label="Filtrer les matchs">
+              <button class="chip-btn active" type="button" data-filter="work">À traiter</button>
+              <button class="chip-btn" type="button" data-filter="next">Prochains</button>
+              <button class="chip-btn" type="button" data-filter="today">Aujourd’hui</button>
+              <button class="chip-btn" type="button" data-filter="finished">Validés</button>
+              <button class="chip-btn" type="button" data-filter="all">Tous</button>
+            </div>
+          </div>
+          <div id="quickScoresAdmin" class="quick-score-grid"></div>
+        </section>
 
-  if demo_team_id is null then
-    raise exception 'Aucune team bureau trouvée. Crée au moins une team avant de générer le joueur démo.';
-  end if;
+        <section class="card admin-section" data-section-panel="teams">
+          <div class="card-title-row">
+            <div>
+              <h2>Gestion des équipes</h2>
+              <p class="muted">Création, renommage, changement de couleur et suppression des teams bureau.</p>
+            </div>
+          </div>
+          <div id="teamsAdmin"></div>
+          <form id="addOfficeTeamForm" class="inline-form">
+            <input type="text" name="name" placeholder="Nom de la team, ex : SNA" required>
+            <input type="color" name="color" value="#facc15" aria-label="Couleur de la team">
+            <button class="primary-btn" type="submit">Ajouter / mettre à jour</button>
+          </form>
+        </section>
 
-  -- Crée un faux compte Auth, pour satisfaire l’éventuel lien profiles -> auth.users.
-  insert into auth.users (
-    id,
-    instance_id,
-    aud,
-    role,
-    email,
-    encrypted_password,
-    email_confirmed_at,
-    raw_app_meta_data,
-    raw_user_meta_data,
-    created_at,
-    updated_at
-  )
-  values (
-    demo_user_id,
-    '00000000-0000-0000-0000-000000000000'::uuid,
-    'authenticated',
-    'authenticated',
-    demo_email,
-    crypt('demo-pdf-nid', gen_salt('bf')),
-    now(),
-    '{"provider":"email","providers":["email"]}'::jsonb,
-    jsonb_build_object('pseudo', demo_pseudo),
-    now(),
-    now()
-  )
-  on conflict (id) do update
-  set email = excluded.email,
-      updated_at = now(),
-      raw_user_meta_data = excluded.raw_user_meta_data;
+        <section class="card admin-section" data-section-panel="messages">
+          <div class="card-title-row">
+            <div>
+              <h2>Modération des messages</h2>
+              <p class="muted">Masque un message du chat global ou d’un chat de team. Il disparaît côté joueurs sans tout supprimer physiquement.</p>
+            </div>
+          </div>
+          <div id="chatModerationAdmin"></div>
+        </section>
 
-  -- Crée / remet à jour le profil joueur.
-  insert into public.profiles (
-    id,
-    email,
-    pseudo,
-    role,
-    player_scope,
-    office_team_id,
-    is_active,
-    is_banned,
-    can_chat,
-    can_predict,
-    can_change_avatar,
-    can_change_pseudo,
-    avatar_key,
-    badge_shape,
-    badge_color,
-    profile_setup_done,
-    show_family_players,
-    created_at
-  )
-  values (
-    demo_user_id,
-    demo_email,
-    demo_pseudo,
-    'user',
-    'uis',
-    demo_team_id,
-    true,
-    false,
-    true,
-    true,
-    true,
-    true,
-    'owl-18-le-coach-au-sifflet',
-    'rounded',
-    '#facc15',
-    true,
-    false,
-    now()
-  )
-  on conflict (id) do update
-  set email = excluded.email,
-      pseudo = excluded.pseudo,
-      role = excluded.role,
-      player_scope = excluded.player_scope,
-      office_team_id = excluded.office_team_id,
-      is_active = true,
-      is_banned = false,
-      can_chat = true,
-      can_predict = true,
-      can_change_avatar = true,
-      can_change_pseudo = true,
-      avatar_key = excluded.avatar_key,
-      badge_shape = excluded.badge_shape,
-      badge_color = excluded.badge_color,
-      profile_setup_done = true,
-      show_family_players = false;
+        <section class="card admin-section" data-section-panel="scores">
+          <div class="card-title-row">
+            <div>
+              <h2>Gestion complète des scores</h2>
+              <p class="muted">Vue complète des matchs, modification horaire / lieu / statut / scores / diffusion.</p>
+            </div>
+            <button class="primary-btn" id="recalcAllBtn">Réparer scores manquants + recalculer</button>
+          </div>
+          <div id="matchesAdmin"></div>
+        </section>
 
-  -- Nettoyage des anciennes données du joueur démo.
-  if to_regclass('public.prediction_points') is not null then
-    delete from public.prediction_points where user_id = demo_user_id;
-  end if;
+        <section class="card admin-section" data-section-panel="backups">
+          <div class="card-title-row">
+            <div>
+              <h2>Sauvegardes & remise à zéro</h2>
+              <p class="muted">Sauvegarde des pronos joueurs et des résultats de matchs. Une sauvegarde automatique est prévue tous les jours à midi via le patch SQL.</p>
+            </div>
+            <button class="primary-btn" id="createBackupBtn" type="button">Créer une sauvegarde maintenant</button>
+          </div>
 
-  if to_regclass('public.predictions') is not null then
-    delete from public.predictions where user_id = demo_user_id;
-  end if;
+          <div class="backup-ux-guide">
+            <span><strong>1</strong> Sauvegarder</span>
+            <span><strong>2</strong> Tester sans risque</span>
+            <span><strong>3</strong> Couper les prévisualisations</span>
+            <span class="danger-step"><strong>!</strong> Reset = danger</span>
+          </div>
 
-  if to_regclass('public.winner_predictions') is not null then
-    delete from public.winner_predictions where user_id = demo_user_id;
-  end if;
+          <div class="backup-panel-grid">
+            <section class="backup-box">
+              <h3>Charger une sauvegarde</h3>
+              <p class="muted">Choisis une sauvegarde, puis restaure les pronos et les résultats des matchs.</p>
+              <select id="backupSelect">
+                <option value="">Chargement des sauvegardes...</option>
+              </select>
+              <button class="ghost-btn" id="restoreBackupBtn" type="button">Charger la sauvegarde</button>
+            </section>
 
-  -- Snapshot des statuts/scores avant simulation.
-  if p_finish_matches then
-    insert into public.pdf_demo_match_snapshot (
-      match_id,
-      status,
-      home_score,
-      away_score,
-      winner_team_id
-    )
-    select
-      m.id,
-      m.status::text,
-      m.home_score,
-      m.away_score,
-      m.winner_team_id
-    from public.matches m
-    where coalesce(m.is_test_match, false) = false
-    on conflict (match_id) do nothing;
+            <section class="backup-box prep-reset-box prep-module-box">
+              <p class="backup-box-kicker">Réglages non destructifs</p>
+              <h3>Préparation & prévisualisations</h3>
+              <p class="muted">Ici, tu règles ce qui sert aux tests visuels. Ces boutons ne suppriment pas les pronos réels des joueurs.</p>
+              <p class="prep-module-status muted" id="prepModuleStatusText">Chargement du statut préparation...</p>
+              <div class="prep-module-actions">
+                <button class="ghost-btn" id="resetPreparationScoresBtn" type="button">Reset scores préparation</button>
+                <button class="danger-btn" id="togglePreparationModuleBtn" type="button">Désactiver le module préparation</button>
+              </div>
+              <div class="graph-preview-admin-box">
+                <h4>Prévisualisation des graphs</h4>
+                <p class="prep-module-status muted" id="graphPreviewStatusText">Chargement du statut graph...</p>
+                <div class="graph-preview-actions">
+                  <button class="ghost-btn" id="toggleGraphPreviewBtn" type="button">Graphs avec matchs test</button>
+                  <button class="ghost-btn" id="toggleGraphMockPreviewBtn" type="button">Maquette graph sans données</button>
+                </div>
+                <p class="prep-module-status muted" id="graphMockPreviewStatusText">Chargement du statut maquette...</p>
+                <div class="graph-preview-actions">
+                  <button class="ghost-btn" id="toggleHomeProgressTestMatchesBtn" type="button">Inclure les matchs test dans la progression</button>
+                </div>
+                <p class="prep-module-status muted" id="homeProgressTestMatchesStatusText">Chargement du statut progression accueil...</p>
+              </div>
 
-    -- Simulation de résultats sur les matchs officiels.
-    -- On ne touche pas aux horaires, lieux, équipes, diffuseurs, villes, stades, etc.
-    with numbered as (
-      select
-        m.id,
-        m.stage::text as stage_text,
-        m.home_team_id,
-        m.away_team_id,
-        row_number() over (order by m.kickoff_at nulls last, m.id) as rn
-      from public.matches m
-      where coalesce(m.is_test_match, false) = false
-        and m.home_team_id is not null
-        and m.away_team_id is not null
-    ), scores as (
-      select
-        id,
-        stage_text,
-        home_team_id,
-        away_team_id,
-        case
-          when stage_text = 'group' and rn % 7 = 0 then 1
-          when rn % 5 in (0,1) then 2
-          when rn % 5 = 2 then 3
-          else 1
-        end as h,
-        case
-          when stage_text = 'group' and rn % 7 = 0 then 1
-          when rn % 5 in (0,1) then 0
-          when rn % 5 = 2 then 1
-          else 2
-        end as a
-      from numbered
-    )
-    update public.matches m
-    set
-      status = 'finished',
-      home_score = s.h,
-      away_score = s.a,
-      winner_team_id = case
-        when s.h > s.a then s.home_team_id
-        when s.a > s.h then s.away_team_id
-        when s.stage_text <> 'group' then s.home_team_id
-        else null
-      end
-    from scores s
-    where m.id = s.id;
-  end if;
-
-  -- Création de pronos variés : exacts, bons résultats, mauvais, casseroles.
-  with match_base as (
-    select
-      m.id as match_id,
-      m.stage::text as stage_text,
-      m.home_team_id,
-      m.away_team_id,
-      coalesce(m.home_score, 2) as real_home,
-      coalesce(m.away_score, 1) as real_away,
-      m.winner_team_id,
-      row_number() over (order by m.kickoff_at nulls last, m.id) as rn
-    from public.matches m
-    where coalesce(m.is_test_match, false) = false
-      and m.home_team_id is not null
-      and m.away_team_id is not null
-  ), demo_predictions as (
-    select
-      demo_user_id as user_id,
-      match_id,
-
-      -- home_score_pred
-      case
-        -- 1 sur 4 : score exact.
-        when rn % 4 = 0 then real_home
-
-        -- bon résultat mais pas forcément exact.
-        when rn % 4 = 1 then
-          case
-            when real_home > real_away then real_home + 1
-            when real_home < real_away then greatest(real_home - 1, 0)
-            else real_home + 1
-          end
-
-        -- casserole / mauvais sens.
-        when rn % 4 = 2 then
-          case
-            when real_home > real_away then greatest(real_away - 1, 0)
-            when real_home < real_away then real_away + 1
-            else real_home + 2
-          end
-
-        -- prono neutre.
-        else greatest(real_home, 0)
-      end as pred_home,
-
-      -- away_score_pred
-      case
-        -- 1 sur 4 : score exact.
-        when rn % 4 = 0 then real_away
-
-        -- bon résultat mais pas forcément exact.
-        when rn % 4 = 1 then
-          case
-            when real_home > real_away then real_away
-            when real_home < real_away then real_away + 1
-            else real_away + 1
-          end
-
-        -- casserole / mauvais sens.
-        when rn % 4 = 2 then
-          case
-            when real_home > real_away then real_home + 1
-            when real_home < real_away then greatest(real_home - 1, 0)
-            else greatest(real_away - 1, 0)
-          end
-
-        -- prono neutre.
-        else greatest(real_away, 0)
-      end as pred_away,
-
-      stage_text,
-      home_team_id,
-      away_team_id,
-      winner_team_id,
-      rn
-    from match_base
-  ), normalized as (
-    select
-      user_id,
-      match_id,
-      pred_home,
-      case
-        -- En phase finale, on évite les égalités dans le prono.
-        when stage_text <> 'group' and pred_home = pred_away then pred_away + 1
-        else pred_away
-      end as pred_away,
-      stage_text,
-      home_team_id,
-      away_team_id,
-      winner_team_id,
-      rn
-    from demo_predictions
-  )
-  insert into public.predictions (
-    user_id,
-    match_id,
-    home_score_pred,
-    away_score_pred,
-    qualified_team_pred,
-    created_at,
-    updated_at
-  )
-  select
-    user_id,
-    match_id,
-    pred_home,
-    pred_away,
-    case
-      when stage_text = 'group' then null
-      when rn % 4 in (0,1) then coalesce(winner_team_id, case when pred_home > pred_away then home_team_id else away_team_id end)
-      else case
-        when coalesce(winner_team_id, home_team_id) = home_team_id then away_team_id
-        else home_team_id
-      end
-    end as qualified_team_pred,
-    now() - ((rn % 18) || ' hours')::interval,
-    now() - ((rn % 7) || ' minutes')::interval
-  from normalized
-  on conflict (user_id, match_id) do update
-  set home_score_pred = excluded.home_score_pred,
-      away_score_pred = excluded.away_score_pred,
-      qualified_team_pred = excluded.qualified_team_pred,
-      updated_at = excluded.updated_at;
-
-  get diagnostics inserted_predictions = row_count;
-
-  -- Choix champion démo : idéalement le vainqueur de la finale simulée.
-  if to_regclass('public.winner_predictions') is not null
-     and to_regclass('public.competitions') is not null
-     and to_regclass('public.football_teams') is not null then
-
-    select id
-    into demo_competition_id
-    from public.competitions
-    where is_active = true
-    order by id desc
-    limit 1;
-
-    if demo_competition_id is null then
-      select id
-      into demo_competition_id
-      from public.competitions
-      order by id desc
-      limit 1;
-    end if;
-
-    select winner_team_id
-    into demo_champion_team_id
-    from public.matches
-    where stage::text = 'final'
-      and winner_team_id is not null
-    order by kickoff_at desc nulls last
-    limit 1;
-
-    if demo_champion_team_id is null then
-      select id
-      into demo_champion_team_id
-      from public.football_teams
-      order by name
-      limit 1;
-    end if;
-
-    if demo_competition_id is not null and demo_champion_team_id is not null then
-      insert into public.winner_predictions (
-        user_id,
-        competition_id,
-        predicted_team_id,
-        locked_at,
-        created_at,
-        updated_at
-      )
-      values (
-        demo_user_id,
-        demo_competition_id,
-        demo_champion_team_id,
-        now(),
-        now() - interval '6 days',
-        now()
-      )
-      on conflict (user_id, competition_id) do update
-      set predicted_team_id = excluded.predicted_team_id,
-          locked_at = excluded.locked_at,
-          updated_at = now();
-    end if;
-  end if;
-
-  -- Recalcule les points à partir des vrais/simulés résultats.
-  begin
-    perform public.recalc_all_points();
-  exception when undefined_function then
-    null;
-  end;
-
-  begin
-    perform public.recalc_winner_predictions();
-  exception when undefined_function then
-    null;
-  end;
-
-  return jsonb_build_object(
-    'message', 'Joueur démo PDF créé. Va dans Admin > Bilan PDF et choisis Hibou Démo PDF.',
-    'demo_user_id', demo_user_id,
-    'demo_email', demo_email,
-    'demo_pseudo', demo_pseudo,
-    'finish_matches', p_finish_matches,
-    'predictions_created_or_updated', inserted_predictions,
-    'cleanup_sql', 'select public.admin_delete_pdf_demo_player(true);'
-  );
-end;
-$$;
-
-grant execute on function public.admin_create_pdf_demo_player(boolean) to authenticated;
-
--- ----------------------------------------------------------------
--- Fonction 2 : suppression complète du joueur démo.
--- ----------------------------------------------------------------
-create or replace function public.admin_delete_pdf_demo_player(
-  p_restore_matches boolean default true
-)
-returns jsonb
-language plpgsql
-security definer
-set search_path = public, auth
-as $$
-declare
-  demo_user_id uuid := '00000000-0000-4000-8000-000000001300'::uuid;
-  deleted_prediction_points int := 0;
-  deleted_predictions int := 0;
-  deleted_winner_predictions int := 0;
-  deleted_profile int := 0;
-  deleted_auth_user int := 0;
-  restored_matches int := 0;
-begin
-  if not public.is_super_admin() then
-    raise exception 'Réservé au super admin';
-  end if;
-
-  if p_restore_matches and to_regclass('public.pdf_demo_match_snapshot') is not null then
-    update public.matches m
-    set
-      status = s.status::public.match_status,
-      home_score = s.home_score,
-      away_score = s.away_score,
-      winner_team_id = s.winner_team_id
-    from public.pdf_demo_match_snapshot s
-    where m.id = s.match_id;
-
-    get diagnostics restored_matches = row_count;
-
-    delete from public.pdf_demo_match_snapshot where true;
-  end if;
-
-  if to_regclass('public.prediction_points') is not null then
-    delete from public.prediction_points where user_id = demo_user_id;
-    get diagnostics deleted_prediction_points = row_count;
-  end if;
-
-  if to_regclass('public.predictions') is not null then
-    delete from public.predictions where user_id = demo_user_id;
-    get diagnostics deleted_predictions = row_count;
-  end if;
-
-  if to_regclass('public.winner_predictions') is not null then
-    delete from public.winner_predictions where user_id = demo_user_id;
-    get diagnostics deleted_winner_predictions = row_count;
-  end if;
-
-  delete from public.profiles where id = demo_user_id;
-  get diagnostics deleted_profile = row_count;
-
-  delete from auth.users where id = demo_user_id;
-  get diagnostics deleted_auth_user = row_count;
-
-  begin
-    perform public.recalc_all_points();
-  exception when undefined_function then
-    null;
-  end;
-
-  return jsonb_build_object(
-    'message', 'Joueur démo PDF supprimé.',
-    'demo_user_id', demo_user_id,
-    'restored_matches', restored_matches,
-    'deleted_prediction_points', deleted_prediction_points,
-    'deleted_predictions', deleted_predictions,
-    'deleted_winner_predictions', deleted_winner_predictions,
-    'deleted_profile', deleted_profile,
-    'deleted_auth_user', deleted_auth_user
-  );
-end;
-$$;
-
-grant execute on function public.admin_delete_pdf_demo_player(boolean) to authenticated;
+              <div class="graph-preview-admin-box live-demo-admin-box">
+                <h4>Labo score en direct</h4>
+                <p class="prep-module-status muted" id="liveDemoMatchStatusText">Chargement du labo live...</p>
+                <div class="graph-preview-actions">
+                  <button class="ghost-btn" id="toggleLiveDemoMatchBtn" type="button">Activer le match fictif live</button>
+                </div>
+                <div class="live-demo-score-inject" id="liveDemoScoreInjectBox"></div>
+                <p class="muted tiny-note">Match 100% fictif : sert à tester l’affichage live, les scores et les classements. Il est compté temporairement tant qu’il est actif, puis supprimé avec ses pronos quand tu le retires. À retirer avant validation Coupe du monde.</p>
+              </div>
 
 
+              <div class="graph-preview-admin-box champion-bonus-admin-box">
+                <h4>Bonus champion du monde</h4>
+                <p class="prep-module-status muted" id="championBonusPointsStatusText">Chargement du barème champion...</p>
+                <div class="champion-bonus-inputs">
+                  <label>
+                    <span>Avant compétition</span>
+                    <input id="championFirstBonusPointsInput" type="number" min="0" max="500" step="1" value="100">
+                  </label>
+                  <label>
+                    <span>Avant phase finale</span>
+                    <input id="championSecondBonusPointsInput" type="number" min="0" max="500" step="1" value="50">
+                  </label>
+                  <button class="primary-btn" id="saveChampionBonusPointsBtn" type="button">Enregistrer le barème</button>
+                </div>
+                <p class="muted tiny-note">Réglage super admin : prépare le nouveau barème avant de l’appliquer officiellement. Lance le patch SQL V1.8.41 pour que les vues de classement lisent ces valeurs.</p>
+              </div>
+              <p class="muted tiny-note">Désactiver masque les matchs test, les règles et les classements liés. Les 2 badges préparation restent dans les exploits. La prévisualisation graphs ne sert qu’à vérifier l’affichage avant le premier match officiel.</p>
+            </section>
 
--- ----------------------------------------------------------------
--- Fonction 3 : vérifier si le joueur démo existe encore.
--- ----------------------------------------------------------------
-create or replace function public.admin_check_pdf_demo_player()
-returns jsonb
-language plpgsql
-security definer
-set search_path = public
-as $$
-declare
-  demo_user_id uuid := '00000000-0000-4000-8000-000000001300'::uuid;
-  profile_exists boolean := false;
-  auth_exists boolean := false;
-  predictions_count int := 0;
-  points_count int := 0;
-begin
-  if not public.is_super_admin() then
-    raise exception 'Réservé au super admin';
-  end if;
+            <section class="backup-box clean-start-box">
+              <p class="backup-box-kicker">Départ compétition</p>
+              <h3>Remettre les classements à zéro</h3>
+              <p class="real-pronos-warning">✅ À utiliser maintenant : les pronos déjà posés sont conservés.</p>
+              <p class="muted">Supprime les points et les scores de test/labo, remet les matchs à venir, coupe le labo et les prévisualisations, mais ne supprime pas les pronostics joueurs ni les choix champion.</p>
+              <label>
+                Tape exactement <strong>DEPART PROPRE</strong>
+                <input id="cleanStartConfirmInput" type="text" placeholder="DEPART PROPRE" autocomplete="off">
+              </label>
+              <button class="primary-btn" id="cleanStartPreservePredictionsBtn" type="button">Reset classements — garder les pronos</button>
+              <p class="muted tiny-note">Après ce reset, l’accueil ne montrera plus de 1er joueur/1re team tant qu’aucun vrai point n’est marqué.</p>
+            </section>
 
-  select exists(select 1 from public.profiles where id = demo_user_id)
-  into profile_exists;
+            <section class="backup-box danger-zone launch-reset-box">
+              <p class="backup-box-kicker danger-kicker">Zone danger</p>
+              <h3>Reset lancement complet</h3>
+              <p class="real-pronos-warning">⚠️ Ne pas utiliser maintenant si des joueurs ont déjà posé des pronos réels.</p>
+              <p class="muted">Remet l’application à blanc sans supprimer les matchs : pronos, points, champion, scores/statuts, coupons, sauvegardes, messages, réactions, blocages et journal admin.</p>
+              <label>
+                Tape exactement <strong>LANCEMENT PROPRE</strong>
+                <input id="launchResetConfirmInput" type="text" placeholder="LANCEMENT PROPRE" autocomplete="off">
+              </label>
+              <button class="danger-btn" id="fullLaunchResetBtn" type="button">Reset complet lancement</button>
+              <p class="muted tiny-note">Ultra sécurisé : demande une phrase exacte + une confirmation. Les matchs, teams, comptes et réglages restent conservés. Les infos modifiées des matchs restent, seuls scores/statuts repartent à zéro.</p>
+            </section>
 
-  select exists(select 1 from auth.users where id = demo_user_id)
-  into auth_exists;
+            <section class="backup-box danger-zone">
+              <p class="backup-box-kicker danger-kicker">Zone danger</p>
+              <h3>Remise à zéro sécurisée</h3>
+              <p class="real-pronos-warning">⚠️ À éviter dès que la compétition a commencé ou que des pronos réels existent.</p>
+              <p class="muted">Supprime tous les pronostics joueurs, les pronos champion, les points/badges calculés et les messages du chat. Une sauvegarde est créée avant la remise à zéro.</p>
+              <label>
+                Tape exactement <strong>REMISE A ZERO</strong>
+                <input id="resetConfirmInput" type="text" placeholder="REMISE A ZERO" autocomplete="off">
+              </label>
+              <button class="danger-btn" id="resetPredictionsBtn" type="button">Remise à zéro pronos + messages</button>
+            </section>
+          </div>
+        </section>
 
-  if to_regclass('public.predictions') is not null then
-    select count(*)::int into predictions_count
-    from public.predictions
-    where user_id = demo_user_id;
-  end if;
+        <section class="card admin-section" data-section-panel="health">
+          <div class="card-title-row">
+            <div>
+              <h2><img class="owl-icon title-icon" src="assets/icons/owl-png/sante.png" alt="" aria-hidden="true" loading="lazy" onerror="this.onerror=null;this.src='assets/icons/owl-png/admin.png';"> Santé du Nid</h2>
+              <p class="muted">Contrôle rapide de l’état de l’application : données, sauvegardes, matchs, joueurs, coupons, chat et réglages.</p>
+            </div>
+            <button class="primary-btn" id="refreshHealthBtn" type="button">Rafraîchir le diagnostic</button>
+          </div>
+          <div id="healthAdmin"></div>
+        </section>
 
-  if to_regclass('public.prediction_points') is not null then
-    select count(*)::int into points_count
-    from public.prediction_points
-    where user_id = demo_user_id;
-  end if;
+        <section class="card admin-section" data-section-panel="audit">
+          <div class="card-title-row">
+            <div>
+              <h2><img class="owl-icon title-icon" src="assets/icons/owl-png/journal.png" alt="" aria-hidden="true" loading="lazy" onerror="this.onerror=null;this.src='assets/icons/owl-png/admin.png';"> Journal du Nid</h2>
+              <p class="muted">Historique des actions sensibles super admin : resets, sauvegardes, coupons, rôles, préparation et modération.</p>
+            </div>
+            <button class="ghost-btn" id="refreshAuditBtn" type="button">Rafraîchir le journal</button>
+          </div>
+          <div id="auditAdmin"></div>
+        </section>
 
-  return jsonb_build_object(
-    'demo_user_id', demo_user_id,
-    'pseudo', 'Hibou Démo PDF',
-    'profile_exists', profile_exists,
-    'auth_user_exists', auth_exists,
-    'predictions_count', predictions_count,
-    'points_count', points_count,
-    'visible_in_admin_bilan_pdf', profile_exists and predictions_count > 0
-  );
-end;
-$$;
+        <section class="card admin-section" data-section-panel="final-report">
+          <div class="card-title-row">
+            <div>
+              <h2><img class="owl-icon title-icon" src="assets/icons/owl-png/bilan.png" alt="" aria-hidden="true" loading="lazy" onerror="this.onerror=null;this.src='assets/icons/owl-png/admin.png';"> Bilan PDF final</h2>
+              <p class="muted">Aperçu en temps réel du carnet de vol joueur + diplôme. Le rendu est imprimable en PDF et prêt à recevoir les futurs fonds/images surprise.</p>
+            </div>
+          </div>
+          <div id="finalReportAdmin"></div>
+        </section>
 
-grant execute on function public.admin_check_pdf_demo_player() to authenticated;
+        <section class="card admin-section" data-section-panel="users">
+          <h2>Joueurs</h2>
+          <p class="muted">Association team, rôle, activation et droits particuliers.</p>
+          <div id="usersAdmin"></div>
+        </section>
 
--- Après installation du script, tu peux vérifier les fonctions avec :
-select
-  'demo_pdf_tools_ready' as check_name,
-  to_regprocedure('public.admin_create_pdf_demo_player(boolean)') is not null as create_function_ok,
-  to_regprocedure('public.admin_delete_pdf_demo_player(boolean)') is not null as delete_function_ok,
-  to_regprocedure('public.admin_check_pdf_demo_player()') is not null as check_function_ok;
+        <section class="card admin-section" data-section-panel="family">
+          <div class="card-title-row">
+            <div>
+              <h2>Mode Famille</h2>
+              <p class="muted">Activation des inscriptions Famille, invitations et dépannage super admin.</p>
+            </div>
+          </div>
+          <div id="familyAdmin"></div>
+        </section>
+      </div>
+    </main>
+  </div>
 
--- IMPORTANT :
--- Le script ci-dessus installe les outils, mais ne crée pas automatiquement le joueur.
--- Pour créer le joueur démo :
---   select public.admin_create_pdf_demo_player(true);
---
--- Pour vérifier qu'il existe :
---   select public.admin_check_pdf_demo_player();
---
--- Pour tout supprimer après test :
---   select public.admin_delete_pdf_demo_player(true);
+  <div class="mobile-menu-backdrop" id="adminMobileMenuBackdrop" hidden></div>
+  <nav class="mobile-menu-panel admin-mobile-menu-panel" id="adminMobileMenuPanel" aria-label="Navigation admin mobile" hidden>
+    <div class="mobile-menu-head">
+      <strong>Menu admin</strong>
+      <button class="ghost-btn mobile-menu-close" id="adminMobileMenuClose" type="button">Fermer</button>
+    </div>
+    <button class="nav-btn active" type="button" data-admin-section="quick"><img class="owl-icon" src="assets/icons/owl-png/admin.png" alt="" aria-hidden="true" loading="lazy"><span>Saisie rapide</span></button>
+    <button class="nav-btn" type="button" data-admin-section="teams"><img class="owl-icon" src="assets/icons/owl-png/classements.png" alt="" aria-hidden="true" loading="lazy"><span>Équipes</span></button>
+    <button class="nav-btn" type="button" data-admin-section="messages"><img class="owl-icon" src="assets/icons/owl-png/diffusion.png" alt="" aria-hidden="true" loading="lazy"><span>Messages</span></button>
+    <button class="nav-btn" type="button" data-admin-section="scores"><img class="owl-icon" src="assets/icons/owl-png/score-exact.png" alt="" aria-hidden="true" loading="lazy"><span>Scores</span></button>
+    <button class="nav-btn" type="button" data-admin-section="backups"><img class="owl-icon" src="assets/icons/owl-png/verrouille.png" alt="" aria-hidden="true" loading="lazy"><span>Sauvegardes</span></button>
+    <button class="nav-btn" type="button" data-admin-section="health"><img class="owl-icon" src="assets/icons/owl-png/sante.png" alt="" aria-hidden="true" loading="lazy" onerror="this.onerror=null;this.src='assets/icons/owl-png/admin.png';"><span>Santé du Nid</span></button>
+    <button class="nav-btn" type="button" data-admin-section="audit"><img class="owl-icon" src="assets/icons/owl-png/journal.png" alt="" aria-hidden="true" loading="lazy" onerror="this.onerror=null;this.src='assets/icons/owl-png/admin.png';"><span>Journal</span></button>
+    <button class="nav-btn" type="button" data-admin-section="users"><img class="owl-icon" src="assets/icons/owl-png/profil.png" alt="" aria-hidden="true" loading="lazy"><span>Joueurs</span></button>
+    <button class="nav-btn" type="button" data-admin-section="family"><img class="owl-icon" src="assets/icons/owl-png/famille.png" alt="" aria-hidden="true" loading="lazy"><span>Famille</span></button>
+    <div class="admin-mobile-menu-actions">
+      <a class="ghost-btn" href="app.html">Retour app</a>
+      <button class="ghost-btn" id="refreshAdminMobile" type="button">Rafraîchir</button>
+      <button class="danger-btn" id="logoutBtnMobile" type="button">Déconnexion</button>
+    </div>
+  </nav>
+
+  <button class="mobile-scroll-top-owl admin-scroll-top-owl" id="adminScrollTopOwl" type="button" aria-label="Revenir en haut de la page admin">
+    <img src="assets/icons/owl-png/retour-haut-chouette.png" alt="" aria-hidden="true" loading="lazy" onerror="this.onerror=null;this.src='assets/icons/owl-png/accueil.png';">
+  </button>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="js/config.js?v=1.8.41"></script>
+  <script src="js/supabaseClient.js?v=1.8.41"></script>
+  <script src="js/auth.js?v=1.8.41"></script>
+  <script src="js/common.js?v=1.8.41"></script>
+  <script src="js/admin.js?v=1.8.41"></script>
+</body>
+</html>

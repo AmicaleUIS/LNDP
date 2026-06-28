@@ -1,6 +1,6 @@
 
 /* ============================================================
-   LE NID DES PRONOS — BILAN PDF V1.3.0
+   LE NID DES PRONOS — BILAN PDF V1.5.2
    Aperçu temps réel + impression PDF
    ============================================================ */
 
@@ -389,5 +389,352 @@
   .bilan-page:last-child {
     page-break-after: auto !important;
     break-after: auto !important;
+  }
+}
+
+
+/* ============================================================
+   V1.5.0 — Bilan collector super admin
+   ============================================================ */
+
+.bilan-document.collector {
+  gap: 32px;
+}
+
+.bilan-page.identity {
+  background:
+    linear-gradient(rgba(2,6,23,.18), rgba(2,6,23,.24)),
+    url("../assets/reports/bg-stats.png"),
+    radial-gradient(circle at 20% 10%, rgba(168,85,247,.20), transparent 36%),
+    linear-gradient(135deg, #07111f, #1e1b4b 95%);
+  background-size: cover;
+}
+
+.bilan-page.competition {
+  background:
+    linear-gradient(rgba(2,6,23,.18), rgba(2,6,23,.24)),
+    url("../assets/reports/bg-records.png"),
+    linear-gradient(135deg, #07111f, #111827);
+  background-size: cover;
+}
+
+.bilan-page.race {
+  background:
+    linear-gradient(rgba(2,6,23,.18), rgba(2,6,23,.24)),
+    url("../assets/reports/bg-graphs.png"),
+    linear-gradient(135deg, #06101d, #123b52);
+  background-size: cover;
+}
+
+.bilan-page.casseroles {
+  background:
+    linear-gradient(rgba(2,6,23,.20), rgba(2,6,23,.30)),
+    url("../assets/reports/bg-records.png"),
+    radial-gradient(circle at 20% 0%, rgba(251,146,60,.22), transparent 36%),
+    linear-gradient(135deg, #111827, #431407);
+  background-size: cover;
+}
+
+.bilan-page.history {
+  background:
+    linear-gradient(rgba(2,6,23,.20), rgba(2,6,23,.24)),
+    url("../assets/reports/bg-stats.png"),
+    linear-gradient(135deg, #07111f, #172554);
+  background-size: cover;
+}
+
+.identity-layout {
+  display: grid;
+  grid-template-columns: .95fr 1.05fr;
+  gap: 22px;
+  margin-top: 22px;
+}
+
+.identity-rank-card,
+.identity-meter-card,
+.fun-fact-grid article {
+  border: 1px solid rgba(250,204,21,.22);
+  border-radius: 28px;
+  background: rgba(15,23,42,.74);
+  box-shadow: 0 22px 48px rgba(0,0,0,.22);
+}
+
+.identity-rank-card {
+  padding: 28px;
+  display: grid;
+  gap: 14px;
+  place-items: start;
+}
+
+.identity-rank-card .profile-badge {
+  width: 92px;
+  height: 92px;
+}
+
+.identity-rank-card h3 {
+  margin: 0;
+  font-size: 2.1rem;
+  color: var(--bilan-gold);
+}
+
+.identity-rank-card p {
+  margin: 0;
+  color: var(--bilan-muted);
+}
+
+.identity-meter-card {
+  padding: 24px;
+}
+
+.meter-row {
+  display: grid;
+  grid-template-columns: 140px 1fr 54px;
+  align-items: center;
+  gap: 12px;
+  margin: 14px 0;
+}
+
+.meter-row span,
+.meter-row strong {
+  font-weight: 900;
+}
+
+.meter-track {
+  height: 12px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(148,163,184,.20);
+}
+
+.meter-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #facc15, #38bdf8);
+}
+
+.fun-fact-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+  margin-top: 20px;
+}
+
+.fun-fact-grid article {
+  padding: 18px;
+}
+
+.fun-fact-grid strong {
+  display: block;
+  font-size: 1.45rem;
+  color: var(--bilan-gold);
+}
+
+.fun-fact-grid span {
+  color: var(--bilan-muted);
+  font-weight: 800;
+}
+
+.collector-badges .badge-card {
+  min-height: 180px;
+}
+
+.badge-png {
+  width: 58px;
+  height: 58px;
+  object-fit: contain;
+  filter: drop-shadow(0 10px 18px rgba(250,204,21,.20));
+}
+
+.collector-stats {
+  margin-bottom: 20px;
+}
+
+.race-card {
+  min-height: 640px;
+}
+
+.race-chart .race-line {
+  filter: drop-shadow(0 0 4px rgba(255,255,255,.20));
+}
+
+.race-dot {
+  stroke: rgba(2,6,23,.88);
+  stroke-width: 2;
+}
+
+.race-legend {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.race-player {
+  display: grid;
+  grid-template-columns: 12px 1fr auto;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 16px;
+  background: rgba(15,23,42,.72);
+  border: 1px solid rgba(148,163,184,.16);
+}
+
+.race-player span {
+  width: 10px;
+  height: 34px;
+  border-radius: 99px;
+  background: var(--race-color, #facc15);
+}
+
+.race-player.is-player {
+  border-color: rgba(250,204,21,.42);
+  box-shadow: 0 0 0 1px rgba(250,204,21,.12);
+}
+
+.race-player strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.race-player em {
+  color: var(--bilan-gold);
+  font-style: normal;
+  font-weight: 900;
+}
+
+.casserole-list {
+  display: grid;
+  gap: 12px;
+}
+
+.casserole-card {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr) 92px 92px minmax(150px, .8fr);
+  gap: 12px;
+  align-items: center;
+  padding: 14px;
+  border-radius: 20px;
+  border: 1px solid rgba(251,146,60,.26);
+  background: rgba(15,23,42,.72);
+}
+
+.casserole-card.opposite {
+  border-color: rgba(248,113,113,.55);
+  box-shadow: inset 4px 0 0 rgba(248,113,113,.78);
+}
+
+.casserole-rank {
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border-radius: 14px;
+  color: #111827;
+  background: #facc15;
+  font-weight: 1000;
+}
+
+.casserole-card strong {
+  color: #fff;
+}
+
+.casserole-card small,
+.casserole-card span,
+.casserole-card p {
+  color: var(--bilan-muted);
+  margin: 0;
+  font-weight: 800;
+}
+
+.bilan-flag {
+  width: 22px;
+  height: 16px;
+  object-fit: cover;
+  border-radius: 3px;
+  vertical-align: -3px;
+  margin-right: 4px;
+}
+
+.collector-history-table {
+  font-size: .78rem;
+}
+
+.collector-history-table th,
+.collector-history-table td {
+  padding: 8px 7px;
+  vertical-align: top;
+}
+
+@media print {
+  .bilan-page {
+    break-after: page;
+    page-break-after: always;
+  }
+
+  .collector-history-table {
+    font-size: 8.2pt;
+  }
+}
+
+@media (max-width: 900px) {
+  .identity-layout,
+  .fun-fact-grid,
+  .race-legend,
+  .casserole-card {
+    grid-template-columns: 1fr;
+  }
+}
+
+
+/* V1.5.2 — Bilan collector : badges acquis chargés depuis les tables */
+
+
+/* ============================================================
+   V1.7.0 — Refonte PDF collector
+   ============================================================ */
+.bilan-page { background-size: cover; background-position: center center; }
+.icon-stats-grid .icon-stat { display: grid; grid-template-columns: 46px 1fr; align-items: center; gap: 12px; }
+.icon-stat img, .record-card.with-icon img, .mini-record-grid img, .mini-record-player-card img { width: 42px; height: 42px; object-fit: contain; filter: drop-shadow(0 8px 14px rgba(250,204,21,.18)); }
+.champion-card .champion-pick-line { align-items: center; gap: 12px; }
+.champion-pick-line p { margin: 0; display: grid; gap: 3px; }
+.champion-pick-line span, .champion-pick-line small { color: var(--bilan-muted); }
+.identity-mini-facts { display: grid; gap: 8px; margin-top: 16px; color: var(--bilan-muted); }
+.identity-detail-grid, .history-capsule-grid, .mini-record-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 18px; }
+.detail-match-card, .history-capsule, .mini-record-grid article { border: 1px solid rgba(250,204,21,.22); border-radius: 20px; background: rgba(15,23,42,.72); padding: 12px; }
+.detail-match-card h4, .history-capsule strong { margin: 6px 0; color: #fff; }
+.detail-match-card p, .history-capsule p { margin: 8px 0 0; color: var(--bilan-muted); }
+.vs-mini { opacity: .6; margin: 0 3px; }
+.hour-radar { display: grid; grid-template-columns: repeat(4, 1fr); align-items: end; gap: 10px; height: 132px; margin: 12px 0 6px; }
+.hour-radar div { display: grid; grid-template-rows: auto 1fr auto; align-items: end; gap: 6px; text-align: center; color: var(--bilan-muted); height: 100%; }
+.hour-radar b { display: block; width: 100%; border-radius: 999px 999px 8px 8px; background: linear-gradient(180deg, #facc15, #38bdf8); min-height: 8px; }
+.badge-section-title { margin: 16px 0 10px; color: #fff7cc; }
+.featured-badges { grid-template-columns: repeat(3, 1fr); }
+.featured-badge-card { border-color: rgba(250,204,21,.55); box-shadow: 0 0 0 1px rgba(250,204,21,.18), 0 20px 45px rgba(250,204,21,.08); }
+.badge-card small { display: block; margin: 4px 0 6px; color: var(--bilan-muted); font-size: .78rem; }
+.rich-record-grid .record-card { min-height: 126px; }
+.mini-record-player-card p { display: flex; align-items: center; gap: 10px; }
+.mini-record-grid article { display: grid; gap: 6px; }
+.mini-record-grid article span { color: var(--bilan-muted); font-size: .85rem; }
+.history-capsule-grid { grid-template-columns: repeat(3, 1fr); }
+.history-capsule { min-height: 132px; }
+.history-capsule.good { border-color: rgba(34,197,94,.35); }
+.history-capsule.bad { border-color: rgba(248,113,113,.35); }
+@media print {
+  .bilan-page, .bilan-page.diploma { background-size: cover !important; background-position: center center !important; }
+  .bilan-page.diploma { width: 210mm !important; height: 297mm !important; min-height: 297mm !important; page: auto !important; padding: 14mm !important; }
+  .bilan-page.diploma .bilan-page-content { min-height: 260mm !important; }
+  .identity-detail-grid, .history-capsule-grid, .mini-record-grid { grid-template-columns: repeat(3, 1fr); }
+}
+
+
+/* V1.7.1 — Course aux points : top 8 + joueur */
+.race-legend {
+  grid-template-columns: repeat(3, 1fr);
+}
+@media print {
+  .race-legend {
+    grid-template-columns: repeat(3, 1fr) !important;
   }
 }

@@ -496,6 +496,185 @@ function matchLocationHtml(match, compact = false) {
   return `${icon("pin")} <span class="location-format ${compact ? "location-format-compact" : ""}">${parts.join(' <span class="location-separator">-</span> ')}</span>`;
 }
 
+
+// ============================================================
+// FIFA 2026 — ORDRE OFFICIEL DE LA PHASE FINALE
+// ============================================================
+// Le calendrier FIFA n'est pas toujours chronologique dans le tableau :
+// par exemple le match 75 peut se jouer après le 74, mais il doit rester
+// sous le match 73 car les deux alimentent le même huitième.
+function officialBracketLocalDateKey(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+function officialBracketDateMap() {
+  return {
+    // 16èmes / Round of 32 — heures affichées en France (CEST) quand le site est consulté depuis la France.
+    "round_of_32|2026-06-28 21:00": 73,
+    "round_of_32|2026-06-29 19:00": 76,
+    "round_of_32|2026-06-29 22:30": 74,
+    "round_of_32|2026-06-30 03:00": 75,
+    "round_of_32|2026-06-30 19:00": 78,
+    "round_of_32|2026-06-30 23:00": 77,
+    "round_of_32|2026-07-01 03:00": 79,
+    "round_of_32|2026-07-01 18:00": 80,
+    "round_of_32|2026-07-01 22:00": 82,
+    "round_of_32|2026-07-02 02:00": 81,
+    "round_of_32|2026-07-02 21:00": 84,
+    "round_of_32|2026-07-03 01:00": 83,
+    "round_of_32|2026-07-03 05:00": 85,
+    "round_of_32|2026-07-03 20:00": 88,
+    "round_of_32|2026-07-04 00:00": 86,
+    "round_of_32|2026-07-04 03:30": 87,
+
+    // 8èmes / Round of 16
+    "round_of_16|2026-07-04 19:00": 90,
+    "round_of_16|2026-07-04 23:00": 89,
+    "round_of_16|2026-07-05 22:00": 91,
+    "round_of_16|2026-07-06 03:00": 92,
+    "round_of_16|2026-07-06 21:00": 93,
+    "round_of_16|2026-07-07 02:00": 94,
+    "round_of_16|2026-07-07 18:00": 95,
+    "round_of_16|2026-07-07 22:00": 96,
+
+    // Quarts, demies, petite finale, finale
+    "quarter_final|2026-07-09 22:00": 97,
+    "quarter_final|2026-07-10 21:00": 98,
+    "quarter_final|2026-07-11 23:00": 99,
+    "quarter_final|2026-07-12 03:00": 100,
+    "semi_final|2026-07-14 21:00": 101,
+    "semi_final|2026-07-15 21:00": 102,
+    "third_place|2026-07-18 23:00": 103,
+    "final|2026-07-19 21:00": 104
+  };
+}
+
+function officialBracketExplicitNumber(match = {}) {
+  const keys = [
+    "bracket_match_number",
+    "official_match_number",
+    "fifa_match_number",
+    "match_number",
+    "fixture_number",
+    "display_order",
+    "match_order"
+  ];
+  for (const key of keys) {
+    const value = Number(match?.[key]);
+    if (Number.isInteger(value) && value >= 73 && value <= 104) return value;
+  }
+
+  const apiValue = Number(match?.api_match_id);
+  if (Number.isInteger(apiValue) && apiValue >= 73 && apiValue <= 104) return apiValue;
+
+  return null;
+}
+
+function officialBracketMatchNumber(match = {}) {
+  if (!match || match.stage === "group" || match.is_test_match) return null;
+
+  const explicit = officialBracketExplicitNumber(match);
+  if (explicit) return explicit;
+
+  const searchable = [
+    match.home_team_name,
+    match.away_team_name,
+    match.home_team_short_name,
+    match.away_team_short_name,
+    match.name,
+    match.label,
+    match.round_label,
+    match.fixture_label
+  ].filter(Boolean).join(" ");
+
+  const textMatch = searchable.match(/(?:\bmatch\s*|\bm\s*)(7[3-9]|8[0-9]|9[0-9]|10[0-4])\b/i);
+  if (textMatch) return Number(textMatch[1]);
+
+  const localKey = officialBracketLocalDateKey(match.kickoff_at);
+  const mapped = officialBracketDateMap()[`${match.stage}|${localKey}`];
+  return mapped || null;
+}
+
+function officialBracketFallbackStageOrder(stage) {
+  const orders = {
+    round_of_32: 73,
+    round_of_16: 89,
+    quarter_final: 97,
+    semi_final: 101,
+    third_place: 103,
+    final: 104
+  };
+  return orders[stage] || 999;
+}
+
+function officialBracketDisplayOrder(number) {
+  const order = [
+    73, 75, 74, 77, 83, 84, 81, 82,
+    76, 78, 79, 80, 86, 88, 85, 87,
+    90, 89, 93, 94, 91, 92, 95, 96,
+    97, 98, 99, 100, 101, 102, 103, 104
+  ];
+  const index = order.indexOf(Number(number));
+  return index >= 0 ? index + 1 : Number(number) || 999;
+}
+
+function officialBracketSortValue(match = {}) {
+  const number = officialBracketMatchNumber(match);
+  if (number) return officialBracketDisplayOrder(number);
+  const kickoff = match?.kickoff_at ? new Date(match.kickoff_at).getTime() : 9999999999999;
+  return officialBracketFallbackStageOrder(match?.stage) * 10000000000000 + kickoff;
+}
+
+function finalBracketLayout() {
+  return {
+    left: [
+      { r32: [73, 75], r16: 90, qf: 97, sf: 101 },
+      { r32: [74, 77], r16: 89, qf: 97, sf: 101 },
+      { r32: [83, 84], r16: 93, qf: 98, sf: 101 },
+      { r32: [81, 82], r16: 94, qf: 98, sf: 101 }
+    ],
+    right: [
+      { r32: [76, 78], r16: 91, qf: 99, sf: 102 },
+      { r32: [79, 80], r16: 92, qf: 99, sf: 102 },
+      { r32: [86, 88], r16: 95, qf: 100, sf: 102 },
+      { r32: [85, 87], r16: 96, qf: 100, sf: 102 }
+    ]
+  };
+}
+
+function finalBracketProgressionMap() {
+  return {
+    90: { sources: [73, 75], use: "winner" },
+    89: { sources: [74, 77], use: "winner" },
+    93: { sources: [83, 84], use: "winner" },
+    94: { sources: [81, 82], use: "winner" },
+    91: { sources: [76, 78], use: "winner" },
+    92: { sources: [79, 80], use: "winner" },
+    95: { sources: [86, 88], use: "winner" },
+    96: { sources: [85, 87], use: "winner" },
+    97: { sources: [90, 89], use: "winner" },
+    98: { sources: [93, 94], use: "winner" },
+    99: { sources: [91, 92], use: "winner" },
+    100: { sources: [95, 96], use: "winner" },
+    101: { sources: [97, 98], use: "winner" },
+    102: { sources: [99, 100], use: "winner" },
+    103: { sources: [101, 102], use: "loser" },
+    104: { sources: [101, 102], use: "winner" }
+  };
+}
+
+function finalBracketProgressionOrder() {
+  return [90, 89, 93, 94, 91, 92, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104];
+}
+
+function finalBracketProgressionRule(number) {
+  return finalBracketProgressionMap()[Number(number)] || null;
+}
+
 function resultIcon(row) {
   if (!row || row.points_total === null || row.points_total === undefined) return "";
   if (row.is_exact_score) return icon("target", "Score exact");
@@ -512,6 +691,13 @@ window.Helpers = {
   formatDateOnly,
   formatShortDate,
   matchDateRangeLabel,
+  officialBracketMatchNumber,
+  officialBracketSortValue,
+  officialBracketDisplayOrder,
+  finalBracketLayout,
+  finalBracketProgressionMap,
+  finalBracketProgressionOrder,
+  finalBracketProgressionRule,
   poolRoundLabel,
   shortPoolRoundLabel,
   groupMatchesByPouleRound,

@@ -1,608 +1,549 @@
--- ============================================================
--- LE NID DES PRONOS — OUTIL DEMO PDF FINAL — VERSION SQL EDITOR
--- Crée un joueur fictif qui a pronostiqué toute la compétition.
--- Permet de prévisualiser le Bilan PDF : scores, badges, records, graphs.
---
--- UTILISATION :
--- 1) Installer les fonctions ci-dessous dans Supabase SQL Editor.
--- 2) Créer le joueur démo :
---      select public.admin_create_pdf_demo_player_sql_editor(true);
---
---    true  = marque temporairement les matchs comme terminés avec des scores fictifs
---            pour avoir immédiatement des points, badges, records et graphiques.
---    false = crée seulement les pronos, sans toucher aux matchs.
---
--- 3) Tester dans Admin > Bilan PDF avec le joueur :
---      Hibou Démo PDF
---
--- 4) Nettoyer totalement après test :
---      select public.admin_delete_pdf_demo_player_sql_editor(true);
---
---    true restaure les scores/statuts de matchs sauvegardés au moment de la création.
---
--- IMPORTANT :
--- - Les horaires, lieux, équipes, diffuseurs TV et infos de match ne sont pas modifiés.
--- - Si tu utilises true, ne modifie pas les scores/statuts réels entre la création et le nettoyage,
---   sinon le nettoyage remettra les statuts/scores comme avant le test.
--- ============================================================
+// ============================================================
+// LE NID DES PRONOS — SUPABASE EDGE FUNCTION
+// sync-football
+// Provider: API-Football / API-Sports v3
+// ============================================================
+//
+// Actions disponibles :
+// - { "mode": "fixtures" } : importe / met à jour tous les matchs de la compétition
+// - { "mode": "live" }     : met à jour les matchs en direct
+// - { "mode": "all" }      : fixtures puis live
+// - { "mode": "debug" }    : teste la connexion API et retourne les infos brutes utiles
+//
+// Sécurité :
+// - appel depuis l'admin web : vérifie le JWT utilisateur + role admin dans profiles
+// - appel cron : accepte le header x-sync-secret si égal au secret SYNC_SECRET
+//
+// Secrets requis dans Supabase Edge Functions :
+// - API_FOOTBALL_KEY
+// - SUPABASE_SERVICE_ROLE_KEY
+// - SYNC_SECRET optionnel, mais conseillé pour Cron
+//
+// Déploiement conseillé :
+// supabase functions deploy sync-football --no-verify-jwt
 
-create extension if not exists pgcrypto;
+import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
 
--- Table de snapshot technique, utilisée uniquement pour restaurer les statuts/scores après test.
-create table if not exists public.pdf_demo_match_snapshot (
-  match_id uuid primary key,
-  status text,
-  home_score integer,
-  away_score integer,
-  winner_team_id uuid,
-  captured_at timestamptz not null default now()
-);
+type SyncMode = "fixtures" | "live" | "all" | "debug";
 
--- ----------------------------------------------------------------
--- Fonction 1 : création / recréation du joueur démo PDF.
--- ----------------------------------------------------------------
-create or replace function public.admin_create_pdf_demo_player_sql_editor(
-  p_finish_matches boolean default true
-)
-returns jsonb
-language plpgsql
-security definer
-set search_path = public, auth
-as $$
-declare
-  demo_user_id uuid := '00000000-0000-4000-8000-000000001300'::uuid;
-  demo_email text := 'demo-pdf@le-nid.local';
-  demo_pseudo text := 'Hibou Démo PDF';
-  demo_team_id uuid;
-  demo_competition_id uuid;
-  demo_champion_team_id uuid;
-  inserted_predictions int := 0;
-begin
-  -- SQL Editor only : pas de auth.uid(), donc pas de contrôle super admin ici.
--- Team de rattachement : on prend la première team existante.
-  select id
-  into demo_team_id
-  from public.office_teams
-  order by name asc nulls last
-  limit 1;
+type ApiFootballFixture = {
+  fixture: {
+    id: number;
+    date: string;
+    status: { short: string; long?: string; elapsed?: number | null };
+    venue?: { name?: string | null; city?: string | null };
+  };
+  league?: { round?: string | null };
+  teams: {
+    home: { id: number; name: string; logo?: string | null; winner?: boolean | null };
+    away: { id: number; name: string; logo?: string | null; winner?: boolean | null };
+  };
+  goals?: { home: number | null; away: number | null };
+};
 
-  if demo_team_id is null then
-    raise exception 'Aucune team bureau trouvée. Crée au moins une team avant de générer le joueur démo.';
-  end if;
+type ApiFootballResponse<T> = {
+  get?: string;
+  parameters?: Record<string, unknown>;
+  errors?: unknown;
+  results?: number;
+  response: T[];
+};
 
-  -- Crée un faux compte Auth, pour satisfaire l’éventuel lien profiles -> auth.users.
-  insert into auth.users (
-    id,
-    instance_id,
-    aud,
-    role,
-    email,
-    encrypted_password,
-    email_confirmed_at,
-    raw_app_meta_data,
-    raw_user_meta_data,
-    created_at,
-    updated_at
-  )
-  values (
-    demo_user_id,
-    '00000000-0000-0000-0000-000000000000'::uuid,
-    'authenticated',
-    'authenticated',
-    demo_email,
-    crypt('demo-pdf-nid', gen_salt('bf')),
-    now(),
-    '{"provider":"email","providers":["email"]}'::jsonb,
-    jsonb_build_object('pseudo', demo_pseudo),
-    now(),
-    now()
-  )
-  on conflict (id) do update
-  set email = excluded.email,
-      updated_at = now(),
-      raw_user_meta_data = excluded.raw_user_meta_data;
+const CORS_HEADERS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-sync-secret",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+};
 
-  -- Crée / remet à jour le profil joueur.
-  insert into public.profiles (
-    id,
-    email,
-    pseudo,
-    role,
-    player_scope,
-    office_team_id,
-    is_active,
-    is_banned,
-    can_chat,
-    can_predict,
-    can_change_avatar,
-    can_change_pseudo,
-    avatar_key,
-    badge_shape,
-    badge_color,
-    profile_setup_done,
-    show_family_players,
-    created_at
-  )
-  values (
-    demo_user_id,
-    demo_email,
-    demo_pseudo,
-    'user',
-    'uis',
-    demo_team_id,
-    true,
-    false,
-    true,
-    true,
-    true,
-    true,
-    'owl-18-le-coach-au-sifflet',
-    'rounded',
-    '#facc15',
-    true,
-    false,
-    now()
-  )
-  on conflict (id) do update
-  set email = excluded.email,
-      pseudo = excluded.pseudo,
-      role = excluded.role,
-      player_scope = excluded.player_scope,
-      office_team_id = excluded.office_team_id,
-      is_active = true,
-      is_banned = false,
-      can_chat = true,
-      can_predict = true,
-      can_change_avatar = true,
-      can_change_pseudo = true,
-      avatar_key = excluded.avatar_key,
-      badge_shape = excluded.badge_shape,
-      badge_color = excluded.badge_color,
-      profile_setup_done = true,
-      show_family_players = false;
+const API_BASE_URL = "https://v3.football.api-sports.io";
+const WORLD_CUP_LEAGUE_ID = Number(Deno.env.get("API_FOOTBALL_LEAGUE_ID") || "1");
+const WORLD_CUP_SEASON = Number(Deno.env.get("API_FOOTBALL_SEASON") || "2026");
+const COMPETITION_SLUG = Deno.env.get("COMPETITION_SLUG") || "world-cup-2026";
+const FRANCE_TZ = Deno.env.get("APP_TIMEZONE") || "Europe/Paris";
 
-  -- Nettoyage des anciennes données du joueur démo.
-  if to_regclass('public.prediction_points') is not null then
-    delete from public.prediction_points where user_id = demo_user_id;
-  end if;
+const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+const apiFootballKey = Deno.env.get("API_FOOTBALL_KEY")!;
+const syncSecret = Deno.env.get("SYNC_SECRET") || "";
 
-  if to_regclass('public.predictions') is not null then
-    delete from public.predictions where user_id = demo_user_id;
-  end if;
+const adminDb = createClient(supabaseUrl, serviceRoleKey, {
+  auth: { persistSession: false, autoRefreshToken: false },
+});
 
-  if to_regclass('public.winner_predictions') is not null then
-    delete from public.winner_predictions where user_id = demo_user_id;
-  end if;
+serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { headers: CORS_HEADERS });
+  }
 
-  -- Snapshot des statuts/scores avant simulation.
-  if p_finish_matches then
-    insert into public.pdf_demo_match_snapshot (
-      match_id,
-      status,
-      home_score,
-      away_score,
-      winner_team_id
-    )
-    select
-      m.id,
-      m.status::text,
-      m.home_score,
-      m.away_score,
-      m.winner_team_id
-    from public.matches m
-    where coalesce(m.is_test_match, false) = false
-    on conflict (match_id) do nothing;
+  if (req.method !== "POST") {
+    return json({ ok: false, error: "Méthode non autorisée. Utilise POST." }, 405);
+  }
 
-    -- Simulation de résultats sur les matchs officiels.
-    -- On ne touche pas aux horaires, lieux, équipes, diffuseurs, villes, stades, etc.
-    with numbered as (
-      select
-        m.id,
-        m.stage::text as stage_text,
-        m.home_team_id,
-        m.away_team_id,
-        row_number() over (order by m.kickoff_at nulls last, m.id) as rn
-      from public.matches m
-      where coalesce(m.is_test_match, false) = false
-        and m.home_team_id is not null
-        and m.away_team_id is not null
-    ), scores as (
-      select
-        id,
-        stage_text,
-        home_team_id,
-        away_team_id,
-        case
-          when stage_text = 'group' and rn % 7 = 0 then 1
-          when rn % 5 in (0,1) then 2
-          when rn % 5 = 2 then 3
-          else 1
-        end as h,
-        case
-          when stage_text = 'group' and rn % 7 = 0 then 1
-          when rn % 5 in (0,1) then 0
-          when rn % 5 = 2 then 1
-          else 2
-        end as a
-      from numbered
-    )
-    update public.matches m
-    set
-      status = 'finished',
-      home_score = s.h,
-      away_score = s.a,
-      winner_team_id = case
-        when s.h > s.a then s.home_team_id
-        when s.a > s.h then s.away_team_id
-        when s.stage_text <> 'group' then s.home_team_id
-        else null
-      end
-    from scores s
-    where m.id = s.id;
-  end if;
+  try {
+    if (!apiFootballKey) {
+      return json({ ok: false, error: "Secret API_FOOTBALL_KEY manquant." }, 500);
+    }
 
-  -- Création de pronos variés : exacts, bons résultats, mauvais, casseroles.
-  with match_base as (
-    select
-      m.id as match_id,
-      m.stage::text as stage_text,
-      m.home_team_id,
-      m.away_team_id,
-      coalesce(m.home_score, 2) as real_home,
-      coalesce(m.away_score, 1) as real_away,
-      m.winner_team_id,
-      row_number() over (order by m.kickoff_at nulls last, m.id) as rn
-    from public.matches m
-    where coalesce(m.is_test_match, false) = false
-      and m.home_team_id is not null
-      and m.away_team_id is not null
-  ), demo_predictions as (
-    select
-      demo_user_id as user_id,
-      match_id,
+    const allowed = await isAllowed(req);
+    if (!allowed.ok) {
+      return json({ ok: false, error: allowed.error }, 401);
+    }
 
-      -- home_score_pred
-      case
-        -- 1 sur 4 : score exact.
-        when rn % 4 = 0 then real_home
+    const body = await safeJson(req);
+    const mode: SyncMode = ["fixtures", "live", "all", "debug"].includes(body.mode) ? body.mode : "fixtures";
 
-        -- bon résultat mais pas forcément exact.
-        when rn % 4 = 1 then
-          case
-            when real_home > real_away then real_home + 1
-            when real_home < real_away then greatest(real_home - 1, 0)
-            else real_home + 1
-          end
+    const result: Record<string, unknown> = {
+      mode,
+      league: WORLD_CUP_LEAGUE_ID,
+      season: WORLD_CUP_SEASON,
+      competitionSlug: COMPETITION_SLUG,
+    };
 
-        -- casserole / mauvais sens.
-        when rn % 4 = 2 then
-          case
-            when real_home > real_away then greatest(real_away - 1, 0)
-            when real_home < real_away then real_away + 1
-            else real_home + 2
-          end
+    if (mode === "debug") {
+      result.debug = await debugApiFootball();
+      return json({ ok: true, ...result });
+    }
 
-        -- prono neutre.
-        else greatest(real_home, 0)
-      end as pred_home,
+    if (mode === "fixtures" || mode === "all") {
+      result.fixtures = await syncFixtures();
+    }
 
-      -- away_score_pred
-      case
-        -- 1 sur 4 : score exact.
-        when rn % 4 = 0 then real_away
+    if (mode === "live" || mode === "all") {
+      result.live = await syncLiveFixtures();
+    }
 
-        -- bon résultat mais pas forcément exact.
-        when rn % 4 = 1 then
-          case
-            when real_home > real_away then real_away
-            when real_home < real_away then real_away + 1
-            else real_away + 1
-          end
+    return json({ ok: true, ...result });
+  } catch (error) {
+    console.error(error);
+    return json({ ok: false, error: error instanceof Error ? error.message : String(error) }, 500);
+  }
+});
 
-        -- casserole / mauvais sens.
-        when rn % 4 = 2 then
-          case
-            when real_home > real_away then real_home + 1
-            when real_home < real_away then greatest(real_home - 1, 0)
-            else greatest(real_away - 1, 0)
-          end
+async function safeJson(req: Request): Promise<Record<string, any>> {
+  try {
+    return await req.json();
+  } catch {
+    return {};
+  }
+}
 
-        -- prono neutre.
-        else greatest(real_away, 0)
-      end as pred_away,
+function json(payload: unknown, status = 200) {
+  return new Response(JSON.stringify(payload, null, 2), {
+    status,
+    headers: {
+      ...CORS_HEADERS,
+      "Content-Type": "application/json; charset=utf-8",
+    },
+  });
+}
 
-      stage_text,
-      home_team_id,
-      away_team_id,
-      winner_team_id,
-      rn
-    from match_base
-  ), normalized as (
-    select
-      user_id,
-      match_id,
-      pred_home,
-      case
-        -- En phase finale, on évite les égalités dans le prono.
-        when stage_text <> 'group' and pred_home = pred_away then pred_away + 1
-        else pred_away
-      end as pred_away,
-      stage_text,
-      home_team_id,
-      away_team_id,
-      winner_team_id,
-      rn
-    from demo_predictions
-  )
-  insert into public.predictions (
-    user_id,
-    match_id,
-    home_score_pred,
-    away_score_pred,
-    qualified_team_pred,
-    created_at,
-    updated_at
-  )
-  select
-    user_id,
-    match_id,
-    pred_home,
-    pred_away,
-    case
-      when stage_text = 'group' then null
-      when rn % 4 in (0,1) then coalesce(winner_team_id, case when pred_home > pred_away then home_team_id else away_team_id end)
-      else case
-        when coalesce(winner_team_id, home_team_id) = home_team_id then away_team_id
-        else home_team_id
-      end
-    end as qualified_team_pred,
-    now() - ((rn % 18) || ' hours')::interval,
-    now() - ((rn % 7) || ' minutes')::interval
-  from normalized
-  on conflict (user_id, match_id) do update
-  set home_score_pred = excluded.home_score_pred,
-      away_score_pred = excluded.away_score_pred,
-      qualified_team_pred = excluded.qualified_team_pred,
-      updated_at = excluded.updated_at;
+async function isAllowed(req: Request): Promise<{ ok: true } | { ok: false; error: string }> {
+  const headerSecret = req.headers.get("x-sync-secret") || "";
+  if (syncSecret && headerSecret && headerSecret === syncSecret) {
+    return { ok: true };
+  }
 
-  get diagnostics inserted_predictions = row_count;
+  const authHeader = req.headers.get("Authorization") || "";
+  const token = authHeader.replace(/^Bearer\s+/i, "").trim();
 
-  -- Choix champion démo : idéalement le vainqueur de la finale simulée.
-  if to_regclass('public.winner_predictions') is not null
-     and to_regclass('public.competitions') is not null
-     and to_regclass('public.football_teams') is not null then
+  if (!token) {
+    return { ok: false, error: "Non autorisé : JWT ou x-sync-secret manquant." };
+  }
 
-    select id
-    into demo_competition_id
-    from public.competitions
-    where is_active = true
-    order by id desc
-    limit 1;
+  const authClient = createClient(supabaseUrl, serviceRoleKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+    global: { headers: { Authorization: `Bearer ${token}` } },
+  });
 
-    if demo_competition_id is null then
-      select id
-      into demo_competition_id
-      from public.competitions
-      order by id desc
-      limit 1;
-    end if;
+  const { data: userData, error: userError } = await authClient.auth.getUser(token);
+  if (userError || !userData.user) {
+    return { ok: false, error: "Utilisateur non reconnu." };
+  }
 
-    select winner_team_id
-    into demo_champion_team_id
-    from public.matches
-    where stage::text = 'final'
-      and winner_team_id is not null
-    order by kickoff_at desc nulls last
-    limit 1;
+  const { data: profile, error: profileError } = await adminDb
+    .from("profiles")
+    .select("role,is_active")
+    .eq("id", userData.user.id)
+    .single();
 
-    if demo_champion_team_id is null then
-      select id
-      into demo_champion_team_id
-      from public.football_teams
-      order by name
-      limit 1;
-    end if;
+  if (profileError || !profile) {
+    return { ok: false, error: "Profil introuvable." };
+  }
 
-    if demo_competition_id is not null and demo_champion_team_id is not null then
-      insert into public.winner_predictions (
-        user_id,
-        competition_id,
-        predicted_team_id,
-        locked_at,
-        created_at,
-        updated_at
-      )
-      values (
-        demo_user_id,
-        demo_competition_id,
-        demo_champion_team_id,
-        now(),
-        now() - interval '6 days',
-        now()
-      )
-      on conflict (user_id, competition_id) do update
-      set predicted_team_id = excluded.predicted_team_id,
-          locked_at = excluded.locked_at,
-          updated_at = now();
-    end if;
-  end if;
+  if (profile.role !== "admin" || profile.is_active !== true) {
+    return { ok: false, error: "Action réservée à l’admin." };
+  }
 
-  -- Recalcule les points à partir des vrais/simulés résultats.
-  begin
-    perform public.recalc_all_points();
-  exception when undefined_function then
-    null;
-  end;
+  return { ok: true };
+}
 
-  begin
-    perform public.recalc_winner_predictions();
-  exception when undefined_function then
-    null;
-  end;
+async function apiFootball<T>(path: string, params: Record<string, string | number | boolean> = {}) {
+  const url = new URL(`${API_BASE_URL}${path}`);
+  for (const [key, value] of Object.entries(params)) {
+    url.searchParams.set(key, String(value));
+  }
 
-  return jsonb_build_object(
-    'message', 'Joueur démo PDF créé. Va dans Admin > Bilan PDF et choisis Hibou Démo PDF.',
-    'demo_user_id', demo_user_id,
-    'demo_email', demo_email,
-    'demo_pseudo', demo_pseudo,
-    'finish_matches', p_finish_matches,
-    'predictions_created_or_updated', inserted_predictions,
-    'cleanup_sql', 'select public.admin_delete_pdf_demo_player_sql_editor(true);'
-  );
-end;
-$$;
+  const response = await fetch(url.toString(), {
+    headers: {
+      "x-apisports-key": apiFootballKey,
+    },
+  });
 
-revoke all on function public.admin_create_pdf_demo_player_sql_editor(boolean) from public;
-revoke all on function public.admin_create_pdf_demo_player_sql_editor(boolean) from anon;
-revoke all on function public.admin_create_pdf_demo_player_sql_editor(boolean) from authenticated;
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(`API-Football HTTP ${response.status}: ${text}`);
+  }
 
--- ----------------------------------------------------------------
--- Fonction 2 : suppression complète du joueur démo.
--- ----------------------------------------------------------------
-create or replace function public.admin_delete_pdf_demo_player_sql_editor(
-  p_restore_matches boolean default true
-)
-returns jsonb
-language plpgsql
-security definer
-set search_path = public, auth
-as $$
-declare
-  demo_user_id uuid := '00000000-0000-4000-8000-000000001300'::uuid;
-  deleted_prediction_points int := 0;
-  deleted_predictions int := 0;
-  deleted_winner_predictions int := 0;
-  deleted_profile int := 0;
-  deleted_auth_user int := 0;
-  restored_matches int := 0;
-begin
-  -- SQL Editor only : pas de auth.uid(), donc pas de contrôle super admin ici.
-if p_restore_matches and to_regclass('public.pdf_demo_match_snapshot') is not null then
-    update public.matches m
-    set
-      status = s.status::public.match_status,
-      home_score = s.home_score,
-      away_score = s.away_score,
-      winner_team_id = s.winner_team_id
-    from public.pdf_demo_match_snapshot s
-    where m.id = s.match_id;
+  const payload = (await response.json()) as ApiFootballResponse<T>;
+  const apiErrors = normalizeApiErrors(payload.errors);
 
-    get diagnostics restored_matches = row_count;
+  if (apiErrors) {
+    throw new Error(`API-Football a répondu une erreur : ${apiErrors}`);
+  }
 
-    delete from public.pdf_demo_match_snapshot where true;
-  end if;
+  console.log("API-Football response", {
+    path,
+    params,
+    results: payload.results,
+    returned: payload.response?.length || 0,
+  });
 
-  if to_regclass('public.prediction_points') is not null then
-    delete from public.prediction_points where user_id = demo_user_id;
-    get diagnostics deleted_prediction_points = row_count;
-  end if;
+  return payload.response || [];
+}
 
-  if to_regclass('public.predictions') is not null then
-    delete from public.predictions where user_id = demo_user_id;
-    get diagnostics deleted_predictions = row_count;
-  end if;
+async function debugApiFootball() {
+  const url = new URL(`${API_BASE_URL}/fixtures`);
+  url.searchParams.set("league", String(WORLD_CUP_LEAGUE_ID));
+  url.searchParams.set("season", String(WORLD_CUP_SEASON));
 
-  if to_regclass('public.winner_predictions') is not null then
-    delete from public.winner_predictions where user_id = demo_user_id;
-    get diagnostics deleted_winner_predictions = row_count;
-  end if;
+  const response = await fetch(url.toString(), {
+    headers: {
+      "x-apisports-key": apiFootballKey,
+    },
+  });
 
-  delete from public.profiles where id = demo_user_id;
-  get diagnostics deleted_profile = row_count;
+  let payload: ApiFootballResponse<ApiFootballFixture> | Record<string, unknown>;
+  try {
+    payload = await response.json();
+  } catch {
+    payload = { rawText: await response.text() };
+  }
 
-  delete from auth.users where id = demo_user_id;
-  get diagnostics deleted_auth_user = row_count;
+  const p = payload as ApiFootballResponse<ApiFootballFixture>;
+  const first = Array.isArray(p.response) && p.response.length ? p.response[0] : null;
 
-  begin
-    perform public.recalc_all_points();
-  exception when undefined_function then
-    null;
-  end;
+  return {
+    request: {
+      endpoint: "/fixtures",
+      league: WORLD_CUP_LEAGUE_ID,
+      season: WORLD_CUP_SEASON,
+      competitionSlug: COMPETITION_SLUG,
+    },
+    httpStatus: response.status,
+    httpOk: response.ok,
+    apiErrors: normalizeApiErrors(p.errors),
+    apiResults: p.results ?? null,
+    responseLength: Array.isArray(p.response) ? p.response.length : null,
+    firstFixture: first
+      ? {
+          id: first.fixture?.id,
+          date: first.fixture?.date,
+          status: first.fixture?.status,
+          round: first.league?.round,
+          home: first.teams?.home?.name,
+          away: first.teams?.away?.name,
+        }
+      : null,
+  };
+}
 
-  return jsonb_build_object(
-    'message', 'Joueur démo PDF supprimé.',
-    'demo_user_id', demo_user_id,
-    'restored_matches', restored_matches,
-    'deleted_prediction_points', deleted_prediction_points,
-    'deleted_predictions', deleted_predictions,
-    'deleted_winner_predictions', deleted_winner_predictions,
-    'deleted_profile', deleted_profile,
-    'deleted_auth_user', deleted_auth_user
-  );
-end;
-$$;
+function normalizeApiErrors(errors: unknown): string {
+  if (!errors) return "";
+  if (Array.isArray(errors) && errors.length === 0) return "";
+  if (typeof errors === "object" && Object.keys(errors as Record<string, unknown>).length === 0) return "";
+  if (typeof errors === "string") return errors;
+  try {
+    return JSON.stringify(errors);
+  } catch {
+    return String(errors);
+  }
+}
 
-revoke all on function public.admin_delete_pdf_demo_player_sql_editor(boolean) from public;
-revoke all on function public.admin_delete_pdf_demo_player_sql_editor(boolean) from anon;
-revoke all on function public.admin_delete_pdf_demo_player_sql_editor(boolean) from authenticated;
+async function syncFixtures() {
+  const fixtures = await apiFootball<ApiFootballFixture>("/fixtures", {
+    league: WORLD_CUP_LEAGUE_ID,
+    season: WORLD_CUP_SEASON,
+  });
 
+  return await upsertFixtures(fixtures, "fixtures");
+}
 
+async function syncLiveFixtures() {
+  const fixtures = await apiFootball<ApiFootballFixture>("/fixtures", {
+    league: WORLD_CUP_LEAGUE_ID,
+    season: WORLD_CUP_SEASON,
+    live: "all",
+  });
 
--- ----------------------------------------------------------------
--- Fonction 3 : vérifier si le joueur démo existe encore.
--- ----------------------------------------------------------------
-create or replace function public.admin_check_pdf_demo_player_sql_editor()
-returns jsonb
-language plpgsql
-security definer
-set search_path = public
-as $$
-declare
-  demo_user_id uuid := '00000000-0000-4000-8000-000000001300'::uuid;
-  profile_exists boolean := false;
-  auth_exists boolean := false;
-  predictions_count int := 0;
-  points_count int := 0;
-begin
-  -- SQL Editor only : pas de auth.uid(), donc pas de contrôle super admin ici.
-select exists(select 1 from public.profiles where id = demo_user_id)
-  into profile_exists;
+  return await upsertFixtures(fixtures, "live");
+}
 
-  select exists(select 1 from auth.users where id = demo_user_id)
-  into auth_exists;
+async function upsertFixtures(fixtures: ApiFootballFixture[], source: "fixtures" | "live") {
+  if (!fixtures.length) {
+    return { fetched: 0, teamsUpserted: 0, matchesUpserted: 0 };
+  }
 
-  if to_regclass('public.predictions') is not null then
-    select count(*)::int into predictions_count
-    from public.predictions
-    where user_id = demo_user_id;
-  end if;
+  const competitionId = await getCompetitionId();
+  const nowIso = new Date().toISOString();
 
-  if to_regclass('public.prediction_points') is not null then
-    select count(*)::int into points_count
-    from public.prediction_points
-    where user_id = demo_user_id;
-  end if;
+  const teamPayloads = collectTeams(fixtures);
+  const { error: teamUpsertError } = await adminDb
+    .from("football_teams")
+    .upsert(teamPayloads, { onConflict: "api_team_id" });
 
-  return jsonb_build_object(
-    'demo_user_id', demo_user_id,
-    'pseudo', 'Hibou Démo PDF',
-    'profile_exists', profile_exists,
-    'auth_user_exists', auth_exists,
-    'predictions_count', predictions_count,
-    'points_count', points_count,
-    'visible_in_admin_bilan_pdf', profile_exists and predictions_count > 0
-  );
-end;
-$$;
+  if (teamUpsertError) throw teamUpsertError;
 
-revoke all on function public.admin_check_pdf_demo_player_sql_editor() from public;
-revoke all on function public.admin_check_pdf_demo_player_sql_editor() from anon;
-revoke all on function public.admin_check_pdf_demo_player_sql_editor() from authenticated;
+  const apiTeamIds = teamPayloads.map((team) => team.api_team_id);
+  const { data: teams, error: teamsError } = await adminDb
+    .from("football_teams")
+    .select("id,api_team_id")
+    .in("api_team_id", apiTeamIds);
 
--- Après installation du script, tu peux vérifier les fonctions avec :
-select
-  'demo_pdf_tools_ready' as check_name,
-  to_regprocedure('public.admin_create_pdf_demo_player_sql_editor(boolean)') is not null as create_function_ok,
-  to_regprocedure('public.admin_delete_pdf_demo_player_sql_editor(boolean)') is not null as delete_function_ok,
-  to_regprocedure('public.admin_check_pdf_demo_player_sql_editor()') is not null as check_function_ok;
+  if (teamsError) throw teamsError;
 
--- IMPORTANT :
--- Le script ci-dessus installe les outils, mais ne crée pas automatiquement le joueur.
--- Pour créer le joueur démo :
---   select public.admin_create_pdf_demo_player_sql_editor(true);
---
--- Pour vérifier qu'il existe :
---   select public.admin_check_pdf_demo_player_sql_editor();
---
--- Pour tout supprimer après test :
---   select public.admin_delete_pdf_demo_player_sql_editor(true);
+  const teamIdByApiId = new Map<number, string>();
+  for (const team of teams || []) {
+    teamIdByApiId.set(Number(team.api_team_id), team.id);
+  }
+
+  const fixtureIds = fixtures.map((fixture) => fixture.fixture.id);
+  const { data: existingMatches, error: existingError } = await adminDb
+    .from("matches")
+    .select("api_match_id,tv_channel,tv_channel_source")
+    .in("api_match_id", fixtureIds);
+
+  if (existingError) throw existingError;
+
+  const existingByApiId = new Map<number, { tv_channel?: string | null; tv_channel_source?: string | null }>();
+  for (const match of existingMatches || []) {
+    existingByApiId.set(Number(match.api_match_id), match);
+  }
+
+  const matchPayloads = fixtures
+    .map((fixture) => {
+      const homeTeamId = teamIdByApiId.get(fixture.teams.home.id);
+      const awayTeamId = teamIdByApiId.get(fixture.teams.away.id);
+      if (!homeTeamId || !awayTeamId) return null;
+
+      const existing = existingByApiId.get(fixture.fixture.id);
+      const status = mapStatus(fixture.fixture.status.short);
+      const homeScore = fixture.goals?.home ?? null;
+      const awayScore = fixture.goals?.away ?? null;
+      const winnerTeamId = getWinnerTeamId(fixture, homeTeamId, awayTeamId, status, homeScore, awayScore);
+      const round = fixture.league?.round || "";
+
+      return {
+        competition_id: competitionId,
+        api_match_id: fixture.fixture.id,
+        home_team_id: homeTeamId,
+        away_team_id: awayTeamId,
+        kickoff_at: fixture.fixture.date,
+        match_day: localDateInTimezone(fixture.fixture.date, FRANCE_TZ),
+        venue: fixture.fixture.venue?.name || null,
+        city: fixture.fixture.venue?.city || null,
+        stage: mapStage(round),
+        group_name: extractGroupName(round),
+        status,
+        home_score: homeScore,
+        away_score: awayScore,
+        winner_team_id: winnerTeamId,
+        tv_channel: existing?.tv_channel || "à confirmer",
+        tv_channel_source: existing?.tv_channel_source || "unknown",
+        last_api_sync_at: nowIso,
+        raw_api_payload: fixture,
+      };
+    })
+    .filter(Boolean);
+
+  const { error: matchUpsertError } = await adminDb
+    .from("matches")
+    .upsert(matchPayloads, { onConflict: "api_match_id" });
+
+  if (matchUpsertError) throw matchUpsertError;
+
+  return {
+    source,
+    fetched: fixtures.length,
+    teamsUpserted: teamPayloads.length,
+    matchesUpserted: matchPayloads.length,
+  };
+}
+
+async function getCompetitionId(): Promise<string> {
+  const { data: existing, error: existingError } = await adminDb
+    .from("competitions")
+    .select("id")
+    .eq("slug", COMPETITION_SLUG)
+    .maybeSingle();
+
+  if (existingError) throw existingError;
+  if (existing?.id) return existing.id;
+
+  const { data: created, error: createError } = await adminDb
+    .from("competitions")
+    .insert({
+      name: "Coupe du Monde 2026",
+      slug: COMPETITION_SLUG,
+      season: String(WORLD_CUP_SEASON),
+      is_active: true,
+    })
+    .select("id")
+    .single();
+
+  if (createError) throw createError;
+  return created.id;
+}
+
+function collectTeams(fixtures: ApiFootballFixture[]) {
+  const byId = new Map<number, any>();
+
+  for (const fixture of fixtures) {
+    for (const side of [fixture.teams.home, fixture.teams.away]) {
+      if (!side?.id) continue;
+      byId.set(side.id, {
+        api_team_id: side.id,
+        name: side.name,
+        short_name: shortName(side.name),
+        country_code: null,
+        flag_emoji: flagEmoji(side.name),
+        flag_url: side.logo || null,
+      });
+    }
+  }
+
+  return Array.from(byId.values());
+}
+
+function mapStatus(short: string) {
+  const value = String(short || "NS").toUpperCase();
+
+  if (["NS", "TBD"].includes(value)) return "scheduled";
+  if (["1H", "HT", "2H", "ET", "BT", "P", "SUSP", "INT"].includes(value)) return "live";
+  if (["FT", "AET", "PEN"].includes(value)) return "finished";
+  if (["PST"].includes(value)) return "postponed";
+  if (["CANC", "ABD", "AWD", "WO"].includes(value)) return "cancelled";
+
+  return "scheduled";
+}
+
+function mapStage(round: string) {
+  const value = round.toLowerCase();
+
+  if (value.includes("final") && !value.includes("semi") && !value.includes("third")) return "final";
+  if (value.includes("third")) return "third_place";
+  if (value.includes("semi")) return "semi_final";
+  if (value.includes("quarter")) return "quarter_final";
+  if (value.includes("round of 16") || value.includes("1/8")) return "round_of_16";
+  if (value.includes("round of 32") || value.includes("1/16")) return "round_of_32";
+
+  return "group";
+}
+
+function extractGroupName(round: string) {
+  const groupMatch = round.match(/group\s+([a-z0-9]+)/i);
+  if (!groupMatch) return null;
+  return groupMatch[1].toUpperCase();
+}
+
+function getWinnerTeamId(
+  fixture: ApiFootballFixture,
+  homeTeamId: string,
+  awayTeamId: string,
+  status: string,
+  homeScore: number | null,
+  awayScore: number | null,
+) {
+  if (fixture.teams.home.winner === true) return homeTeamId;
+  if (fixture.teams.away.winner === true) return awayTeamId;
+
+  if (status !== "finished") return null;
+  if (homeScore === null || awayScore === null) return null;
+  if (homeScore > awayScore) return homeTeamId;
+  if (awayScore > homeScore) return awayTeamId;
+
+  return null;
+}
+
+function localDateInTimezone(isoDate: string, timeZone: string) {
+  const formatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+
+  return formatter.format(new Date(isoDate));
+}
+
+function shortName(name: string) {
+  const clean = String(name || "").replace(/[^A-Za-zÀ-ÿ]/g, "").toUpperCase();
+  return clean.slice(0, 3) || null;
+}
+
+function flagEmoji(teamName: string) {
+  const flags: Record<string, string> = {
+    France: "🇫🇷",
+    Italy: "🇮🇹",
+    Italie: "🇮🇹",
+    Argentina: "🇦🇷",
+    Argentine: "🇦🇷",
+    Brazil: "🇧🇷",
+    Brésil: "🇧🇷",
+    Spain: "🇪🇸",
+    Espagne: "🇪🇸",
+    Germany: "🇩🇪",
+    Allemagne: "🇩🇪",
+    Morocco: "🇲🇦",
+    Maroc: "🇲🇦",
+    Japan: "🇯🇵",
+    Japon: "🇯🇵",
+    England: "🏴",
+    Portugal: "🇵🇹",
+    Netherlands: "🇳🇱",
+    Belgium: "🇧🇪",
+    Croatia: "🇭🇷",
+    Uruguay: "🇺🇾",
+    Mexico: "🇲🇽",
+    Canada: "🇨🇦",
+    "United States": "🇺🇸",
+    USA: "🇺🇸",
+    "Saudi Arabia": "🇸🇦",
+    Australia: "🇦🇺",
+    Switzerland: "🇨🇭",
+    Denmark: "🇩🇰",
+    Sweden: "🇸🇪",
+    Poland: "🇵🇱",
+    Senegal: "🇸🇳",
+    "South Korea": "🇰🇷",
+    Korea: "🇰🇷",
+    Iran: "🇮🇷",
+    Qatar: "🇶🇦",
+    Tunisia: "🇹🇳",
+    Serbia: "🇷🇸",
+    Ghana: "🇬🇭",
+    Cameroon: "🇨🇲",
+    Nigeria: "🇳🇬",
+    Egypt: "🇪🇬",
+    Algeria: "🇩🇿",
+    Norway: "🇳🇴",
+    Turkey: "🇹🇷",
+    Czechia: "🇨🇿",
+    "Czech Republic": "🇨🇿",
+    Austria: "🇦🇹",
+    Scotland: "🏴",
+    Wales: "🏴",
+  };
+
+  return flags[teamName] || null;
+}

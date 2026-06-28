@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — ADMIN V1.3.25
+// LE NID DES PRONOS — ADMIN V1.8.41
 // ============================================================
 
 const H = window.Helpers;
@@ -20,16 +20,56 @@ const Admin = {
     adminSection: "quick",
     backups: [],
     familyInvites: [],
+    manualBadges: [],
     appSettings: {},
+    loginOwlMessage: null,
+    owlMessages: [],
+    owlPollResults: [],
+    owlPollVoteDetails: [],
     familyModeEnabled: false,
     preparationModuleEnabled: true,
     graphPreviewTestMatchesEnabled: false,
     graphMockPreviewEnabled: false,
     homeProgressIncludeTestMatches: false,
+    liveDemoMatchEnabled: false,
+    championFirstBonusPoints: 100,
+    championSecondBonusPoints: 50,
     auditLogs: [],
     healthSnapshot: null,
     healthError: null,
     finalReportSelectedUserId: null
+  },
+
+
+  adminStoragePrefix() {
+    return `nid-pronos-admin:${this.state.session?.user?.id || "anonymous"}`;
+  },
+
+  lastAdminSectionStorageKey() {
+    return `${this.adminStoragePrefix()}:last-section`;
+  },
+
+  readLastAdminSection() {
+    try {
+      return localStorage.getItem(this.lastAdminSectionStorageKey()) || "";
+    } catch (error) {
+      return "";
+    }
+  },
+
+  rememberLastAdminSection(section) {
+    try {
+      if (section) localStorage.setItem(this.lastAdminSectionStorageKey(), section);
+    } catch (error) {
+      // LocalStorage peut être indisponible en navigation privée stricte.
+    }
+  },
+
+  initialAdminSection() {
+    const allowedSections = ["quick", "teams", "messages", "scores", "backups", "health", "audit", "final-report", "users", "family"];
+    const params = new URLSearchParams(window.location.search);
+    const requested = params.get("section") || this.readLastAdminSection() || "quick";
+    return allowedSections.includes(requested) ? requested : "quick";
   },
 
   isSuperAdmin() {
@@ -48,7 +88,7 @@ const Admin = {
       p_category: category,
       p_details: details || {},
       p_metadata: {
-        app_version: "1.3.4",
+        app_version: "1.8.41",
         source: "admin_front"
       }
     });
@@ -81,7 +121,7 @@ const Admin = {
 
   userFamilyModeLabel(user, inviteUserIds = this.familyInviteUserIds()) {
     if (this.isFamilyAccount(user, inviteUserIds)) return "Compte Famille";
-    return user?.show_family_players ? "Mode affiché" : "Mode masqué";
+    return "Joueur normal";
   },
 
   async init() {
@@ -96,6 +136,7 @@ const Admin = {
 
     this.bindActions();
     await this.reloadAll();
+    this.setAdminSection(this.initialAdminSection());
     this.setupRealtime();
   },
 
@@ -116,7 +157,11 @@ const Admin = {
     H.$("#toggleGraphPreviewBtn")?.addEventListener("click", () => this.toggleGraphPreviewTestMatches());
     H.$("#toggleGraphMockPreviewBtn")?.addEventListener("click", () => this.toggleGraphMockPreview());
     H.$("#toggleHomeProgressTestMatchesBtn")?.addEventListener("click", () => this.toggleHomeProgressTestMatches());
+    H.$("#toggleLiveDemoMatchBtn")?.addEventListener("click", () => this.toggleLiveDemoMatch());
+    H.$("#saveChampionBonusPointsBtn")?.addEventListener("click", () => this.saveChampionBonusPoints());
+    this.ensureLiveDemoControls();
     H.$("#fullLaunchResetBtn")?.addEventListener("click", () => this.fullLaunchReset());
+    H.$("#cleanStartPreservePredictionsBtn")?.addEventListener("click", () => this.cleanStartPreservePredictions());
     H.$("#refreshHealthBtn")?.addEventListener("click", async () => { await this.loadHealthSnapshot(); this.renderHealth(); });
     H.$("#refreshAuditBtn")?.addEventListener("click", async () => { await this.loadAuditLogs(); this.renderAudit(); });
 
@@ -189,6 +234,7 @@ const Admin = {
   setAdminSection(section = "quick") {
     this.closeMobileMenu();
     this.state.adminSection = section;
+    this.rememberLastAdminSection(section);
     const titles = {
       quick: ["Saisie rapide des scores", "Prochains matchs en haut, validation rapide et scores manuels."],
       teams: ["Gestion des équipes", "Créer, renommer, recolorer ou supprimer les teams bureau."],
@@ -385,7 +431,9 @@ const Admin = {
         this.loadBackups(),
         this.loadChatMessages(),
         this.loadFamilyInvites(),
+        this.loadManualBadges(),
         this.loadFamilyModeSetting(),
+        this.loadOwlMessagesAdmin(),
         this.loadAuditLogs(),
         this.loadHealthSnapshot()
       ]);
@@ -417,6 +465,197 @@ const Admin = {
     H.toast("Admin rafraîchi", "success");
   },
 
+
+  async loadManualBadges() {
+    const { data, error } = await window.sb
+      .from("manual_user_badges")
+      .select("user_id,badge_id,granted_at,reason");
+
+    if (error) {
+      console.warn("manual_user_badges indisponible", error);
+      this.state.manualBadges = [];
+      return;
+    }
+
+    this.state.manualBadges = data || [];
+  },
+
+  manualBadgeGranted(userId, badgeId) {
+    return (this.state.manualBadges || []).some((row) =>
+      String(row.user_id) === String(userId) && row.badge_id === badgeId
+    );
+  },
+
+  displayCountryName(name = "") {
+    return String(name || "").trim() === "Mexico" ? "Mexique" : name;
+  },
+
+  normalizeTeamLabels(row = {}) {
+    const copy = { ...row };
+    [
+      "name",
+      "team_name",
+      "home_team_name",
+      "away_team_name",
+      "qualified_team_name",
+      "winner_team_name",
+      "venue_country_name"
+    ].forEach((key) => {
+      if (copy[key]) copy[key] = this.displayCountryName(copy[key]);
+    });
+    return copy;
+  },
+
+  footballTeamOptionsHtml(currentId = "") {
+    const current = String(currentId || "");
+    return [
+      `<option value="">À déterminer</option>`,
+      ...(this.state.footballTeams || []).map((team) =>
+        `<option value="${team.id}" ${String(team.id) === current ? "selected" : ""}>${H.escapeHtml(this.displayCountryName(team.name))} ${team.short_name ? `(${H.escapeHtml(team.short_name)})` : ""}</option>`
+      )
+    ].join("");
+  },
+
+  finalTeamsEditorHtml(match = {}) {
+    if (match.stage === "group" || match.is_test_match) return "";
+    return `
+      <details class="final-teams-editor">
+        <summary>Équipes qualifiées / phase finale</summary>
+        <p class="mini-help">Sélectionne manuellement les équipes du match. Les pronos et scores déjà posés restent liés au match.</p>
+        <div class="match-info-grid final-teams-grid">
+          <label>
+            Équipe domicile
+            <select class="match-home-team-id">
+              ${this.footballTeamOptionsHtml(match.home_team_id)}
+            </select>
+          </label>
+          <label>
+            Équipe extérieur
+            <select class="match-away-team-id">
+              ${this.footballTeamOptionsHtml(match.away_team_id)}
+            </select>
+          </label>
+        </div>
+      </details>
+    `;
+  },
+
+  finalBracketNumber(match = {}) {
+    return H.officialBracketMatchNumber?.(match) || null;
+  },
+
+  finalBracketMatchMap(matches = this.state.matches || []) {
+    const map = new Map();
+    (matches || []).forEach((match) => {
+      const number = this.finalBracketNumber(match);
+      if (number && !map.has(number)) map.set(number, match);
+    });
+    return map;
+  },
+
+  scoreNumber(value) {
+    const number = Number(value);
+    return Number.isFinite(number) ? number : null;
+  },
+
+  finalBracketWinnerTeamId(match = {}) {
+    if (!match || match.status !== "finished") return null;
+    if (match.winner_team_id) return match.winner_team_id;
+    const home = this.scoreNumber(match.home_score);
+    const away = this.scoreNumber(match.away_score);
+    if (home === null || away === null) return null;
+    if (home > away) return match.home_team_id || null;
+    if (away > home) return match.away_team_id || null;
+    return null;
+  },
+
+  finalBracketLoserTeamId(match = {}) {
+    if (!match || match.status !== "finished") return null;
+    const winner = this.finalBracketWinnerTeamId(match);
+    if (!winner) return null;
+    if (String(winner) === String(match.home_team_id)) return match.away_team_id || null;
+    if (String(winner) === String(match.away_team_id)) return match.home_team_id || null;
+    return null;
+  },
+
+  finalBracketQualifiedTeamId(match = {}, mode = "winner") {
+    return mode === "loser"
+      ? this.finalBracketLoserTeamId(match)
+      : this.finalBracketWinnerTeamId(match);
+  },
+
+  async propagateFinalBracketTeams(source = "manual") {
+    const progression = H.finalBracketProgressionMap?.() || {};
+    const order = H.finalBracketProgressionOrder?.() || Object.keys(progression).map(Number).sort((a, b) => a - b);
+    if (!order.length) return 0;
+
+    const matchMap = this.finalBracketMatchMap();
+    let changedCount = 0;
+
+    for (const targetNumber of order) {
+      const rule = progression[targetNumber];
+      const target = matchMap.get(Number(targetNumber));
+      if (!rule || !target) continue;
+
+      const [sourceA, sourceB] = rule.sources || [];
+      const matchA = matchMap.get(Number(sourceA));
+      const matchB = matchMap.get(Number(sourceB));
+      if (!matchA || !matchB) continue;
+
+      const nextHomeId = this.finalBracketQualifiedTeamId(matchA, rule.use);
+      const nextAwayId = this.finalBracketQualifiedTeamId(matchB, rule.use);
+      if (!nextHomeId || !nextAwayId) continue;
+
+      const alreadyOk = String(target.home_team_id || "") === String(nextHomeId)
+        && String(target.away_team_id || "") === String(nextAwayId);
+      if (alreadyOk) continue;
+
+      const payload = {
+        home_team_id: nextHomeId,
+        away_team_id: nextAwayId
+      };
+
+      const { error } = await window.sb
+        .from("matches")
+        .update(payload)
+        .eq("id", target.id);
+
+      if (error) {
+        console.warn("Propagation phase finale impossible", { targetNumber, sourceA, sourceB, error });
+        continue;
+      }
+
+      target.home_team_id = nextHomeId;
+      target.away_team_id = nextAwayId;
+      changedCount += 1;
+
+      if (this.isSuperAdmin()) {
+        await this.logAdminAction("auto_propagate_final_bracket", "match", {
+          source,
+          target_match_number: targetNumber,
+          from_matches: [sourceA, sourceB],
+          propagation_mode: rule.use,
+          home_team_id: nextHomeId,
+          away_team_id: nextAwayId
+        }).catch(() => {});
+      }
+    }
+
+    if (changedCount) {
+      H.toast(`${changedCount} match${changedCount > 1 ? "s" : ""} de phase finale mis à jour automatiquement`, "success");
+    }
+
+    return changedCount;
+  },
+
+  async reloadAndPropagateFinalBracket(source = "manual") {
+    await this.loadMatches();
+    const changed = await this.propagateFinalBracketTeams(source);
+    if (changed) await this.loadMatches();
+    return changed;
+  },
+
+
   async loadUsers() {
     const { data, error } = await window.sb
       .from("profiles")
@@ -444,7 +683,7 @@ const Admin = {
       .order("name");
 
     if (error) throw error;
-    this.state.footballTeams = data || [];
+    this.state.footballTeams = (data || []).map((row) => this.normalizeTeamLabels(row));
   },
 
 
@@ -508,11 +747,11 @@ const Admin = {
         .select("*")
         .order("kickoff_at", { ascending: true });
       if (refreshError) throw refreshError;
-      this.state.matches = refreshed || [];
+      this.state.matches = (refreshed || []).map((row) => this.normalizeTeamLabels(row));
       H.toast("Match live initialisé à 0 - 0", "info");
       return;
     }
-    this.state.matches = rows;
+    this.state.matches = rows.map((row) => this.normalizeTeamLabels(row));
   },
 
   async loadBackups() {
@@ -578,11 +817,102 @@ const Admin = {
     return Boolean(value);
   },
 
+  settingNumber(value, fallback = 0) {
+    if (value === undefined || value === null) return fallback;
+    if (typeof value === "number") return Number.isFinite(value) ? value : fallback;
+    if (typeof value === "string") {
+      const parsed = Number(value.replace(",", "."));
+      return Number.isFinite(parsed) ? parsed : fallback;
+    }
+    if (value && typeof value === "object") {
+      const raw = value.points ?? value.value ?? value.amount ?? value.enabled;
+      return this.settingNumber(raw, fallback);
+    }
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : fallback;
+  },
+
+
+  async loadOwlMessagesAdmin() {
+    if (!this.isSuperAdmin()) {
+      this.state.owlMessages = [];
+      this.state.owlPollResults = [];
+      this.state.owlPollVoteDetails = [];
+      return;
+    }
+
+    const { data, error } = await window.sb
+      .from("owl_messages")
+      .select("*")
+      .order("start_at", { ascending: false })
+      .limit(200);
+
+    if (error) {
+      console.warn("Historique Hibou indisponible : lance le patch SQL V1.6.4", error);
+      this.state.owlMessages = [];
+      this.state.owlPollResults = [];
+      this.state.owlPollVoteDetails = [];
+      return;
+    }
+
+    this.state.owlMessages = data || [];
+    await this.loadOwlPollResultsAdmin();
+    await this.loadOwlPollVoteDetailsAdmin();
+  },
+
+  async loadOwlPollResultsAdmin() {
+    const messageIds = (this.state.owlMessages || [])
+      .filter((message) => message.poll_enabled)
+      .map((message) => message.id)
+      .filter(Boolean);
+    if (!messageIds.length) {
+      this.state.owlPollResults = [];
+      return;
+    }
+
+    const { data, error } = await window.sb
+      .from("v_admin_owl_poll_results")
+      .select("*")
+      .in("message_id", messageIds);
+
+    if (error) {
+      console.warn("Résultats de sondage Hibou indisponibles : lance le patch SQL V1.8.41", error);
+      this.state.owlPollResults = [];
+      return;
+    }
+
+    this.state.owlPollResults = data || [];
+  },
+
+  async loadOwlPollVoteDetailsAdmin() {
+    const messageIds = (this.state.owlMessages || [])
+      .filter((message) => message.poll_enabled)
+      .map((message) => message.id)
+      .filter(Boolean);
+    if (!messageIds.length) {
+      this.state.owlPollVoteDetails = [];
+      return;
+    }
+
+    const { data, error } = await window.sb
+      .from("v_owl_poll_vote_details")
+      .select("*")
+      .in("message_id", messageIds);
+
+    if (error) {
+      console.warn("Détail des votes Hibou indisponible : lance le patch SQL V1.8.41", error);
+      this.state.owlPollVoteDetails = [];
+      return;
+    }
+
+    this.state.owlPollVoteDetails = data || [];
+  },
+
   async loadFamilyModeSetting() {
     const { data, error } = await window.sb
       .from("app_settings")
       .select("key,value")
-      .in("key", ["family_mode_enabled", "preparation_module_enabled", "graph_preview_test_matches_enabled", "graph_mock_preview_enabled", "home_progress_include_test_matches"]);
+      .in("key", ["family_mode_enabled", "preparation_module_enabled", "graph_preview_test_matches_enabled", "graph_mock_preview_enabled", "home_progress_include_test_matches", "live_demo_match_enabled", "login_owl_message", "champion_bonus_initial_points", "champion_bonus_second_points"]);
 
     if (error) {
       console.warn("Paramètres app indisponibles", error);
@@ -591,6 +921,10 @@ const Admin = {
       this.state.graphPreviewTestMatchesEnabled = false;
       this.state.graphMockPreviewEnabled = false;
       this.state.homeProgressIncludeTestMatches = false;
+      this.state.liveDemoMatchEnabled = false;
+      this.state.championFirstBonusPoints = 100;
+      this.state.championSecondBonusPoints = 50;
+      this.state.loginOwlMessage = null;
       return;
     }
 
@@ -601,6 +935,10 @@ const Admin = {
     this.state.graphPreviewTestMatchesEnabled = this.settingBoolean(settings.graph_preview_test_matches_enabled, false);
     this.state.graphMockPreviewEnabled = this.settingBoolean(settings.graph_mock_preview_enabled, false);
     this.state.homeProgressIncludeTestMatches = this.settingBoolean(settings.home_progress_include_test_matches, false);
+    this.state.liveDemoMatchEnabled = this.settingBoolean(settings.live_demo_match_enabled, false);
+    this.state.championFirstBonusPoints = Math.max(0, Math.round(this.settingNumber(settings.champion_bonus_initial_points, 100)));
+    this.state.championSecondBonusPoints = Math.max(0, Math.round(this.settingNumber(settings.champion_bonus_second_points, 50)));
+    this.state.loginOwlMessage = settings.login_owl_message || null;
   },
 
   async loadAuditLogs() {
@@ -642,10 +980,20 @@ const Admin = {
     this.state.healthSnapshot = Array.isArray(data) ? data[0] : data;
   },
 
+  isLiveDemoMatch(match = null) {
+    if (!match) return false;
+    return Number(match.api_match_id) === -133000
+      || String(match.test_match_label || "").toLowerCase().includes("labo live")
+      || String(match.test_match_label || "").toLowerCase().includes("live demo")
+      || String(match.group_name || "").toLowerCase().includes("labo live");
+  },
+
   adminVisibleMatches(matches = this.state.matches) {
-    return this.state.preparationModuleEnabled === false
-      ? matches.filter((match) => !match.is_test_match)
-      : matches;
+    return matches.filter((match) => {
+      if (this.isLiveDemoMatch(match)) return this.state.preparationModuleEnabled !== false && this.state.liveDemoMatchEnabled === true;
+      if (this.state.preparationModuleEnabled === false && match.is_test_match) return false;
+      return true;
+    });
   },
 
   applyRolePermissions() {
@@ -677,8 +1025,9 @@ const Admin = {
     const graphTestOff = this.state.graphPreviewTestMatchesEnabled !== true;
     const graphMockOff = this.state.graphMockPreviewEnabled !== true;
     const homeProgressOfficialOnly = this.state.homeProgressIncludeTestMatches !== true;
+    const liveDemoOff = this.state.liveDemoMatchEnabled !== true && !this.liveDemoMatch();
     const noFinishedWithoutScore = Number(summary.finished_without_score || 0) === 0;
-    const allGreen = prepOff && graphTestOff && graphMockOff && noFinishedWithoutScore;
+    const allGreen = prepOff && graphTestOff && graphMockOff && homeProgressOfficialOnly && liveDemoOff && noFinishedWithoutScore;
 
     const item = (ok, title, message) => `
       <article class="worldcup-ready-row ${ok ? "ok" : "warning"}">
@@ -711,10 +1060,11 @@ const Admin = {
           </div>
         </div>
         <div class="worldcup-ready-list">
-          ${item(prepOff, "Matchs test masqués", prepOff ? "Le module préparation est désactivé." : "Désactive le module préparation dans Sauvegardes > Préparation.")}
+          ${item(prepOff, "Matchs test normals", prepOff ? "Le module préparation est désactivé." : "Désactive le module préparation dans Sauvegardes > Préparation.")}
           ${item(graphTestOff, "Graph avec matchs test désactivé", graphTestOff ? "Les graphs ignorent les matchs test." : "Désactive la prévisualisation graphs avec matchs test.")}
-          ${item(graphMockOff, "Maquette graph désactivée", graphMockOff ? "Aucune courbe fictive n’est affichée." : "Désactive la maquette graph avant lancement.")}
+          ${item(graphMockOff, "Maquette graph désactivée", graphMockOff ? "Aucune courbe fictive n’est Famillee." : "Désactive la maquette graph avant lancement.")}
           ${item(homeProgressOfficialOnly, "Progression accueil officielle", homeProgressOfficialOnly ? "La progression de l’accueil ignore les matchs test." : "La progression de l’accueil inclut les matchs test. À couper pour le vrai lancement.")}
+          ${item(liveDemoOff, "Labo live retiré", liveDemoOff ? "Aucun match fictif labo n’est actif." : "Retire le match fictif live avant validation Coupe du monde.")}
           ${item(noFinishedWithoutScore, "Scores terminés cohérents", noFinishedWithoutScore ? "Aucun match terminé sans score complet." : `${Number(summary.finished_without_score || 0)} match(s) terminé(s) sans score complet.`)}
           ${info("Pronos joueurs conservés", "Des joueurs peuvent déjà avoir posé des pronos : ne lance pas de reset complet sauf vraie volonté de repartir à zéro.")}
         </div>
@@ -772,7 +1122,7 @@ const Admin = {
         ${metric("Joueurs actifs", summary.active_users)}
         ${metric("Comptes Famille", summary.family_users)}
         ${metric("Matchs officiels", summary.official_matches)}
-        ${metric("Matchs préparation", summary.preparation_matches, summary.preparation_module_enabled === false ? "masqués" : "visibles")}
+        ${metric("Matchs préparation", summary.preparation_matches, summary.preparation_module_enabled === false ? "normals" : "visibles")}
         ${metric("Coupons disponibles", summary.available_family_invites)}
         ${metric("Sauvegardes", summary.backups_count)}
         ${metric("Badges attribués", summary.badges_count)}
@@ -832,7 +1182,7 @@ const Admin = {
       reset_family_invite: "Coupon réinitialisé",
       update_profile_controls: "Profil modifié",
       set_profile_active: "Activation joueur modifiée",
-      hide_chat_message: "Message masqué",
+      hide_chat_message: "Message normal",
       recalc_all_points: "Recalcul global",
       recalc_match_points: "Recalcul match",
       save_match: "Match modifié",
@@ -1013,7 +1363,7 @@ const Admin = {
                 ${user.is_banned ? `<span class="pill danger">Banni</span>` : (!user.is_active ? `<span class="pill danger">Inactif</span>` : `<span class="pill success">Actif</span>`)}
                 ${!user.profile_setup_done ? `<span class="pill neutral">Profil à compléter</span>` : ""}
                 ${user.force_password_change ? `<span class="pill warning">MDP à changer</span>` : ""}
-                ${this.isFamilyAccount(user) ? `<span class="pill neutral">Compte Famille</span>` : (user.show_family_players ? `<span class="pill success">Mode Famille affiché</span>` : `<span class="pill neutral">Mode Famille masqué</span>`)}
+                ${this.isFamilyAccount(user) ? `<span class="pill success">Compte Famille réel</span>` : `<span class="pill neutral">Joueur normal</span>`}
                 </div>
               </div>
 
@@ -1033,8 +1383,13 @@ const Admin = {
                 <label class="mini-check"><input class="user-can-avatar" type="checkbox" ${user.can_change_avatar !== false ? "checked" : ""}> Avatar</label>
                 <label class="mini-check"><input class="user-can-pseudo" type="checkbox" ${user.can_change_pseudo !== false ? "checked" : ""}> Pseudo</label>
                 <label class="mini-check danger"><input class="user-is-banned" type="checkbox" ${user.is_banned ? "checked" : ""}> Ban</label>
-                ${this.isFamilyAccount(user) || ["admin", "super_admin"].includes(role) ? "" : `<button class="ghost-btn user-family-mode-toggle-btn" data-enabled="${user.show_family_players ? "false" : "true"}">${user.show_family_players ? "Masquer famille" : "Afficher famille"}</button>`}
+                ${["admin", "super_admin"].includes(role) ? "" : `<button class="ghost-btn user-family-mode-toggle-btn ${role === "family" ? "danger-soft" : ""}" data-enabled="${role === "family" ? "false" : "true"}">${role === "family" ? "Repasser normal" : "Passer famille"}</button>`}
                 <button class="ghost-btn admin-password-reset-btn">Mot de passe</button>
+                <div class="manual-badge-controls">
+                  <span class="manual-badge-label">Badges souvenir</span>
+                  <button class="ghost-btn tiny-btn manual-badge-btn ${this.manualBadgeGranted(user.id, "preparation-two-picks") ? "is-granted" : ""}" type="button" data-badge-id="preparation-two-picks" data-action="${this.manualBadgeGranted(user.id, "preparation-two-picks") ? "revoke" : "grant"}">${this.manualBadgeGranted(user.id, "preparation-two-picks") ? "Retirer Prépa" : "Ajouter Prépa"}</button>
+                  <button class="ghost-btn tiny-btn manual-badge-btn ${this.manualBadgeGranted(user.id, "prep-good-pick") ? "is-granted" : ""}" type="button" data-badge-id="prep-good-pick" data-action="${this.manualBadgeGranted(user.id, "prep-good-pick") ? "revoke" : "grant"}">${this.manualBadgeGranted(user.id, "prep-good-pick") ? "Retirer Test concluant" : "Ajouter Test concluant"}</button>
+                </div>
                 <button class="ghost-btn save-user-btn">Sauver</button>
                 ${user.is_active
                   ? `<button class="danger-btn toggle-active-btn" data-active="false">Désactiver</button>`
@@ -1062,6 +1417,37 @@ const Admin = {
     H.$$(".admin-password-reset-btn", root).forEach((btn) => {
       btn.addEventListener("click", (event) => this.openPasswordResetModal(event.currentTarget.closest(".admin-row")));
     });
+
+    H.$$(".manual-badge-btn", root).forEach((btn) => {
+      btn.addEventListener("click", (event) => this.toggleManualBadge(event.currentTarget.closest(".admin-row"), event.currentTarget.dataset.badgeId, event.currentTarget.dataset.action));
+    });
+  },
+
+  async toggleManualBadge(row, badgeId, action = "grant") {
+    const userId = row?.dataset?.userId;
+    if (!userId || !badgeId) return;
+    const fn = action === "revoke" ? "admin_revoke_manual_badge" : "admin_grant_manual_badge";
+    const label = badgeId === "prep-good-pick" ? "Test concluant" : "Préparation du nid";
+    const confirmText = action === "revoke"
+      ? `Retirer le badge “${label}” à ce joueur ?`
+      : `Ajouter manuellement le badge “${label}” à ce joueur ?`;
+    if (!confirm(confirmText)) return;
+
+    const { error } = await window.sb.rpc(fn, {
+      p_user_id: userId,
+      p_badge_id: badgeId,
+      p_reason: "Ajout manuel super admin"
+    });
+
+    if (error) {
+      H.toast(error.message || "Impossible de modifier le badge manuel. Lance le patch SQL V1.3.41.", "error");
+      return;
+    }
+
+    await this.loadManualBadges();
+    await this.logAdminAction(action === "revoke" ? "manual_badge_revoke" : "manual_badge_grant", "badges", { user_id: userId, badge_id: badgeId });
+    this.renderUsers();
+    H.toast(action === "revoke" ? "Badge retiré" : "Badge ajouté", "success");
   },
 
   async saveUser(row) {
@@ -1093,7 +1479,7 @@ const Admin = {
       office_team_id: teamId,
       banned: payload.p_is_banned
     });
-    H.toast("Utilisateur mis à jour", "success");
+    H.toast(role === "family" ? "Utilisateur mis à jour : vrai compte Famille" : "Utilisateur mis à jour", "success");
     await this.reloadAll();
   },
 
@@ -1141,18 +1527,23 @@ const Admin = {
     const userId = row?.dataset?.userId;
     if (!userId) return;
 
+    const message = enabled
+      ? "Passer ce compte en vraie catégorie Famille ? Il sortira du classement général normal."
+      : "Repasser ce compte en joueur normal ? Il reviendra dans le classement général.";
+    if (!confirm(message)) return;
+
     const { error } = await window.sb.rpc("admin_set_user_family_mode", {
       p_user_id: userId,
       p_enabled: enabled
     });
 
     if (error) {
-      H.toast(error.message || "Impossible de modifier le mode Famille.", "error");
+      H.toast(error.message || "Impossible de modifier la catégorie réelle du joueur.", "error");
       return;
     }
 
-    await this.logAdminAction("set_user_family_mode", "family", { user_id: userId, enabled });
-    H.toast(enabled ? "Mode Famille affiché pour ce joueur" : "Mode Famille masqué pour ce joueur", "success");
+    await this.logAdminAction("set_user_family_role", "family", { user_id: userId, enabled });
+    H.toast(enabled ? "Compte passé en Famille" : "Compte repassé en joueur normal", "success");
     await this.reloadAll();
   },
 
@@ -1276,8 +1667,8 @@ const Admin = {
         || Number(this.isFamilyAccount(b, inviteUserIds)) - Number(this.isFamilyAccount(a, inviteUserIds))
         || String(a.pseudo || a.email || "").localeCompare(String(b.pseudo || b.email || ""), "fr")
       );
-    const familyVisibleCount = familyVisibilityUsers.filter((user) => !this.isFamilyAccount(user, inviteUserIds) && user.show_family_players).length;
-    const familyHiddenCount = familyVisibilityUsers.filter((user) => !this.isFamilyAccount(user, inviteUserIds) && !user.show_family_players).length;
+    const familyVisibleCount = familyVisibilityUsers.filter((user) => this.isFamilyAccount(user, inviteUserIds)).length;
+    const familyHiddenCount = familyVisibilityUsers.filter((user) => !this.isFamilyAccount(user, inviteUserIds)).length;
     const teamOptions = this.state.teams.map((team) => `<option value="${H.escapeHtml(team.id)}">${H.escapeHtml(team.name)}</option>`).join("");
     const inviterOptions = inviterCandidates.map((user) => {
       const teamName = this.teamName(user.office_team_id);
@@ -1364,8 +1755,8 @@ const Admin = {
             <p class="muted">Vue de contrôle : qui a activé les classements/messages Famille dans son profil.</p>
           </div>
           <div class="family-visibility-counters">
-            <span class="pill success">${familyVisibleCount} affiché${familyVisibleCount > 1 ? "s" : ""}</span>
-            <span class="pill neutral">${familyHiddenCount} masqué${familyHiddenCount > 1 ? "s" : ""}</span>
+            <span class="pill success">${familyVisibleCount} Famille${familyVisibleCount > 1 ? "s" : ""}</span>
+            <span class="pill neutral">${familyHiddenCount} normal${familyHiddenCount > 1 ? "s" : ""}</span>
           </div>
         </div>
         <div class="admin-list compact family-visibility-list">
@@ -1385,8 +1776,8 @@ const Admin = {
                   </div>
                 </div>
                 <div class="family-visibility-actions">
-                  <span class="pill ${isFam || user.show_family_players ? "success" : "neutral"}">${H.escapeHtml(this.userFamilyModeLabel(user, inviteUserIds))}</span>
-                  ${isFam ? "" : `<button class="ghost-btn small-btn family-visibility-toggle-btn" data-user-id="${H.escapeHtml(user.id)}" data-enabled="${user.show_family_players ? "false" : "true"}">${user.show_family_players ? "Masquer" : "Activer"}</button>`}
+                  <span class="pill ${isFam ? "success" : "neutral"}">${H.escapeHtml(this.userFamilyModeLabel(user, inviteUserIds))}</span>
+                  <button class="ghost-btn small-btn family-visibility-toggle-btn ${isFam ? "danger-soft" : ""}" data-user-id="${H.escapeHtml(user.id)}" data-enabled="${isFam ? "false" : "true"}">${isFam ? "Repasser normal" : "Passer famille"}</button>
                 </div>
               </article>
             `;
@@ -1622,6 +2013,326 @@ const Admin = {
     return "Tout le monde";
   },
 
+  normalizeOwlPollOptions(rawValue = "") {
+    return String(rawValue || "")
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .slice(0, 8)
+      .map((label, index) => ({ key: `choice_${index + 1}`, label }));
+  },
+
+  owlPollOptionsText(message = {}) {
+    const options = Array.isArray(message.poll_options) ? message.poll_options : [];
+    return options.map((option) => option?.label || option?.text || "").filter(Boolean).join("\n");
+  },
+
+  owlPollResultsForMessage(messageId) {
+    return (this.state.owlPollResults || []).filter((row) => String(row.message_id) === String(messageId));
+  },
+
+  owlPollVoteDetailsForMessage(messageId) {
+    return (this.state.owlPollVoteDetails || [])
+      .filter((row) => String(row.message_id) === String(messageId))
+      .slice()
+      .sort((a, b) => String(a.pseudo || "").localeCompare(String(b.pseudo || ""), "fr"));
+  },
+
+  owlPollVoteDetailsHtml(message = {}) {
+    const options = Array.isArray(message.poll_options) ? message.poll_options : [];
+    const details = this.owlPollVoteDetailsForMessage(message.id);
+    const byOption = new Map();
+    details.forEach((row) => {
+      const key = String(row.option_key || "");
+      if (!byOption.has(key)) byOption.set(key, []);
+      byOption.get(key).push(row);
+    });
+    return `
+      <details class="admin-owl-poll-voters">
+        <summary>Voir qui a voté quoi 🕵️‍♂️</summary>
+        <div class="admin-owl-poll-voters-grid">
+          ${options.map((option) => {
+            const voters = byOption.get(String(option.key)) || [];
+            return `<div class="admin-owl-poll-voter-group">
+              <strong>${H.escapeHtml(option.label || option.key)}</strong>
+              ${voters.length ? `<ul>${voters.map((vote) => `<li><span>${H.escapeHtml(vote.pseudo || "Joueur")}</span><small>${vote.voted_at ? H.formatDateTime(vote.voted_at) : ""}</small></li>`).join("")}</ul>` : `<small>Aucun vote.</small>`}
+            </div>`;
+          }).join("")}
+        </div>
+      </details>
+    `;
+  },
+
+  owlPollAdminSummaryHtml(message = {}) {
+    if (!message.poll_enabled) return "";
+    const options = Array.isArray(message.poll_options) ? message.poll_options : [];
+    const results = this.owlPollResultsForMessage(message.id);
+    const countFor = (key) => Number((results.find((row) => String(row.option_key) === String(key)) || {}).votes_count || 0);
+    const total = results.reduce((sum, row) => sum + Number(row.votes_count || 0), 0);
+    const closed = message.poll_end_at && new Date(message.poll_end_at).getTime() < Date.now();
+    return `
+      <div class="admin-owl-poll-summary">
+        <div class="admin-owl-poll-summary-head">
+          <strong>📊 ${H.escapeHtml(message.poll_question || "Sondage du Hibou")}</strong>
+          <span class="pill ${closed ? "neutral" : "success"}">${closed ? "Sondage terminé" : "Sondage ouvert"}</span>
+        </div>
+        <small class="muted">${total} vote(s)${message.poll_end_at ? ` · fin ${H.formatDateTime(message.poll_end_at)}` : ""}</small>
+        <div class="admin-owl-poll-bars">
+          ${options.length ? options.map((option) => {
+            const votes = countFor(option.key);
+            const pct = total ? Math.round((votes / total) * 100) : 0;
+            return `<div class="admin-owl-poll-bar-row"><span>${H.escapeHtml(option.label || option.key)}</span><b>${votes}</b><div><i style="width:${pct}%"></i></div><em>${pct}%</em></div>`;
+          }).join("") : `<p class="muted">Aucun choix configuré.</p>`}
+        </div>
+        ${this.owlPollVoteDetailsHtml(message)}
+      </div>
+    `;
+  },
+
+
+
+  owlLoginMessageAdminHtml() {
+    const msg = this.state.loginOwlMessage || {};
+    const start = msg.start_at ? this.datetimeLocalValue(msg.start_at) : this.datetimeLocalValue(new Date());
+    const durationDays = Number(msg.duration_days || 1);
+    const rows = (this.state.owlMessages || []).slice().sort((a, b) => new Date(b.start_at || b.created_at || 0) - new Date(a.start_at || a.created_at || 0));
+
+    return `
+      <section class="card admin-owl-message-card">
+        <div class="card-title-row">
+          <div>
+            <h3>${H.icon("diffusion")} Messages du Hibou masqué</h3>
+            <p class="muted">Crée une annonce à la connexion, puis gère tous les anciens messages : actif, affiché dans l’historique, ou caché au fond du nid.</p>
+          </div>
+          <span class="pill ${rows.some((row) => row.enabled) ? "success" : "neutral"}">${rows.length} message(s)</span>
+        </div>
+
+        <div class="admin-chat-actions">
+          <button class="primary-btn" id="newOwlMessageBtn" type="button">Créer un nouveau message du Hibou</button>
+        </div>
+
+        <form id="owlLoginMessageForm" class="form-stack owl-message-create-form" hidden>
+          <input type="hidden" name="message_id" id="owlMessageEditId" value="">
+          <div class="grid two">
+            <label><span>Titre</span><input name="title" maxlength="120" value="${H.escapeHtml(msg.title || "Message du Hibou masqué")}" required></label>
+            <label><span>Importance</span><select name="importance">
+              ${["info", "fun", "warning", "urgent"].map((value) => `<option value="${value}" ${msg.importance === value ? "selected" : ""}>${value}</option>`).join("")}
+            </select></label>
+            <label><span>Date et heure de début</span><input type="datetime-local" name="start_at" value="${H.escapeHtml(start)}" required></label>
+            <label><span>Durée en jours</span><input type="number" name="duration_days" min="0.04" step="0.04" value="${H.escapeHtml(String(durationDays || 1))}" required></label>
+          </div>
+          <label><span>Message</span><textarea name="body" rows="8" maxlength="4000" placeholder="Ex : Le Hibou masqué rappelle que les 16èmes arrivent. Pas de panique, juste des plumes." required>${H.escapeHtml(msg.body || msg.message || "")}</textarea><small class="muted">Maximum 4000 caractères. Le Hibou masqué peut enfin faire son discours.</small></label>
+          <div class="admin-owl-poll-editor">
+            <label class="check-line"><input type="checkbox" name="poll_enabled" ${msg.poll_enabled ? "checked" : ""}> Ajouter un sondage à ce message</label>
+            <div class="grid two">
+              <label><span>Question du sondage</span><input name="poll_question" maxlength="180" value="${H.escapeHtml(msg.poll_question || "")}" placeholder="Ex : Validez-vous le nouveau barème champion ?"></label>
+              <label><span>Date et heure de fin du sondage</span><input type="datetime-local" name="poll_end_at" value="${H.escapeHtml(msg.poll_end_at ? this.datetimeLocalValue(msg.poll_end_at) : "")}"></label>
+            </div>
+            <label><span>Choix de réponse</span><textarea name="poll_options" rows="5" maxlength="1200" placeholder="Un choix par ligne. Exemple :
+Oui, on passe à 30 / 15
+Non, on garde 100 / 50
+Je m’en remets au Hibou">${H.escapeHtml(this.owlPollOptionsText(msg))}</textarea><small class="muted">Un choix par ligne. Tu peux faire Oui/Non, 3 choix, 4 choix, etc. Maximum 8 choix.</small></label>
+          </div>
+          <div class="grid two">
+            <label class="check-line"><input type="checkbox" name="enabled" ${msg.enabled === false ? "" : "checked"}> Activer / planifier ce message</label>
+            <label class="check-line"><input type="checkbox" name="show_in_history" ${msg.show_in_history === false ? "" : "checked"}> Afficher dans le bouton “Messages du Hibou”</label>
+          </div>
+          <div class="admin-chat-actions">
+            <button class="primary-btn" id="owlMessageSubmitBtn" type="submit">Créer le message</button>
+            <button class="ghost-btn" id="cancelOwlMessageEditBtn" type="button" hidden>Annuler la modification</button>
+            <button class="danger-btn" id="clearOwlLoginMessageBtn" type="button">Désactiver les messages actifs</button>
+          </div>
+        </form>
+
+        <div class="admin-owl-message-history">
+          <div class="section-title-row">
+            <h4>Historique des messages</h4>
+            <small class="muted">Tri décroissant · plus récent en haut</small>
+          </div>
+          ${rows.length ? rows.map((message) => `
+            <article class="admin-owl-message-row ${message.enabled ? "" : "is-disabled"}" data-owl-message-id="${H.escapeHtml(message.id)}" data-enabled="${message.enabled ? "true" : "false"}" data-history="${message.show_in_history === false ? "false" : "true"}">
+              <div>
+                <strong>${H.escapeHtml(message.title || "Message du Hibou masqué")}</strong>
+                <small>${H.escapeHtml(message.importance || "info")} · début ${H.formatDateTime(message.start_at || message.created_at)}${message.end_at ? ` · fin ${H.formatDateTime(message.end_at)}` : ""}</small>
+                <p>${H.escapeHtml(String(message.body || "").slice(0, 260))}${String(message.body || "").length > 260 ? "…" : ""}</p>
+                ${this.owlPollAdminSummaryHtml(message)}
+              </div>
+              <div class="admin-owl-message-actions">
+                <span class="pill ${message.enabled ? "success" : "neutral"}">${message.enabled ? "Actif/planifié" : "Inactif"}</span>
+                <span class="pill ${message.show_in_history === false ? "neutral" : "success"}">${message.show_in_history === false ? "Caché historique" : "Visible historique"}</span>
+                <button class="ghost-btn edit-owl-message-btn" type="button">Modifier</button>
+                <button class="ghost-btn toggle-owl-message-enabled-btn" type="button">${message.enabled ? "Désactiver" : "Activer"}</button>
+                <button class="ghost-btn toggle-owl-message-history-btn" type="button">${message.show_in_history === false ? "Afficher historique" : "Masquer historique"}</button>
+                <button class="danger-btn archive-owl-message-btn" type="button">Cacher partout</button>
+              </div>
+            </article>
+          `).join("") : `<p class="muted">Aucun message Hibou enregistré pour l’instant.</p>`}
+        </div>
+      </section>
+    `;
+  },
+
+  datetimeLocalValue(value) {
+    const date = value instanceof Date ? value : new Date(value || Date.now());
+    if (!Number.isFinite(date.getTime())) return "";
+    const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+    return local.toISOString().slice(0, 16);
+  },
+
+  async saveOwlLoginMessage(form) {
+    const formData = new FormData(form);
+    const startLocal = String(formData.get("start_at") || "");
+    const startDate = startLocal ? new Date(startLocal) : new Date();
+    const durationDays = Math.max(0.04, Number(formData.get("duration_days") || 1));
+    const endDate = new Date(startDate.getTime() + durationDays * 24 * 60 * 60 * 1000);
+    const pollEnabled = formData.get("poll_enabled") === "on";
+    const pollOptions = this.normalizeOwlPollOptions(formData.get("poll_options") || "");
+    const pollEndLocal = String(formData.get("poll_end_at") || "").trim();
+    const pollEndDate = pollEndLocal ? new Date(pollEndLocal) : endDate;
+    const payload = {
+      enabled: formData.get("enabled") === "on",
+      show_in_history: formData.get("show_in_history") === "on",
+      title: String(formData.get("title") || "Message du Hibou masqué").trim(),
+      body: String(formData.get("body") || "").trim(),
+      importance: String(formData.get("importance") || "info"),
+      start_at: startDate.toISOString(),
+      end_at: endDate.toISOString(),
+      duration_days: durationDays,
+      poll_enabled: pollEnabled,
+      poll_question: pollEnabled ? String(formData.get("poll_question") || "").trim() : null,
+      poll_options: pollEnabled ? pollOptions : [],
+      poll_end_at: pollEnabled ? pollEndDate.toISOString() : null
+    };
+
+    if (!payload.body) {
+      H.toast("Le Hibou refuse de hululer dans le vide.", "error");
+      return;
+    }
+
+    if (payload.poll_enabled) {
+      if (!payload.poll_question) {
+        H.toast("Ajoute une question de sondage, sinon le Nid va voter dans le brouillard.", "error");
+        return;
+      }
+      if (!payload.poll_options || payload.poll_options.length < 2) {
+        H.toast("Un sondage doit avoir au moins 2 choix.", "error");
+        return;
+      }
+    }
+
+    const messageId = String(formData.get("message_id") || "").trim();
+    const request = messageId
+      ? window.sb.from("owl_messages").update(payload).eq("id", messageId)
+      : window.sb.from("owl_messages").insert(payload);
+    const { error } = await request;
+    if (error) {
+      H.toast(error.message || "Impossible d’enregistrer le message. Lance le patch SQL V1.8.41.", "error");
+      return;
+    }
+
+    await this.loadOwlMessagesAdmin();
+    await this.loadFamilyModeSetting();
+    this.renderChatModeration();
+    H.toast(messageId ? "Message du Hibou modifié" : "Message du Hibou créé", "success");
+  },
+
+  startEditOwlMessage(row) {
+    const id = row?.dataset.owlMessageId;
+    if (!id) return;
+    const message = (this.state.owlMessages || []).find((item) => String(item.id) === String(id));
+    if (!message) return H.toast("Message introuvable dans le nid.", "error");
+
+    const root = H.$("#chatModerationAdmin");
+    const form = H.$("#owlLoginMessageForm", root);
+    const newButton = H.$("#newOwlMessageBtn", root);
+    if (!form) return;
+
+    const durationDays = Number(message.duration_days || ((new Date(message.end_at || 0) - new Date(message.start_at || Date.now())) / 86400000) || 1);
+    form.hidden = false;
+    H.$("#owlMessageEditId", form).value = String(message.id);
+    form.elements.title.value = message.title || "Message du Hibou masqué";
+    form.elements.importance.value = message.importance || "info";
+    form.elements.start_at.value = this.datetimeLocalValue(message.start_at || message.created_at || new Date());
+    form.elements.duration_days.value = String(Math.max(0.04, durationDays || 1));
+    form.elements.body.value = message.body || message.message || "";
+    if (form.elements.poll_enabled) form.elements.poll_enabled.checked = Boolean(message.poll_enabled);
+    if (form.elements.poll_question) form.elements.poll_question.value = message.poll_question || "";
+    if (form.elements.poll_options) form.elements.poll_options.value = this.owlPollOptionsText(message);
+    if (form.elements.poll_end_at) form.elements.poll_end_at.value = message.poll_end_at ? this.datetimeLocalValue(message.poll_end_at) : "";
+    form.elements.enabled.checked = message.enabled !== false;
+    form.elements.show_in_history.checked = message.show_in_history !== false;
+    H.$("#owlMessageSubmitBtn", form).textContent = "Enregistrer les modifications";
+    H.$("#cancelOwlMessageEditBtn", form).hidden = false;
+    if (newButton) newButton.textContent = "Refermer le formulaire du Hibou";
+    form.scrollIntoView({ behavior: "smooth", block: "center" });
+  },
+
+  resetOwlMessageForm() {
+    const root = H.$("#chatModerationAdmin");
+    const form = H.$("#owlLoginMessageForm", root);
+    if (!form) return;
+    form.reset();
+    H.$("#owlMessageEditId", form).value = "";
+    form.elements.title.value = "Message du Hibou masqué";
+    form.elements.importance.value = "info";
+    form.elements.start_at.value = this.datetimeLocalValue(new Date());
+    form.elements.duration_days.value = "1";
+    form.elements.enabled.checked = true;
+    form.elements.show_in_history.checked = true;
+    H.$("#owlMessageSubmitBtn", form).textContent = "Créer le message";
+    H.$("#cancelOwlMessageEditBtn", form).hidden = true;
+  },
+
+  async clearOwlLoginMessage() {
+    if (!confirm("Désactiver tous les messages Hibou actifs ou planifiés ?")) return;
+    const { error } = await window.sb
+      .from("owl_messages")
+      .update({ enabled: false })
+      .eq("enabled", true);
+
+    if (error) {
+      H.toast(error.message || "Impossible de désactiver les messages.", "error");
+      return;
+    }
+
+    await this.loadOwlMessagesAdmin();
+    this.renderChatModeration();
+    H.toast("Messages Hibou désactivés", "success");
+  },
+
+  async toggleOwlMessageEnabled(row) {
+    const id = row?.dataset.owlMessageId;
+    if (!id) return;
+    const next = row.dataset.enabled !== "true";
+    const { error } = await window.sb.from("owl_messages").update({ enabled: next }).eq("id", id);
+    if (error) return H.toast(error.message || "Modification impossible.", "error");
+    await this.loadOwlMessagesAdmin();
+    this.renderChatModeration();
+    H.toast(next ? "Message activé" : "Message désactivé", "success");
+  },
+
+  async toggleOwlMessageHistory(row) {
+    const id = row?.dataset.owlMessageId;
+    if (!id) return;
+    const next = row.dataset.history !== "true";
+    const { error } = await window.sb.from("owl_messages").update({ show_in_history: next }).eq("id", id);
+    if (error) return H.toast(error.message || "Modification impossible.", "error");
+    await this.loadOwlMessagesAdmin();
+    this.renderChatModeration();
+    H.toast(next ? "Message visible dans l’historique" : "Message masqué de l’historique", "success");
+  },
+
+  async archiveOwlMessage(row) {
+    const id = row?.dataset.owlMessageId;
+    if (!id) return;
+    if (!confirm("Cacher ce message partout ? Il restera en base mais ne sera plus visible côté joueurs.")) return;
+    const { error } = await window.sb.from("owl_messages").update({ enabled: false, show_in_history: false }).eq("id", id);
+    if (error) return H.toast(error.message || "Modification impossible.", "error");
+    await this.loadOwlMessagesAdmin();
+    this.renderChatModeration();
+    H.toast("Message caché partout", "success");
+  },
+
   renderChatModeration() {
     const root = H.$("#chatModerationAdmin");
     if (!root) return;
@@ -1640,6 +2351,8 @@ const Admin = {
     }
 
     root.innerHTML = `
+
+      ${this.isSuperAdmin() ? this.owlLoginMessageAdminHtml() : ""}
       <div class="admin-chat-toolbar">
         <div class="segmented small">
           <button class="${scope === "all" ? "active" : ""}" type="button" data-chat-admin-filter="all">Tous</button>
@@ -1666,7 +2379,7 @@ const Admin = {
               }, "profile-badge mini")}
               <div>
                 <strong>${H.escapeHtml(message.author_pseudo || "Joueur")}</strong>
-                <small>${H.escapeHtml(this.chatScopeLabel(message))} · ${H.formatDateTime(message.created_at)}${message.deleted_at ? ` · masqué le ${H.formatDateTime(message.deleted_at)}` : ""}</small>
+                <small>${H.escapeHtml(this.chatScopeLabel(message))} · ${H.formatDateTime(message.created_at)}${message.deleted_at ? ` · normal le ${H.formatDateTime(message.deleted_at)}` : ""}</small>
                 <p>${H.escapeHtml(message.body)}</p>
                 ${message.deleted_reason ? `<small class="moderation-reason">Raison : ${H.escapeHtml(message.deleted_reason)}</small>` : ""}
               </div>
@@ -1680,6 +2393,34 @@ const Admin = {
         `).join("") : `<p class="muted">Aucun message dans ce filtre.</p>`}
       </div>
     `;
+
+    H.$("#newOwlMessageBtn", root)?.addEventListener("click", () => {
+      const form = H.$("#owlLoginMessageForm", root);
+      const button = H.$("#newOwlMessageBtn", root);
+      if (!form || !button) return;
+      form.hidden = !form.hidden;
+      if (!form.hidden) this.resetOwlMessageForm();
+      button.textContent = form.hidden ? "Créer un nouveau message du Hibou" : "Refermer le formulaire du Hibou";
+    });
+
+    H.$("#owlLoginMessageForm", root)?.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      await this.saveOwlLoginMessage(event.currentTarget);
+    });
+    H.$("#clearOwlLoginMessageBtn", root)?.addEventListener("click", async () => this.clearOwlLoginMessage());
+    H.$("#cancelOwlMessageEditBtn", root)?.addEventListener("click", () => this.resetOwlMessageForm());
+    H.$$(".edit-owl-message-btn", root).forEach((button) => {
+      button.addEventListener("click", (event) => this.startEditOwlMessage(event.currentTarget.closest(".admin-owl-message-row")));
+    });
+    H.$$(".toggle-owl-message-enabled-btn", root).forEach((button) => {
+      button.addEventListener("click", (event) => this.toggleOwlMessageEnabled(event.currentTarget.closest(".admin-owl-message-row")));
+    });
+    H.$$(".toggle-owl-message-history-btn", root).forEach((button) => {
+      button.addEventListener("click", (event) => this.toggleOwlMessageHistory(event.currentTarget.closest(".admin-owl-message-row")));
+    });
+    H.$$(".archive-owl-message-btn", root).forEach((button) => {
+      button.addEventListener("click", (event) => this.archiveOwlMessage(event.currentTarget.closest(".admin-owl-message-row")));
+    });
 
     H.$$('[data-chat-admin-filter]', root).forEach((button) => {
       button.addEventListener("click", async () => {
@@ -1711,7 +2452,7 @@ const Admin = {
     const messageId = row?.dataset.messageId;
     if (!messageId) return;
 
-    const reason = prompt("Raison de modération ?", "Message masqué par admin") || "Message masqué par admin";
+    const reason = prompt("Raison de modération ?", "Message normal par admin") || "Message normal par admin";
     if (!confirm("Masquer ce message ? Il ne sera plus visible côté joueurs.")) return;
 
     const { error } = await window.sb.rpc("moderate_team_chat_message", {
@@ -1728,7 +2469,7 @@ const Admin = {
       message_id: messageId,
       reason
     });
-    H.toast("Message masqué", "success");
+    H.toast("Message normal", "success");
     await this.loadChatMessages();
     await this.loadAuditLogs();
     this.renderChatModeration();
@@ -1743,6 +2484,7 @@ const Admin = {
   },
 
   canScoreMatch(matchOrKickoff) {
+    if (typeof matchOrKickoff === "object" && this.isLiveDemoMatch(matchOrKickoff)) return true;
     return !this.isMatchBeforeKickoff(matchOrKickoff);
   },
 
@@ -1778,6 +2520,11 @@ const Admin = {
       const pa = this.matchAdminPriority(a);
       const pb = this.matchAdminPriority(b);
       if (pa.bucket !== pb.bucket) return pa.bucket - pb.bucket;
+
+      if (a.stage !== "group" || b.stage !== "group") {
+        const bracketDiff = (H.officialBracketSortValue?.(a) || pa.kickoff) - (H.officialBracketSortValue?.(b) || pb.kickoff);
+        if (bracketDiff) return bracketDiff;
+      }
 
       // Les prochains matchs montent en haut. Les matchs terminés descendent en bas,
       // avec le plus récent en premier dans leur zone.
@@ -1895,6 +2642,17 @@ const Admin = {
       });
     });
 
+    H.$$(".quick-reset-scheduled-btn", root).forEach((button) => {
+      button.addEventListener("click", (event) => {
+        const row = event.currentTarget.closest(".quick-score-card");
+        row.querySelector(".quick-status").value = "scheduled";
+        row.querySelector(".quick-home-score").value = "";
+        row.querySelector(".quick-away-score").value = "";
+        row.querySelector(".quick-winner").value = "";
+        this.saveQuickScore(row);
+      });
+    });
+
     H.$$(".quick-save-btn", root).forEach((button) => {
       button.addEventListener("click", (event) => this.saveQuickScore(event.currentTarget.closest(".quick-score-card")));
     });
@@ -1920,7 +2678,7 @@ const Admin = {
     `;
 
     return `
-      <article class="quick-score-card status-${H.escapeHtml(match.status || "scheduled")}" data-match-id="${match.id}" data-home-team-id="${match.home_team_id}" data-away-team-id="${match.away_team_id}" data-stage="${match.stage}" data-is-test-match="${match.is_test_match ? "true" : "false"}" data-kickoff-at="${H.escapeHtml(match.kickoff_at || "")}">
+      <article class="quick-score-card status-${H.escapeHtml(match.status || "scheduled")}" data-match-id="${match.id}" data-home-team-id="${match.home_team_id}" data-away-team-id="${match.away_team_id}" data-stage="${match.stage}" data-current-status="${H.escapeHtml(match.status || "scheduled")}" data-is-test-match="${match.is_test_match ? "true" : "false"}" data-is-live-demo-match="${this.isLiveDemoMatch(match) ? "true" : "false"}" data-kickoff-at="${H.escapeHtml(match.kickoff_at || "")}">
         <div class="quick-score-head">
           <div>
             <strong>${H.matchFlagHtml(match, "home")} ${H.escapeHtml(match.home_team_name)} <span>vs</span> ${H.matchFlagHtml(match, "away")} ${H.escapeHtml(match.away_team_name)}</strong>
@@ -1928,7 +2686,7 @@ const Admin = {
             <small class="quick-location-line">${H.matchLocationHtml(match, true)}</small>
           </div>
           <div class="quick-score-pills">
-            ${match.is_test_match ? `<span class="pill warning">TEST</span>` : ""}
+            ${this.isLiveDemoMatch(match) ? `<span class="pill danger">LABO LIVE</span>` : match.is_test_match ? `<span class="pill warning">TEST</span>` : ""}
             <span class="pill ${match.status === "finished" ? "success" : match.status === "live" ? "warning" : ""}">${H.statusLabel(match.status)}</span>
           </div>
         </div>
@@ -1970,6 +2728,7 @@ const Admin = {
         ${this.matchInfoEditorHtml(match, "quick")}
 
         <div class="quick-score-actions">
+          ${match.status === "live" ? `<button type="button" class="ghost-btn quick-reset-scheduled-btn">Remettre à venir</button>` : ""}
           <button type="button" class="ghost-btn quick-live-btn" ${scoreDisabled}>En direct</button>
           <button type="button" class="primary-btn quick-finish-btn" ${scoreDisabled}>Sauver + terminé</button>
           <button type="button" class="ghost-btn quick-save-btn">Sauver</button>
@@ -2007,14 +2766,21 @@ const Admin = {
 
   async saveQuickScore(row, forceFinished = false) {
     const matchId = row.dataset.matchId;
-    const homeScore = this.getScoreValue(row, ".quick-home-score");
-    const awayScore = this.getScoreValue(row, ".quick-away-score");
+    let homeScore = this.getScoreValue(row, ".quick-home-score");
+    let awayScore = this.getScoreValue(row, ".quick-away-score");
     const status = forceFinished ? "finished" : row.querySelector(".quick-status").value;
     const stage = row.dataset.stage;
     const infoPayload = this.matchInfoPayloadFromRow(row, "quick");
     const effectiveKickoffAt = infoPayload.kickoff_at || row.dataset.kickoffAt;
-    const canScore = this.canScoreMatch(effectiveKickoffAt);
+    const isDemoMatch = row.dataset.isLiveDemoMatch === "true";
+    const canScore = isDemoMatch || this.canScoreMatch(effectiveKickoffAt);
     let winnerTeamId = row.querySelector(".quick-winner").value || null;
+    const resetToScheduled = status === "scheduled";
+    if (resetToScheduled) {
+      homeScore = null;
+      awayScore = null;
+      winnerTeamId = null;
+    }
 
     if (!canScore && ["live", "finished"].includes(status)) {
       H.toast("Ce match n'a pas encore commencé : impossible de le passer en direct ou terminé.", "error");
@@ -2076,7 +2842,8 @@ const Admin = {
       home_score: homeScore,
       away_score: awayScore
     });
-    H.toast(status === "finished" ? "Score enregistré et match terminé" : "Match enregistré", "success");
+    await this.reloadAndPropagateFinalBracket("quick_score");
+    H.toast(resetToScheduled ? "Match remis à venir" : status === "finished" ? "Score enregistré et match terminé" : "Match enregistré", "success");
     await this.reloadAll();
   },
 
@@ -2098,12 +2865,13 @@ const Admin = {
             const canScore = this.canScoreMatch(match);
             const scoreDisabled = canScore ? "" : "disabled";
             return `
-              <article class="admin-row match-admin-row status-${H.escapeHtml(match.status || "scheduled")}" data-match-id="${match.id}" data-kickoff-at="${H.escapeHtml(match.kickoff_at || "")}">
+              <article class="admin-row match-admin-row status-${H.escapeHtml(match.status || "scheduled")}" data-match-id="${match.id}" data-home-team-id="${match.home_team_id}" data-away-team-id="${match.away_team_id}" data-stage="${match.stage}" data-current-status="${H.escapeHtml(match.status || "scheduled")}" data-kickoff-at="${H.escapeHtml(match.kickoff_at || "")}">
                 <div class="admin-main">
                   <strong>${H.matchFlagHtml(match, "home")} ${H.escapeHtml(match.home_team_name)} - ${H.matchFlagHtml(match, "away")} ${H.escapeHtml(match.away_team_name)}</strong>
                   <small>${H.formatDateTime(match.kickoff_at)} · ${H.shortPoolRoundLabel(match)} · ${H.statusLabel(match.status)} · <span class="admin-location-line">${H.matchLocationHtml(match, true)}</span></small>
                 </div>
                 ${this.matchInfoEditorHtml(match, "match")}
+                ${this.finalTeamsEditorHtml(match)}
                 <div class="admin-controls match-controls">
                   <select class="match-status">
                     ${this.statusOptionsHtml(match.status, canScore)}
@@ -2116,6 +2884,7 @@ const Admin = {
                     <option value="${match.away_team_id}" ${match.winner_team_id === match.away_team_id ? "selected" : ""}>${H.escapeHtml(match.away_team_name)}</option>
                   </select>
                   ${this.tvChannelTogglesHtml(match, "match")}
+                  ${match.status === "live" ? `<button type="button" class="ghost-btn reset-match-scheduled-btn">Remettre à venir</button>` : ""}
                   <button class="primary-btn save-match-btn">Sauver</button>
                   <button class="ghost-btn recalc-match-btn">Recalculer</button>
                 </div>
@@ -2130,6 +2899,17 @@ const Admin = {
       btn.addEventListener("click", (event) => this.saveMatch(event.currentTarget.closest(".match-admin-row")));
     });
 
+    H.$$(".reset-match-scheduled-btn", root).forEach((btn) => {
+      btn.addEventListener("click", (event) => {
+        const row = event.currentTarget.closest(".match-admin-row");
+        row.querySelector(".match-status").value = "scheduled";
+        row.querySelector(".match-home-score").value = "";
+        row.querySelector(".match-away-score").value = "";
+        row.querySelector(".match-winner").value = "";
+        this.saveMatch(row);
+      });
+    });
+
     H.$$(".recalc-match-btn", root).forEach((btn) => {
       btn.addEventListener("click", (event) => this.recalcMatch(event.currentTarget.closest(".match-admin-row").dataset.matchId));
     });
@@ -2142,12 +2922,19 @@ const Admin = {
     const homeScoreRaw = row.querySelector(".match-home-score").value;
     const awayScoreRaw = row.querySelector(".match-away-score").value;
     const status = row.querySelector(".match-status").value;
-    const homeScore = homeScoreRaw === "" ? null : Number(homeScoreRaw);
-    const awayScore = awayScoreRaw === "" ? null : Number(awayScoreRaw);
-    const winnerTeamId = row.querySelector(".match-winner").value || null;
+    let homeScore = homeScoreRaw === "" ? null : Number(homeScoreRaw);
+    let awayScore = awayScoreRaw === "" ? null : Number(awayScoreRaw);
+    let winnerTeamId = row.querySelector(".match-winner").value || null;
     const infoPayload = this.matchInfoPayloadFromRow(row, "match");
     const effectiveKickoffAt = infoPayload.kickoff_at || row.dataset.kickoffAt;
-    const canScore = this.canScoreMatch(effectiveKickoffAt);
+    const isDemoMatch = row.dataset.isLiveDemoMatch === "true";
+    const canScore = isDemoMatch || this.canScoreMatch(effectiveKickoffAt);
+    const resetToScheduled = status === "scheduled";
+    if (resetToScheduled) {
+      homeScore = null;
+      awayScore = null;
+      winnerTeamId = null;
+    }
 
     if (!canScore && ["live", "finished"].includes(status)) {
       H.toast("Ce match n'a pas encore commencé : impossible de le passer en direct ou terminé.", "error");
@@ -2159,6 +2946,26 @@ const Admin = {
       return;
     }
 
+    const homeTeamSelect = row.querySelector(".match-home-team-id");
+    const awayTeamSelect = row.querySelector(".match-away-team-id");
+    const effectiveHomeTeamId = homeTeamSelect?.value || row.dataset.homeTeamId || null;
+    const effectiveAwayTeamId = awayTeamSelect?.value || row.dataset.awayTeamId || null;
+
+    if (homeScore !== null && awayScore !== null) {
+      if (homeScore > awayScore) winnerTeamId = effectiveHomeTeamId || winnerTeamId;
+      if (awayScore > homeScore) winnerTeamId = effectiveAwayTeamId || winnerTeamId;
+      if (homeScore === awayScore && row.dataset.stage === "group") winnerTeamId = null;
+    }
+
+    if (status === "finished" && row.dataset.stage !== "group" && homeScore === awayScore && !winnerTeamId) {
+      H.toast("Choisis le qualifié pour ce match à élimination directe.", "error");
+      return;
+    }
+
+    const manualTeamPayload = {};
+    if (homeTeamSelect) manualTeamPayload.home_team_id = effectiveHomeTeamId;
+    if (awayTeamSelect) manualTeamPayload.away_team_id = effectiveAwayTeamId;
+
     const payload = {
       status,
       home_score: homeScore,
@@ -2166,6 +2973,7 @@ const Admin = {
       winner_team_id: winnerTeamId,
       tv_channel: this.tvChannelValueFromRow(row, "match"),
       tv_channel_source: "manual",
+      ...manualTeamPayload,
       ...infoPayload
     };
 
@@ -2185,7 +2993,8 @@ const Admin = {
       home_score: homeScore,
       away_score: awayScore
     });
-    H.toast("Match mis à jour", "success");
+    await this.reloadAndPropagateFinalBracket("match_admin");
+    H.toast(resetToScheduled ? "Match remis à venir" : "Match mis à jour", "success");
     await this.reloadAll();
   },
 
@@ -2202,23 +3011,78 @@ const Admin = {
   },
 
   async recalcAll() {
-    const { error } = await window.sb.rpc("recalc_all_points");
+    const btn = H.$("#recalcAllBtn");
+    if (btn) {
+      btn.disabled = true;
+      btn.dataset.originalText = btn.dataset.originalText || btn.textContent;
+      btn.textContent = "Réparation en cours…";
+    }
+
+    let result = null;
+    let { data, error } = await window.sb.rpc("admin_repair_missing_scores");
+
+    // Compatibilité : si le patch SQL V1.8.8 n'est pas encore lancé,
+    // on tente quand même l'ancien recalcul global.
+    if (error && /function .*admin_repair_missing_scores|Could not find the function|PGRST202/i.test(error.message || "")) {
+      ({ data, error } = await window.sb.rpc("recalc_all_points"));
+    }
+
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = btn.dataset.originalText || "Réparer scores manquants + recalculer";
+    }
+
     if (error) {
       H.toast(error.message, "error");
       return;
     }
-    H.toast("Tous les points ont été recalculés", "success");
+
+    result = Array.isArray(data) ? data[0] : data;
+    const recalculated = Number(result?.recalculated_prediction_points ?? result ?? 0);
+    const missingAfter = Number(result?.missing_after ?? 0);
+    const message = missingAfter > 0
+      ? `Recalcul terminé : ${recalculated} ligne(s). Encore ${missingAfter} score(s) manquant(s) à vérifier.`
+      : `Scores manquants réparés : ${recalculated} ligne(s) recalculée(s).`;
+
+    H.toast(message, missingAfter > 0 ? "warning" : "success");
+    await this.reloadAll();
+    if (this.state.adminSection === "scores") this.renderMatches();
     await this.loadAuditLogs();
     this.renderAudit();
   },
 
+
+  ensureLiveDemoControls() {
+    if (H.$("#toggleLiveDemoMatchBtn")) return;
+
+    const prepBox = H.$(".prep-module-box") || H.$(".backup-panel-grid") || H.$("#backupsSection") || H.$("main");
+    if (!prepBox) return;
+
+    const box = document.createElement("div");
+    box.className = "graph-preview-admin-box live-demo-admin-box injected-live-demo-box";
+    box.innerHTML = `
+      <h4>Labo score en direct</h4>
+      <p class="prep-module-status muted" id="liveDemoMatchStatusText">Chargement du labo live...</p>
+      <div class="graph-preview-actions">
+        <button class="ghost-btn" id="toggleLiveDemoMatchBtn" type="button">Activer le match fictif live</button>
+      </div>
+      <div class="live-demo-score-inject" id="liveDemoScoreInjectBox"></div>
+      <p class="muted tiny-note">Match 100% fictif : sert à tester l’affichage live, les scores et les classements. Il est compté temporairement tant qu’il est actif, puis supprimé avec ses pronos quand tu le retires. À retirer avant validation Coupe du monde.</p>
+    `;
+
+    prepBox.appendChild(box);
+    H.$("#toggleLiveDemoMatchBtn")?.addEventListener("click", () => this.toggleLiveDemoMatch());
+  },
+
   renderBackups() {
+    this.ensureLiveDemoControls();
     const select = H.$("#backupSelect");
     const list = H.$("#backupListAdmin");
     const prepEnabled = this.state.preparationModuleEnabled !== false;
     const graphPreviewEnabled = this.state.graphPreviewTestMatchesEnabled === true;
     const graphMockPreviewEnabled = this.state.graphMockPreviewEnabled === true;
     const homeProgressIncludeTestMatches = this.state.homeProgressIncludeTestMatches === true;
+    const liveDemoMatchEnabled = this.state.liveDemoMatchEnabled === true;
     const prepStatus = H.$("#prepModuleStatusText");
     const prepToggle = H.$("#togglePreparationModuleBtn");
     const graphPreviewStatus = H.$("#graphPreviewStatusText");
@@ -2227,11 +3091,16 @@ const Admin = {
     const graphMockToggle = H.$("#toggleGraphMockPreviewBtn");
     const homeProgressStatus = H.$("#homeProgressTestMatchesStatusText");
     const homeProgressToggle = H.$("#toggleHomeProgressTestMatchesBtn");
+    const liveDemoStatus = H.$("#liveDemoMatchStatusText");
+    const liveDemoToggle = H.$("#toggleLiveDemoMatchBtn");
+    const championFirstInput = H.$("#championFirstBonusPointsInput");
+    const championSecondInput = H.$("#championSecondBonusPointsInput");
+    const championBonusStatus = H.$("#championBonusPointsStatusText");
 
     if (prepStatus) {
       prepStatus.innerHTML = prepEnabled
         ? `<strong>Actif</strong> · les matchs test restent visibles dans les écrans joueurs/admin.`
-        : `<strong>Désactivé</strong> · les matchs test, règles et classements de préparation sont masqués.`;
+        : `<strong>Désactivé</strong> · les matchs test, règles et classements de préparation sont normals.`;
     }
 
     if (prepToggle) {
@@ -2276,6 +3145,26 @@ const Admin = {
       homeProgressToggle.classList.toggle("ghost-btn", !homeProgressIncludeTestMatches);
     }
 
+    if (liveDemoStatus) {
+      liveDemoStatus.innerHTML = liveDemoMatchEnabled
+        ? `<strong>Actif</strong> · le match fictif Labo live est visible dans l’admin et l’app. À retirer avant validation Coupe du monde.`
+        : `<strong>Désactivé</strong> · aucun match fictif live n’est injecté.`;
+    }
+
+    if (liveDemoToggle) {
+      liveDemoToggle.textContent = liveDemoMatchEnabled ? "Retirer le match fictif live" : "Activer le match fictif live";
+      liveDemoToggle.classList.toggle("danger-btn", liveDemoMatchEnabled);
+      liveDemoToggle.classList.toggle("ghost-btn", !liveDemoMatchEnabled);
+    }
+
+    if (championFirstInput && document.activeElement !== championFirstInput) championFirstInput.value = String(this.state.championFirstBonusPoints ?? 100);
+    if (championSecondInput && document.activeElement !== championSecondInput) championSecondInput.value = String(this.state.championSecondBonusPoints ?? 50);
+    if (championBonusStatus) {
+      championBonusStatus.innerHTML = `<strong>${Number(this.state.championFirstBonusPoints ?? 100)} pts</strong> avant compétition · <strong>${Number(this.state.championSecondBonusPoints ?? 50)} pts</strong> avant phase finale. Les classements suivent ce réglage dès que le patch SQL est lancé.`;
+    }
+
+    this.renderLiveDemoScoreInjectBox();
+
     if (!select) return;
 
     if (!this.state.backups.length) {
@@ -2290,6 +3179,32 @@ const Admin = {
     }).join("");
 
     if (list) list.innerHTML = "";
+  },
+
+  async saveChampionBonusPoints() {
+    const first = Math.max(0, Math.min(500, Math.round(Number(H.$("#championFirstBonusPointsInput")?.value ?? 100))));
+    const second = Math.max(0, Math.min(500, Math.round(Number(H.$("#championSecondBonusPointsInput")?.value ?? 50))));
+    if (!Number.isFinite(first) || !Number.isFinite(second)) {
+      H.toast("Entre deux nombres de points valides.", "error");
+      return;
+    }
+
+    const { error } = await window.sb.rpc("admin_set_champion_bonus_points", {
+      p_initial_points: first,
+      p_second_points: second
+    });
+
+    if (error) {
+      H.toast(error.message || "Impossible d’enregistrer les points bonus. Lance le patch SQL V1.8.41.", "error");
+      return;
+    }
+
+    this.state.championFirstBonusPoints = first;
+    this.state.championSecondBonusPoints = second;
+    await this.loadFamilyModeSetting();
+    this.renderBackups();
+    await this.logAdminAction("set_champion_bonus_points", "settings", { initial_points: first, second_points: second });
+    H.toast(`Bonus champion réglés : ${first} pts / ${second} pts`, "success");
   },
 
   async createBackup() {
@@ -2328,6 +3243,33 @@ const Admin = {
     await this.reloadAll();
   },
 
+
+
+  async cleanStartPreservePredictions() {
+    const typed = H.$("#cleanStartConfirmInput")?.value || "";
+    if (typed !== "DEPART PROPRE") {
+      H.toast("Tape exactement : DEPART PROPRE", "error");
+      return;
+    }
+
+    const first = confirm("Reset départ compétition : garder les pronostics déjà posés, mais remettre à zéro points, classements, scores/statuts, leaders accueil et labo. Continuer ?");
+    if (!first) return;
+
+    const second = confirm("Dernière sécurité : les pronos restent, mais les points actuels et scores de test seront effacés. Continuer ?");
+    if (!second) return;
+
+    const { data, error } = await window.sb.rpc("admin_clean_start_preserve_predictions", { p_confirm: "DEPART PROPRE" });
+    if (error) {
+      H.toast(error.message || "Reset classements impossible. Lance le patch SQL V1.8.41.", "error");
+      return;
+    }
+
+    const summary = Array.isArray(data) ? data[0] : data;
+    H.$("#cleanStartConfirmInput").value = "";
+    await this.logAdminAction("clean_start_preserve_predictions", "reset", summary || {});
+    H.toast(summary?.message || "Classements remis à zéro, pronos conservés", "success");
+    await this.reloadAll();
+  },
 
   async fullLaunchReset() {
     const typed = H.$("#launchResetConfirmInput")?.value || "";
@@ -2445,11 +3387,160 @@ const Admin = {
     H.toast(nextEnabled ? "Prévisualisation graphs activée" : "Prévisualisation graphs désactivée", "success");
   },
 
+
+
+  liveDemoMatch() {
+    return (this.state.matches || []).find((match) => this.isLiveDemoMatch(match)) || null;
+  },
+
+  renderLiveDemoScoreInjectBox() {
+    const box = H.$("#liveDemoScoreInjectBox");
+    if (!box) return;
+
+    const match = this.liveDemoMatch();
+    const enabled = this.state.liveDemoMatchEnabled === true;
+
+    if (!enabled) {
+      box.innerHTML = "";
+      return;
+    }
+
+    if (!match) {
+      box.innerHTML = `
+        <div class="live-demo-inject-empty">
+          Active le match fictif live, puis reviens ici pour injecter des scores et des pronos.
+        </div>
+      `;
+      return;
+    }
+
+    const scoreButtons = [
+      [0, 0],
+      [1, 0],
+      [0, 1],
+      [1, 1],
+      [2, 1],
+      [1, 2],
+      [2, 2],
+      [3, 1]
+    ];
+
+    box.innerHTML = `
+      <div class="live-demo-inject-panel">
+        <div>
+          <strong>${H.escapeHtml(match.home_team_name || "Hiboux du Nid")} ${H.scoreText(match.home_score ?? 0, match.away_score ?? 0)} ${H.escapeHtml(match.away_team_name || "Chouettes du Live")}</strong>
+          <small>Injection labo : visible pour tous les joueurs et comptée temporairement dans les classements tant que le labo est actif. Tout disparaît quand tu retires le labo.</small>
+        </div>
+        <div class="live-demo-inject-actions">
+          <button class="ghost-btn" id="injectLiveDemoPredictionsBtn" type="button">Injecter des pronos pour tous</button>
+          <button class="ghost-btn live-demo-status-btn" type="button" data-status="scheduled">Remettre à venir</button>
+          <button class="ghost-btn live-demo-status-btn" type="button" data-status="live">Passer en direct</button>
+          ${scoreButtons.map(([home, away]) => `<button class="ghost-btn live-demo-score-btn" type="button" data-home="${home}" data-away="${away}">${home}-${away}</button>`).join("")}
+        </div>
+      </div>
+    `;
+
+    H.$("#injectLiveDemoPredictionsBtn", box)?.addEventListener("click", () => this.injectLiveDemoPredictionsForAll());
+    H.$$(".live-demo-status-btn", box).forEach((button) => {
+      button.addEventListener("click", () => this.setLiveDemoStatus(button.dataset.status));
+    });
+
+    H.$$(".live-demo-score-btn", box).forEach((button) => {
+      button.addEventListener("click", () => this.setLiveDemoScore(Number(button.dataset.home), Number(button.dataset.away)));
+    });
+  },
+
+  async injectLiveDemoPredictionsForAll() {
+    if (!confirm("Injecter des pronos de labo pour tous les joueurs actifs ? Ils seront supprimés quand tu retires le match labo.")) return;
+
+    const { data, error } = await window.sb.rpc("admin_inject_live_demo_predictions");
+    if (error) {
+      H.toast(error.message || "Injection impossible. Lance le patch SQL V1.3.34.", "error");
+      return;
+    }
+
+    const count = Array.isArray(data) ? data[0]?.inserted_count : data;
+    await this.logAdminAction("inject_live_demo_predictions", "preparation", { count });
+    H.toast(`${count ?? "Les"} prono(s) labo injecté(s)`, "success");
+    await this.loadMatches();
+    this.renderBackups();
+    this.renderQuickScores();
+  },
+
+  async setLiveDemoStatus(status) {
+    const { error } = await window.sb.rpc("admin_set_live_demo_score", {
+      p_status: status,
+      p_home_score: null,
+      p_away_score: null
+    });
+
+    if (error) {
+      H.toast(error.message || "Impossible de modifier le statut labo. Lance le patch SQL V1.3.35.", "error");
+      return;
+    }
+
+    await this.logAdminAction("set_live_demo_status", "score", { status });
+    H.toast(status === "scheduled" ? "Match labo remis à venir" : "Match labo passé en direct", "success");
+    await this.loadMatches();
+    await this.loadHealthSnapshot();
+    this.renderBackups();
+    this.renderQuickScores();
+    this.renderHealth();
+  },
+
+  async setLiveDemoScore(home, away) {
+    const { error } = await window.sb.rpc("admin_set_live_demo_score", {
+      p_status: "live",
+      p_home_score: home,
+      p_away_score: away
+    });
+
+    if (error) {
+      H.toast(error.message || "Impossible d’injecter ce score labo. Lance le patch SQL V1.3.35.", "error");
+      return;
+    }
+
+    await this.logAdminAction("set_live_demo_score", "score", { home_score: home, away_score: away });
+    H.toast(`Score labo injecté : ${home}-${away}`, "success");
+    await this.loadMatches();
+    await this.loadHealthSnapshot();
+    this.renderBackups();
+    this.renderQuickScores();
+    this.renderHealth();
+  },
+
+  async toggleLiveDemoMatch() {
+    const enabledNow = this.state.liveDemoMatchEnabled === true;
+    const nextEnabled = !enabledNow;
+    const message = enabledNow
+      ? "Retirer le match fictif live ? Il sera supprimé avec ses pronos/points éventuels. À faire avant validation Coupe du monde."
+      : "Activer le match fictif live ? Il apparaîtra dans l’admin et l’app pour tester les scores en direct. Il ne compte dans aucun classement.";
+
+    if (!confirm(message)) return;
+
+    const { error } = await window.sb.rpc("admin_set_live_demo_match", { p_enabled: nextEnabled });
+    if (error) {
+      H.toast(error.message || "Impossible de modifier le match fictif live. Lance le patch SQL V1.3.30 inclus dans le zip V1.3.32.", "error");
+      return;
+    }
+
+    await this.loadFamilyModeSetting();
+    await this.loadMatches();
+    await this.loadHealthSnapshot();
+    await this.loadAuditLogs();
+    this.renderBackups();
+    this.renderQuickScores();
+    this.renderMatches();
+    this.renderHealth();
+    this.renderAudit();
+    H.toast(nextEnabled ? "Match fictif live activé" : "Match fictif live retiré", "success");
+  },
+
   async togglePreparationModule() {
     const enabledNow = this.state.preparationModuleEnabled !== false;
     const nextEnabled = !enabledNow;
     const message = enabledNow
-      ? "Désactiver le module préparation ? Les matchs test, leurs règles et leurs classements par phase seront masqués. Les 2 badges de préparation restent visibles dans les exploits."
+      ? "Désactiver le module préparation ? Les matchs test, leurs règles et leurs classements par phase seront normals. Les 2 badges de préparation restent visibles dans les exploits."
       : "Réactiver le module préparation ? Les matchs test redeviendront visibles dans les écrans joueurs et admin.";
 
     if (!confirm(message)) return;
@@ -2498,6 +3589,11 @@ const Admin = {
       })
       .on("postgres_changes", { event: "*", schema: "public", table: "team_chat_messages" }, async () => {
         await this.loadChatMessages();
+        this.renderChatModeration();
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "app_settings" }, async () => {
+        if (!this.isSuperAdmin()) return;
+        await this.loadFamilyModeSetting();
         this.renderChatModeration();
       })
       .on("postgres_changes", { event: "*", schema: "public", table: "family_invites" }, async () => {

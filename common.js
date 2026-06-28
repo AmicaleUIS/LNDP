@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — APP PRINCIPALE V1.3.28
+// LE NID DES PRONOS — APP PRINCIPALE V1.8.41
 // ============================================================
 
 const H = window.Helpers;
@@ -12,17 +12,24 @@ const App = {
     footballTeams: [],
     activeCompetition: null,
     winnerPrediction: null,
+    secondWinnerPrediction: null,
     matches: [],
     groupStandings: [],
     myPredictions: [],
     visiblePredictions: [],
     miniRecordPredictionCounts: [],
+    manualBadges: [],
     familyInvites: [],
     blockedUserIds: new Set(),
     appSettings: {},
+    owlMessages: [],
+    owlPollVotes: {},
+    owlPollResults: {},
+    owlPollVoteDetails: {},
     publicProfiles: [],
     playerScoreRows: [],
     winnerPredictions: [],
+    secondWinnerPredictions: [],
     winnerPredictionsError: null,
     teamSelectedPlayerId: null,
     teamChatMessages: [],
@@ -46,6 +53,7 @@ const App = {
     ],
     hasUnreadTeamMessages: false,
     currentView: "home",
+    matchesTab: "upcoming",
     leaderboardTab: "players",
     playerLeaderboardMode: "overall",
     teamTab: "average",
@@ -59,11 +67,20 @@ const App = {
     familyLeaderboardEvolutionMode: "day",
     achievementsTab: "mine",
     worldcupTab: "groups",
+    finalBracketActiveRound: null,
+    finalBracketExpandedMatchNumber: null,
     matchPhaseIndex: 0,
     myPredictionsPhaseIndex: 0,
     leaderboardPhaseIndex: 0,
     teamLeaderboardPhaseIndex: 0,
     leaderboardEvolutionMode: "day",
+    evolutionZoomMap: {},
+    evolutionFocusMap: {},
+    rankSentinelQueue: [],
+    rankSentinelModalOpen: false,
+    rankSentinelLastSnapshot: null,
+    rankSentinelPreviousSnapshot: null,
+    rankSentinelMovementMaps: { official: {}, family: {} },
     achievementNotificationQueue: [],
     achievementModalOpen: false,
     achievementNotificationTimer: null,
@@ -72,6 +89,40 @@ const App = {
     homeCountdownTimer: null,
     lastAchievementIds: null,
     predictionAutoSaveTimers: new Map()
+  },
+
+
+  appStoragePrefix() {
+    return `nid-pronos:${this.state.session?.user?.id || "anonymous"}`;
+  },
+
+  lastViewStorageKey() {
+    return `${this.appStoragePrefix()}:last-view`;
+  },
+
+  readLastView() {
+    try {
+      return localStorage.getItem(this.lastViewStorageKey()) || "";
+    } catch (error) {
+      return "";
+    }
+  },
+
+  rememberLastView(viewName) {
+    try {
+      if (viewName && viewName !== "mypredictions") localStorage.setItem(this.lastViewStorageKey(), viewName);
+    } catch (error) {
+      // LocalStorage peut être indisponible en navigation privée stricte.
+    }
+  },
+
+  initialRequestedView() {
+    const allowedViews = ["home", "matches", "worldcup", "leaderboard", "teams", "achievements", "profile"];
+    const params = new URLSearchParams(window.location.search);
+    const fromQuery = params.get("view");
+    const raw = fromQuery || this.readLastView() || "home";
+    const normalized = raw === "mypredictions" ? "matches" : raw;
+    return allowedViews.includes(normalized) ? normalized : "home";
   },
 
   async init() {
@@ -87,13 +138,12 @@ const App = {
       await Auth.logout();
       return;
     }
-    const rawRequestedView = new URLSearchParams(window.location.search).get("view") || "home";
-    const requestedView = rawRequestedView === "mypredictions" ? "matches" : rawRequestedView;
-    const allowedViews = ["home", "matches", "worldcup", "leaderboard", "teams", "achievements", "profile"];
+    const requestedView = this.initialRequestedView();
     const mustChangePassword = this.passwordChangeRequired();
     const mustCompleteProfile = !this.profileSetupComplete();
     this.syncAchievementNotifications({ silent: !this.hasAchievementNotificationStore() });
-    await this.loadView((mustChangePassword || mustCompleteProfile) ? "profile" : (allowedViews.includes(requestedView) ? requestedView : "home"));
+    await this.loadView((mustChangePassword || mustCompleteProfile) ? "profile" : requestedView);
+    this.maybeShowLoginOwlMessage();
     await this.refreshTeamChatUnreadIndicator();
     if (mustChangePassword) {
       H.toast("Mot de passe temporaire : choisis ton nouveau mot de passe.", "info");
@@ -431,7 +481,7 @@ const App = {
           <div>
             <p class="eyebrow">Crédits cachés</p>
             <h2 id="creditsTitle">Le Nid des Pronos</h2>
-            <p class="muted">Version publique <strong>1.3.28</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
+            <p class="muted">Version publique <strong>1.8.41</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
           </div>
         </div>
         <div class="credits-grid">
@@ -448,7 +498,7 @@ const App = {
             <p><strong>1.0.5</strong> — dashboard mobile/desktop stabilisé, sans chevauchement des cartes.</p>
           </section>
           <section>
-            <h3>Évolutions V1.3.28</h3>
+            <h3>Évolutions V1.8.41</h3>
             <ul class="changelog-list">
               <li>Le super admin peut désactiver ou réactiver l’affichage du module préparation.</li>
               <li>Quand la préparation est désactivée, les matchs test disparaissent des matchs/pronos, classements par phase et règles.</li>
@@ -580,7 +630,8 @@ const App = {
           <article><strong>Bon résultat</strong><span>Tu trouves le bon sens du match : victoire, nul ou défaite, même si le score n’est pas exact.</span><b>+3 pts</b></article>
           <article><strong>Bon écart</strong><span>Tu ne trouves pas forcément le score, mais tu trouves le bon écart de buts. Exemple : tu pronostiques 2-0 et le match finit 3-1.</span><b>+1 pt</b></article>
           <article><strong>Phase finale</strong><span>Dans un match couperet, l’important est aussi de deviner quel oiseau reste perché. Si tu choisis la bonne équipe qualifiée, même après prolongation ou tirs au but, tu gagnes le bonus.</span><b>+2 pts</b></article>
-          <article><strong>Champion du monde</strong><span>Ton grand favori, choisi avant le début de la Coupe du monde, soulève le trophée à la fin.</span><b>+100 pts</b></article>
+          <article><strong>Champion du monde</strong><span>Ton grand favori, choisi avant le début de la Coupe du monde, soulève le trophée à la fin.</span><b>+${this.championFirstBonusPoints()} pts</b></article>
+          <article><strong>2e choix champion</strong><span>Avant la phase finale, tu peux remettre une pièce sur le futur champion. Bonus plus petit, mais toujours piquant.</span><b>+${this.championSecondBonusPoints()} pts</b></article>
           ${preparationEnabled ? `<article><strong>Matchs test</strong><span>France–Côte d’Ivoire et France–Irlande du Nord servent uniquement à tester le nid avant le vrai envol.</span><b>0 pt classement</b></article>` : ""}
         </div>
         ${preparationEnabled ? `
@@ -610,16 +661,83 @@ const App = {
       this.loadMyPredictions(),
       this.loadVisiblePredictions(),
       this.loadAppSettings(),
+      this.loadOwlMessages(),
       this.loadBlockedUsers()
     ]);
 
     await Promise.all([
       this.loadPublicProfiles(),
       this.loadWinnerPrediction(),
+      this.loadSecondWinnerPrediction(),
       this.loadMiniRecordPredictionCounts(),
+      this.loadManualBadges(),
+      this.loadPlayerScoreRows(),
       this.loadMyFamilyInvites()
     ]);
     this.renderShell();
+  },
+
+  displayCountryName(name = "") {
+    return String(name || "").trim() === "Mexico" ? "Mexique" : name;
+  },
+
+  normalizeTeamLabels(row = {}) {
+    const copy = { ...row };
+    [
+      "name",
+      "team_name",
+      "home_team_name",
+      "away_team_name",
+      "qualified_team_name",
+      "winner_team_name",
+      "venue_country_name"
+    ].forEach((key) => {
+      if (copy[key]) copy[key] = this.displayCountryName(copy[key]);
+    });
+    return copy;
+  },
+
+  hasKnownMatchTeams(match = {}) {
+    const bad = (value = "") => {
+      const label = String(value || "").trim();
+      return /^(tbd|à déterminer|a determiner|1st group|2nd group|3rd group|winner|runner-up|loser|vainqueur|perdant)/i.test(label)
+        || /^(m|match)\s*(7[3-9]|8[0-9]|9[0-9]|10[0-4])\b/i.test(label)
+        || /\b(à définir|a definir|to be decided|to be confirmed)\b/i.test(label);
+    };
+    return Boolean(match.home_team_id && match.away_team_id)
+      && !bad(match.home_team_name)
+      && !bad(match.away_team_name)
+      && !bad(match.home_team_short_name)
+      && !bad(match.away_team_short_name);
+  },
+
+
+  async selectAllRows(tableName, options = {}) {
+    const pageSize = Math.max(100, Math.min(Number(options.pageSize || 1000), 1000));
+    const orderColumn = options.orderColumn || "id";
+    const ascending = options.ascending !== false;
+    const rows = [];
+    let from = 0;
+
+    while (true) {
+      let query = window.sb
+        .from(tableName)
+        .select(options.select || "*");
+
+      if (orderColumn) {
+        query = query.order(orderColumn, { ascending });
+      }
+
+      const { data, error } = await query.range(from, from + pageSize - 1);
+      if (error) return { data: rows, error };
+
+      const page = data || [];
+      rows.push(...page);
+      if (page.length < pageSize) break;
+      from += pageSize;
+    }
+
+    return { data: rows, error: null };
   },
 
   async loadProfile() {
@@ -651,7 +769,7 @@ const App = {
       .order("name");
 
     if (error) throw error;
-    this.state.footballTeams = data || [];
+    this.state.footballTeams = (data || []).map((row) => this.normalizeTeamLabels(row));
   },
 
   async loadActiveCompetition() {
@@ -688,11 +806,35 @@ const App = {
     this.state.winnerPrediction = data || null;
   },
 
-  async loadPlayerScoreRows() {
+
+
+  async loadSecondWinnerPrediction() {
+    if (!this.state.activeCompetition) {
+      this.state.secondWinnerPrediction = null;
+      return;
+    }
+
     const { data, error } = await window.sb
-      .from("v_leaderboard_overall")
+      .from("second_winner_predictions")
       .select("*")
-      .order("rank");
+      .eq("user_id", this.state.session.user.id)
+      .eq("competition_id", this.state.activeCompetition.id)
+      .maybeSingle();
+
+    if (error) {
+      console.warn("second_winner_predictions indisponible : lance le patch SQL V1.6.0", error);
+      this.state.secondWinnerPrediction = null;
+      return;
+    }
+
+    this.state.secondWinnerPrediction = data || null;
+  },
+
+  async loadPlayerScoreRows() {
+    const { data, error } = await this.selectAllRows("v_leaderboard_overall", {
+      orderColumn: "rank",
+      pageSize: 1000
+    });
 
     if (error) {
       console.warn("Classement indisponible pour les fiches joueurs", error);
@@ -701,6 +843,7 @@ const App = {
     }
 
     this.state.playerScoreRows = data || [];
+    this.observeRankSentinel("leaderboard-load");
   },
 
   async loadMiniRecordPredictionCounts() {
@@ -721,7 +864,7 @@ const App = {
     const { data, error } = await window.sb
       .from("app_settings")
       .select("key,value")
-      .in("key", ["family_mode_enabled", "preparation_module_enabled", "graph_preview_test_matches_enabled", "graph_mock_preview_enabled", "home_progress_include_test_matches"]);
+      .in("key", ["family_mode_enabled", "preparation_module_enabled", "graph_preview_test_matches_enabled", "graph_mock_preview_enabled", "home_progress_include_test_matches", "live_demo_match_enabled", "login_owl_message", "champion_bonus_initial_points", "champion_bonus_second_points"]);
 
     if (error) {
       console.warn("Paramètres app indisponibles", error);
@@ -730,6 +873,380 @@ const App = {
     }
 
     this.state.appSettings = Object.fromEntries((data || []).map((row) => [row.key, row.value]));
+  },
+
+
+
+
+  async loadOwlMessages() {
+    const nowIso = new Date().toISOString();
+    const { data, error } = await window.sb
+      .from("owl_messages")
+      .select("id,title,body,importance,start_at,end_at,duration_days,enabled,show_in_history,poll_enabled,poll_question,poll_options,poll_end_at,created_at,updated_at")
+      .eq("enabled", true)
+      .eq("show_in_history", true)
+      .lte("start_at", nowIso)
+      .order("start_at", { ascending: false })
+      .limit(100);
+
+    if (error) {
+      console.warn("Messages Hibou indisponibles : lance le patch SQL V1.6.4", error);
+      this.state.owlMessages = [];
+      return;
+    }
+
+    this.state.owlMessages = data || [];
+    await this.loadMyOwlPollVotes();
+    await this.loadOwlPollResults();
+    await this.loadOwlPollVoteDetails();
+  },
+
+  owlPollMessageIds() {
+    return (this.state.owlMessages || [])
+      .filter((message) => message.poll_enabled)
+      .map((message) => message.id)
+      .filter(Boolean);
+  },
+
+  async loadMyOwlPollVotes() {
+    const ids = this.owlPollMessageIds();
+    if (!ids.length || !this.state.session?.user?.id) {
+      this.state.owlPollVotes = {};
+      return;
+    }
+
+    const { data, error } = await window.sb
+      .from("owl_message_votes")
+      .select("message_id,option_key,created_at,updated_at")
+      .eq("user_id", this.state.session.user.id)
+      .in("message_id", ids);
+
+    if (error) {
+      console.warn("Votes de sondage Hibou indisponibles : lance le patch SQL V1.8.41", error);
+      this.state.owlPollVotes = {};
+      return;
+    }
+
+    this.state.owlPollVotes = Object.fromEntries((data || []).map((vote) => [String(vote.message_id), vote]));
+  },
+
+  async loadOwlPollResults(messageIds = null) {
+    const ids = Array.isArray(messageIds) && messageIds.length ? messageIds.filter(Boolean) : this.owlPollMessageIds();
+    if (!ids.length) {
+      this.state.owlPollResults = {};
+      return;
+    }
+
+    const { data, error } = await window.sb
+      .from("v_admin_owl_poll_results")
+      .select("message_id,option_key,option_label,votes_count")
+      .in("message_id", ids);
+
+    if (error) {
+      console.warn("Résultats de sondage Hibou indisponibles : lance le patch SQL corrigé V1.8.30c", error);
+      return;
+    }
+
+    const previous = messageIds ? { ...(this.state.owlPollResults || {}) } : {};
+    ids.forEach((id) => { delete previous[String(id)]; });
+    for (const row of data || []) {
+      const key = String(row.message_id);
+      if (!previous[key]) previous[key] = [];
+      previous[key].push(row);
+    }
+    this.state.owlPollResults = previous;
+  },
+
+  async loadOwlPollVoteDetails(messageIds = null) {
+    const ids = Array.isArray(messageIds) && messageIds.length ? messageIds.filter(Boolean) : this.owlPollMessageIds();
+    if (!ids.length) {
+      this.state.owlPollVoteDetails = {};
+      return;
+    }
+
+    const { data, error } = await window.sb
+      .from("v_owl_poll_vote_details")
+      .select("message_id,option_key,option_label,user_id,pseudo,voted_at")
+      .in("message_id", ids);
+
+    if (error) {
+      console.warn("Détail des votes Hibou indisponible : lance le patch SQL V1.8.41", error);
+      return;
+    }
+
+    const previous = messageIds ? { ...(this.state.owlPollVoteDetails || {}) } : {};
+    ids.forEach((id) => { delete previous[String(id)]; });
+    for (const row of data || []) {
+      const key = String(row.message_id);
+      if (!previous[key]) previous[key] = [];
+      previous[key].push(row);
+    }
+    this.state.owlPollVoteDetails = previous;
+  },
+
+
+  activeLoginOwlMessage() {
+    const now = Date.now();
+    const fromTable = (this.state.owlMessages || []).find((message) => {
+      if (!message || message.enabled === false) return false;
+      const start = message.start_at ? new Date(message.start_at).getTime() : 0;
+      const end = message.end_at ? new Date(message.end_at).getTime() : 0;
+      if (start && now < start) return false;
+      if (end && now > end) return false;
+      return Boolean(String(message.body || message.message || "").trim());
+    });
+    if (fromTable) return fromTable;
+
+    const message = this.state.appSettings?.login_owl_message;
+    if (!message || typeof message !== "object" || message.enabled === false) return null;
+    const start = message.start_at ? new Date(message.start_at).getTime() : 0;
+    const end = message.end_at ? new Date(message.end_at).getTime() : 0;
+    if (start && now < start) return null;
+    if (end && now > end) return null;
+    if (!String(message.body || message.message || "").trim()) return null;
+    return message;
+  },
+
+  loginOwlMessageDismissKey(message) {
+    const signature = message.id || message.updated_at || `${message.start_at || ""}:${message.end_at || ""}:${message.body || message.message || ""}`;
+    return `${this.appStoragePrefix()}:login-owl-message:${btoa(unescape(encodeURIComponent(signature))).slice(0, 40)}`;
+  },
+
+  maybeShowLoginOwlMessage() {
+    const message = this.activeLoginOwlMessage();
+    if (!message) return;
+    const key = this.loginOwlMessageDismissKey(message);
+    try {
+      if (localStorage.getItem(key) === "dismissed") return;
+    } catch (error) {}
+    window.setTimeout(() => this.openLoginOwlMessageModal(message, key), 180);
+  },
+
+  owlPollOpen(message = {}) {
+    if (!message.poll_enabled) return false;
+    if (!Array.isArray(message.poll_options) || message.poll_options.length < 2) return false;
+    const end = message.poll_end_at ? new Date(message.poll_end_at).getTime() : 0;
+    return !end || Date.now() <= end;
+  },
+
+  owlPollResultsForMessage(message = {}) {
+    const rows = this.state.owlPollResults?.[String(message.id)] || [];
+    const mapped = new Map(rows.map((row) => [String(row.option_key), Number(row.votes_count || 0)]));
+    return (Array.isArray(message.poll_options) ? message.poll_options : []).map((option) => ({
+      key: String(option.key),
+      label: option.label || option.key,
+      votes: mapped.get(String(option.key)) || 0
+    }));
+  },
+
+  owlPollVoteDetailsForMessage(message = {}) {
+    return (this.state.owlPollVoteDetails?.[String(message.id)] || [])
+      .slice()
+      .sort((a, b) => String(a.pseudo || "").localeCompare(String(b.pseudo || ""), "fr"));
+  },
+
+  owlPollVotersHtml(message = {}, showDetails = false, startOpen = false) {
+    if (!showDetails) {
+      return `<p class="muted tiny-note">Vote d’abord pour ouvrir le grimoire des plumes et voir qui a voté quoi.</p>`;
+    }
+    const details = this.owlPollVoteDetailsForMessage(message);
+    const options = Array.isArray(message.poll_options) ? message.poll_options : [];
+    const byOption = new Map();
+    details.forEach((row) => {
+      const key = String(row.option_key || "");
+      if (!byOption.has(key)) byOption.set(key, []);
+      byOption.get(key).push(row);
+    });
+    return `
+      <details class="login-owl-poll-voters" ${startOpen ? "open" : ""}>
+        <summary>Voir qui a voté quoi 🕵️‍♂️</summary>
+        <div class="login-owl-poll-voters-list">
+          ${options.map((option) => {
+            const voters = byOption.get(String(option.key)) || [];
+            return `<div class="login-owl-poll-voter-group">
+              <strong>${H.escapeHtml(option.label || option.key)}</strong>
+              ${voters.length ? `<ul>${voters.map((vote) => `<li>${H.escapeHtml(vote.pseudo || "Joueur mystère")}</li>`).join("")}</ul>` : `<small>Aucun hibou posé ici.</small>`}
+            </div>`;
+          }).join("")}
+        </div>
+      </details>
+    `;
+  },
+
+  owlPollRootSelector(message = {}) {
+    const id = String(message?.id || "");
+    const safeId = window.CSS?.escape ? CSS.escape(id) : id.replace(/[^a-zA-Z0-9_-]/g, "");
+    return `.login-owl-poll[data-owl-poll-message-id="${safeId}"]`;
+  },
+
+  owlPollTotalVotes(message = {}) {
+    return this.owlPollResultsForMessage(message).reduce((sum, row) => sum + Number(row.votes || 0), 0);
+  },
+
+  owlPollHtml(message = {}, options = {}) {
+    if (!message.poll_enabled || !Array.isArray(message.poll_options) || message.poll_options.length < 2) return "";
+    const vote = this.state.owlPollVotes?.[String(message.id)];
+    const isOpen = this.owlPollOpen(message);
+    const forceResults = Boolean(options.forceResults);
+    const forceVoters = Boolean(options.forceVoters);
+    const inHistory = options.context === "history";
+    const status = vote ? "vote enregistré" : (isOpen ? "vote ouvert" : "sondage terminé");
+    const resultRows = this.owlPollResultsForMessage(message);
+    const totalVotes = resultRows.reduce((sum, row) => sum + Number(row.votes || 0), 0);
+    const showResults = forceResults || Boolean(vote) || !isOpen;
+    const showVoters = forceVoters || showResults;
+    const resultMap = new Map(resultRows.map((row) => [String(row.key), row]));
+    return `
+      <section class="login-owl-poll ${inHistory ? "owl-poll-history-inline" : ""}" data-owl-poll-message-id="${H.escapeHtml(message.id || "")}">
+        <div class="login-owl-poll-head">
+          <strong>📊 ${H.escapeHtml(message.poll_question || "Sondage du Hibou")}</strong>
+          <small>${H.escapeHtml(status)}${message.poll_end_at ? ` · fin ${H.formatDateTime(message.poll_end_at)}` : ""}${showResults ? ` · ${totalVotes} vote(s)` : ""}${inHistory ? " · visible dans l’historique" : ""}</small>
+        </div>
+        <div class="login-owl-poll-options ${showResults ? "has-results" : ""}">
+          ${message.poll_options.map((option) => {
+            const selected = vote && String(vote.option_key) === String(option.key);
+            const row = resultMap.get(String(option.key)) || { votes: 0 };
+            const votes = Number(row.votes || 0);
+            const pct = totalVotes ? Math.round((votes / totalVotes) * 100) : 0;
+            return `<button type="button" class="login-owl-poll-option ${selected ? "selected" : ""} ${showResults ? "with-result" : ""}" data-owl-poll-option="${H.escapeHtml(option.key)}" ${!isOpen ? "disabled" : ""} style="--poll-pct:${pct}%">
+              <span>${H.escapeHtml(option.label || option.key)}</span>
+              <b>${selected ? "✓ ton vote" : (showResults ? `${pct}%` : "choisir")}</b>
+              ${showResults ? `<i class="login-owl-poll-result-bar" aria-hidden="true"></i><em>${votes} vote(s) · ${pct}%</em>` : ""}
+            </button>`;
+          }).join("")}
+        </div>
+        <p class="muted tiny-note">${inHistory ? "Sondage attaché à ce message : résultats, pourcentages et votes nominatifs restent lisibles ici." : (showResults ? "Résultats visibles après ton vote. Tu peux encore changer tant que le sondage est ouvert." : "Un seul vote par joueur, modifiable jusqu’à la fin du sondage.")}</p>
+        ${this.owlPollVotersHtml(message, showVoters, inHistory)}
+      </section>
+    `;
+  },
+
+  async voteOwlPoll(message, optionKey, modal) {
+    if (!message?.id || !optionKey) return;
+    if (!this.owlPollOpen(message)) {
+      H.toast("Le sondage est terminé, le Hibou a refermé l’urne.", "error");
+      return;
+    }
+
+    const { error } = await window.sb
+      .from("owl_message_votes")
+      .upsert({ message_id: message.id, user_id: this.state.session?.user?.id, option_key: optionKey }, { onConflict: "message_id,user_id" });
+
+    if (error) {
+      H.toast(error.message || "Vote impossible. Lance le patch SQL V1.8.41.", "error");
+      return;
+    }
+
+    this.state.owlPollVotes[String(message.id)] = { message_id: message.id, option_key: optionKey };
+    await this.loadOwlPollResults([message.id]);
+    await this.loadOwlPollVoteDetails([message.id]);
+    const pollRoot = H.$(this.owlPollRootSelector(message), modal) || H.$(".login-owl-poll", modal);
+    if (pollRoot) {
+      const inHistory = pollRoot.classList.contains("owl-poll-history-inline") || Boolean(pollRoot.closest(".owl-messages-history-modal"));
+      pollRoot.outerHTML = this.owlPollHtml(message, inHistory ? { forceResults: true, forceVoters: true, context: "history" } : {});
+    }
+    this.bindOwlPollButtons(modal, message);
+    H.toast("Vote enregistré dans le nid 🦉", "success");
+  },
+
+  bindOwlPollButtons(modal, message) {
+    const root = H.$(this.owlPollRootSelector(message), modal) || modal;
+    H.$$('[data-owl-poll-option]', root).forEach((button) => {
+      if (button.dataset.owlPollBound === "true") return;
+      button.dataset.owlPollBound = "true";
+      button.addEventListener("click", async () => this.voteOwlPoll(message, button.dataset.owlPollOption, modal));
+    });
+  },
+
+  openLoginOwlMessageModal(message, storageKey) {
+    if (document.querySelector(".login-owl-message-modal")) return;
+    const importance = message.importance || "info";
+    const title = message.title || "Message du Hibou masqué";
+    const body = message.body || message.message || "";
+    const modal = document.createElement("div");
+    modal.className = `modal-backdrop login-owl-message-modal importance-${importance}`;
+    modal.innerHTML = `
+      <div class="modal-card login-owl-message-card" role="dialog" aria-modal="true" aria-labelledby="loginOwlTitle">
+        <button class="modal-close" type="button" aria-label="Fermer">×</button>
+        <div class="login-owl-message-head">
+          <img src="assets/icons/owl-png/admin.png" alt="" class="login-owl-message-icon" loading="lazy" onerror="this.style.display='none'">
+          <div>
+            <p class="eyebrow">Le Hibou masqué passe une tête</p>
+            <h2 id="loginOwlTitle">${H.escapeHtml(title)}</h2>
+          </div>
+        </div>
+        <div class="login-owl-message-body">${H.escapeHtml(body).replace(/\n/g, "<br>")}</div>
+        ${this.owlPollHtml(message)}
+        <div class="login-owl-message-actions">
+          <button class="primary-btn" type="button" id="closeLoginOwlMessageBtn">Bien reçu, chef Hibou</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+    this.bindOwlPollButtons(modal, message);
+    const close = () => {
+      const mustVoteFirst = message.poll_enabled && this.owlPollOpen(message) && !this.state.owlPollVotes?.[String(message.id)];
+      if (!mustVoteFirst) {
+        try { localStorage.setItem(storageKey, "dismissed"); } catch (error) {}
+      }
+      modal.remove();
+    };
+    H.$("#closeLoginOwlMessageBtn", modal)?.addEventListener("click", close);
+    H.$(".modal-close", modal)?.addEventListener("click", close);
+    modal.addEventListener("click", (event) => { if (event.target === modal) close(); });
+  },
+
+
+
+  openOwlMessagesHistoryModal() {
+    H.$("#owlMessagesHistoryModal")?.remove();
+    const messages = [
+      ...this.rankSentinelHistoryMessages(),
+      ...(this.state.owlMessages || [])
+    ]
+      .slice()
+      .sort((a, b) => new Date(b.start_at || b.created_at || 0) - new Date(a.start_at || a.created_at || 0));
+
+    const modal = document.createElement("div");
+    modal.id = "owlMessagesHistoryModal";
+    modal.className = "modal-backdrop owl-messages-history-modal";
+    modal.innerHTML = `
+      <div class="modal-card owl-messages-history-card" role="dialog" aria-modal="true" aria-labelledby="owlMessagesHistoryTitle">
+        <button class="modal-x-btn" id="closeOwlMessagesHistoryBtn" type="button" aria-label="Fermer">×</button>
+        <div class="card-title-row">
+          <div>
+            <p class="eyebrow">${H.icon("diffusion")} Messages du Hibou masqué</p>
+            <h2 id="owlMessagesHistoryTitle">Le grimoire des annonces</h2>
+            <p class="muted">Tous les messages publiés par le Hibou, du plus récent au plus ancien. Les vieilles plumes restent lisibles.</p>
+          </div>
+        </div>
+        <div class="owl-message-history-list">
+          ${messages.length ? messages.map((message) => `
+            <article class="owl-message-history-item importance-${H.escapeHtml(message.importance || "info")}">
+              <div class="owl-message-history-head">
+                <img src="assets/icons/owl-png/admin.png" alt="" loading="lazy" onerror="this.style.display='none'">
+                <div>
+                  <strong>${H.escapeHtml(message.title || "Message du Hibou masqué")}</strong>
+                  <small>${H.formatDateTime(message.start_at || message.created_at)}${message.end_at ? ` · visible jusqu’au ${H.formatDateTime(message.end_at)}` : ""}</small>
+                </div>
+                <span class="pill">${H.escapeHtml(message.importance || "info")}</span>
+              </div>
+              <p>${H.escapeHtml(message.body || message.message || "").replace(/\\n/g, "<br>")}</p>
+              ${this.owlPollHtml(message, { forceResults: true, forceVoters: true, context: "history" })}
+            </article>
+          `).join("") : `
+            <div class="empty-state compact">
+              <strong>Aucun message publié</strong>
+              <p>Le Hibou masqué n’a pas encore déposé de parchemin public.</p>
+            </div>
+          `}
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+    const close = () => modal.remove();
+    H.$("#closeOwlMessagesHistoryBtn", modal)?.addEventListener("click", close);
+    modal.addEventListener("click", (event) => { if (event.target === modal) close(); });
   },
 
   familyModeEnabled() {
@@ -776,9 +1293,49 @@ const App = {
     return Boolean(value);
   },
 
+  liveDemoMatchEnabled() {
+    const value = this.state.appSettings?.live_demo_match_enabled;
+    if (value === undefined || value === null) return false;
+    if (typeof value === "boolean") return value;
+    if (typeof value === "string") return value === "true";
+    if (value && typeof value === "object" && "enabled" in value) return Boolean(value.enabled);
+    return Boolean(value);
+  },
+
+  appSettingNumberFromValue(value, fallback = 0) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : fallback;
+  },
+
+  appSettingNumber(key, fallback = 0) {
+    const value = this.state.appSettings?.[key];
+    if (value === undefined || value === null) return fallback;
+    if (typeof value === "number") return Number.isFinite(value) ? value : fallback;
+    if (typeof value === "string") return this.appSettingNumberFromValue(value.replace(",", "."), fallback);
+    if (value && typeof value === "object") return this.appSettingNumberFromValue(value.points ?? value.value ?? value.amount, fallback);
+    return this.appSettingNumberFromValue(value, fallback);
+  },
+
+  championFirstBonusPoints() {
+    return Math.max(0, Math.round(this.appSettingNumber("champion_bonus_initial_points", 100)));
+  },
+
+  championSecondBonusPoints() {
+    return Math.max(0, Math.round(this.appSettingNumber("champion_bonus_second_points", 50)));
+  },
+
+  isLiveDemoMatch(match = null) {
+    if (!match) return false;
+    return Number(match.api_match_id) === -133000
+      || String(match.test_match_label || "").toLowerCase().includes("labo live")
+      || String(match.test_match_label || "").toLowerCase().includes("live demo")
+      || String(match.group_name || "").toLowerCase().includes("labo live");
+  },
+
   homeProgressMatches() {
     return this.state.matches.filter((m) =>
-      !["cancelled", "postponed"].includes(m.status)
+      !this.isLiveDemoMatch(m)
+      && !["cancelled", "postponed"].includes(m.status)
       && (!m.is_test_match || this.homeProgressIncludeTestMatches())
     );
   },
@@ -788,9 +1345,11 @@ const App = {
   },
 
   displayMatches() {
-    return this.preparationModuleEnabled()
-      ? this.state.matches
-      : this.state.matches.filter((match) => !match.is_test_match);
+    return this.state.matches.filter((match) => {
+      if (this.isLiveDemoMatch(match)) return this.preparationModuleEnabled() && this.liveDemoMatchEnabled();
+      if (!this.preparationModuleEnabled() && match.is_test_match) return false;
+      return true;
+    });
   },
 
   async loadMyFamilyInvites() {
@@ -826,6 +1385,28 @@ const App = {
     }
 
     this.state.blockedUserIds = new Set((data || []).map((row) => String(row.blocked_id)));
+  },
+
+
+  async loadSecondWinnerPredictionsForTeams() {
+    const selectFields = "user_id,predicted_team_id,predicted_team_name,predicted_team_short_name,predicted_team_country_code,predicted_team_flag_url,points_total,competition_id,created_at,updated_at";
+    let query = window.sb
+      .from("v_second_winner_predictions")
+      .select(selectFields)
+      .order("predicted_team_name", { ascending: true });
+
+    if (this.state.activeCompetition?.id) {
+      query = query.eq("competition_id", this.state.activeCompetition.id);
+    }
+
+    const { data, error } = await query;
+    if (error) {
+      console.warn("2e choix champion indisponible pour les fiches joueurs", error);
+      this.state.secondWinnerPredictions = [];
+      return;
+    }
+
+    this.state.secondWinnerPredictions = data || [];
   },
 
   miniRecordPredictionCountRow(userId) {
@@ -874,7 +1455,7 @@ const App = {
       .order("kickoff_at", { ascending: true });
 
     if (error) throw error;
-    this.state.matches = data || [];
+    this.state.matches = (data || []).map((row) => this.normalizeTeamLabels(row));
   },
 
   async loadGroupStandings() {
@@ -890,7 +1471,7 @@ const App = {
       return;
     }
 
-    this.state.groupStandings = data || [];
+    this.state.groupStandings = (data || []).map((row) => this.normalizeTeamLabels(row));
   },
 
   async loadMyPredictions() {
@@ -903,17 +1484,63 @@ const App = {
     this.state.myPredictions = data || [];
   },
 
+  mergePredictionRows(baseRows = [], extraRows = []) {
+    const byKey = new Map();
+    [...(baseRows || []), ...(extraRows || [])].forEach((row) => {
+      if (!row) return;
+      const key = `${row.prediction_id || row.id || ""}:${row.user_id || ""}:${row.match_id || ""}`;
+      if (!key.replace(/:/g, "")) return;
+      byKey.set(key, { ...(byKey.get(key) || {}), ...row });
+    });
+    return [...byKey.values()];
+  },
+
+
   async loadVisiblePredictions() {
-    const { data, error } = await window.sb
-      .from("v_visible_predictions")
-      .select("*");
+    // V1.8.41 — IMPORTANT : Supabase REST renvoie 1000 lignes max par requête.
+    // Le classement général est agrégé en base, mais les détails joueurs et le classement Famille
+    // repartent des pronos visibles côté front. On pagine donc toute la vue, sinon les détails
+    // s'arrêtent après les premiers paquets de matchs/joueurs.
+    const { data, error } = await this.selectAllRows("v_visible_predictions", {
+      orderColumn: "prediction_id",
+      pageSize: 1000
+    });
 
     if (error) {
       console.warn("v_visible_predictions indisponible pour le moment", error);
       this.state.visiblePredictions = [];
+    } else {
+      this.state.visiblePredictions = data || [];
+    }
+
+    // V1.8.12 — filet spécial live :
+    // si la vue générale rate un prono sur un match en direct,
+    // la vue dédiée v_live_visible_predictions le réinjecte.
+    const liveResult = await this.selectAllRows("v_live_visible_predictions", {
+      orderColumn: "prediction_id",
+      pageSize: 1000
+    });
+
+    if (!liveResult.error && Array.isArray(liveResult.data) && liveResult.data.length) {
+      this.state.visiblePredictions = this.mergePredictionRows(this.state.visiblePredictions, liveResult.data);
+    } else if (liveResult.error && !/relation .*v_live_visible_predictions|does not exist|PGRST205/i.test(liveResult.error.message || "")) {
+      console.warn("v_live_visible_predictions indisponible", liveResult.error);
+    }
+  },
+
+
+  async loadManualBadges() {
+    const { data, error } = await window.sb
+      .from("manual_user_badges")
+      .select("user_id,badge_id,granted_at,reason");
+
+    if (error) {
+      console.warn("manual_user_badges indisponible pour le moment", error);
+      this.state.manualBadges = [];
       return;
     }
-    this.state.visiblePredictions = data || [];
+
+    this.state.manualBadges = data || [];
   },
 
   async loadPublicProfiles() {
@@ -1042,6 +1669,7 @@ const App = {
     this.stopTeamChatAutoRefresh();
     this.state.currentView = viewName;
     document.body.dataset.currentView = viewName;
+    this.rememberLastView(viewName);
     this.setActiveNav(viewName);
 
     const titleMap = {
@@ -1059,7 +1687,10 @@ const App = {
 
     if (viewName === "home") await this.renderHome();
     if (viewName === "matches") await this.renderMatches();
-    if (viewName === "worldcup") await this.renderWorldCup();
+    if (viewName === "worldcup") {
+      this.state.worldcupTab = "finals";
+      await this.renderWorldCup();
+    }
     if (viewName === "leaderboard") await this.renderLeaderboard();
     if (viewName === "teams") await this.renderTeamsPage();
     if (viewName === "achievements") await this.renderAchievements();
@@ -1069,11 +1700,18 @@ const App = {
   },
 
   getMyPrediction(matchId) {
-    return this.state.myPredictions.find((p) => p.match_id === matchId);
+    const targetId = String(matchId ?? "");
+    return this.state.myPredictions.find((p) => String(p.match_id) === targetId);
   },
 
   predictionsForMatch(matchId) {
-    return this.state.visiblePredictions.filter((p) => p.match_id === matchId);
+    const targetId = String(matchId ?? "");
+    const rows = this.state.visiblePredictions.filter((p) => String(p.match_id) === targetId);
+    const mine = this.state.myPredictions.find((p) => String(p.match_id) === targetId);
+    if (mine && !rows.some((row) => String(row.user_id) === String(this.state.session?.user?.id))) {
+      return this.mergePredictionRows(rows, [{ ...mine, user_id: this.state.session?.user?.id, pseudo: this.state.profile?.pseudo }]);
+    }
+    return rows;
   },
 
   upcomingMatches() {
@@ -1085,22 +1723,27 @@ const App = {
   },
 
   availablePredictionMatches() {
-    return this.state.matches.filter((m) => !m.is_test_match && !["cancelled", "postponed"].includes(m.status));
+    return this.state.matches.filter((m) =>
+      !this.isLiveDemoMatch(m)
+      && !m.is_test_match
+      && !["cancelled", "postponed"].includes(m.status)
+      && this.hasKnownMatchTeams(m)
+    );
   },
 
   preparationMatches() {
-    return this.state.matches.filter((m) => m.is_test_match);
+    return this.state.matches.filter((m) => m.is_test_match && !this.isLiveDemoMatch(m));
   },
 
   isPreparationMatch(matchOrId) {
-    const match = typeof matchOrId === "string"
-      ? this.state.matches.find((m) => m.id === matchOrId)
+    const match = typeof matchOrId === "string" || typeof matchOrId === "number"
+      ? this.state.matches.find((m) => String(m.id) === String(matchOrId))
       : matchOrId;
     return Boolean(match?.is_test_match);
   },
 
   competitionMatches() {
-    return this.state.matches.filter((m) => !m.is_test_match);
+    return this.state.matches.filter((m) => !this.isLiveDemoMatch(m) && !m.is_test_match);
   },
 
   phaseLeaderboardMatches() {
@@ -1122,7 +1765,12 @@ const App = {
     };
 
     const includeTest = Boolean(options.includeTest);
-    const keepPrediction = (p) => includeTest || !this.isPreparationMatch(p.match_id);
+    const includeLiveDemo = Boolean(options.includeLiveDemo);
+    const keepPrediction = (p) => {
+      const match = this.state.matches.find((m) => m.id === p.match_id);
+      if (this.isLiveDemoMatch(match) && !includeLiveDemo) return false;
+      return includeTest || !this.isPreparationMatch(p.match_id);
+    };
 
     this.state.visiblePredictions
       .filter((p) => p.user_id === userId && keepPrediction(p))
@@ -1229,12 +1877,35 @@ const App = {
   predictionForDisplay(prediction, match) {
     if (!prediction) return null;
     if (match?.status === "live") return this.projectedPredictionPoints(prediction, match) || prediction;
+
+    // V1.8.6 — filet de sécurité :
+    // si prediction_points n'a pas encore été créé/recalculé en base,
+    // on calcule quand même les points affichés à partir du résultat officiel.
+    if (
+      match?.status === "finished"
+      && (prediction.points_total === null || prediction.points_total === undefined)
+    ) {
+      return this.projectedPredictionPoints(prediction, match) || prediction;
+    }
+
     return prediction;
   },
 
-  liveProjectionCountForMatchIds(matchIds = null, { includeTest = false, userIds = null } = {}) {
-    const idSet = matchIds ? new Set(matchIds.map(String)) : null;
-    const userSet = userIds ? new Set(userIds.map(String)) : null;
+  liveProjectionCountForMatchIds(matchIds = null, options = {}) {
+    const normalizedOptions = options && typeof options === "object" && !Array.isArray(options) ? options : {};
+    const includeTest = Boolean(normalizedOptions.includeTest);
+    const userIds = normalizedOptions.userIds ?? null;
+    const toArray = (value) => {
+      if (!value) return null;
+      if (Array.isArray(value)) return value;
+      if (value instanceof Set) return [...value];
+      if (typeof value?.values === "function") return [...value.values()];
+      return [value];
+    };
+    const matchIdArray = toArray(matchIds);
+    const userIdArray = toArray(userIds);
+    const idSet = matchIdArray ? new Set(matchIdArray.map(String)) : null;
+    const userSet = userIdArray ? new Set(userIdArray.map(String)) : null;
 
     return this.state.visiblePredictions
       .filter((prediction) => !userSet || userSet.has(String(prediction.user_id)))
@@ -1247,7 +1918,11 @@ const App = {
         && match.status === "live"
         && prediction?.is_live_projection
         && (!idSet || idSet.has(String(match.id)))
-        && (includeTest || !match.is_test_match)
+        && (
+          includeTest
+          || !match.is_test_match
+          || (this.isLiveDemoMatch(match) && this.liveDemoMatchEnabled())
+        )
       ).length;
   },
 
@@ -1265,8 +1940,8 @@ const App = {
   liveOfficialProjectionRows() {
     const liveOfficialMatches = this.state.matches.filter((match) =>
       match.status === "live"
-      && !match.is_test_match
       && this.hasLiveScore(match)
+      && (!match.is_test_match || (this.isLiveDemoMatch(match) && this.liveDemoMatchEnabled()))
     );
 
     if (!liveOfficialMatches.length) return [];
@@ -1282,13 +1957,44 @@ const App = {
       .filter(Boolean);
   },
 
+
+  rankedOfficialLeaderboardRows(rows = []) {
+    const sortedRows = (rows || [])
+      .filter((row) => {
+        const profile = this.profileForUser(row.user_id || row.id, row);
+        return profile?.player_scope !== "family" && profile?.role !== "family";
+      })
+      .map((row) => ({
+        ...row,
+        user_id: row.user_id || row.id,
+        total_points: Number(row.total_points || 0),
+        exact_scores: Number(row.exact_scores || 0),
+        good_results: Number(row.good_results || 0),
+        good_goal_diffs: Number(row.good_goal_diffs || 0),
+        good_qualified: Number(row.good_qualified || 0),
+        scored_matches: Number(row.scored_matches || 0),
+        live_points: Number(row.live_points || 0),
+        live_match_count: Number(row.live_match_count || 0)
+      }))
+      .sort((a, b) =>
+        Number(b.total_points || 0) - Number(a.total_points || 0)
+        || Number(b.exact_scores || 0) - Number(a.exact_scores || 0)
+        || Number(b.good_results || 0) - Number(a.good_results || 0)
+        || Number(b.good_goal_diffs || 0) - Number(a.good_goal_diffs || 0)
+        || String(a.pseudo || "").localeCompare(String(b.pseudo || ""), "fr")
+      );
+
+    return this.rankRowsWithTies(sortedRows, (row) => Number(row.total_points || 0))
+      .map((row) => ({ ...row, has_live_projection: Number(row.live_match_count || 0) > 0 }));
+  },
+
   liveAdjustedLeaderboardRows(rows = this.state.playerScoreRows) {
     const liveRows = this.liveOfficialProjectionRows();
-    if (!liveRows.length) return rows;
+    if (!liveRows.length) return this.rankedOfficialLeaderboardRows(rows);
 
     const byUser = new Map();
 
-    this.state.publicProfiles.forEach((profile) => {
+    this.officialProfiles(this.state.publicProfiles).forEach((profile) => {
       const userId = profile.id || profile.user_id;
       if (!userId) return;
       byUser.set(String(userId), {
@@ -1345,19 +2051,7 @@ const App = {
       byUser.set(userId, row);
     });
 
-    return [...byUser.values()]
-      .filter((row) => {
-        const profile = this.profileForUser(row.user_id, row);
-        return profile?.player_scope !== "family" && profile?.role !== "family";
-      })
-      .sort((a, b) =>
-        Number(b.total_points || 0) - Number(a.total_points || 0)
-        || Number(b.exact_scores || 0) - Number(a.exact_scores || 0)
-        || Number(b.good_results || 0) - Number(a.good_results || 0)
-        || Number(b.good_goal_diffs || 0) - Number(a.good_goal_diffs || 0)
-        || String(a.pseudo || "").localeCompare(String(b.pseudo || ""), "fr")
-      )
-      .map((row, index) => ({ ...row, rank: index + 1, has_live_projection: Number(row.live_match_count || 0) > 0 }));
+    return this.rankedOfficialLeaderboardRows([...byUser.values()]);
   },
 
   officialCompetitionStartAt() {
@@ -1405,6 +2099,95 @@ const App = {
       : this.state.footballTeams;
 
     return [...candidates].sort((a, b) => String(a.name).localeCompare(String(b.name), "fr"));
+  },
+
+
+
+  secondChampionCloseAt() {
+    const knockout = this.competitionMatches()
+      .filter((match) => !["cancelled", "postponed"].includes(match.status))
+      .filter((match) => ["round_of_32", "round_of_16"].includes(match.stage))
+      .sort((a, b) => new Date(a.kickoff_at || 0) - new Date(b.kickoff_at || 0))[0];
+    return knockout?.kickoff_at ? new Date(knockout.kickoff_at) : null;
+  },
+
+  secondChampionPickOpen() {
+    const closeAt = this.secondChampionCloseAt();
+    return !closeAt || closeAt.getTime() > Date.now();
+  },
+
+
+  groupStageFinishedForSecondChampion() {
+    const groupMatches = this.competitionMatches()
+      .filter((match) => match.stage === "group" && !["cancelled", "postponed"].includes(match.status));
+    return Boolean(groupMatches.length) && groupMatches.every((match) => match.status === "finished");
+  },
+
+  secondChampionCandidateTeams() {
+    const groupFinished = this.groupStageFinishedForSecondChampion();
+
+    if (!groupFinished) {
+      // Avant la fin des poules : tous les vrais pays de la compétition sont disponibles.
+      // On se base uniquement sur les matchs de groupe pour éviter les placeholders M73A/M73B.
+      return this.championCandidateTeams();
+    }
+
+    // Après les poules : seulement les qualifiés réels.
+    const qualifiedStatuses = new Set(["qualified", "qualified_best_third"]);
+    const qualifiedIds = new Set((this.state.groupStandings || [])
+      .filter((row) => qualifiedStatuses.has(row.qualification_status))
+      .map((row) => row.team_id)
+      .filter(Boolean));
+
+    return this.state.footballTeams
+      .filter((team) => qualifiedIds.has(team.id))
+      .sort((a, b) => String(a.name).localeCompare(String(b.name), "fr"));
+  },
+
+  secondChampionSelectedTeam() {
+    const teamId = this.state.secondWinnerPrediction?.predicted_team_id || "";
+    return this.state.footballTeams.find((team) => team.id === teamId) || null;
+  },
+
+  async saveSecondChampionPick(teamId) {
+    if (this.state.profile?.can_predict === false || this.state.profile?.is_banned) {
+      H.toast("Les pronostics sont désactivés sur ton compte.", "error");
+      return;
+    }
+    if (!this.state.activeCompetition) {
+      H.toast("Compétition active introuvable", "error");
+      return;
+    }
+    if (!teamId) {
+      H.toast("Choisis ton deuxième champion", "error");
+      return;
+    }
+    if (!this.secondChampionPickOpen()) {
+      H.toast("2e choix champion verrouillé : les 16èmes ont commencé.", "error");
+      return;
+    }
+    const allowedIds = new Set(this.secondChampionCandidateTeams().map((team) => team.id));
+    if (!allowedIds.has(teamId)) {
+      H.toast("Cette équipe n’est pas disponible pour le 2e choix. Le hibou refuse le ticket.", "error");
+      return;
+    }
+
+    const { error } = await window.sb.rpc("save_second_winner_prediction", {
+      p_predicted_team_id: teamId,
+      p_competition_id: this.state.activeCompetition.id
+    });
+
+    if (error) {
+      H.toast(error.message || "Impossible d’enregistrer le 2e champion. Lance le patch SQL V1.6.0.", "error");
+      return;
+    }
+
+    await this.loadSecondWinnerPrediction();
+    await this.loadPlayerScoreRows().catch(() => {});
+    this.syncAchievementNotifications();
+    this.scheduleAchievementResync();
+    H.toast(`2e champion enregistré : +${this.championSecondBonusPoints()} points si ça passe !`, "success");
+    await this.renderProfile();
   },
 
   async saveChampionPick(teamId) {
@@ -1467,15 +2250,18 @@ const App = {
     const predictionProgress = availablePredictionCount ? Math.round((donePredictionCount / availablePredictionCount) * 100) : 0;
     const liveAdjustedRows = this.liveAdjustedLeaderboardRows(this.state.playerScoreRows);
     const myRank = (typeof this.myRankFromRows === "function" ? this.myRankFromRows(liveAdjustedRows) : null) || await this.fetchMyRank();
+    const myRankTieCount = myRank ? this.tieCountForRank(liveAdjustedRows, myRank.rank) : 0;
     const teamAverageRows = this.overallTeamAverageRows(liveAdjustedRows);
     const familyRows = this.canSeeFamily() ? this.familyPlayerRows() : [];
+    if (this.canSeeFamily()) this.observeRankSentinel("family-home", "family", familyRows);
     const myFamilyRank = familyRows.find((row) => String(row.user_id || row.id) === String(this.state.session.user.id));
+    const myFamilyRankTieCount = myFamilyRank ? this.tieCountForRank(familyRows, myFamilyRank.rank) : 0;
     const familyTeamRows = this.canSeeFamily() ? this.familyTeamRows(null, "average") : [];
 
     root.innerHTML = `
       <section class="home-dashboard-screen" aria-label="Tableau de bord accueil">
-        <section class="hero-card home-dashboard-hero">
-          <div>
+        <section class="hero-card home-dashboard-hero home-dashboard-hero-split">
+          <div class="home-hero-main">
             <p class="eyebrow">${H.icon("nest")} Bienvenue dans le nid</p>
             <h2>Fais tes scores avant le coup d’envoi.</h2>
             <p class="muted">Les pronos des autres restent cachés jusqu’au début du match. Pas de copie, que du flair.</p>
@@ -1491,10 +2277,16 @@ const App = {
               <small class="home-prono-progress-note">${this.homeProgressIncludeTestMatches() ? "Matchs test inclus dans cette progression" : "Matchs officiels uniquement"}</small>
             </div>
             <div class="home-hero-actions">
-              <button class="ghost-btn rules-home-btn" id="rulesHomeBtn" type="button">${H.icon("list")} Règles & points</button>
-              <button class="ghost-btn home-see-predictions-btn" id="homeSeePredictionsBtn" type="button">${H.icon("score")} Voir les pronos du Nid</button>
+              <button class="ghost-btn rules-home-btn home-hero-equal-btn" id="rulesHomeBtn" type="button">${H.icon("list")} Règles & points</button>
+              <button class="ghost-btn owl-messages-home-btn home-hero-equal-btn" id="owlMessagesHomeBtn" type="button">${H.icon("diffusion")} Messages du Hibou</button>
             </div>
           </div>
+          <aside class="home-hero-final-card">
+            <p class="eyebrow">${H.icon("worldcup")} Phase finale</p>
+            <strong>Le tableau est lancé</strong>
+            <span>Accède directement aux 16èmes, 8èmes, quarts, demies et finale.</span>
+            <button class="primary-btn" type="button" data-action="go-worldcup-finals">Voir la phase finale</button>
+          </aside>
         </section>
 
         <section class="home-dashboard-grid">
@@ -1534,12 +2326,12 @@ const App = {
 
           <aside class="home-dashboard-right" aria-label="Classements rapides et pronos">
             <section class="home-standing-stack" aria-label="Classements rapides">
-              ${this.homeRankCardHtml(myRank)}
+              ${this.homeRankCardHtml(myRank, myRankTieCount)}
               ${this.homeTeamAverageCardHtml(teamAverageRows)}
             </section>
             ${this.canSeeFamily() ? `
               <section class="home-standing-stack home-family-stack" aria-label="Classements Famille rapides">
-                ${this.homeFamilyRankCardHtml(myFamilyRank)}
+                ${this.homeFamilyRankCardHtml(myFamilyRank, myFamilyRankTieCount)}
                 ${this.homeFamilyTeamAverageCardHtml(familyTeamRows)}
               </section>
             ` : ""}
@@ -1549,7 +2341,10 @@ const App = {
     `;
 
     H.$("#rulesHomeBtn")?.addEventListener("click", () => this.openRulesModal());
-    H.$("#homeSeePredictionsBtn")?.addEventListener("click", async () => this.goToVisiblePredictionsFromHome());
+    H.$("#owlMessagesHomeBtn")?.addEventListener("click", async () => {
+      await this.loadOwlMessages();
+      this.openOwlMessagesHistoryModal();
+    });
     H.$('[data-action="continue-predictions"]', root)?.addEventListener("click", async () => {
       if (missing.length) {
         await this.goToNearestMissingPrediction();
@@ -1558,6 +2353,10 @@ const App = {
       } else {
         this.loadView("leaderboard");
       }
+    });
+    H.$('[data-action="go-worldcup-finals"]', root)?.addEventListener("click", async () => {
+      this.state.worldcupTab = "finals";
+      await this.loadView("worldcup");
     });
     H.$("#homeRecordsBtn", root)?.addEventListener("click", () => {
       this.state.achievementsTab = "records";
@@ -1595,7 +2394,7 @@ const App = {
   },
 
 
-  homeRankCardHtml(myRank) {
+  homeRankCardHtml(myRank, tieCount = 0) {
     if (!myRank) {
       return `
         <article class="card home-rank-card home-clickable-card" data-home-leaderboard-action="go-overall-leaderboard" role="button" tabindex="0">
@@ -1619,7 +2418,7 @@ const App = {
           <h3>Classement général</h3>
         </div>
         <div class="home-rank-main">
-          <span class="home-rank-number">#${myRank.rank}</span>
+          <span class="home-rank-number">#${myRank.rank}</span>${tieCount > 1 ? `<small class="rank-tie-label">ex æquo</small>` : ""}
           <div>
             <strong>${Number(myRank.total_points || 0)} pts</strong>
             <small>Ton rang joueur</small>
@@ -1631,33 +2430,38 @@ const App = {
 
   overallTeamAverageRows(scoreRows = this.state.playerScoreRows) {
     const scoreByUser = new Map(
-      scoreRows.map((row) => [row.user_id || row.id, row])
+      scoreRows.map((row) => [String(row.user_id || row.id), row])
     );
 
-    return this.state.officeTeams
+    const rows = this.state.officeTeams
       .map((team) => {
         const players = this.teamPlayers(team.id, { officialOnly: true }).filter((player) => player.profile_setup_done !== false);
-        const total = players.reduce((sum, player) => {
-          const score = scoreByUser.get(player.id) || scoreByUser.get(player.user_id);
-          return sum + Number(score?.total_points || 0);
-        }, 0);
+        const totals = players.reduce((acc, player) => {
+          const score = scoreByUser.get(String(player.id || player.user_id)) || {};
+          acc.total_points += Number(score?.total_points || 0);
+          acc.scored_matches += Number(score?.scored_matches || 0);
+          return acc;
+        }, { total_points: 0, scored_matches: 0 });
 
         return {
           office_team_id: team.id,
           office_team_name: team.name,
           office_team_color: team.color,
           active_players: players.length,
-          total_points: total,
-          average_points: players.length ? total / players.length : 0
+          total_points: totals.total_points,
+          scored_matches: totals.scored_matches,
+          average_points: totals.scored_matches ? totals.total_points / totals.scored_matches : 0
         };
       })
-      .filter((row) => row.active_players > 0)
-      .sort((a, b) =>
-        (b.average_points || 0) - (a.average_points || 0)
-        || (b.total_points || 0) - (a.total_points || 0)
-        || String(a.office_team_name || "").localeCompare(String(b.office_team_name || ""), "fr")
-      )
-      .map((row, index) => ({ ...row, rank: index + 1 }));
+      .filter((row) => row.active_players > 0);
+
+    const sortedRows = rows.sort((a, b) =>
+      (b.average_points || 0) - (a.average_points || 0)
+      || (b.total_points || 0) - (a.total_points || 0)
+      || String(a.office_team_name || "").localeCompare(String(b.office_team_name || ""), "fr")
+    );
+
+    return this.rankRowsWithTies(sortedRows, (row) => Number(row.average_points || 0));
   },
 
   homeTeamAverageCardHtml(rows = []) {
@@ -1699,27 +2503,27 @@ const App = {
           <h3>Moyenne team</h3>
         </div>
         <div class="home-team-average-main">
-          <span class="home-team-rank">#${myRow.rank}</span>
+          <span class="home-team-rank">#${myRow.rank}</span>${this.tieCountForRank(rows, myRow.rank) > 1 ? `<small class="rank-tie-label">ex æquo</small>` : ""}
           <div>
             <strong>${H.escapeHtml(myRow.office_team_name)}</strong>
-            <small>${Number(myRow.average_points || 0).toFixed(1)} pts/joueur · ${myRow.active_players} joueur${myRow.active_players > 1 ? "s" : ""}</small>
+            <small>${Number(myRow.average_points || 0).toFixed(2)} pts/match · ${myRow.scored_matches || 0} prono${Number(myRow.scored_matches || 0) > 1 ? "s" : ""} compté${Number(myRow.scored_matches || 0) > 1 ? "s" : ""}</small>
           </div>
         </div>
-        ${leader && leader.office_team_id !== myRow.office_team_id ? `
-          <p class="home-team-average-leader">Leader : <strong>${H.escapeHtml(leader.office_team_name)}</strong> · ${Number(leader.average_points || 0).toFixed(1)} pts/j</p>
-        ` : `<p class="home-team-average-leader is-first">Ta team mène le nid à la moyenne 🦉</p>`}
+        ${leader && leader.office_team_id !== myRow.office_team_id && Number(leader.rank) !== Number(myRow.rank) ? `
+          <p class="home-team-average-leader">Leader : <strong>${H.escapeHtml(leader.office_team_name)}</strong> · ${Number(leader.average_points || 0).toFixed(2)} pts/match</p>
+        ` : Number(myRow.rank) === 1 && this.tieCountForRank(rows, myRow.rank) > 1 ? `<p class="home-team-average-leader is-first">Ta team est ex æquo en tête du nid 🦉</p>` : `<p class="home-team-average-leader is-first">Ta team mène le nid à la moyenne 🦉</p>`}
       </article>
     `;
   },
 
-  homeFamilyRankCardHtml(myRank) {
+  homeFamilyRankCardHtml(myRank, tieCount = 0) {
     return `
       <article class="card home-rank-card home-family-rank-card home-clickable-card" data-home-leaderboard-action="go-family-player-leaderboard" role="button" tabindex="0">
         <div class="card-title-row">
           <h3>Classement Famille</h3>
         </div>
         <div class="home-rank-main ${myRank ? "" : "empty"}">
-          <span class="home-rank-number">${myRank ? `#${myRank.rank}` : "—"}</span>
+          <span class="home-rank-number">${myRank ? `#${myRank.rank}` : "—"}</span>${myRank && tieCount > 1 ? `<small class="rank-tie-label">ex æquo</small>` : ""}
           <div>
             <strong>${myRank ? `${Math.round(Number(myRank.total_points || 0) * 10) / 10} pts` : "Pas encore classé"}</strong>
             <small>Famille · hors classement officiel</small>
@@ -1738,10 +2542,10 @@ const App = {
           <h3>Team Famille</h3>
         </div>
         <div class="home-team-average-main ${myRow ? "" : "empty"}">
-          <span class="home-team-rank">${myRow ? `#${myRow.rank}` : "—"}</span>
+          <span class="home-team-rank">${myRow ? `#${myRow.rank}` : "—"}</span>${myRow && this.tieCountForRank(rows, myRow.rank) > 1 ? `<small class="rank-tie-label">ex æquo</small>` : ""}
           <div>
             <strong>${myRow ? H.escapeHtml(myRow.office_team_name || "Team") : "Pas classée"}</strong>
-            <small>${myRow ? `${Number(myRow.average_points || 0).toFixed(1)} pts/joueur · ${myRow.active_players || 0} joueur${(myRow.active_players || 0) > 1 ? "s" : ""}` : "Aucun joueur Famille actif"}</small>
+            <small>${myRow ? `${Number(myRow.average_points || 0).toFixed(1)} pts/match · ${myRow.active_players || 0} joueur${(myRow.active_players || 0) > 1 ? "s" : ""}` : "Aucun joueur Famille actif"}</small>
           </div>
         </div>
       </article>
@@ -1763,7 +2567,7 @@ const App = {
           <span>vs</span>
           <strong>${H.matchFlagHtml(match, "away")} ${H.escapeHtml(match.away_team_name)}</strong>
         </div>
-        ${match.is_test_match ? `<p class="test-match-mini-label">MATCH TEST · hors classement Coupe du monde</p>` : ""}
+        ${this.isLiveDemoMatch(match) ? `<p class="test-match-mini-label">LABO LIVE · test classement</p>` : match.is_test_match ? `<p class="test-match-mini-label">MATCH TEST · hors classement Coupe du monde</p>` : ""}
         <p class="muted mini-location-line">${H.matchLocationHtml(match, true)}</p>
         <p class="muted mini-tv-line">${H.formatDateTime(match.kickoff_at)} · ${H.tvChannelLogosHtml(this.matchTvChannel(match))}</p>
       </div>
@@ -1775,6 +2579,569 @@ const App = {
     return (rows || []).find((row) =>
       String(row.user_id || row.id) === String(this.state.session?.user?.id)
     ) || null;
+  },
+
+
+
+  rankSentinelContextKey(context = "official") {
+    return context === "family" ? "family" : "official";
+  },
+
+  rankSentinelStorageKey(context = "official") {
+    return `${this.appStoragePrefix()}:rank-sentinel-${this.rankSentinelContextKey(context)}-snapshot:v2`;
+  },
+
+  rankMovementStorageKey(context = "official") {
+    return `${this.appStoragePrefix()}:rank-sentinel-${this.rankSentinelContextKey(context)}-movement:v2`;
+  },
+
+  rankSentinelLastMessagesKey() {
+    return `${this.appStoragePrefix()}:rank-sentinel-last-messages:v1`;
+  },
+
+  rankSentinelHasLiveOfficialMatch() {
+    return (this.state.matches || []).some((match) =>
+      match.status === "live"
+      && !match.is_test_match
+    ) || this.liveOfficialProjectionRows().length > 0;
+  },
+
+  rankSentinelRows(rows = this.state.playerScoreRows, context = "official") {
+    const key = this.rankSentinelContextKey(context);
+    const officialOnlyRows = (rows || []).map((row) => ({
+      ...row,
+      // Sécurité anti-live : si une ligne arrive avec une projection,
+      // on l'enlève du total et on recalcule le rang.
+      total_points: Number(row.total_points || 0) - Number(row.live_points || 0),
+      live_points: 0,
+      live_match_count: 0,
+      has_live_projection: false
+    }));
+
+    const ranked = key === "family"
+      ? this.sortPlayerRows(officialOnlyRows, "points")
+      : this.rankedOfficialLeaderboardRows(officialOnlyRows);
+
+    return ranked
+      .map((row, index) => ({
+        userId: String(row.user_id || row.id || ""),
+        pseudo: row.pseudo || row.display_name || "Joueur",
+        rank: Number(row.rank || index + 1),
+        total_points: Number(row.total_points || 0),
+        exact_scores: Number(row.exact_scores || 0),
+        good_results: Number(row.good_results || 0)
+      }))
+      .filter((row) => row.userId);
+  },
+
+  currentRankSentinelSnapshot(context = "official", sourceRows = this.state.playerScoreRows) {
+    const key = this.rankSentinelContextKey(context);
+    const rows = this.rankSentinelRows(sourceRows, key);
+    const me = rows.find((row) => row.userId === String(this.state.session?.user?.id));
+    if (!me) return null;
+    return {
+      context: key,
+      userId: me.userId,
+      rank: Number(me.rank || 0),
+      total_points: Number(me.total_points || 0),
+      pseudo: me.pseudo || this.state.profile?.pseudo || "Toi",
+      rows,
+      captured_at: new Date().toISOString()
+    };
+  },
+
+  readRankSentinelSnapshot(context = "official") {
+    try {
+      const raw = window.localStorage.getItem(this.rankSentinelStorageKey(context));
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      if (!parsed || parsed.userId !== String(this.state.session?.user?.id)) return null;
+      return parsed;
+    } catch (error) {
+      return null;
+    }
+  },
+
+  writeRankSentinelSnapshot(snapshot, context = "official") {
+    if (!snapshot) return;
+    const key = this.rankSentinelContextKey(context);
+    try {
+      window.localStorage.setItem(this.rankSentinelStorageKey(key), JSON.stringify(snapshot));
+      this.state.rankSentinelLastSnapshot = snapshot;
+    } catch (error) {
+      console.warn("Hibou Sentinelle : snapshot impossible à sauvegarder", error);
+    }
+  },
+
+  readRankMovementMap(context = "official") {
+    const key = this.rankSentinelContextKey(context);
+    if (this.state.rankSentinelMovementMaps?.[key]) return this.state.rankSentinelMovementMaps[key];
+
+    try {
+      const raw = window.localStorage.getItem(this.rankMovementStorageKey(key));
+      const parsed = raw ? JSON.parse(raw) : {};
+      this.state.rankSentinelMovementMaps[key] = parsed && typeof parsed === "object" ? parsed : {};
+      return this.state.rankSentinelMovementMaps[key];
+    } catch (error) {
+      this.state.rankSentinelMovementMaps[key] = {};
+      return {};
+    }
+  },
+
+  writeRankMovementMap(map = {}, context = "official") {
+    const key = this.rankSentinelContextKey(context);
+    const safeMap = map && typeof map === "object" ? map : {};
+    this.state.rankSentinelMovementMaps[key] = safeMap;
+    try {
+      window.localStorage.setItem(this.rankMovementStorageKey(key), JSON.stringify(safeMap));
+    } catch (error) {
+      console.warn("Hibou Sentinelle : mouvements impossibles à sauvegarder", error);
+    }
+  },
+
+  rankSnapshotChanged(previous, current) {
+    if (!previous || !current) return false;
+    const previousRows = Array.isArray(previous.rows) ? previous.rows : [];
+    const currentRows = Array.isArray(current.rows) ? current.rows : [];
+    if (previousRows.length !== currentRows.length) return true;
+
+    const previousById = new Map(previousRows.map((row) => [String(row.userId), row]));
+    return currentRows.some((row) => {
+      const old = previousById.get(String(row.userId));
+      if (!old) return true;
+      return Number(old.rank) !== Number(row.rank)
+        || Number(old.total_points || 0) !== Number(row.total_points || 0)
+        || Number(old.exact_scores || 0) !== Number(row.exact_scores || 0)
+        || Number(old.good_results || 0) !== Number(row.good_results || 0);
+    });
+  },
+
+  buildRankMovementMap(previous, current) {
+    const previousRows = Array.isArray(previous?.rows) ? previous.rows : [];
+    const currentRows = Array.isArray(current?.rows) ? current.rows : [];
+    const previousById = new Map(previousRows.map((row) => [String(row.userId), row]));
+    const map = {};
+
+    currentRows.forEach((row) => {
+      const old = previousById.get(String(row.userId));
+      if (!old) return;
+      const oldRank = Number(old.rank);
+      const newRank = Number(row.rank);
+      if (!Number.isFinite(oldRank) || !Number.isFinite(newRank) || oldRank === newRank) return;
+      const delta = oldRank - newRank;
+      map[String(row.userId)] = {
+        delta,
+        direction: delta > 0 ? "up" : "down",
+        oldRank,
+        newRank,
+        total_points: Number(row.total_points || 0),
+        updated_at: current.captured_at
+      };
+    });
+
+    return map;
+  },
+
+  readRankSentinelLastMessages() {
+    try {
+      const raw = window.localStorage.getItem(this.rankSentinelLastMessagesKey());
+      const parsed = raw ? JSON.parse(raw) : {};
+      return parsed && typeof parsed === "object" ? parsed : {};
+    } catch (error) {
+      return {};
+    }
+  },
+
+  writeRankSentinelLastMessage(change) {
+    if (!change) return;
+    const key = this.rankSentinelContextKey(change.context);
+    const messages = this.readRankSentinelLastMessages();
+    const contextLabel = key === "family" ? "Famille" : "Général";
+    const crossedNames = this.rankSentinelNames(change.crossed);
+    const body = change.improved
+      ? `Tu es passé de #${change.oldRank} à #${change.newRank}${crossedNames ? ` en dépassant ${crossedNames}` : ""}. Le Hibou a secoué ses plumes avec fierté.`
+      : `Tu es passé de #${change.oldRank} à #${change.newRank}${crossedNames ? `, ${crossedNames} est passé devant` : ""}. Le Hibou garde ça pour la revanche.`;
+
+    messages[key] = {
+      id: `rank-sentinel-${key}-${change.id}`,
+      title: key === "family" ? "Hibou Sentinelle · classement Famille" : "Hibou Sentinelle · classement général",
+      body,
+      importance: change.improved ? "fun" : "warning",
+      start_at: change.created_at || new Date().toISOString(),
+      created_at: change.created_at || new Date().toISOString(),
+      show_in_history: true,
+      enabled: true,
+      is_local_rank_sentinel: true,
+      context_label: contextLabel
+    };
+
+    try {
+      window.localStorage.setItem(this.rankSentinelLastMessagesKey(), JSON.stringify(messages));
+    } catch (error) {
+      console.warn("Hibou Sentinelle : impossible de stocker le dernier message", error);
+    }
+  },
+
+  rankSentinelHistoryMessages() {
+    const messages = this.readRankSentinelLastMessages();
+    const list = [];
+    if (messages.official) list.push(messages.official);
+    if (this.canSeeFamily() && messages.family) list.push(messages.family);
+    return list;
+  },
+
+  rankSentinelBackfillStorageKey(context = "official") {
+    return `${this.appStoragePrefix()}:rank-sentinel-${this.rankSentinelContextKey(context)}-backfill:v1`;
+  },
+
+  latestFinishedOfficialMatchBatch() {
+    const finished = (this.state.matches || [])
+      .filter((match) =>
+        match.status === "finished"
+        && !match.is_test_match
+        && !this.isLiveDemoMatch(match)
+        && !["cancelled", "postponed"].includes(match.status)
+      )
+      .sort((a, b) => new Date(b.kickoff_at || b.updated_at || 0) - new Date(a.kickoff_at || a.updated_at || 0));
+
+    if (!finished.length) return [];
+    const latestTime = new Date(finished[0].kickoff_at || finished[0].updated_at || 0).getTime();
+    return finished.filter((match) => {
+      const time = new Date(match.kickoff_at || match.updated_at || 0).getTime();
+      return Number.isFinite(time) && Math.abs(time - latestTime) < 60 * 1000;
+    });
+  },
+
+  rankSentinelBackfillSignature(matches = []) {
+    return matches
+      .map((match) => String(match.id || ""))
+      .filter(Boolean)
+      .sort()
+      .join("|");
+  },
+
+  rankSentinelBackfillAlreadyDone(context = "official", signature = "") {
+    if (!signature) return true;
+    try {
+      return window.localStorage.getItem(this.rankSentinelBackfillStorageKey(context)) === signature;
+    } catch (error) {
+      return false;
+    }
+  },
+
+  writeRankSentinelBackfillDone(context = "official", signature = "") {
+    if (!signature) return;
+    try {
+      window.localStorage.setItem(this.rankSentinelBackfillStorageKey(context), signature);
+    } catch (error) {}
+  },
+
+  rankSentinelRowsBeforeMatches(sourceRows = [], matchIds = new Set()) {
+    if (!matchIds || !matchIds.size) return sourceRows || [];
+    const byUser = new Map();
+
+    (this.state.visiblePredictions || [])
+      .filter((prediction) => matchIds.has(String(prediction.match_id)))
+      .forEach((prediction) => {
+        const userId = String(prediction.user_id || "");
+        if (!userId) return;
+        const item = byUser.get(userId) || {
+          points: 0,
+          exact: 0,
+          good: 0,
+          diff: 0,
+          qualified: 0,
+          scored: 0
+        };
+        item.points += Number(prediction.points_total || 0);
+        item.exact += prediction.is_exact_score ? 1 : 0;
+        item.good += prediction.is_good_result ? 1 : 0;
+        item.diff += prediction.is_good_goal_diff ? 1 : 0;
+        item.qualified += prediction.is_good_qualified ? 1 : 0;
+        item.scored += prediction.points_total !== null && prediction.points_total !== undefined ? 1 : 0;
+        byUser.set(userId, item);
+      });
+
+    return (sourceRows || []).map((row) => {
+      const userId = String(row.user_id || row.id || "");
+      const minus = byUser.get(userId);
+      if (!minus) return { ...row };
+
+      return {
+        ...row,
+        total_points: Math.max(0, Number(row.total_points || 0) - minus.points),
+        exact_scores: Math.max(0, Number(row.exact_scores || 0) - minus.exact),
+        good_results: Math.max(0, Number(row.good_results || 0) - minus.good),
+        good_goal_diffs: Math.max(0, Number(row.good_goal_diffs || 0) - minus.diff),
+        good_qualified: Math.max(0, Number(row.good_qualified || 0) - minus.qualified),
+        scored_matches: Math.max(0, Number(row.scored_matches || 0) - minus.scored),
+        live_points: 0,
+        live_match_count: 0,
+        has_live_projection: false
+      };
+    });
+  },
+
+  rankSentinelBackfillPreviousSnapshot(context = "official", sourceRows = this.state.playerScoreRows) {
+    const key = this.rankSentinelContextKey(context);
+    const matches = this.latestFinishedOfficialMatchBatch();
+    const signature = this.rankSentinelBackfillSignature(matches);
+    if (!matches.length || !signature || this.rankSentinelBackfillAlreadyDone(key, signature)) return null;
+
+    const matchIds = new Set(matches.map((match) => String(match.id)));
+    const previousRows = this.rankSentinelRowsBeforeMatches(sourceRows, matchIds);
+    const snapshot = this.currentRankSentinelSnapshot(key, previousRows);
+    if (snapshot) {
+      snapshot.backfill = true;
+      snapshot.backfill_signature = signature;
+      snapshot.backfill_match_ids = [...matchIds];
+    }
+    return snapshot;
+  },
+
+  emitRankSentinelChange(previous, current, reason = "leaderboard", context = "official", options = {}) {
+    const key = this.rankSentinelContextKey(context);
+    if (!previous || !current) return false;
+
+    const movementMap = this.buildRankMovementMap(previous, current);
+    this.writeRankMovementMap(movementMap, key);
+
+    const oldRank = Number(previous.rank);
+    const newRank = Number(current.rank);
+    const oldPoints = Number(previous.total_points || 0);
+    const newPoints = Number(current.total_points || 0);
+
+    this.writeRankSentinelSnapshot(current, key);
+
+    if (options.backfillSignature) {
+      this.writeRankSentinelBackfillDone(key, options.backfillSignature);
+    }
+
+    if (oldRank === newRank) return false;
+
+    const improved = newRank < oldRank;
+    const crossed = this.rankSentinelCrossedPlayers(previous, current, improved)
+      .filter((row) => row.userId !== String(this.state.session?.user?.id))
+      .slice(0, 6);
+
+    const change = {
+      id: `${Date.now()}-${key}-${oldRank}-${newRank}`,
+      context: key,
+      reason,
+      improved,
+      oldRank,
+      newRank,
+      oldPoints,
+      newPoints,
+      crossed,
+      created_at: new Date().toISOString(),
+      playerPseudo: current.pseudo || this.state.profile?.pseudo || "Toi"
+    };
+
+    this.writeRankSentinelLastMessage(change);
+    this.enqueueRankSentinelModal(change);
+    return true;
+  },
+
+
+  observeRankSentinel(reason = "leaderboard", context = "official", sourceRows = this.state.playerScoreRows) {
+    const key = this.rankSentinelContextKey(context);
+    // Le Hibou Sentinelle ne regarde jamais les projections live.
+    // Pendant un match live officiel, il ne sauvegarde pas non plus de nouveau snapshot,
+    // pour éviter de polluer la référence avec un rang provisoire.
+    if (this.rankSentinelHasLiveOfficialMatch()) return;
+
+    if (key === "family" && !this.canSeeFamily()) return;
+
+    const current = this.currentRankSentinelSnapshot(key, sourceRows);
+    if (!current || !Number.isFinite(current.rank) || current.rank <= 0) return;
+
+    const previous = this.readRankSentinelSnapshot(key);
+    if (key === "official") this.state.rankSentinelPreviousSnapshot = previous || null;
+
+    const existingMovementMap = this.readRankMovementMap(key);
+    const hasStoredMovements = Object.keys(existingMovementMap || {}).length > 0;
+
+    if (!previous || !Number.isFinite(Number(previous.rank))) {
+      const backfill = this.rankSentinelBackfillPreviousSnapshot(key, sourceRows);
+      if (backfill && this.rankSnapshotChanged(backfill, current)) {
+        this.emitRankSentinelChange(backfill, current, `${reason}-backfill`, key, {
+          backfillSignature: backfill.backfill_signature
+        });
+        return;
+      }
+
+      if (backfill?.backfill_signature) {
+        this.writeRankSentinelBackfillDone(key, backfill.backfill_signature);
+      }
+      this.writeRankSentinelSnapshot(current, key);
+      this.writeRankMovementMap({}, key);
+      return;
+    }
+
+    if (!this.rankSnapshotChanged(previous, current)) {
+      // Cas important : l'utilisateur installe la Sentinelle après les résultats.
+      // Le snapshot local existe déjà avec le classement actuel, donc on reconstruit
+      // une comparaison "avant dernier match terminé" une seule fois.
+      if (!hasStoredMovements) {
+        const backfill = this.rankSentinelBackfillPreviousSnapshot(key, sourceRows);
+        if (backfill && this.rankSnapshotChanged(backfill, current)) {
+          this.emitRankSentinelChange(backfill, current, `${reason}-late-backfill`, key, {
+            backfillSignature: backfill.backfill_signature
+          });
+          return;
+        }
+        if (backfill?.backfill_signature) {
+          this.writeRankSentinelBackfillDone(key, backfill.backfill_signature);
+        }
+      }
+
+      this.writeRankSentinelSnapshot(current, key);
+      return;
+    }
+
+    this.emitRankSentinelChange(previous, current, reason, key);
+  },
+
+
+  rankSentinelCrossedPlayers(previous, current, improved) {
+    const oldRank = Number(previous.rank);
+    const newRank = Number(current.rank);
+    const previousRows = Array.isArray(previous.rows) ? previous.rows : [];
+    const currentRows = Array.isArray(current.rows) ? current.rows : [];
+    const currentById = new Map(currentRows.map((row) => [String(row.userId), row]));
+    const previousById = new Map(previousRows.map((row) => [String(row.userId), row]));
+
+    if (improved) {
+      return previousRows
+        .filter((row) => Number(row.rank) >= newRank && Number(row.rank) < oldRank)
+        .map((row) => currentById.get(String(row.userId)) || row)
+        .sort((a, b) => Number(a.rank || 999) - Number(b.rank || 999));
+    }
+
+    return currentRows
+      .filter((row) => Number(row.rank) >= oldRank && Number(row.rank) < newRank)
+      .map((row) => previousById.get(String(row.userId)) ? { ...row, previousRank: previousById.get(String(row.userId)).rank } : row)
+      .sort((a, b) => Number(a.rank || 999) - Number(b.rank || 999));
+  },
+
+  enqueueRankSentinelModal(change) {
+    if (!change) return;
+    this.state.rankSentinelQueue.push(change);
+    this.showNextRankSentinelModal();
+  },
+
+  rankSentinelNames(crossed = []) {
+    const names = crossed.map((row) => row.pseudo || "un joueur").filter(Boolean);
+    if (!names.length) return "";
+    if (names.length === 1) return names[0];
+    if (names.length === 2) return `${names[0]} et ${names[1]}`;
+    return `${names[0]}, ${names[1]} et ${names.length - 2} autre${names.length - 2 > 1 ? "s" : ""}`;
+  },
+
+  showNextRankSentinelModal() {
+    if (this.state.rankSentinelModalOpen) return;
+    const change = this.state.rankSentinelQueue.shift();
+    if (!change) return;
+
+    this.state.rankSentinelModalOpen = true;
+    H.$("#rankSentinelModal")?.remove();
+
+    const contextLabel = this.rankSentinelContextKey(change.context) === "family" ? "Famille" : "Général";
+    const crossedNames = this.rankSentinelNames(change.crossed);
+    const pointsDelta = Number(change.newPoints || 0) - Number(change.oldPoints || 0);
+    const title = change.improved ? "Le Hibou sentinelle bat des ailes !" : "Alerte plume froissée sur le perchoir";
+    const headline = change.improved
+      ? `Tu grimpes de #${change.oldRank} à #${change.newRank}`
+      : `Tu glisses de #${change.oldRank} à #${change.newRank}`;
+    const story = change.improved
+      ? (crossedNames ? `Tu viens de passer devant ${H.escapeHtml(crossedNames)}. Le Nid a entendu un petit “flap flap” de domination.` : "Tu viens de gagner une place. Le perchoir tremble légèrement.")
+      : (crossedNames ? `${H.escapeHtml(crossedNames)} vient de te passer devant. Le Hibou note ça dans son carnet des revanches.` : "Quelqu’un vient de te passer devant. Rien de dramatique, sauf pour ton ego sportif.");
+
+    const modal = document.createElement("div");
+    modal.id = "rankSentinelModal";
+    modal.className = `modal-backdrop rank-sentinel-modal ${change.improved ? "rank-up" : "rank-down"} context-${this.rankSentinelContextKey(change.context)}`;
+    modal.innerHTML = `
+      <div class="modal-card rank-sentinel-card" role="dialog" aria-modal="true" aria-labelledby="rankSentinelTitle">
+        <button class="modal-x-btn" id="closeRankSentinelXBtn" type="button" aria-label="Fermer">×</button>
+        <div class="rank-sentinel-glow" aria-hidden="true"></div>
+        <div class="rank-sentinel-owl">
+          <img src="assets/icons/owl-png/admin.png" alt="" loading="lazy" onerror="this.style.display='none'">
+          <span>${change.improved ? "🦉⬆️" : "🦉⚠️"}</span>
+        </div>
+        <p class="eyebrow">${H.icon("diffusion")} Hibou Sentinelle · ${H.escapeHtml(contextLabel)}</p>
+        <h2 id="rankSentinelTitle">${H.escapeHtml(title)}</h2>
+        <p class="rank-sentinel-headline">${H.escapeHtml(headline)}</p>
+        <p class="rank-sentinel-story">${story}</p>
+        <div class="rank-sentinel-stats">
+          <article><span>Avant</span><strong>#${H.escapeHtml(change.oldRank)}</strong><small>${H.escapeHtml(change.oldPoints)} pts</small></article>
+          <article class="rank-sentinel-arrow">${change.improved ? "↗" : "↘"}</article>
+          <article><span>Maintenant</span><strong>#${H.escapeHtml(change.newRank)}</strong><small>${H.escapeHtml(change.newPoints)} pts${pointsDelta ? ` · ${pointsDelta > 0 ? "+" : ""}${H.escapeHtml(pointsDelta)}` : ""}</small></article>
+        </div>
+        ${change.crossed?.length ? `<div class="rank-sentinel-crossed"><strong>${change.improved ? "Joueur(s) dépassé(s)" : "Joueur(s) passé(s) devant"}</strong>${change.crossed.map((row) => `<span>#${H.escapeHtml(row.rank || "—")} ${H.escapeHtml(row.pseudo || "Joueur")} · ${H.escapeHtml(row.total_points || 0)} pts</span>`).join("")}</div>` : ""}
+        <div class="rank-sentinel-actions">
+          <button class="primary-btn" id="rankSentinelLeaderboardBtn" type="button">${H.icon("trophy")} Voir le classement</button>
+          <button class="ghost-btn" id="closeRankSentinelBtn" type="button">Bien reçu, vieux hibou</button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    const close = () => {
+      modal.remove();
+      this.state.rankSentinelModalOpen = false;
+      this.showNextRankSentinelModal();
+    };
+
+    H.$("#closeRankSentinelXBtn", modal)?.addEventListener("click", close);
+    H.$("#closeRankSentinelBtn", modal)?.addEventListener("click", close);
+    H.$("#rankSentinelLeaderboardBtn", modal)?.addEventListener("click", async () => {
+      close();
+      await this.loadView("leaderboard");
+      if (this.rankSentinelContextKey(change.context) === "family") {
+        this.state.leaderboardTab = "family";
+        await this.renderLeaderboardContent();
+      }
+    });
+    modal.addEventListener("click", (event) => {
+      if (event.target === modal) close();
+    });
+    H.$("#closeRankSentinelBtn", modal)?.focus();
+  },
+
+  rankMovementForUser(userId, currentRank, context = "official") {
+    const map = this.readRankMovementMap(context);
+    const movement = map?.[String(userId)];
+    if (!movement) return null;
+
+    const newRank = Number(currentRank);
+    if (Number.isFinite(newRank) && Number(movement.newRank) !== newRank) return null;
+    return movement;
+  },
+
+  rankMovementHtml(row, context = "official") {
+    const userId = row?.user_id || row?.id;
+    const movement = this.rankMovementForUser(userId, row?.rank, context);
+    if (!movement) return "";
+    const delta = Number(movement.delta || 0);
+    if (!delta) return "";
+    const title = movement.direction === "up"
+      ? `${Math.abs(delta)} place${Math.abs(delta) > 1 ? "s" : ""} gagnée${Math.abs(delta) > 1 ? "s" : ""}`
+      : `${Math.abs(delta)} place${Math.abs(delta) > 1 ? "s" : ""} perdue${Math.abs(delta) > 1 ? "s" : ""}`;
+    const label = `${movement.direction === "up" ? "↑" : "↓"} ${delta > 0 ? "+" : ""}${delta}`;
+    return `<span class="rank-movement-pill ${movement.direction}" title="${H.escapeHtml(title)}">${H.escapeHtml(label)}</span>`;
+  },
+
+
+  tieCountForRank(rows = [], rank) {
+    const r = Number(rank);
+    if (!Number.isFinite(r)) return 0;
+    return (rows || []).filter((row) => Number(row.rank) === r).length;
+  },
+
+  rankSuffixHtml(rows = [], rank) {
+    return this.tieCountForRank(rows, rank) > 1 ? `<small class="rank-tie-label">ex æquo</small>` : "";
   },
 
   safeHomeLiveMatchCardHtml(match) {
@@ -1793,6 +3160,9 @@ const App = {
             <strong>${H.scoreText(match?.home_score ?? 0, match?.away_score ?? 0)}</strong>
             <span>Match en cours</span>
           </div>
+          <button class="ghost-btn home-live-predictions-btn" type="button" data-home-live-predictions-id="${H.escapeHtml(match?.id || "")}">
+            ${H.icon("score")} Voir les pronos du Nid
+          </button>
         </article>
       `;
     }
@@ -1818,8 +3188,92 @@ const App = {
           ${livePoints !== null && !match.is_test_match ? `<b>${livePoints} pt${livePoints > 1 ? "s" : ""} live</b>` : ""}
           ${match.is_test_match ? `<b>Match test</b>` : ""}
         </div>
+        <button class="ghost-btn home-live-predictions-btn" type="button" data-home-live-predictions-id="${H.escapeHtml(match.id)}">
+          ${H.icon("score")} Voir les pronos du Nid
+        </button>
       </article>
     `;
+  },
+
+  homePredictionRowHtml(prediction, match) {
+    const display = this.predictionForDisplay(prediction, match) || prediction;
+    const isMine = String(prediction.user_id || "") === String(this.state.session?.user?.id || "");
+    const points = display.points_total ?? "—";
+    const reason = this.predictionReasonLabel(display);
+    return `
+      <div class="home-prono-row ${isMine ? "me" : ""} ${display.is_live_projection ? "live" : ""}">
+        <div class="home-prono-player">
+          <strong>${H.escapeHtml(prediction.pseudo || (isMine ? "Moi" : "Joueur"))}</strong>
+          <small>${isMine ? "Ton prono" : H.escapeHtml(prediction.office_team_name || "Le Nid")}</small>
+        </div>
+        <div class="home-prono-score">
+          <strong>${Number(prediction.home_score_pred)} - ${Number(prediction.away_score_pred)}</strong>
+          <small>${H.escapeHtml(reason)}</small>
+        </div>
+        <div class="home-prono-points">
+          <strong>${H.escapeHtml(String(points))}</strong>
+          <small>pt${Number(points || 0) > 1 ? "s" : ""}${display.is_live_projection ? " live" : ""}</small>
+        </div>
+      </div>
+    `;
+  },
+
+  async openHomePredictionsModal(matchId) {
+    const match = this.state.matches.find((item) => String(item.id) === String(matchId));
+    if (!match) {
+      H.toast("Match introuvable pour afficher les pronos.", "error");
+      return;
+    }
+
+    await this.loadVisiblePredictions().catch((error) => console.warn("Rafraîchissement pronos live impossible", error));
+
+    const rows = this.predictionsForMatch(match.id)
+      .map((prediction) => this.predictionForDisplay(prediction, match) || prediction)
+      .sort((a, b) =>
+        Number(b.points_total ?? -1) - Number(a.points_total ?? -1)
+        || String(a.pseudo || "").localeCompare(String(b.pseudo || ""), "fr")
+      );
+
+    const myPrediction = this.getMyPrediction(match.id);
+    const title = `${match.home_team_short_name || match.home_team_name} - ${match.away_team_short_name || match.away_team_name}`;
+
+    document.querySelector("#homePredictionsModal")?.remove();
+
+    const modal = document.createElement("div");
+    modal.id = "homePredictionsModal";
+    modal.className = "modal-backdrop home-predictions-modal";
+    modal.innerHTML = `
+      <div class="modal-card home-predictions-card" role="dialog" aria-modal="true" aria-labelledby="homePredictionsTitle">
+        <button class="modal-x-btn" id="closeHomePredictionsXBtn" type="button" aria-label="Fermer">×</button>
+        <div class="home-predictions-head">
+          <span class="pill danger">${match.status === "live" ? "En direct" : H.statusLabel(match.status)}</span>
+          <h2 id="homePredictionsTitle">${H.matchFlagHtml(match, "home")} ${H.escapeHtml(title)} ${H.matchFlagHtml(match, "away")}</h2>
+          <p>${H.escapeHtml(H.shortPoolRoundLabel(match))} · Score actuel : <strong>${H.scoreText(match.home_score, match.away_score)}</strong></p>
+        </div>
+
+        ${myPrediction ? `
+          <div class="home-prono-mine">
+            <small>Ton prono</small>
+            <strong>${Number(myPrediction.home_score_pred)} - ${Number(myPrediction.away_score_pred)}</strong>
+          </div>
+        ` : `<div class="home-prono-mine missing"><small>Ton prono</small><strong>Non posé</strong></div>`}
+
+        <div class="home-prono-list">
+          ${rows.length ? rows.map((row) => this.homePredictionRowHtml(row, match)).join("") : `<p class="muted">Aucun prono visible pour ce match pour le moment.</p>`}
+        </div>
+
+        <div class="modal-actions-row">
+          <button class="primary-btn" id="closeHomePredictionsBtn" type="button">Fermer</button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(modal);
+    const close = () => modal.remove();
+    H.$("#closeHomePredictionsXBtn", modal)?.addEventListener("click", close);
+    H.$("#closeHomePredictionsBtn", modal)?.addEventListener("click", close);
+    modal.addEventListener("click", (event) => { if (event.target === modal) close(); });
+    H.$("#closeHomePredictionsBtn", modal)?.focus();
   },
 
   async fetchMyRank() {
@@ -1830,14 +3284,65 @@ const App = {
       .maybeSingle();
 
     if (error) return null;
-    return data;
+    const rankedRows = this.rankedOfficialLeaderboardRows(this.state.playerScoreRows || []);
+    const localRank = this.myRankFromRows(rankedRows);
+    return localRank || data;
+  },
+
+
+  upcomingPredictionMatches() {
+    return this.displayMatches()
+      .filter((match) => !["finished", "cancelled"].includes(match.status))
+      .sort((a, b) => {
+        const statusWeight = (match) => match.status === "live" ? 0 : match.status === "scheduled" ? 1 : 2;
+        return statusWeight(a) - statusWeight(b)
+          || new Date(a.kickoff_at || 0) - new Date(b.kickoff_at || 0);
+      });
   },
 
   async renderMatches() {
     await Promise.all([this.loadMatches(), this.loadGroupStandings(), this.loadMyPredictions(), this.loadVisiblePredictions()]);
 
     const root = H.$("#viewRoot");
-    const groups = this.groupMatchesByPouleRound(this.displayMatches());
+    const matchesTab = ["upcoming", "played"].includes(this.state.matchesTab) ? this.state.matchesTab : "upcoming";
+    this.state.matchesTab = matchesTab;
+
+    const tabs = `
+      <div class="segmented match-view-tabs">
+        <button class="${matchesTab === "upcoming" ? "active" : ""}" type="button" data-matches-tab="upcoming">À venir & pronos</button>
+        <button class="${matchesTab === "played" ? "active" : ""}" type="button" data-matches-tab="played">Matchs joués</button>
+      </div>
+    `;
+
+    const playedMatches = this.displayMatches()
+      .filter((match) => match.status === "finished")
+      .sort((a, b) => new Date(b.kickoff_at || 0) - new Date(a.kickoff_at || 0));
+
+    if (matchesTab === "played") {
+      root.innerHTML = `
+        <section class="toolbar-card">
+          <div>
+            <h2>Matchs joués</h2>
+            <p class="muted">Retrouve tes anciens pronos, les scores officiels et les pronos du Nid.</p>
+          </div>
+          <button class="ghost-btn" id="refreshMatchesBtn">Rafraîchir</button>
+        </section>
+        ${tabs}
+        <section class="played-matches-board">
+          ${playedMatches.length ? playedMatches.map((match) => this.playedMatchCardHtml(match)).join("") : `<section class="card"><p class="muted">Aucun match joué pour le moment.</p></section>`}
+        </section>
+      `;
+
+      H.$("#refreshMatchesBtn")?.addEventListener("click", async () => {
+        await this.renderMatches();
+        H.toast("Matchs rafraîchis", "success");
+      });
+      this.bindMatchViewTabs(root);
+      return;
+    }
+
+    const upcomingMatches = this.upcomingPredictionMatches();
+    const groups = this.groupMatchesByPouleRound(upcomingMatches);
     const activeIndex = this.clampPhaseIndex("matchPhaseIndex", groups);
     const group = groups[activeIndex];
 
@@ -1846,15 +3351,18 @@ const App = {
         <section class="toolbar-card">
           <div>
             <h2>Matchs & pronos</h2>
-            <p class="muted">Aucun match à afficher pour le moment.</p>
+            <p class="muted">Aucun match à venir à afficher pour le moment. Les matchs terminés sont dans l’onglet Matchs joués.</p>
           </div>
           <button class="ghost-btn" id="refreshMatchesBtn">Rafraîchir</button>
         </section>
+        ${tabs}
       `;
       H.$("#refreshMatchesBtn")?.addEventListener("click", async () => this.renderMatches());
+      this.bindMatchViewTabs(root);
       return;
     }
 
+    const matchIds = group.matches.map((match) => match.id);
     const finishedCount = group.matches.filter((m) => ["finished", "live"].includes(m.status)).length;
     const liveProjectionCount = this.liveProjectionCountForMatchIds(matchIds);
     const pager = this.phaseNavigatorHtml(groups, activeIndex, "matchPhaseIndex");
@@ -1863,10 +3371,14 @@ const App = {
       <section class="toolbar-card">
         <div>
           <h2>Matchs & pronos</h2>
-          <p class="muted">Tous les matchs et la saisie de tes scores sont réunis ici.</p>
+          <p class="muted">Les prochains matchs et la saisie de tes scores sont ici. Les matchs terminés sont rangés dans Matchs joués.</p>
         </div>
         <button class="ghost-btn" id="refreshMatchesBtn">Rafraîchir</button>
       </section>
+
+      ${tabs}
+
+      <div class="live-ranking-note matches-upcoming-note">${H.icon("info")} Les matchs terminés ne sont plus affichés ici : retrouve-les dans l’onglet <strong>Matchs joués</strong>.</div>
 
       ${this.predictionPhaseSummaryHtml(group)}
 
@@ -1895,25 +3407,38 @@ const App = {
       H.toast("Matchs rafraîchis", "success");
     });
 
+    this.bindMatchViewTabs(root);
     this.bindPhaseNavigation("matchPhaseIndex", () => this.renderMatches());
     this.bindPredictionForms();
     this.bindGoToNearestMissingActions();
   },
 
+  bindMatchViewTabs(root = document) {
+    H.$$("[data-matches-tab]", root).forEach((button) => {
+      button.addEventListener("click", async () => {
+        this.state.matchesTab = button.dataset.matchesTab;
+        await this.renderMatches();
+      });
+    });
+  },
+
   predictionPhaseSummaryHtml(group) {
-    const allMissing = this.missingPredictions();
     const visibleMatches = this.displayMatches();
+    const currentGroupMatches = group?.matches?.length ? group.matches : visibleMatches;
+    const groupMissing = currentGroupMatches
+      .filter((match) => new Date(match.kickoff_at).getTime() > Date.now())
+      .filter((match) => !this.getMyPrediction(match.id));
     const allDone = visibleMatches.filter((match) => this.getMyPrediction(match.id));
     const locked = visibleMatches.filter((match) => H.isKickoffPassed(match.kickoff_at));
 
     return `
       <section class="grid three stats-grid combined-prono-stats">
         <article class="stat-card"><strong>${allDone.length}</strong><span>Pronos posés</span></article>
-        ${allMissing.length ? `
-          <button class="stat-card stat-card-action" type="button" data-action="go-nearest-missing" title="Aller au prono manquant le plus proche">
-            <strong>${allMissing.length}</strong><span>À faire</span>
+        ${groupMissing.length ? `
+          <button class="stat-card stat-card-action" type="button" data-action="go-nearest-missing" title="Aller au prono manquant le plus proche de cette page">
+            <strong>${groupMissing.length}</strong><span>À faire ici</span>
           </button>
-        ` : `<article class="stat-card"><strong>0</strong><span>À faire</span></article>`}
+        ` : `<article class="stat-card"><strong>0</strong><span>À faire ici</span></article>`}
         <article class="stat-card"><strong>${locked.length}</strong><span>Verrouillés</span></article>
       </section>
     `;
@@ -1921,6 +3446,13 @@ const App = {
 
 
   bindHomeClickableCards(root = document) {
+    H.$$("[data-home-live-predictions-id]", root).forEach((button) => {
+      button.addEventListener("click", async (event) => {
+        event.stopPropagation();
+        await this.openHomePredictionsModal(button.dataset.homeLivePredictionsId);
+      });
+    });
+
     H.$$("[data-home-live-match-id]", root).forEach((card) => {
       card.addEventListener("click", () => this.goToMatchPrediction(card.dataset.homeLiveMatchId));
       card.addEventListener("keydown", (event) => {
@@ -2039,20 +3571,64 @@ const App = {
     this.state.homeCountdownTimer = window.setInterval(updateAll, 30000);
   },
 
+  openPredictionsForMatch(matchId) {
+    if (!matchId) return false;
+
+    const stringId = String(matchId);
+    const matchCard = document.getElementById(`match-${stringId}`);
+    const playedCard = document.getElementById(`played-match-${stringId}`);
+
+    const formNode = [...document.querySelectorAll("[data-match-id]")]
+      .find((node) => String(node.dataset.matchId) === stringId);
+
+    const details = matchCard?.querySelector(".others-predictions")
+      || formNode?.closest(".match-card")?.querySelector(".others-predictions")
+      || playedCard;
+
+    if (details) {
+      if ("open" in details) details.open = true;
+      details.hidden = false;
+      details.scrollIntoView({ behavior: "smooth", block: "center" });
+      const summary = details.querySelector?.("summary");
+      if (summary) summary.focus?.({ preventScroll: true });
+      return true;
+    }
+
+    const target = matchCard || playedCard || formNode?.closest(".match-card");
+    if (target) {
+      target.scrollIntoView({ behavior: "smooth", block: "center" });
+      return true;
+    }
+
+    return false;
+  },
+
+
+  setMatchPhaseIndexForMatch(match) {
+    if (!match) return false;
+    const groups = this.groupMatchesByPouleRound(this.upcomingPredictionMatches());
+    const groupIndex = groups.findIndex((group) => group.matches.some((item) => String(item.id) === String(match.id)));
+    if (groupIndex >= 0) {
+      this.state.matchPhaseIndex = groupIndex;
+      return true;
+    }
+    return false;
+  },
+
   async goToMatchPrediction(matchId, options = {}) {
-    const match = this.state.matches.find((item) => item.id === matchId);
+    const targetId = String(matchId ?? "");
+    const match = this.state.matches.find((item) => String(item.id) === targetId);
     if (!match) {
       await this.loadView("matches");
       setTimeout(() => {
-        this.scrollToMatch(matchId);
-        if (options.openPredictions) this.openPredictionsForMatch(matchId);
+        this.scrollToMatch(targetId);
+        if (options.openPredictions) this.openPredictionsForMatch(targetId);
       }, 150);
       return;
     }
 
-    const groups = this.groupMatchesByPouleRound(this.displayMatches());
-    const groupIndex = groups.findIndex((group) => group.matches.some((item) => item.id === match.id));
-    if (groupIndex >= 0) this.state.matchPhaseIndex = groupIndex;
+    this.state.matchesTab = "upcoming";
+    this.setMatchPhaseIndexForMatch(match);
 
     if (this.state.currentView !== "matches") {
       await this.loadView("matches");
@@ -2090,17 +3666,40 @@ const App = {
     setTimeout(() => target.classList.remove("match-card-highlight"), 1200);
   },
 
+  predictionCandidateSortValue(match = {}) {
+    const kickoff = match?.kickoff_at ? new Date(match.kickoff_at).getTime() : 9999999999999;
+    if (match.stage !== "group") return kickoff;
+    const pool = Number(match.pool_round || match.group_round || 99);
+    return pool * 1000000000000 + kickoff;
+  },
+
+  sortPredictionCandidates(matches = []) {
+    return [...matches].sort((a, b) => this.predictionCandidateSortValue(a) - this.predictionCandidateSortValue(b));
+  },
+
+  nearestMissingPredictionMatch() {
+    const now = Date.now();
+    const candidates = this.availablePredictionMatches()
+      .filter((match) => !["finished", "cancelled", "postponed"].includes(match.status))
+      .filter((match) => new Date(match.kickoff_at || 0).getTime() > now)
+      .filter((match) => !this.getMyPrediction(match.id));
+
+    const groupCandidates = this.sortPredictionCandidates(candidates.filter((match) => match.stage === "group"));
+
+    // Tant qu'il reste un vrai match de poule à pronostiquer,
+    // on ne saute jamais vers les 16e ni vers un placeholder de phase finale.
+    return groupCandidates[0] || this.sortPredictionCandidates(candidates)[0] || null;
+  },
+
   async goToNearestMissingPrediction() {
-    const missing = this.missingPredictions();
-    if (!missing.length) {
+    const match = this.nearestMissingPredictionMatch();
+    if (!match) {
       H.toast("Tous tes pronos à venir sont posés. La chouette est tranquille.", "success");
       return;
     }
 
-    const match = missing[0];
-    const groups = this.groupMatchesByPouleRound(this.displayMatches());
-    const groupIndex = groups.findIndex((group) => group.matches.some((item) => item.id === match.id));
-    if (groupIndex >= 0) this.state.matchPhaseIndex = groupIndex;
+    this.state.matchesTab = "upcoming";
+    this.setMatchPhaseIndexForMatch(match);
 
     if (this.state.currentView !== "matches") {
       await this.loadView("matches");
@@ -2116,7 +3715,9 @@ const App = {
     return Object.values(grouped)
       .map((group) => ({
         ...group,
-        matches: group.matches.sort((a, b) => new Date(a.kickoff_at) - new Date(b.kickoff_at))
+        matches: group.matches.sort((a, b) => new Date(a.kickoff_at || 0) - new Date(b.kickoff_at || 0)
+          || (H.officialBracketSortValue?.(a) || this.finalBracketSortValue(a))
+          - (H.officialBracketSortValue?.(b) || this.finalBracketSortValue(b)))
       }))
       .sort((a, b) => a.order - b.order || new Date(a.matches[0]?.kickoff_at || 0) - new Date(b.matches[0]?.kickoff_at || 0));
   },
@@ -2224,7 +3825,7 @@ const App = {
     const storedPoints = this.myPointsForMatch(match.id);
     const points = match.status === "live"
       ? this.predictionForDisplay(prediction, match)
-      : storedPoints;
+      : this.predictionForDisplay(storedPoints || prediction, match);
     const liveSuffix = match.status === "live" ? " live" : "";
     const pointsText = match.is_test_match
       ? (points?.is_live_projection ? `${Number(points.points_total ?? 0)} pt${Number(points.points_total ?? 0) > 1 ? "s" : ""} test live · ${H.escapeHtml(this.predictionReasonLabel(points))}` : "Match test · hors classement")
@@ -2239,6 +3840,82 @@ const App = {
           <strong>${pointsText}</strong>
         </div>
       </div>
+    `;
+  },
+
+  playedMatchCardHtml(match) {
+    const myPrediction = this.getMyPrediction(match.id);
+    const visiblePreds = this.predictionsForMatch(match.id)
+      .map((prediction) => this.predictionForDisplay(prediction, match) || prediction)
+      .sort((a, b) =>
+        Number(b.points_total ?? -1) - Number(a.points_total ?? -1)
+        || String(a.pseudo || "").localeCompare(String(b.pseudo || ""), "fr")
+      );
+
+    const myVisiblePrediction = visiblePreds.find((p) => String(p.user_id) === String(this.state.session?.user?.id));
+    const myDisplay = myVisiblePrediction || (myPrediction ? (this.predictionForDisplay(myPrediction, match) || myPrediction) : null);
+    const myPoints = myDisplay?.points_total ?? "—";
+    const myPointsLabel = myPoints === "—"
+      ? "— pt"
+      : `${myPoints} pt${Number(myPoints || 0) > 1 ? "s" : ""}${myDisplay?.is_live_projection ? " live" : ""}`;
+    const myPronoLabel = myDisplay ? `${myDisplay.home_score_pred} - ${myDisplay.away_score_pred}` : "—";
+    const officialScore = ["finished", "live"].includes(match.status) ? H.scoreText(match.home_score, match.away_score) : "vs";
+    const matchLabel = `${match.home_team_short_name || match.home_team_name} - ${match.away_team_short_name || match.away_team_name}`;
+
+    return `
+      <details class="played-match-card compact ${match.status === "live" ? "live" : "finished"}" id="played-match-${H.escapeHtml(match.id)}">
+        <summary class="played-match-summary">
+          <div class="played-summary-main">
+            <span class="pill ${match.status}">${H.statusLabel(match.status)}</span>
+            <strong>${H.matchFlagHtml(match, "home")} ${H.escapeHtml(match.home_team_short_name || match.home_team_name)} - ${H.matchFlagHtml(match, "away")} ${H.escapeHtml(match.away_team_short_name || match.away_team_name)}</strong>
+            <small>${H.formatDateTime(match.kickoff_at)} · ${H.stageLabel(match.stage)}${match.stage === "group" && match.pool_round ? ` · J. poule ${match.pool_round}` : ""}</small>
+          </div>
+
+          <div class="played-summary-score">
+            <span>Résultat</span>
+            <strong>${officialScore}</strong>
+          </div>
+
+          <div class="played-summary-prono">
+            <span>Mon prono</span>
+            <strong>${H.escapeHtml(myPronoLabel)}</strong>
+          </div>
+
+          <div class="played-summary-points">
+            <span>Points</span>
+            <strong>${H.escapeHtml(String(myPointsLabel))}</strong>
+          </div>
+
+          <span class="played-summary-open">Voir les pronos</span>
+        </summary>
+
+        <div class="played-match-expanded">
+          <section class="played-my-prono">
+            <h4>Mon prono</h4>
+            ${myDisplay ? `
+              <div class="played-prono-big">
+                <strong>${myDisplay.home_score_pred} - ${myDisplay.away_score_pred}</strong>
+                <span>${myPointsLabel} · ${H.escapeHtml(this.predictionReasonLabel(myDisplay))}</span>
+              </div>
+            ` : `<p class="muted">Tu n’avais pas posé de prono sur ce match.</p>`}
+          </section>
+
+          <section class="played-others-pronos">
+            <h4>Pronos du Nid · ${H.escapeHtml(matchLabel)}</h4>
+            ${visiblePreds.length ? `
+              <div class="played-pred-list">
+                ${visiblePreds.map((p) => `
+                  <div class="played-pred-row ${p.user_id === this.state.session.user.id ? "me" : ""}">
+                    <span>${H.escapeHtml(p.pseudo || "Joueur")} ${H.resultIcon(p)}</span>
+                    <strong>${p.home_score_pred} - ${p.away_score_pred}</strong>
+                    <em>${p.points_total ?? "—"} pt${p.points_total === null || p.points_total === undefined ? " · recalcul requis" : ""}${Number(p.points_total || 0) > 1 ? "s" : ""}${p.is_live_projection ? " live" : ""}</em>
+                  </div>
+                `).join("")}
+              </div>
+            ` : `<p class="muted">Aucun prono visible pour ce match.</p>`}
+          </section>
+        </div>
+      </details>
     `;
   },
 
@@ -2271,7 +3948,7 @@ const App = {
           <span class="match-tv-meta">${H.icon("tv")} ${H.tvChannelLogosHtml(this.matchTvChannel(match))}</span>
         </div>
 
-        ${match.is_test_match ? `<div class="test-match-notice">${H.icon("info")} Match de préparation : il sert à tester le site. Il ne compte pas dans le classement Coupe du monde ni dans les exploits normaux.</div>` : ""}
+        ${this.isLiveDemoMatch(match) ? `<div class="test-match-notice live-demo-notice">${H.icon("info")} Labo live fictif : il compte temporairement dans les classements pour tester les variations en direct. Quand tu le retires, le match et ses pronos disparaissent. À retirer avant validation Coupe du monde.</div>` : match.is_test_match ? `<div class="test-match-notice">${H.icon("info")} Match de préparation : il sert à tester le site. Il ne compte pas dans le classement Coupe du monde ni dans les exploits normaux.</div>` : ""}
 
         <form class="prediction-form" data-match-id="${match.id}" data-final-phase="${isFinalPhase}">
           <div class="prediction-inputs">
@@ -2301,7 +3978,7 @@ const App = {
             ${locked ? `<span class="locked-label">${H.icon("lock")} Prono verrouillé</span>` : ``}
             ${myPrediction ? this.myPredictionInlineHtml(myPrediction) : `<span class="muted">Aucun prono posé</span>`}
           </div>
-          ${this.myPredictionResultHtml(match, myPrediction)}
+          <div class="my-prono-result-slot">${this.myPredictionResultHtml(match, myPrediction)}</div>
         </form>
 
         <details class="others-predictions" ${canSeeOthers ? "" : "hidden"}>
@@ -2323,6 +4000,56 @@ const App = {
         </details>
       </article>
     `;
+  },
+
+
+  upsertLocalPrediction(savedPrediction = {}) {
+    if (!savedPrediction?.match_id) return;
+    const userId = savedPrediction.user_id || this.state.session?.user?.id;
+    const normalized = {
+      ...savedPrediction,
+      user_id: userId,
+      pseudo: this.state.profile?.pseudo,
+      office_team_name: this.state.profile?.office_team_name
+    };
+
+    const mergeInto = (rows = []) => {
+      const index = rows.findIndex((row) =>
+        String(row.match_id) === String(normalized.match_id)
+        && String(row.user_id) === String(userId)
+      );
+      if (index >= 0) {
+        rows[index] = { ...rows[index], ...normalized };
+        return rows;
+      }
+      return [...rows, normalized];
+    };
+
+    this.state.myPredictions = mergeInto(this.state.myPredictions);
+    this.state.visiblePredictions = mergeInto(this.state.visiblePredictions);
+  },
+
+  refreshPredictionFormDisplay(form, savedPrediction = {}) {
+    if (!form || !savedPrediction?.match_id) return;
+    const match = this.state.matches.find((item) => String(item.id) === String(savedPrediction.match_id));
+    const prediction = this.getMyPrediction(savedPrediction.match_id) || savedPrediction;
+    const actions = form.querySelector(".prediction-actions");
+    if (actions) {
+      const locked = match ? H.isKickoffPassed(match.kickoff_at) : false;
+      actions.innerHTML = `
+        ${locked ? `<span class="locked-label">${H.icon("lock")} Prono verrouillé</span>` : ``}
+        ${this.myPredictionInlineHtml(prediction)}
+      `;
+    }
+
+    const resultSlot = form.querySelector(".my-prono-result-slot");
+    if (resultSlot && match) {
+      resultSlot.innerHTML = this.myPredictionResultHtml(match, prediction);
+    }
+
+    const article = form.closest(".match-card");
+    if (article) article.classList.add("prediction-saved-pulse");
+    window.setTimeout(() => article?.classList.remove("prediction-saved-pulse"), 900);
   },
 
   bindPredictionForms() {
@@ -2458,13 +4185,20 @@ const App = {
       return;
     }
 
+    this.upsertLocalPrediction(payload);
+    this.refreshPredictionFormDisplay(form, payload);
+
     await this.loadMyPredictions();
+    this.upsertLocalPrediction(payload);
+    this.refreshPredictionFormDisplay(form, payload);
     await this.loadMiniRecordPredictionCounts().catch((refreshError) => {
       console.warn("Impossible de rafraîchir les compteurs mini-records", refreshError);
     });
     await this.loadVisiblePredictions().catch((refreshError) => {
       console.warn("Impossible de rafraîchir les pronos visibles avant l’annonce d’exploit", refreshError);
     });
+    this.upsertLocalPrediction(payload);
+    this.refreshPredictionFormDisplay(form, payload);
     this.queueAchievementDiffFromSnapshot(achievementIdsBeforeSave);
     this.syncAchievementNotifications();
     this.scheduleAchievementResync([120, 700, 1800]);
@@ -2479,8 +4213,12 @@ const App = {
     }
 
     this.setPredictionAutoSaveStatus(form, source === "auto" ? "Enregistré automatiquement" : "Enregistré", "success");
+    this.refreshPredictionFormDisplay(form, payload);
     if (!silent) H.toast("Prono enregistré", "success");
-    if (reloadView) await this.loadView(this.state.currentView);
+    if (reloadView) {
+      if (this.state.currentView === "matches") await this.renderMatches();
+      else await this.loadView(this.state.currentView);
+    }
     this.syncAchievementNotifications();
     this.scheduleAchievementResync([300, 1200, 3500]);
   },
@@ -2549,7 +4287,7 @@ const App = {
   },
 
   async renderAchievements() {
-    await Promise.all([this.loadMatches(), this.loadVisiblePredictions(), this.loadMiniRecordPredictionCounts(), this.loadWinnerPredictionsForTeams(), this.loadPlayerScoreRows()]);
+    await Promise.all([this.loadMatches(), this.loadVisiblePredictions(), this.loadMiniRecordPredictionCounts(), this.loadWinnerPrediction(), this.loadSecondWinnerPrediction(), this.loadWinnerPredictionsForTeams(), this.loadSecondWinnerPredictionsForTeams(), this.loadPlayerScoreRows()]);
 
     const root = H.$("#viewRoot");
     root.innerHTML = `
@@ -2637,6 +4375,8 @@ const App = {
     const latestPredictionAt = countRow?.latest_prediction_at || countRow?.latest_at || null;
     const availableMatchCount = this.availablePredictionMatches().length;
     const champion = this.winnerPredictionForUser(userId);
+    const secondChampion = String(userId) === String(this.state.session?.user?.id) ? this.state.secondWinnerPrediction : null;
+    const final = this.finalMatch();
 
     if (predictionCount >= 1) unlock("egg-hatched", firstPredictionAt);
     if (predictionCount >= 10) unlock("young-feathers", latestPredictionAt || firstPredictionAt);
@@ -2644,6 +4384,8 @@ const App = {
     if (availableMatchCount > 0 && predictionCount >= Math.ceil(availableMatchCount * 0.75)) unlock("three-quarter-perch", latestPredictionAt || firstPredictionAt);
     if (availableMatchCount > 0 && predictionCount >= availableMatchCount) unlock("all-picks-in", latestPredictionAt || firstPredictionAt);
     if (champion?.predicted_team_id) unlock("champion-picked", champion.locked_at || champion.updated_at || champion.created_at || firstPredictionAt);
+    if (secondChampion?.predicted_team_id) unlock("second-champion-picked", secondChampion.locked_at || secondChampion.updated_at || secondChampion.created_at || latestPredictionAt || firstPredictionAt);
+    if (final?.status === "finished" && final?.winner_team_id && secondChampion?.predicted_team_id === final.winner_team_id) unlock("second-final-winner-oracle", this.matchResultDate(final));
 
     return badges.sort((a, b) => {
       const aDate = a.unlockedAt?.getTime?.() || 0;
@@ -2678,7 +4420,10 @@ const App = {
       this.loadPlayerScoreRows().catch((error) => console.warn("Classement indisponible pour le Hall", error)),
       this.loadVisiblePredictions().catch((error) => console.warn("Pronos visibles indisponibles pour le Hall", error)),
       this.loadMiniRecordPredictionCounts().catch((error) => console.warn("Compteurs publics indisponibles pour le Hall", error)),
-      this.loadWinnerPredictionsForTeams().catch((error) => console.warn("Choix champion indisponibles pour le Hall", error))
+      this.loadWinnerPrediction().catch(() => null),
+      this.loadSecondWinnerPrediction().catch(() => null),
+      this.loadWinnerPredictionsForTeams().catch((error) => console.warn("Choix champion indisponibles pour le Hall", error)),
+      this.loadSecondWinnerPredictionsForTeams().catch((error) => console.warn("2e choix champion indisponibles pour le Hall", error))
     ]);
 
     const byUser = new Map();
@@ -2777,7 +4522,7 @@ const App = {
   },
 
   playerRecordStats(userId) {
-    const rows = this.scoreDetailRowsForUser(userId);
+    const rows = this.scoreDetailRowsForUser(userId, { finishedOnly: true });
     const predictionRows = this.predictionRowsForUser(userId);
     const countRow = this.miniRecordPredictionCountRow(userId);
     const publicPredictionCount = Number(countRow?.prediction_count ?? NaN);
@@ -2853,9 +4598,15 @@ const App = {
       ? this.state.playerScoreRows
       : this.state.publicProfiles.map((profile) => ({ ...profile, user_id: profile.id }));
 
+    const officialIds = this.officialUserIdSetForHome();
+
     return source
-      .filter((row) => (row.player_scope || row.role || "uis") !== "family" && row.role !== "family")
       .filter((row) => row.user_id || row.id)
+      .filter((row) => {
+        const userId = String(row.user_id || row.id);
+        if (officialIds.size && !officialIds.has(userId)) return false;
+        return (row.player_scope || row.role || "uis") !== "family" && row.role !== "family";
+      })
       .map((row) => {
         const userId = row.user_id || row.id;
         return { row, userId, stats: this.playerRecordStats(userId) };
@@ -2914,7 +4665,7 @@ const App = {
   },
 
   recordDateForUser(userId, record, stats = {}, value = 0) {
-    const rows = this.scoreDetailRowsForUser(userId);
+    const rows = this.scoreDetailRowsForUser(userId, { finishedOnly: true });
 
     // Greffier du grimoire : la date du trophée vient de Supabase.
     // Elle correspond au moment où le joueur a atteint son total actuel de pronos.
@@ -3006,38 +4757,93 @@ const App = {
   },
 
 
+
+
+  officialUserIdSetForHome() {
+    return new Set(this.officialProfiles(this.state.publicProfiles)
+      .map((profile) => String(profile.id || profile.user_id))
+      .filter(Boolean));
+  },
+
+  filterOfficialRowsForHome(rows = []) {
+    const officialIds = this.officialUserIdSetForHome();
+    if (!officialIds.size) return [];
+    return (rows || []).filter((row) => officialIds.has(String(row.user_id || row.id)));
+  },
+
+
+  homeStoryEligibleUserIds() {
+    // Le perchoir d’accueil reste dans le classement normal : pas de joueurs Famille
+    // tant que l’espace Famille n’est pas explicitement séparé dans sa propre vue.
+    return this.officialUserIdSetForHome();
+  },
+
+  isOppositeResultPrediction(prediction, match) {
+    const pred = this.outcomeFromScores(Number(prediction.home_score_pred), Number(prediction.away_score_pred));
+    const real = this.outcomeFromScores(Number(match.home_score), Number(match.away_score));
+    return (pred === "home" && real === "away") || (pred === "away" && real === "home");
+  },
+
+  scoreMissDistance(prediction, match) {
+    return Math.abs(Number(prediction.home_score_pred) - Number(match.home_score))
+      + Math.abs(Number(prediction.away_score_pred) - Number(match.away_score));
+  },
+
+  hasLeaderboardScoreActivity(leaderboardRows = this.state.playerScoreRows, teamRows = this.overallTeamAverageRows()) {
+    const playerHasPoints = (leaderboardRows || []).some((row) =>
+      Number(row.total_points || 0) > 0
+      || Number(row.live_points || 0) > 0
+      || Number(row.exact_scores || 0) > 0
+      || Number(row.good_results || 0) > 0
+      || Number(row.good_goal_diffs || 0) > 0
+    );
+    const teamHasPoints = (teamRows || []).some((row) =>
+      Number(row.total_points || 0) > 0
+      || Number(row.average_points || 0) > 0
+      || Number(row.live_points || 0) > 0
+    );
+    return playerHasPoints || teamHasPoints;
+  },
+
   homeStoryHighlights(recordHighlights = [], leaderboardRows = [], teamRows = []) {
     const slides = [];
-    const profileName = (profile) => profile?.pseudo || "Le Nid";
+    const eligibleIds = this.homeStoryEligibleUserIds();
+    const officialRows = this.filterOfficialRowsForHome(leaderboardRows);
+    const profileName = (profile) => profile?.pseudo || "";
     const teamName = (profile) => profile?.office_team_name || "Sans team";
+    const profileIsUsable = (profile) => Boolean(profile?.pseudo && profile.pseudo !== "Joueur");
 
-    const leaderPlayerRow = (leaderboardRows || [])[0];
-    if (leaderPlayerRow) {
+    const leaderboardHasActivity = this.hasLeaderboardScoreActivity(officialRows, teamRows);
+    const leaderPlayerRow = (officialRows || [])[0];
+    if (leaderboardHasActivity && leaderPlayerRow && (Number(leaderPlayerRow.total_points || 0) > 0 || Number(leaderPlayerRow.live_points || 0) > 0)) {
       const leaderProfile = this.profileForUser(leaderPlayerRow.user_id || leaderPlayerRow.id, leaderPlayerRow);
-      slides.push({
-        kind: "story",
-        theme: "leader",
-        label: "1er du classement",
-        title: profileName(leaderProfile),
-        subtitle: teamName(leaderProfile),
-        value: `${Number(leaderPlayerRow.total_points || 0)} pts`,
-        detail: leaderPlayerRow.live_points ? `+${Number(leaderPlayerRow.live_points || 0)} pt${Number(leaderPlayerRow.live_points || 0) > 1 ? "s" : ""} live` : "Classement général",
-        date: null,
-        dateLabel: "Classement actuel",
-        icon: "trophy",
-        profile: leaderProfile
-      });
+      if (profileIsUsable(leaderProfile)) {
+        slides.push({
+          kind: "story",
+          theme: "leader",
+          label: this.tieCountForRank(officialRows, leaderPlayerRow.rank || 1) > 1 ? "1er ex æquo du classement" : "1er du classement",
+          title: profileName(leaderProfile),
+          subtitle: teamName(leaderProfile),
+          value: `${Number(leaderPlayerRow.total_points || 0)} pts`,
+          detail: leaderPlayerRow.live_points ? `+${Number(leaderPlayerRow.live_points || 0)} pt${Number(leaderPlayerRow.live_points || 0) > 1 ? "s" : ""} live` : "Classement général",
+          date: null,
+          dateLabel: "Classement actuel",
+          icon: "trophy",
+          profile: leaderProfile,
+          teamColor: this.teamColorForProfile(leaderProfile)
+        });
+      }
     }
 
     const leaderTeamRow = (teamRows || [])[0];
-    if (leaderTeamRow) {
+    if (leaderboardHasActivity && leaderTeamRow && (Number(leaderTeamRow.total_points || 0) > 0 || Number(leaderTeamRow.average_points || 0) > 0 || Number(leaderTeamRow.live_points || 0) > 0)) {
       slides.push({
         kind: "story",
         theme: "team-leader",
         label: "1re équipe",
         title: leaderTeamRow.office_team_name || "Team en tête",
         subtitle: `${leaderTeamRow.active_players || 0} joueur${Number(leaderTeamRow.active_players || 0) > 1 ? "s" : ""}`,
-        value: `${Math.round(Number(leaderTeamRow.average_points || 0) * 10) / 10} pts/joueur`,
+        value: `${Math.round(Number(leaderTeamRow.average_points || 0) * 10) / 10} pts/match`,
         detail: `${Math.round(Number(leaderTeamRow.total_points || 0) * 10) / 10} pts au total`,
         date: null,
         dateLabel: "Classement actuel",
@@ -3046,6 +4852,7 @@ const App = {
         teamColor: leaderTeamRow.office_team_color || "#facc15"
       });
     }
+
     const finishedMatches = this.state.matches
       .filter((match) => match.status === "finished" && !match.is_test_match)
       .sort((a, b) => new Date(b.kickoff_at || 0) - new Date(a.kickoff_at || 0));
@@ -3054,11 +4861,12 @@ const App = {
       .map((prediction) => ({ prediction, match: this.state.matches.find((match) => match.id === prediction.match_id) }))
       .filter(({ prediction, match }) => match?.status === "finished"
         && !match.is_test_match
+        && eligibleIds.has(String(prediction.user_id))
         && prediction.points_total !== null
         && prediction.points_total !== undefined
       );
 
-    // 1) Forme du moment : meilleur score sur les 5 derniers matchs officiels terminés.
+    // Hibou en feu : meilleur joueur officiel sur les 5 derniers matchs terminés.
     const lastFiveMatchIds = new Set(finishedMatches.slice(0, 5).map((match) => match.id));
     if (lastFiveMatchIds.size) {
       const totals = new Map();
@@ -3074,7 +4882,7 @@ const App = {
 
       const best = [...totals.entries()]
         .map(([userId, stats]) => ({ userId, ...stats, profile: this.profileForUser(userId) }))
-        .filter((item) => item.points > 0)
+        .filter((item) => item.points > 0 && profileIsUsable(item.profile))
         .sort((a, b) => b.points - a.points || b.exact - a.exact || profileName(a.profile).localeCompare(profileName(b.profile), "fr"))[0];
 
       if (best) {
@@ -3093,19 +4901,24 @@ const App = {
       }
     }
 
-    // 2) Casserole du jour : un zéro pointé sur le dernier match terminé.
+    // Casserole du jour : score vraiment inversé sur le dernier match terminé.
     const latestFinished = finishedMatches[0];
     if (latestFinished) {
-      const zeroRows = predictionRows
-        .filter(({ match, prediction }) => match.id === latestFinished.id && Number(prediction.points_total || 0) === 0)
+      const casserole = predictionRows
+        .filter(({ match, prediction }) =>
+          match.id === latestFinished.id
+          && Number(prediction.points_total || 0) === 0
+          && this.isOppositeResultPrediction(prediction, latestFinished)
+        )
         .map(({ prediction, match }) => ({
           prediction,
           match,
+          missDistance: this.scoreMissDistance(prediction, match),
           profile: this.profileForUser(prediction.user_id)
         }))
-        .sort((a, b) => profileName(a.profile).localeCompare(profileName(b.profile), "fr"));
+        .filter((item) => profileIsUsable(item.profile))
+        .sort((a, b) => b.missDistance - a.missDistance || profileName(a.profile).localeCompare(profileName(b.profile), "fr"))[0];
 
-      const casserole = zeroRows[0];
       if (casserole) {
         slides.push({
           kind: "story",
@@ -3114,7 +4927,7 @@ const App = {
           title: profileName(casserole.profile),
           subtitle: teamName(casserole.profile),
           value: `${casserole.prediction.home_score_pred}-${casserole.prediction.away_score_pred} au lieu de ${H.scoreText(latestFinished.home_score, latestFinished.away_score)}`,
-          detail: `${latestFinished.home_team_short_name || latestFinished.home_team_name} - ${latestFinished.away_team_short_name || latestFinished.away_team_name}`,
+          detail: "Résultat inversé",
           date: latestFinished.kickoff_at,
           icon: "badges",
           profile: casserole.profile
@@ -3122,28 +4935,29 @@ const App = {
       }
     }
 
-    // 3) Score exact récent : le dernier joueur qui a mis dans le mille.
+    // Dans le mille : dernier score exact officiel.
     const latestExact = predictionRows
       .filter(({ prediction }) => prediction.is_exact_score)
+      .map((row) => ({ ...row, profile: this.profileForUser(row.prediction.user_id) }))
+      .filter((row) => profileIsUsable(row.profile))
       .sort((a, b) => new Date(b.match.kickoff_at || 0) - new Date(a.match.kickoff_at || 0))[0];
 
     if (latestExact) {
-      const exactProfile = this.profileForUser(latestExact.prediction.user_id);
       slides.push({
         kind: "story",
         theme: "perfect",
         label: "Dans le mille",
-        title: profileName(exactProfile),
-        subtitle: teamName(exactProfile),
+        title: profileName(latestExact.profile),
+        subtitle: teamName(latestExact.profile),
         value: `Score exact ${latestExact.prediction.home_score_pred}-${latestExact.prediction.away_score_pred}`,
         detail: `${latestExact.match.home_team_short_name || latestExact.match.home_team_name} - ${latestExact.match.away_team_short_name || latestExact.match.away_team_name}`,
         date: latestExact.match.kickoff_at,
         icon: "target",
-        profile: exactProfile
+        profile: latestExact.profile
       });
     }
 
-    // 4) Match rentable : le match qui a distribué le plus de points au Nid.
+    // Match qui a gavé le Nid : uniquement sur pronos officiels visibles.
     const matchTotals = new Map();
     predictionRows.forEach(({ prediction, match }) => {
       const current = matchTotals.get(match.id) || { match, points: 0, count: 0 };
@@ -3171,18 +4985,16 @@ const App = {
       });
     }
 
-    // On complète avec des records vivants pour garder l’esprit mini-record.
-    const remainingSlots = Math.max(0, 6 - slides.length);
-    recordHighlights.slice(0, remainingSlots).forEach((item) => slides.push({ kind: "record", ...item }));
-
-    return slides.slice(0, 6);
+    recordHighlights.forEach((item) => slides.push({ kind: "record", ...item }));
+    return slides;
   },
 
   homeStorySlideHtml(item, index) {
     if (item.kind === "record") {
       const { record, best, bestProfile, detail, date } = item;
+      const recordTeamColor = this.teamColorForProfile(bestProfile);
       return `
-        <article class="home-record-slide home-record-slide-record ${index === 0 ? "active" : ""}" data-home-record-slide data-record-popup-id="${H.escapeHtml(record.id)}" role="button" tabindex="0" title="Voir le détail du mini-record">
+        <article class="home-record-slide home-record-slide-record team-tinted-perchoir ${index === 0 ? "active" : ""}" style="--perchoir-team-color:${H.escapeHtml(recordTeamColor)};--story-team-color:${H.escapeHtml(recordTeamColor)}" data-home-record-slide data-record-popup-id="${H.escapeHtml(record.id)}" role="button" tabindex="0" title="Voir le détail du mini-record">
           <div class="home-record-art">${this.recordArtHtml(record)}</div>
           <div class="home-record-main">
             <small class="home-record-label">${H.escapeHtml(record.title)}</small>
@@ -3198,9 +5010,10 @@ const App = {
       `;
     }
 
+    const storyTeamColor = item.teamColor || this.teamColorForProfile(item.profile || {});
     return `
-      <article class="home-record-slide home-story-slide story-${H.escapeHtml(item.theme || "default")} ${index === 0 ? "active" : ""}" data-home-record-slide>
-        <div class="home-record-art story-art" ${item.teamColor ? `style="--story-team-color:${H.escapeHtml(item.teamColor)}"` : ""}>${item.profile ? H.profileBadgeHtml(item.profile, "profile-badge leaderboard-badge") : H.icon(item.icon || "badges")}</div>
+      <article class="home-record-slide home-story-slide team-tinted-perchoir story-${H.escapeHtml(item.theme || "default")} ${index === 0 ? "active" : ""}" style="--perchoir-team-color:${H.escapeHtml(storyTeamColor)};--story-team-color:${H.escapeHtml(storyTeamColor)}" data-home-record-slide>
+        <div class="home-record-art story-art">${item.profile ? H.profileBadgeHtml(item.profile, "profile-badge leaderboard-badge") : H.icon(item.icon || "badges")}</div>
         <div class="home-record-main">
           <small class="home-record-label">${H.escapeHtml(item.label)}</small>
           <strong>${H.escapeHtml(item.title)}</strong>
@@ -3216,12 +5029,16 @@ const App = {
   },
 
   homeRecordCarouselHtml(leaderboardRows = this.state.playerScoreRows, teamRows = this.overallTeamAverageRows()) {
+    const hasScoreActivity = this.hasLeaderboardScoreActivity(leaderboardRows, teamRows);
     const rows = this.achievementRecordRows();
-    const recordHighlights = this.achievementRecordDefinitions()
+    const availableRecords = this.achievementRecordDefinitions()
+      .filter((record) => hasScoreActivity || record.id === "record-predictions");
+
+    const recordHighlights = availableRecords
       .map((record) => this.recordWinner(record, rows))
       .filter((item) => item.best && item.bestProfile);
 
-    const highlights = this.homeStoryHighlights(recordHighlights, leaderboardRows, teamRows);
+    const highlights = this.homeStoryHighlights(recordHighlights, this.filterOfficialRowsForHome(leaderboardRows), teamRows);
 
     if (!highlights.length) {
       return `
@@ -3230,7 +5047,7 @@ const App = {
             <div>
               <p class="eyebrow">${H.icon("badges")} Actus du nid</p>
               <h3>Le tableau des petits exploits arrive</h3>
-              <p class="muted">Dès que les premiers matchs seront comptabilisés, les records, casseroles et hiboux en feu défileront ici.</p>
+              <p class="muted">Dès que les premiers pronos ou points seront comptabilisés, les records, casseroles et hiboux en feu défileront ici.</p>
             </div>
           </div>
         </section>
@@ -3243,7 +5060,7 @@ const App = {
           <div>
             <p class="eyebrow">${H.icon("badges")} Actus du nid</p>
             <h3>Les chouettes qui font parler le perchoir</h3>
-            <p class="muted">Records uniques, forme du moment, casseroles et coups parfaits défilent ici toutes les 10 secondes.</p>
+            <p class="muted">Records, coups chauds et casseroles cohérentes défilent ici toutes les 5 secondes.</p>
           </div>
           <button class="ghost-btn" id="homeRecordsBtn" type="button">Voir les records</button>
         </div>
@@ -3279,7 +5096,7 @@ const App = {
     });
 
     if (slides.length > 1) {
-      this.state.homeRecordCarouselTimer = window.setInterval(() => show(index + 1), 10000);
+      this.state.homeRecordCarouselTimer = window.setInterval(() => show(index + 1), 5000);
     }
   },
 
@@ -3459,28 +5276,124 @@ const App = {
       <section class="toolbar-card compact-toolbar worldcup-final-toolbar">
         <div>
           <h3>Phase finale</h3>
-          <p class="muted">Un vrai tableau visuel : les seizièmes partent des ailes, puis le nid converge vers la grande finale.</p>
+          <p class="muted">Choisis un tour : ce tour s’ouvre en détail, les autres restent compacts pour garder la lecture du tableau.</p>
         </div>
         <div class="final-bracket-toolbar-actions">
-          <button class="ghost-btn final-scroll-btn" type="button" data-final-scroll="left" aria-label="Voir la partie gauche">←</button>
           <span class="pill neutral">${totalFinalMatches} match${totalFinalMatches > 1 ? "s" : ""}</span>
-          <button class="ghost-btn final-scroll-btn" type="button" data-final-scroll="right" aria-label="Voir la partie droite">→</button>
         </div>
       </section>
       ${totalFinalMatches ? this.finalBracketHtml(byStage) : `<section class="card"><p class="muted">Aucune phase finale à afficher pour le moment.</p></section>`}
     `;
+    this.bindFinalBracketRoundTabs();
     this.bindFinalBracketDrag();
     this.bindFinalBracketControls();
+    this.scrollFinalBracketToActiveRound();
+  },
+
+  bindFinalBracketRoundTabs() {
+    H.$$('[data-final-round]').forEach((button) => {
+      if (button.dataset.finalRoundBound === "true") return;
+      button.dataset.finalRoundBound = "true";
+      button.addEventListener("click", () => {
+        this.setFinalBracketRound(button.dataset.finalRound || null);
+      });
+    });
+
+    const scroller = H.$("#finalBracketScroll");
+    if (scroller && scroller.dataset.finalDelegationBound !== "true") {
+      scroller.dataset.finalDelegationBound = "true";
+      scroller.addEventListener("click", (event) => {
+        if (event.target.closest("button, a, input, select, textarea")) return;
+
+        const matchCard = event.target.closest("[data-final-match-toggle]");
+        if (matchCard) {
+          const round = matchCard.closest("[data-final-stage-round]")?.dataset?.finalStageRound || matchCard.dataset.finalRoundTarget;
+          const currentRound = this.state.finalBracketActiveRound || scroller.querySelector(".final-focus-board")?.dataset?.activeRound;
+          if (round && round !== currentRound) {
+            this.setFinalBracketRound(round);
+            return;
+          }
+          const number = Number(matchCard.dataset.finalMatchToggle || 0);
+          if (number) {
+            this.state.finalBracketExpandedMatchNumber = Number(this.state.finalBracketExpandedMatchNumber || 0) === number ? null : number;
+            this.renderWorldCupFinals();
+          }
+          return;
+        }
+
+        const target = event.target.closest("[data-final-round-target], [data-final-stage-round]");
+        const round = target?.dataset?.finalRoundTarget || target?.dataset?.finalStageRound;
+        if (round) this.setFinalBracketRound(round);
+      });
+    }
+
+    H.$$('[data-final-match-toggle]').forEach((card) => {
+      if (card.dataset.finalMatchToggleBound === "true") return;
+      card.dataset.finalMatchToggleBound = "true";
+      const activateCard = (event) => {
+        if (event?.target?.closest?.("a, button, input, select, textarea")) return;
+        event?.preventDefault?.();
+        event?.stopPropagation?.();
+        const scroller = H.$("#finalBracketScroll");
+        const round = card.closest("[data-final-stage-round]")?.dataset?.finalStageRound || card.dataset.finalRoundTarget;
+        const currentRound = this.state.finalBracketActiveRound || scroller?.querySelector?.(".final-focus-board")?.dataset?.activeRound;
+        if (round && round !== currentRound) {
+          this.setFinalBracketRound(round);
+          return;
+        }
+        const number = Number(card.dataset.finalMatchToggle || 0);
+        if (!number) return;
+        this.state.finalBracketExpandedMatchNumber = Number(this.state.finalBracketExpandedMatchNumber || 0) === number ? null : number;
+        this.renderWorldCupFinals();
+      };
+      card.addEventListener("click", activateCard);
+      card.addEventListener("keydown", (event) => {
+        if (event.key !== "Enter" && event.key !== " ") return;
+        activateCard(event);
+      });
+    });
+
+    H.$$('[data-final-stage-round]').forEach((stage) => {
+      if (stage.dataset.finalStageRoundBound === "true") return;
+      stage.dataset.finalStageRoundBound = "true";
+      const activateStage = () => this.setFinalBracketRound(stage.dataset.finalStageRound || null);
+      stage.addEventListener("keydown", (event) => {
+        if (event.key !== "Enter" && event.key !== " ") return;
+        const matchCard = event.target.closest?.("[data-final-match-toggle]");
+        if (matchCard) {
+          event.preventDefault();
+          const round = matchCard.closest("[data-final-stage-round]")?.dataset?.finalStageRound || matchCard.dataset.finalRoundTarget;
+          const currentRound = this.state.finalBracketActiveRound || H.$("#finalBracketScroll .final-focus-board")?.dataset?.activeRound;
+          if (round && round !== currentRound) {
+            this.setFinalBracketRound(round);
+            return;
+          }
+          const number = Number(matchCard.dataset.finalMatchToggle || 0);
+          if (number) {
+            this.state.finalBracketExpandedMatchNumber = Number(this.state.finalBracketExpandedMatchNumber || 0) === number ? null : number;
+            this.renderWorldCupFinals();
+          }
+          return;
+        }
+        event.preventDefault();
+        activateStage();
+      });
+    });
   },
 
   bindFinalBracketDrag() {
     const scroller = H.$("#finalBracketScroll");
-    if (!scroller || scroller.dataset.dragBound === "true") return;
+    if (!scroller || scroller.classList.contains("final-bracket-road-shell") || scroller.dataset.dragBound === "true") return;
     scroller.dataset.dragBound = "true";
 
     let isDown = false;
     let startX = 0;
     let startScrollLeft = 0;
+    let touchStartX = 0;
+    let touchStartY = 0;
+    let touchStartLeft = 0;
+    let touchDragging = false;
+    let touchLastDx = 0;
 
     const stop = () => {
       isDown = false;
@@ -3488,6 +5401,7 @@ const App = {
     };
 
     scroller.addEventListener("pointerdown", (event) => {
+      if (event.pointerType && event.pointerType !== "mouse") return;
       if (event.target.closest("button, a, input, select, textarea")) return;
       isDown = true;
       startX = event.clientX;
@@ -3502,14 +5416,96 @@ const App = {
       scroller.scrollLeft = startScrollLeft - (event.clientX - startX);
     });
 
+    scroller.addEventListener("touchstart", (event) => {
+      if (!event.touches || event.touches.length !== 1) return;
+      const touch = event.touches[0];
+      touchStartX = touch.clientX;
+      touchStartY = touch.clientY;
+      touchStartLeft = scroller.scrollLeft;
+      touchDragging = false;
+      touchLastDx = 0;
+    }, { passive: true });
+
+    scroller.addEventListener("touchmove", (event) => {
+      if (!event.touches || event.touches.length !== 1) return;
+      const touch = event.touches[0];
+      const dx = touch.clientX - touchStartX;
+      const dy = touch.clientY - touchStartY;
+      touchLastDx = dx;
+      if (!touchDragging && Math.abs(dx) > Math.abs(dy) + 6) touchDragging = true;
+      if (!touchDragging) return;
+      event.preventDefault();
+      scroller.scrollLeft = touchStartLeft - dx;
+    }, { passive: false });
+
+    scroller.addEventListener("touchend", () => {
+      if (touchDragging && Math.abs(touchLastDx) > 56) {
+        this.stepFinalBracket(touchLastDx < 0 ? 1 : -1);
+      }
+      touchDragging = false;
+      touchLastDx = 0;
+    }, { passive: true });
+    scroller.addEventListener("touchcancel", () => { touchDragging = false; touchLastDx = 0; }, { passive: true });
     scroller.addEventListener("pointerup", stop);
     scroller.addEventListener("pointercancel", stop);
     scroller.addEventListener("mouseleave", stop);
   },
 
+  scrollFinalBracketToActiveRound() {
+    const scroller = H.$("#finalBracketScroll");
+    const board = scroller?.querySelector?.(".final-focus-board");
+    if (!scroller || !board) return;
+    const activeRound = this.state.finalBracketActiveRound || board.dataset.activeRound;
+    if (!activeRound) return;
+
+    window.setTimeout(() => {
+      const safeRound = window.CSS?.escape ? CSS.escape(activeRound) : String(activeRound).replace(/[^a-z0-9_-]/gi, "");
+      const activeStage = scroller.querySelector(`.final-focus-stage.stage-${safeRound}`);
+      if (!activeStage) return;
+      const maxLeft = Math.max(0, scroller.scrollWidth - scroller.clientWidth);
+      const desiredLeft = activeStage.offsetLeft - Math.max(0, (scroller.clientWidth - activeStage.offsetWidth) / 2);
+      scroller.scrollTo({ left: Math.min(maxLeft, Math.max(0, desiredLeft)), behavior: "smooth" });
+    }, 70);
+  },
+
+  setFinalBracketRound(roundKey = null) {
+    const configs = this.finalBracketRoundConfigs();
+    const targetIndex = configs.findIndex((config) => config.key === roundKey);
+    if (targetIndex < 0) return;
+    const currentRound = this.state.finalBracketActiveRound || H.$("#finalBracketScroll .final-focus-board")?.dataset?.activeRound || configs[0]?.key;
+    const currentIndex = Math.max(0, configs.findIndex((config) => config.key === currentRound));
+    if (configs[targetIndex]?.key === currentRound) return;
+    this.state.finalBracketActiveRound = configs[targetIndex].key;
+    this.state.finalBracketExpandedMatchNumber = null;
+    this.state.finalBracketSlideDirection = targetIndex < currentIndex ? "left" : "right";
+    this.renderWorldCupFinals();
+  },
+
+  stepFinalBracket(direction = 0) {
+    const configs = this.finalBracketRoundConfigs();
+    const currentRound = this.state.finalBracketActiveRound || H.$("#finalBracketScroll .final-focus-board")?.dataset?.activeRound || configs[0]?.key;
+    const currentIndex = Math.max(0, configs.findIndex((config) => config.key === currentRound));
+    const nextIndex = Math.min(configs.length - 1, Math.max(0, currentIndex + Number(direction || 0)));
+    const nextKey = configs[nextIndex]?.key || currentRound;
+    if (nextKey === currentRound) return;
+    this.state.finalBracketActiveRound = nextKey;
+    this.state.finalBracketSlideDirection = direction < 0 ? "left" : "right";
+    this.renderWorldCupFinals();
+  },
+
   bindFinalBracketControls() {
     const scroller = H.$("#finalBracketScroll");
     if (!scroller) return;
+
+    H.$$('[data-final-step]').forEach((button) => {
+      if (button.dataset.finalStepBound === "true") return;
+      button.dataset.finalStepBound = "true";
+      button.addEventListener("click", () => {
+        const direction = Number(button.dataset.finalStep || 0);
+        this.stepFinalBracket(direction);
+      });
+    });
+
     H.$$('[data-final-scroll]').forEach((button) => {
       if (button.dataset.finalScrollBound === "true") return;
       button.dataset.finalScrollBound = "true";
@@ -3523,16 +5519,7 @@ const App = {
   },
 
   finalBracketSortValue(match) {
-    const stageOrder = {
-      round_of_32: 1,
-      round_of_16: 2,
-      quarter_final: 3,
-      semi_final: 4,
-      third_place: 5,
-      final: 6
-    };
-    const kickoff = match?.kickoff_at ? new Date(match.kickoff_at).getTime() : 0;
-    return ((stageOrder[match?.stage] || 99) * 10000000000000) + kickoff;
+    return H.officialBracketSortValue?.(match) || 999999999999999;
   },
 
   finalBracketStages(finals = []) {
@@ -3550,7 +5537,8 @@ const App = {
     });
 
     Object.keys(stages).forEach((key) => {
-      stages[key] = stages[key].sort((a, b) => new Date(a.kickoff_at || 0) - new Date(b.kickoff_at || 0));
+      stages[key] = stages[key].sort((a, b) => this.finalBracketSortValue(a) - this.finalBracketSortValue(b)
+        || new Date(a.kickoff_at || 0) - new Date(b.kickoff_at || 0));
     });
 
     return stages;
@@ -3561,7 +5549,164 @@ const App = {
     return [matches.slice(0, midpoint), matches.slice(midpoint)];
   },
 
-  finalBracketHtml(byStage) {
+  finalBracketStageChronologicalNumbers(stage) {
+    const map = {
+      round_of_32: [73, 76, 74, 75, 78, 77, 79, 80, 82, 81, 84, 83, 85, 88, 86, 87],
+      round_of_16: [90, 89, 91, 92, 93, 94, 95, 96],
+      quarter_final: [97, 98, 99, 100],
+      semi_final: [101, 102],
+      third_place: [103],
+      final: [104]
+    };
+    return map[stage] || [];
+  },
+
+  finalBracketStableMatchNumber(match, usedNumbers = new Set()) {
+    const direct = H.officialBracketMatchNumber?.(match);
+    if (direct && !usedNumbers.has(direct)) return direct;
+    return null;
+  },
+
+  finalBracketMatchMap(byStage = {}) {
+    const map = new Map();
+    const usedMatchKeys = new Set();
+    const matchKey = (match) => String(match?.id || `${match?.stage || ""}|${match?.kickoff_at || ""}|${match?.home_team_id || ""}|${match?.away_team_id || ""}`);
+
+    // 1) Priorité aux numéros explicites ou visibles dans les placeholders (M76, Match 76...).
+    Object.values(byStage).flat().forEach((match) => {
+      const number = this.finalBracketStableMatchNumber(match, map);
+      if (number && !map.has(number)) {
+        map.set(number, match);
+        usedMatchKeys.add(matchKey(match));
+      }
+    });
+
+    // 2) Filet de sécurité : quand l'admin remplace les deux placeholders par deux vraies équipes,
+    // le texte ne contient plus “M76 / Match 76”. On réattribue alors les trous par ordre chronologique
+    // officiel du tour. Cela évite que M76, M78, etc. repassent en “À définir”.
+    Object.entries(byStage).forEach(([stage, matches]) => {
+      const officialNumbers = this.finalBracketStageChronologicalNumbers(stage);
+      if (!officialNumbers.length) return;
+      const freeNumbers = officialNumbers.filter((number) => !map.has(number));
+      if (!freeNumbers.length) return;
+
+      const unmatched = (matches || [])
+        .filter((match) => !usedMatchKeys.has(matchKey(match)))
+        .sort((a, b) => new Date(a.kickoff_at || 0) - new Date(b.kickoff_at || 0)
+          || String(a.id || "").localeCompare(String(b.id || "")));
+
+      unmatched.forEach((match, index) => {
+        const number = freeNumbers[index];
+        if (number && !map.has(number)) {
+          map.set(number, match);
+          usedMatchKeys.add(matchKey(match));
+        }
+      });
+    });
+
+    return map;
+  },
+
+  finalBracketMatchByNumber(matchMap, number) {
+    return matchMap.get(Number(number)) || null;
+  },
+
+  finalBracketMatchOrPlaceholder(matchMap, number, title, extraClass = "") {
+    const match = this.finalBracketMatchByNumber(matchMap, number);
+    return match
+      ? this.finalBracketMatchHtml(match, `${extraClass} official-match-${number}`.trim(), `${title} · M${number}`)
+      : this.finalBracketPlaceholderHtml(`${title} · M${number}`, extraClass);
+  },
+
+  finalBracketRoadLaneHtml(matchMap, lane, index = 0) {
+    return `
+      <div class="final-bracket-road-lane" data-r16="${H.escapeHtml(lane.r16)}">
+        <div class="road-node road-r32 top">${this.finalBracketMatchOrPlaceholder(matchMap, lane.r32[0], "16e")}</div>
+        <div class="road-flow-line" aria-hidden="true"><span></span></div>
+        <div class="road-node road-r16">${this.finalBracketMatchOrPlaceholder(matchMap, lane.r16, "8e")}</div>
+        <div class="road-flow-line" aria-hidden="true"><span></span></div>
+        <div class="road-node road-r32 bottom">${this.finalBracketMatchOrPlaceholder(matchMap, lane.r32[1], "16e")}</div>
+      </div>
+    `;
+  },
+
+  finalBracketRoadQuarterHtml(matchMap, block) {
+    const lanes = block.lanes || [];
+    return `
+      <article class="final-bracket-road-block">
+        <header class="final-bracket-road-block-head">
+          <strong>${H.escapeHtml(block.title)}</strong>
+          <small>${H.escapeHtml(block.subtitle)}</small>
+        </header>
+        <div class="final-bracket-road-lanes">
+          ${lanes.map((lane, index) => this.finalBracketRoadLaneHtml(matchMap, lane, index)).join("")}
+        </div>
+        <div class="road-quarter-join" aria-hidden="true"><span></span></div>
+        <div class="final-bracket-road-quarter">
+          ${this.finalBracketMatchOrPlaceholder(matchMap, block.qf, "Quart")}
+        </div>
+      </article>
+    `;
+  },
+
+  finalBracketRoadBlocks() {
+    const layout = H.finalBracketLayout?.() || { left: [], right: [] };
+    return [
+      { title: "Quart haut gauche", subtitle: "M73/M75 et M74/M77", lanes: layout.left.slice(0, 2), qf: 97, sf: 101 },
+      { title: "Quart bas gauche", subtitle: "M83/M84 et M81/M82", lanes: layout.left.slice(2, 4), qf: 98, sf: 101 },
+      { title: "Quart haut droit", subtitle: "M76/M78 et M79/M80", lanes: layout.right.slice(0, 2), qf: 99, sf: 102 },
+      { title: "Quart bas droit", subtitle: "M86/M88 et M85/M87", lanes: layout.right.slice(2, 4), qf: 100, sf: 102 }
+    ];
+  },
+
+  finalBracketLaneHtml(matchMap, lane) {
+    return `
+      <div class="final-bracket-lane" data-r16="${lane.r16}">
+        <div class="final-bracket-lane-slot top">${this.finalBracketMatchOrPlaceholder(matchMap, lane.r32[0], "16e")}</div>
+        <div class="final-bracket-lane-connector" aria-hidden="true"></div>
+        <div class="final-bracket-lane-slot middle">${this.finalBracketMatchOrPlaceholder(matchMap, lane.r16, "8e")}</div>
+        <div class="final-bracket-lane-connector" aria-hidden="true"></div>
+        <div class="final-bracket-lane-slot bottom">${this.finalBracketMatchOrPlaceholder(matchMap, lane.r32[1], "16e")}</div>
+      </div>
+    `;
+  },
+
+  finalBracketSideTreeHtml(side, lanes, matchMap) {
+    const quarterNumbers = [...new Set(lanes.map((lane) => lane.qf))];
+    const semiNumber = lanes[0]?.sf;
+    const lanesHtml = `
+      <div class="final-bracket-tree-column lane-tree-column">
+        <div class="final-bracket-stage-title">16èmes → 8èmes</div>
+        <div class="final-bracket-lane-stack">
+          ${lanes.map((lane) => this.finalBracketLaneHtml(matchMap, lane)).join("")}
+        </div>
+      </div>
+    `;
+    const quartersHtml = `
+      <div class="final-bracket-tree-column quarter-tree-column">
+        <div class="final-bracket-stage-title">Quarts</div>
+        <div class="final-bracket-quarter-stack">
+          ${quarterNumbers.map((number) => this.finalBracketMatchOrPlaceholder(matchMap, number, "Quart")).join("")}
+        </div>
+      </div>
+    `;
+    const semiHtml = `
+      <div class="final-bracket-tree-column semi-tree-column">
+        <div class="final-bracket-stage-title">Demi-finale</div>
+        <div class="final-bracket-semi-stack">
+          ${semiNumber ? this.finalBracketMatchOrPlaceholder(matchMap, semiNumber, "Demi") : this.finalBracketPlaceholderHtml("Demi-finale")}
+        </div>
+      </div>
+    `;
+
+    return `
+      <div class="final-bracket-side final-bracket-tree-side final-bracket-tree-side-${side}">
+        ${side === "left" ? `${lanesHtml}${quartersHtml}${semiHtml}` : `${semiHtml}${quartersHtml}${lanesHtml}`}
+      </div>
+    `;
+  },
+
+  legacyFinalBracketHtml(byStage) {
     const [r32Left, r32Right] = this.splitBracketSide(byStage.round_of_32);
     const [r16Left, r16Right] = this.splitBracketSide(byStage.round_of_16);
     const [qfLeft, qfRight] = this.splitBracketSide(byStage.quarter_final);
@@ -3571,18 +5716,12 @@ const App = {
 
     return `
       <section class="final-bracket-shell draggable-bracket" id="finalBracketScroll" aria-label="Tableau de la phase finale" tabindex="0">
-        <div class="final-bracket-ribbon ribbon-left-a"></div>
-        <div class="final-bracket-ribbon ribbon-left-b"></div>
-        <div class="final-bracket-ribbon ribbon-right-a"></div>
-        <div class="final-bracket-ribbon ribbon-right-b"></div>
-
         <div class="final-bracket-side final-bracket-side-left">
           ${this.finalBracketColumnHtml("Seizièmes", r32Left, "round32")}
           ${this.finalBracketColumnHtml("Huitièmes", r16Left, "round16")}
           ${this.finalBracketColumnHtml("Quarts", qfLeft, "quarter")}
           ${this.finalBracketColumnHtml("Demi-finale", sfLeft, "semi")}
         </div>
-
         <div class="final-bracket-center">
           <div class="final-bracket-cup-card">
             <span class="final-bracket-cup-emoji" aria-hidden="true">🏆</span>
@@ -3592,7 +5731,6 @@ const App = {
           ${finalMatch ? this.finalBracketMatchHtml(finalMatch, "final-main", "Grande finale") : this.finalBracketPlaceholderHtml("Grande finale")}
           ${thirdPlaceMatch ? this.finalBracketMatchHtml(thirdPlaceMatch, "third-place", "Petite finale") : this.finalBracketPlaceholderHtml("Petite finale")}
         </div>
-
         <div class="final-bracket-side final-bracket-side-right">
           ${this.finalBracketColumnHtml("Demi-finale", sfRight, "semi")}
           ${this.finalBracketColumnHtml("Quarts", qfRight, "quarter")}
@@ -3601,6 +5739,532 @@ const App = {
         </div>
       </section>
     `;
+  },
+
+  finalBracketColumnHtmlFromNumbers(title, numbers = [], matchMap, sizeClass = "", cardClass = "") {
+    return `
+      <div class="final-bracket-column ${sizeClass}">
+        <div class="final-bracket-stage-title">${H.escapeHtml(title)}</div>
+        <div class="final-bracket-match-stack">
+          ${numbers.map((number) => this.finalBracketMatchOrPlaceholder(matchMap, number, title, cardClass)).join("")}
+        </div>
+      </div>
+    `;
+  },
+
+  officialFinalBracketDesktopHtml(matchMap) {
+    const leftR32 = [73, 75, 74, 77, 83, 84, 81, 82];
+    const rightR32 = [76, 78, 79, 80, 86, 88, 85, 87];
+    const leftR16 = [90, 89, 93, 94];
+    const rightR16 = [91, 92, 95, 96];
+    const leftQf = [97, 98];
+    const rightQf = [99, 100];
+    const semiLeft = [101];
+    const semiRight = [102];
+    const finalMatch = this.finalBracketMatchByNumber(matchMap, 104);
+    const thirdPlaceMatch = this.finalBracketMatchByNumber(matchMap, 103);
+
+    return `
+      <section class="final-bracket-official final-bracket-official-desktop" aria-label="Tableau officiel de la phase finale">
+        <div class="final-bracket-official-head">
+          <strong>Tableau phase finale</strong>
+          <span>Lecture classique : 16èmes → 8èmes → quarts → demies → finale.</span>
+        </div>
+        <div class="final-bracket-official-body">
+          <div class="final-bracket-official-side left">
+            ${this.finalBracketColumnHtmlFromNumbers("16ᵉ", leftR32, matchMap, "round32", "desktop-compact")}
+            ${this.finalBracketColumnHtmlFromNumbers("8ᵉ", leftR16, matchMap, "round16", "desktop-compact")}
+            ${this.finalBracketColumnHtmlFromNumbers("Quarts", leftQf, matchMap, "quarter", "desktop-compact")}
+            ${this.finalBracketColumnHtmlFromNumbers("Demi-finale", semiLeft, matchMap, "semi", "desktop-compact")}
+          </div>
+          <div class="final-bracket-official-center">
+            <div class="final-bracket-cup-card official-center-cup">
+              <span class="final-bracket-cup-emoji" aria-hidden="true">🏆</span>
+              <strong>FINALE</strong>
+              <small>19 juillet 2026</small>
+            </div>
+            ${finalMatch ? this.finalBracketMatchHtml(finalMatch, "final-main desktop-compact", "Grande finale · M104") : this.finalBracketPlaceholderHtml("Grande finale · M104", "desktop-compact")}
+            ${thirdPlaceMatch ? this.finalBracketMatchHtml(thirdPlaceMatch, "third-place desktop-compact", "3ᵉ place · M103") : this.finalBracketPlaceholderHtml("3ᵉ place · M103", "desktop-compact")}
+          </div>
+          <div class="final-bracket-official-side right">
+            ${this.finalBracketColumnHtmlFromNumbers("Demi-finale", semiRight, matchMap, "semi", "desktop-compact")}
+            ${this.finalBracketColumnHtmlFromNumbers("Quarts", rightQf, matchMap, "quarter", "desktop-compact")}
+            ${this.finalBracketColumnHtmlFromNumbers("8ᵉ", rightR16, matchMap, "round16", "desktop-compact")}
+            ${this.finalBracketColumnHtmlFromNumbers("16ᵉ", rightR32, matchMap, "round32", "desktop-compact")}
+          </div>
+        </div>
+      </section>
+    `;
+  },
+
+  officialFinalBracketMobileHtml(matchMap) {
+    const leftR32 = [73, 75, 74, 77, 83, 84, 81, 82];
+    const rightR32 = [76, 78, 79, 80, 86, 88, 85, 87];
+    const leftR16 = [90, 89, 93, 94];
+    const rightR16 = [91, 92, 95, 96];
+    const leftQf = [97, 98];
+    const rightQf = [99, 100];
+    const finalMatch = this.finalBracketMatchByNumber(matchMap, 104);
+    const thirdPlaceMatch = this.finalBracketMatchByNumber(matchMap, 103);
+    const semiLeft = this.finalBracketMatchByNumber(matchMap, 101);
+    const semiRight = this.finalBracketMatchByNumber(matchMap, 102);
+
+    return `
+      <section class="final-bracket-official final-bracket-official-mobile" aria-label="Tableau mobile de la phase finale">
+        <div class="final-bracket-official-head mobile-head">
+          <strong>Tableau compact mobile</strong>
+          <span>Deux chemins lisibles, puis le dernier carré.</span>
+        </div>
+
+        <div class="final-bracket-mobile-half">
+          <div class="final-bracket-mobile-half-head">Partie gauche</div>
+          <div class="final-bracket-mobile-grid">
+            ${this.finalBracketColumnHtmlFromNumbers("16ᵉ", leftR32, matchMap, "round32", "mobile-compact")}
+            ${this.finalBracketColumnHtmlFromNumbers("8ᵉ", leftR16, matchMap, "round16", "mobile-compact")}
+            ${this.finalBracketColumnHtmlFromNumbers("Quarts", leftQf, matchMap, "quarter", "mobile-compact")}
+            <div class="final-bracket-column semi">
+              <div class="final-bracket-stage-title">Demi</div>
+              <div class="final-bracket-match-stack">
+                ${semiLeft ? this.finalBracketMatchHtml(semiLeft, "mobile-compact", "Demi · M101") : this.finalBracketPlaceholderHtml("Demi · M101", "mobile-compact")}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="final-bracket-mobile-finals">
+          ${finalMatch ? this.finalBracketMatchHtml(finalMatch, "final-main mobile-compact", "Finale · M104") : this.finalBracketPlaceholderHtml("Finale · M104", "mobile-compact")}
+          ${thirdPlaceMatch ? this.finalBracketMatchHtml(thirdPlaceMatch, "third-place mobile-compact", "3ᵉ place · M103") : this.finalBracketPlaceholderHtml("3ᵉ place · M103", "mobile-compact")}
+        </div>
+
+        <div class="final-bracket-mobile-half right-half">
+          <div class="final-bracket-mobile-half-head">Partie droite</div>
+          <div class="final-bracket-mobile-grid">
+            <div class="final-bracket-column semi">
+              <div class="final-bracket-stage-title">Demi</div>
+              <div class="final-bracket-match-stack">
+                ${semiRight ? this.finalBracketMatchHtml(semiRight, "mobile-compact", "Demi · M102") : this.finalBracketPlaceholderHtml("Demi · M102", "mobile-compact")}
+              </div>
+            </div>
+            ${this.finalBracketColumnHtmlFromNumbers("Quarts", rightQf, matchMap, "quarter", "mobile-compact")}
+            ${this.finalBracketColumnHtmlFromNumbers("8ᵉ", rightR16, matchMap, "round16", "mobile-compact")}
+            ${this.finalBracketColumnHtmlFromNumbers("16ᵉ", rightR32, matchMap, "round32", "mobile-compact")}
+          </div>
+        </div>
+      </section>
+    `;
+  },
+
+  finalBracketVerticalLaneHtml(matchMap, lane) {
+    return `
+      <div class="final-bracket-vertical-lane" data-r16="${H.escapeHtml(lane.r16)}">
+        <div class="final-bracket-vertical-r32">
+          ${this.finalBracketMatchOrPlaceholder(matchMap, lane.r32[0], "16e", "vertical-compact")}
+          ${this.finalBracketMatchOrPlaceholder(matchMap, lane.r32[1], "16e", "vertical-compact")}
+        </div>
+        <div class="final-bracket-vertical-link" aria-hidden="true"></div>
+        <div class="final-bracket-vertical-r16">
+          ${this.finalBracketMatchOrPlaceholder(matchMap, lane.r16, "8e", "vertical-compact")}
+        </div>
+      </div>
+    `;
+  },
+
+  finalBracketVerticalQuarterHtml(matchMap, block) {
+    const lanes = block.lanes || [];
+    return `
+      <article class="final-bracket-vertical-quarter">
+        <header class="final-bracket-vertical-quarter-head">
+          <strong>${H.escapeHtml(block.title)}</strong>
+          <small>${H.escapeHtml(block.subtitle)}</small>
+        </header>
+        <div class="final-bracket-vertical-quarter-body">
+          <div class="final-bracket-vertical-lanes">
+            ${lanes.map((lane) => this.finalBracketVerticalLaneHtml(matchMap, lane)).join("")}
+          </div>
+          <div class="final-bracket-vertical-qf">
+            ${this.finalBracketMatchOrPlaceholder(matchMap, block.qf, "Quart", "vertical-compact vertical-qf-card")}
+          </div>
+        </div>
+      </article>
+    `;
+  },
+
+  finalBracketVerticalSemiHtml(matchMap, title, blocks, semiNumber) {
+    return `
+      <section class="final-bracket-vertical-semi-block">
+        <header class="final-bracket-vertical-semi-head">
+          <strong>${H.escapeHtml(title)}</strong>
+          <span>${H.escapeHtml(blocks.map((block) => `M${block.qf}`).join(" + "))} → M${H.escapeHtml(semiNumber)}</span>
+        </header>
+        <div class="final-bracket-vertical-semi-body">
+          <div class="final-bracket-vertical-quarters">
+            ${blocks.map((block) => this.finalBracketVerticalQuarterHtml(matchMap, block)).join("")}
+          </div>
+          <div class="final-bracket-vertical-sf">
+            ${this.finalBracketMatchOrPlaceholder(matchMap, semiNumber, "Demi", "vertical-compact vertical-sf-card")}
+          </div>
+        </div>
+      </section>
+    `;
+  },
+
+  finalBracketVerticalBlocks() {
+    const layout = H.finalBracketLayout?.() || { left: [], right: [] };
+    return [
+      { title: "Chemin 1", subtitle: "M73/M75 → M90 · M74/M77 → M89", lanes: layout.left.slice(0, 2), qf: 97, sf: 101 },
+      { title: "Chemin 2", subtitle: "M83/M84 → M93 · M81/M82 → M94", lanes: layout.left.slice(2, 4), qf: 98, sf: 101 },
+      { title: "Chemin 3", subtitle: "M76/M78 → M91 · M79/M80 → M92", lanes: layout.right.slice(0, 2), qf: 99, sf: 102 },
+      { title: "Chemin 4", subtitle: "M86/M88 → M95 · M85/M87 → M96", lanes: layout.right.slice(2, 4), qf: 100, sf: 102 }
+    ];
+  },
+
+  finalBracketVerticalHtml(matchMap) {
+    const blocks = this.finalBracketVerticalBlocks();
+    return `
+      <section class="final-bracket-vertical-shell" id="finalBracketScroll" aria-label="Tableau vertical de la phase finale" tabindex="0">
+        <header class="final-bracket-vertical-head">
+          <div>
+            <strong>Tableau phase finale</strong>
+            <span>Lecture en hauteur : les 16èmes nourrissent les 8èmes, puis les quarts, les demies et la finale.</span>
+          </div>
+          <div class="final-bracket-vertical-pill">32 matchs</div>
+        </header>
+        <div class="final-bracket-vertical-labels" aria-hidden="true">
+          <span>16èmes</span>
+          <span>8èmes</span>
+          <span>Quarts</span>
+          <span>Demies</span>
+          <span>Finale</span>
+        </div>
+        <div class="final-bracket-vertical-main">
+          <div class="final-bracket-vertical-paths">
+            ${this.finalBracketVerticalSemiHtml(matchMap, "Demi-finale haute", blocks.slice(0, 2), 101)}
+            ${this.finalBracketVerticalSemiHtml(matchMap, "Demi-finale basse", blocks.slice(2, 4), 102)}
+          </div>
+          <aside class="final-bracket-vertical-finals" aria-label="Finales">
+            <div class="final-bracket-cup-card final-bracket-vertical-cup">
+              <span class="final-bracket-cup-emoji" aria-hidden="true">🏆</span>
+              <strong>FINALE</strong>
+              <small>19 juillet 2026</small>
+            </div>
+            ${this.finalBracketMatchOrPlaceholder(matchMap, 104, "Grande finale", "vertical-compact vertical-final-card")}
+            ${this.finalBracketMatchOrPlaceholder(matchMap, 103, "3e place", "vertical-compact vertical-third-card")}
+          </aside>
+        </div>
+      </section>
+    `;
+  },
+
+  finalBracketRoundConfigs() {
+    return [
+      {
+        key: "round_of_32",
+        label: "16èmes",
+        shortLabel: "16e",
+        title: "Seizièmes de finale",
+        numbers: [73, 75, 74, 77, 83, 84, 81, 82, 76, 78, 79, 80, 86, 88, 85, 87],
+        rowStart: (index) => index + 1,
+        rowSpan: 1
+      },
+      {
+        key: "round_of_16",
+        label: "8èmes",
+        shortLabel: "8e",
+        title: "Huitièmes de finale",
+        numbers: [90, 89, 93, 94, 91, 92, 95, 96],
+        rowStart: (index) => index * 2 + 1,
+        rowSpan: 2
+      },
+      {
+        key: "quarter_final",
+        label: "Quarts",
+        shortLabel: "Quart",
+        title: "Quarts de finale",
+        numbers: [97, 98, 99, 100],
+        rowStart: (index) => index * 4 + 1,
+        rowSpan: 4
+      },
+      {
+        key: "semi_final",
+        label: "Demies",
+        shortLabel: "Demi",
+        title: "Demi-finales",
+        numbers: [101, 102],
+        rowStart: (index) => index * 8 + 1,
+        rowSpan: 8
+      },
+      {
+        key: "final",
+        label: "Finale",
+        shortLabel: "Finale",
+        title: "Finale et 3e place",
+        numbers: [104, 103],
+        rowStart: (index) => index === 0 ? 5 : 12,
+        rowSpan: 4
+      }
+    ];
+  },
+
+  isFinalRoundComplete(matchMap, config) {
+    const requiredNumbers = (config?.numbers || []).filter((number) => !(config.key === "final" && Number(number) === 103));
+    return Boolean(requiredNumbers.length)
+      && requiredNumbers.every((number) => {
+        const match = this.finalBracketMatchByNumber(matchMap, number);
+        return match && match.status === "finished";
+      });
+  },
+
+  defaultFinalBracketRound(matchMap) {
+    const configs = this.finalBracketRoundConfigs();
+    for (const config of configs) {
+      if (!this.isFinalRoundComplete(matchMap, config)) return config.key;
+    }
+    return "final";
+  },
+
+  activeFinalBracketRound(matchMap) {
+    const configs = this.finalBracketRoundConfigs();
+    const validKeys = new Set(configs.map((config) => config.key));
+    if (validKeys.has(this.state.finalBracketActiveRound)) return this.state.finalBracketActiveRound;
+    return this.defaultFinalBracketRound(matchMap);
+  },
+
+  finalBracketRoundTabsHtml(matchMap, activeRound) {
+    return `
+      <div class="final-focus-tabs" role="tablist" aria-label="Tours de la phase finale">
+        ${this.finalBracketRoundConfigs().map((config) => {
+          const complete = this.isFinalRoundComplete(matchMap, config);
+          return `<button type="button" class="${activeRound === config.key ? "active" : ""} ${complete ? "is-complete" : ""}" data-final-round="${H.escapeHtml(config.key)}" role="tab" aria-selected="${activeRound === config.key ? "true" : "false"}">
+            <span>${H.escapeHtml(config.label)}</span>
+            ${complete ? `<small>terminé</small>` : `<small>${H.escapeHtml(config.shortLabel)}</small>`}
+          </button>`;
+        }).join("")}
+      </div>
+    `;
+  },
+
+  finalFocusWindowWidth(activeKey) {
+    const widths = {
+      round_of_32: 980,
+      round_of_16: 970,
+      quarter_final: 950,
+      semi_final: 930,
+      final: 920
+    };
+    return widths[activeKey] || 960;
+  },
+
+  finalFocusBracketHtml(matchMap, activeRound) {
+    const configs = this.finalBracketRoundConfigs();
+    const activeConfig = configs.find((config) => config.key === activeRound) || configs[0];
+    const activeIndex = Math.max(0, configs.findIndex((config) => config.key === activeConfig.key));
+    const startIndex = Math.min(Math.max(0, activeIndex - 1), Math.max(0, configs.length - 3));
+    const visibleConfigs = configs.slice(startIndex, startIndex + 3);
+    const slideClass = this.state.finalBracketSlideDirection === "left" ? "slide-left" : this.state.finalBracketSlideDirection === "right" ? "slide-right" : "";
+    const rowCount = this.finalFocusVisibleRowCount(startIndex);
+    return `
+      <section class="final-focus-shell final-tournament-shell ${slideClass}" aria-label="Tableau de la phase finale par tour">
+        <header class="final-focus-head final-tournament-head">
+          <div>
+            <strong>${H.escapeHtml(activeConfig.title)}</strong>
+            <span>Vue façon tableau final : trois colonnes maximum, la colonne active en détail, les autres en repère compact.</span>
+          </div>
+          <span class="pill neutral">Vue active : ${H.escapeHtml(activeConfig.label)}</span>
+        </header>
+        <div class="final-tournament-window" id="finalBracketScroll" tabindex="0">
+          <div class="final-focus-board final-tournament-board" data-active-round="${H.escapeHtml(activeConfig.key)}" data-window-start="${startIndex}" style="--final-visible-rows:${rowCount};">
+            ${visibleConfigs.map((config, localIndex) => this.finalFocusStageColumnHtml(matchMap, config, activeConfig.key, startIndex + localIndex, startIndex)).join("")}
+          </div>
+        </div>
+      </section>
+    `;
+  },
+
+  finalFocusStageColumnHtml(matchMap, config, activeRound, stageIndex = 0, windowStart = 0) {
+    const isActive = config.key === activeRound;
+    const complete = this.isFinalRoundComplete(matchMap, config);
+    const expandedNumber = Number(this.state.finalBracketExpandedMatchNumber || 0);
+    let expandedShift = 0;
+    const rowsHtml = config.numbers.map((number, index) => {
+      const placement = this.finalFocusVisiblePlacement(config.key, index, windowStart, number);
+      const isExpanded = isActive && Number(number) === expandedNumber;
+      const rowStart = Number(placement.rowStart || 1) + expandedShift;
+      const rowSpan = isExpanded ? Math.max(Number(placement.rowSpan || 1), 2) : Number(placement.rowSpan || 1);
+      if (isExpanded) expandedShift += 1;
+      return `<div class="final-focus-slot slot-m${number} ${isExpanded ? "is-expanded-slot" : ""}" data-match-number="${number}" data-final-round-target="${H.escapeHtml(config.key)}" style="grid-row:${rowStart} / span ${rowSpan};">
+        ${this.finalFocusMatchCardHtml(matchMap, number, config, { activeColumn: isActive, expanded: isExpanded })}
+      </div>`;
+    }).join("");
+
+    return `
+      <section class="final-focus-stage ${isActive ? "is-active" : "is-compact"} stage-${H.escapeHtml(config.key)}"
+        data-stage-index="${stageIndex}"
+        data-final-stage-round="${H.escapeHtml(config.key)}"
+        data-final-round-target="${H.escapeHtml(config.key)}"
+        tabindex="0"
+        role="button"
+        aria-label="${H.escapeHtml(config.title)}">
+        <button type="button" class="final-focus-stage-title ${isActive ? "active" : ""}" data-final-round="${H.escapeHtml(config.key)}" aria-selected="${isActive ? "true" : "false"}">
+          <span>${H.escapeHtml(config.label)}</span>
+          <small>${complete ? "terminé" : H.escapeHtml(config.shortLabel)}</small>
+        </button>
+        <div class="final-focus-stage-grid" data-final-round-target="${H.escapeHtml(config.key)}">
+          ${rowsHtml}
+        </div>
+      </section>
+    `;
+  },
+
+  finalFocusVisibleRowCount(windowStart = 0) {
+    if (windowStart <= 0) return 16;
+    if (windowStart === 1) return 8;
+    return 4;
+  },
+
+  finalFocusVisiblePlacement(stageKey, index, windowStart = 0, number = null) {
+    if (windowStart <= 0) {
+      const config = this.finalBracketRoundConfigs().find((item) => item.key === stageKey);
+      return { rowStart: config?.rowStart?.(index) || 1, rowSpan: config?.rowSpan || 1 };
+    }
+    if (windowStart === 1) {
+      if (stageKey === "round_of_16") return { rowStart: index + 1, rowSpan: 1 };
+      if (stageKey === "quarter_final") return { rowStart: index * 2 + 1, rowSpan: 2 };
+      if (stageKey === "semi_final") return { rowStart: index * 4 + 1, rowSpan: 4 };
+    }
+    if (stageKey === "quarter_final") return { rowStart: index + 1, rowSpan: 1 };
+    if (stageKey === "semi_final") return { rowStart: index * 2 + 1, rowSpan: 2 };
+    if (stageKey === "final") return { rowStart: Number(number) === 103 ? 3 : 1, rowSpan: 2 };
+    return { rowStart: index + 1, rowSpan: 1 };
+  },
+
+  finalFocusMatchCardHtml(matchMap, number, config, view = {}) {
+    const activeColumn = typeof view === "boolean" ? Boolean(view) : Boolean(view?.activeColumn);
+    const expanded = typeof view === "boolean" ? false : Boolean(view?.expanded);
+    const match = this.finalBracketMatchByNumber(matchMap, number);
+    const title = Number(number) === 103 ? "Petite finale · M103" : Number(number) === 104 ? "Finale · M104" : `${config.shortLabel} · M${number}`;
+    if (!match) return this.finalFocusPlaceholderHtml(title, { activeColumn, expanded, number });
+
+    const isScored = match.status === "finished" || match.status === "live";
+    const score = isScored ? H.scoreText(match.home_score, match.away_score) : "vs";
+    const home = this.finalFocusDisplayTeamName(match.home_team_name, number);
+    const away = this.finalFocusDisplayTeamName(match.away_team_name, number);
+    const date = H.formatDateTime(match.kickoff_at);
+    const compactDate = this.finalFocusCompactDate(match.kickoff_at);
+    const location = [match.city, match.venue].filter(Boolean).join(" · ");
+    const pronoMeta = this.finalFocusPredictionMetaHtml(match, expanded);
+    const tvHtml = H.tvChannelLogosHtml(this.matchTvChannel(match), "tv-logo-strip final-tv-strip");
+    const cardClass = expanded ? "expanded detailed" : `compact ${activeColumn ? "active-compact" : "side-compact"}`;
+
+    return `
+      <article class="final-focus-match ${cardClass} ${match.status || "scheduled"}"
+        data-final-match-toggle="${Number(number)}"
+        data-final-round-target="${H.escapeHtml(config.key)}"
+        role="button"
+        tabindex="0"
+        aria-expanded="${expanded ? "true" : "false"}">
+        <header class="final-focus-card-head">
+          <strong>${H.escapeHtml(title)}</strong>
+          <small>${H.escapeHtml(expanded ? date : compactDate)}</small>
+        </header>
+        <div class="${expanded ? "final-focus-detailed-teams" : "final-focus-compact-teams"}">
+          <span>${H.matchFlagHtml(match, "home")}<strong>${H.escapeHtml(home)}</strong></span>
+          <b>${H.escapeHtml(score)}</b>
+          <span>${H.matchFlagHtml(match, "away")}<strong>${H.escapeHtml(away)}</strong></span>
+        </div>
+        ${pronoMeta}
+        ${expanded ? `<footer class="final-focus-card-foot is-expanded">
+          <span class="final-focus-location">${location ? H.escapeHtml(location) : "Lieu à confirmer"}</span>
+          <span class="final-focus-tv">${H.icon("tv")} ${tvHtml}</span>
+        </footer>` : ""}
+        ${expanded ? this.finalFocusAdminScoreShortcutHtml(match) : ""}
+      </article>
+    `;
+  },
+
+  finalFocusAdminScoreShortcutHtml(match) {
+    if (!this.isScoreAdmin?.() || !match?.id) return "";
+    return `
+      <div class="final-focus-admin-score">
+        <span>Score admin</span>
+        <a class="ghost-btn small" href="admin.html#scores" title="Ouvrir l’admin pour modifier le score">Modifier le score</a>
+      </div>
+    `;
+  },
+
+  finalFocusPredictionMetaHtml(match, detailed = false) {
+    if (!match?.id) return "";
+    const prediction = this.getMyPrediction(match.id);
+    const predictionText = prediction
+      ? `${Number(prediction.home_score_pred ?? 0)}-${Number(prediction.away_score_pred ?? 0)}`
+      : "non posé";
+    const resultText = ["finished", "live"].includes(match.status)
+      ? H.scoreText(match.home_score, match.away_score)
+      : "à venir";
+    const pointsRow = prediction && ["finished", "live"].includes(match.status)
+      ? (this.predictionForDisplay(this.myPointsForMatch(match.id) || prediction, match) || prediction)
+      : null;
+    const pointsText = pointsRow?.points_total !== undefined && pointsRow?.points_total !== null
+      ? `${Number(pointsRow.points_total || 0)} pt${Number(pointsRow.points_total || 0) > 1 ? "s" : ""}`
+      : "";
+
+    if (!detailed) {
+      return `<div class="final-focus-mini-meta"><span>Prono ${H.escapeHtml(predictionText)}</span><span>Rés. ${H.escapeHtml(resultText)}</span></div>`;
+    }
+
+    return `
+      <div class="final-focus-prono-strip">
+        <span><small>Ton prono</small><strong>${H.escapeHtml(predictionText)}</strong></span>
+        <span><small>Résultat réel</small><strong>${H.escapeHtml(resultText)}</strong></span>
+        ${pointsText ? `<span><small>Points</small><strong>${H.escapeHtml(pointsText)}</strong></span>` : ""}
+      </div>
+    `;
+  },
+
+  finalFocusDisplayTeamName(name, number = null) {
+    const clean = String(name || "").trim();
+    if (!clean) return "Équipe pas encore éclose";
+    if (/^à\s*d[ée]finir$/i.test(clean)) return "Équipe pas encore éclose";
+    if (/match\s*\d+\s*[—-]\s*[ée]quipe/i.test(clean)) return "Équipe pas encore éclose";
+    if (number && new RegExp(`^M?${Number(number)}[AB]?$`, "i").test(clean)) return "Équipe pas encore éclose";
+    return clean;
+  },
+
+  finalFocusPlaceholderHtml(title, view = {}) {
+    const expanded = typeof view === "boolean" ? Boolean(view) : Boolean(view?.expanded);
+    const activeColumn = typeof view === "boolean" ? Boolean(view) : Boolean(view?.activeColumn);
+    const number = typeof view === "object" ? Number(view?.number || 0) : 0;
+    const cardClass = expanded ? "expanded detailed" : `compact ${activeColumn ? "active-compact" : "side-compact"}`;
+    return `
+      <article class="final-focus-match ${cardClass} placeholder"
+        ${number ? `data-final-match-toggle="${number}"` : ""}
+        role="button"
+        tabindex="0"
+        aria-expanded="${expanded ? "true" : "false"}">
+        <header class="final-focus-card-head">
+          <strong>${H.escapeHtml(title)}</strong>
+          <small>À confirmer</small>
+        </header>
+        <div class="${expanded ? "final-focus-detailed-teams" : "final-focus-compact-teams"}">
+          <span><span class="flag-mini placeholder-flag"></span><strong>Équipe pas encore éclose</strong></span>
+          <b>vs</b>
+          <span><span class="flag-mini placeholder-flag"></span><strong>Équipe pas encore éclose</strong></span>
+        </div>
+        <div class="final-focus-mini-meta"><span>Prono non posé</span><span>Rés. à venir</span></div>
+        ${expanded ? `<footer class="final-focus-card-foot is-expanded"><span>Lieu à confirmer</span></footer>` : ""}
+      </article>
+    `;
+  },
+
+  finalFocusCompactDate(value) {
+    if (!value) return "à confirmer";
+    const formatted = H.formatDateTime(value) || "";
+    return formatted.split(",")[0] || formatted;
+  },
+
+  finalBracketHtml(byStage) {
+    const matchMap = this.finalBracketMatchMap(byStage);
+    const activeRound = this.activeFinalBracketRound(matchMap);
+    return this.finalFocusBracketHtml(matchMap, activeRound);
   },
 
   finalBracketColumnHtml(title, matches = [], sizeClass = "") {
@@ -3632,8 +6296,9 @@ const App = {
     const title = customTitle || H.stageLabel(match.stage);
     const date = H.formatDateTime(match.kickoff_at);
     const location = [match.city, match.venue].filter(Boolean).join(" · ");
-    const home = match.home_team_name || "À déterminer";
-    const away = match.away_team_name || "À déterminer";
+    const bracketNumber = H.officialBracketMatchNumber?.(match);
+    const home = this.finalFocusDisplayTeamName(match.home_team_name, bracketNumber);
+    const away = this.finalFocusDisplayTeamName(match.away_team_name, bracketNumber);
 
     return `
       <article class="final-bracket-match ${match.status || "scheduled"} ${extraClass}">
@@ -3660,9 +6325,9 @@ const App = {
     `;
   },
 
-  finalBracketPlaceholderHtml(title = "Match") {
+  finalBracketPlaceholderHtml(title = "Match", extraClass = "") {
     return `
-      <article class="final-bracket-match placeholder">
+      <article class="final-bracket-match placeholder ${extraClass}">
         <div class="final-bracket-match-head">
           <span>${H.escapeHtml(title)}</span>
           <small>À confirmer</small>
@@ -3726,20 +6391,23 @@ const App = {
 
   async renderPlayerLeaderboard() {
     const root = H.$("#leaderboardContent");
-    const mode = ["overall", "phase", "evolution"].includes(this.state.playerLeaderboardMode) ? this.state.playerLeaderboardMode : "overall";
+    if (!root) return;
+    const mode = ["overall", "average", "phase", "evolution_points", "evolution_average"].includes(this.state.playerLeaderboardMode) ? this.state.playerLeaderboardMode : "overall";
     this.state.playerLeaderboardMode = mode;
 
     root.innerHTML = `
       <section class="card player-leaderboard-card">
         <div class="card-title-row leaderboard-compact-title">
           <div>
-            <h3>${mode === "evolution" ? "Évolution joueurs" : "Classement joueurs"}</h3>
+            <h3>${mode.startsWith("evolution") ? "Évolution joueurs" : mode === "average" ? "Classement joueurs · moyenne" : "Classement joueurs"}</h3>
           </div>
         </div>
-        <div class="segmented small player-leaderboard-mode leaderboard-view-switch">
+        <div class="segmented small player-leaderboard-mode leaderboard-view-switch wide-switch">
           <button class="${mode === "overall" ? "active" : ""}" type="button" data-player-leaderboard-mode="overall">Général</button>
+          <button class="${mode === "average" ? "active" : ""}" type="button" data-player-leaderboard-mode="average">Moyenne</button>
           <button class="${mode === "phase" ? "active" : ""}" type="button" data-player-leaderboard-mode="phase">Par phase</button>
-          <button class="${mode === "evolution" ? "active" : ""}" type="button" data-player-leaderboard-mode="evolution">Évolution</button>
+          <button class="${mode === "evolution_points" ? "active" : ""}" type="button" data-player-leaderboard-mode="evolution_points">Évolution points</button>
+          <button class="${mode === "evolution_average" ? "active" : ""}" type="button" data-player-leaderboard-mode="evolution_average">Évolution moyenne</button>
         </div>
         <div id="playerLeaderboardRows"></div>
       </section>
@@ -3753,13 +6421,15 @@ const App = {
     });
 
     const target = H.$("#playerLeaderboardRows", root);
-    if (mode === "evolution") {
+    if (!target) return;
+    if (mode.startsWith("evolution")) {
       const evolutionMode = this.state.leaderboardEvolutionMode === "week" ? "week" : "day";
+      const valueMode = mode === "evolution_average" ? "average" : "points";
       const useMockGraph = this.graphMockPreviewEnabled();
-      const series = useMockGraph ? this.mockEvolutionSeries(evolutionMode) : this.playerEvolutionSeries(evolutionMode);
+      const series = useMockGraph ? this.mockEvolutionSeries(evolutionMode, valueMode) : this.playerEvolutionSeries(evolutionMode, { valueMode });
       target.innerHTML = this.evolutionBlockHtml(series, {
-        title: "Évolution · classement général",
-        description: "Points cumulés des meilleurs joueurs.",
+        title: valueMode === "average" ? "Évolution · moyenne par match" : "Évolution · classement général",
+        description: valueMode === "average" ? "Moyenne cumulée : points ÷ matchs pronostiqués." : "Points cumulés des meilleurs joueurs.",
         mode: evolutionMode,
         attrName: "data-player-evolution-mode",
         emptyText: "Pas encore assez de matchs terminés pour dessiner l’évolution générale."
@@ -3771,24 +6441,43 @@ const App = {
     if (mode === "phase") {
       await this.renderPoolRoundLeaderboard("#playerLeaderboardRows");
     } else {
-      await this.renderOverallLeaderboard("#playerLeaderboardRows");
+      await this.renderOverallLeaderboard("#playerLeaderboardRows", mode === "average" ? "average" : "points");
     }
   },
 
   scoreDetailRowsForUser(userId, filters = {}) {
-    const includeTest = Boolean(filters.includeTest || (filters.matchIds && filters.matchIds.length));
-    return this.state.visiblePredictions
-      .filter((p) => p.user_id === userId)
+    const includeTest = filters.includeTest === true;
+    const includeLiveDemo = Boolean(filters.includeLiveDemo);
+    const finishedOnly = Boolean(filters.finishedOnly);
+
+    const source = [
+      ...this.state.visiblePredictions.filter((p) => String(p.user_id) === String(userId)),
+      ...(String(userId) === String(this.state.session?.user?.id) ? this.state.myPredictions : [])
+    ];
+
+    const byMatch = new Map();
+    source.forEach((p) => {
+      if (!p?.match_id) return;
+      const current = byMatch.get(p.match_id) || {};
+      byMatch.set(p.match_id, { ...current, ...p, user_id: p.user_id || userId });
+    });
+
+    return [...byMatch.values()]
       .map((p) => {
         const match = this.state.matches.find((m) => m.id === p.match_id);
         const prediction = this.predictionForDisplay(p, match) || p;
         return { prediction, match };
       })
       .filter(({ match, prediction }) => match
-        && ["finished", "live"].includes(match.status)
+        && (finishedOnly ? match.status === "finished" : ["finished", "live"].includes(match.status))
         && prediction.points_total !== null
         && prediction.points_total !== undefined
-        && (includeTest || !match.is_test_match)
+        && (
+          includeTest
+          || !match.is_test_match
+          || (this.isLiveDemoMatch(match) && this.liveDemoMatchEnabled())
+        )
+        && (!this.isLiveDemoMatch(match) || includeLiveDemo)
         && (!filters.matchDay || match.match_day === filters.matchDay)
         && (!filters.poolRound || Number(match.pool_round || 0) === Number(filters.poolRound))
         && (!filters.matchIds || filters.matchIds.includes(match.id))
@@ -4022,7 +6711,9 @@ const App = {
       { id: "last-wingbeat", title: "Dernier battement d’aile", description: "Un prono ajusté dans les 2 heures avant le coup d’envoi. Frisson, sueur, validation.", type: "neutral", category: "fidelity" },
 
       { id: "champion-picked", title: "Champion choisi", description: "L’équipe championne a été désignée avant le grand envol. Le hibou assume son oracle.", type: "neutral", category: "progression" },
+      { id: "second-champion-picked", title: "Deuxième plume posée", description: "Un 2e champion a été choisi après les poules. Le hibou sort son stylo de secours.", type: "neutral", category: "progression" },
       { id: "final-winner-oracle", title: "Oracle de la finale", description: "L’équipe choisie championne avant le départ gagne réellement la Coupe. Là, le nid sort les confettis.", type: "neutral" },
+      { id: "second-final-winner-oracle", title: "Rattrapage royal", description: "Le 2e champion choisi après les poules gagne la compétition. Filet de sécurité validé par le Hibou.", type: "positive" },
       { id: "bus-stuck", title: "Descente du bus impossible", description: "L’équipe désignée championne reste bloquée en phase de groupes. Le bus a calé avant la sortie des poules.", type: "negative" },
       { id: "final-perfect-score", title: "Finale millimétrée", description: "Score exact trouvé sur la finale. Une plume, une règle, zéro tremblement.", type: "neutral" },
       { id: "first-flight", title: "Premier envol", description: "Premier match comptabilisé. Le hibou a quitté le nid.", type: "neutral" },
@@ -4074,9 +6765,35 @@ const App = {
   badgeById(id) {
     return this.badgeCatalog().find((badge) => badge.id === id);
   },
+  manualBadgesForUser(userId) {
+    return (this.state.manualBadges || [])
+      .filter((row) => String(row.user_id) === String(userId))
+      .map((row) => {
+        const badge = this.badgeById(row.badge_id);
+        if (!badge) return null;
+        return {
+          ...badge,
+          manual: true,
+          unlockedAt: this.safeDate(row.granted_at),
+          manualReason: row.reason || null
+        };
+      })
+      .filter(Boolean);
+  },
+
+  preparationBadgeIds() {
+    return ["preparation-two-picks", "prep-good-pick"];
+  },
+
+
+
+  achievementsFinishedOnlyGuard() {
+    // Les classements peuvent bouger en live, mais les exploits de score restent figés aux matchs terminés.
+    return true;
+  },
 
   computeBadgesForUser(userId) {
-    const rows = this.scoreDetailRowsForUser(userId);
+    const rows = this.scoreDetailRowsForUser(userId, { finishedOnly: true });
     const predictionRows = this.predictionRowsForUser(userId);
     const prepMatches = this.preparationMatches();
     const prepPredictionRows = this.predictionRowsForUser(userId, { includeTest: true })
@@ -4095,8 +6812,10 @@ const App = {
       return pred === real;
     });
     const earlyWinnerPick = this.winnerPredictionForUser(userId);
+    const secondWinnerPick = String(userId) === String(this.state.session?.user?.id) ? this.state.secondWinnerPrediction : null;
+    const manualBadges = this.manualBadgesForUser(userId);
 
-    if (!rows.length && !predictionRows.length && !prepPredictionRows.length && !earlyWinnerPick?.predicted_team_id) return [];
+    if (!rows.length && !predictionRows.length && !prepPredictionRows.length && !earlyWinnerPick?.predicted_team_id && !secondWinnerPick?.predicted_team_id && !manualBadges.length) return [];
 
     const exact = rows.filter(({ prediction }) => prediction.is_exact_score).length;
     const goodResults = rows.filter(({ prediction }) => prediction.is_good_result).length;
@@ -4300,6 +7019,8 @@ const App = {
     if (hasLastWingbeat) unlock("last-wingbeat", this.predictionActivityDate(lastWingbeatPrediction));
 
     if (hasFinalWinnerPick) unlock("final-winner-oracle", finalDate);
+    if (secondWinnerPick?.predicted_team_id) unlock("second-champion-picked", secondWinnerPick.locked_at || secondWinnerPick.updated_at || secondWinnerPick.created_at || null);
+    if (final?.status === "finished" && final?.winner_team_id && secondWinnerPick?.predicted_team_id === final.winner_team_id) unlock("second-final-winner-oracle", finalDate);
     const championGroupExitDate = this.championGroupExitDate(finalWinnerPick);
     if (championGroupExitDate) unlock("bus-stuck", championGroupExitDate);
     if (hasPerfectFinalScore) unlock("final-perfect-score", this.scoreRowResultDate(finalPerfectRow));
@@ -4351,7 +7072,15 @@ const App = {
     if (bigWrongWay >= 1) unlock("big-owch", firstDateFromRows(bigWrongWayRows));
     if (rows.length >= 5 && zeros >= 3) unlock("wet-feathers", dateWhenCountReached(zeroRows, 3));
 
-    return [...badges, ...this.miniRecordBadgesForUser(userId)];
+    const merged = [...badges, ...manualBadges];
+    const seen = new Set();
+    const uniqueBadges = merged.filter((badge) => {
+      if (!badge?.id || seen.has(badge.id)) return false;
+      seen.add(badge.id);
+      return true;
+    });
+
+    return [...uniqueBadges, ...this.miniRecordBadgesForUser(userId)];
   },
 
   badgeIconName(badge) {
@@ -4366,11 +7095,17 @@ const App = {
     const id = H.escapeHtml(badge.id);
     const title = H.escapeHtml(badge.title);
     const isMiniRecord = badge.isMiniRecord || String(badge.id || "").startsWith("record-");
+    const specialBadgeAssets = {
+      "champion-picked": "assets/icons/owl-png/coupe-du-monde.png",
+      "second-champion-picked": "assets/icons/owl-png/badges.png",
+      "second-final-winner-oracle": "assets/icons/owl-png/coupe-du-monde.png"
+    };
     const assetFolder = isMiniRecord ? "assets/records" : "assets/badges";
+    const src = specialBadgeAssets[badge.id] || `${assetFolder}/${id}.png`;
     const altPrefix = isMiniRecord ? "Mini-record" : "Badge";
     return `
       <span class="achievement-art ${unlocked ? "unlocked" : "locked"} ${isMiniRecord ? "mini-record-art" : ""}">
-        <img src="${assetFolder}/${id}.png" alt="${altPrefix} ${title}" loading="lazy" onerror="this.remove()">
+        <img src="${src}" alt="${altPrefix} ${title}" loading="lazy" onerror="this.remove()">
         <span class="achievement-fallback">${H.icon(this.badgeIconName(badge))}</span>
       </span>
     `;
@@ -4627,7 +7362,9 @@ const App = {
             this.loadMyPredictions(),
             this.loadVisiblePredictions(),
             this.loadWinnerPrediction(),
-            this.loadWinnerPredictionsForTeams().catch(() => null)
+            this.loadSecondWinnerPrediction().catch(() => null),
+            this.loadWinnerPredictionsForTeams().catch(() => null),
+            this.loadSecondWinnerPredictionsForTeams().catch(() => null)
           ]);
           this.syncAchievementNotifications();
         } catch (error) {
@@ -4824,30 +7561,93 @@ const App = {
 
 
   playerScoreDetailsHtml(userId, filters = {}) {
-    const rows = this.scoreDetailRowsForUser(userId, filters);
+    const rows = this.scoreDetailRowsForUser(userId, filters)
+      .slice()
+      .sort((a, b) => new Date(b.match.kickoff_at || 0) - new Date(a.match.kickoff_at || 0));
+
     if (!rows.length) {
       return `<p class="muted detail-empty">Aucun match terminé comptabilisé pour ce joueur.</p>`;
     }
 
+    const rowHtml = ({ prediction: p, match }) => `
+      <div class="score-detail-row">
+        <div class="score-detail-match">
+          <strong>${H.matchFlagHtml(match, "home")} ${H.escapeHtml(match.home_team_short_name || match.home_team_name)} - ${H.matchFlagHtml(match, "away")} ${H.escapeHtml(match.away_team_short_name || match.away_team_name)}</strong>
+          <small>${H.formatDateTime(match.kickoff_at)} · ${H.shortPoolRoundLabel(match)} · Réel : ${H.scoreText(match.home_score, match.away_score)} · Prono : ${p.home_score_pred} - ${p.away_score_pred}${p.qualified_team_name ? ` · Qualifié : ${H.escapeHtml(p.qualified_team_name)}` : ""}</small>
+        </div>
+        <div class="score-detail-points">
+          <strong>${p.points_total ?? 0}</strong>
+          <small>${H.escapeHtml(this.predictionReasonLabel(p))}</small>
+        </div>
+      </div>
+    `;
+
+    const latestRows = rows.slice(0, 5);
+    const olderRows = rows.slice(5);
+
     return `
       <div class="score-detail-list">
-        ${rows.map(({ prediction: p, match }) => `
-          <div class="score-detail-row">
-            <div class="score-detail-match">
-              <strong>${H.matchFlagHtml(match, "home")} ${H.escapeHtml(match.home_team_short_name || match.home_team_name)} - ${H.matchFlagHtml(match, "away")} ${H.escapeHtml(match.away_team_short_name || match.away_team_name)}</strong>
-              <small>${H.shortPoolRoundLabel(match)} · Réel : ${H.scoreText(match.home_score, match.away_score)} · Prono : ${p.home_score_pred} - ${p.away_score_pred}${p.qualified_team_name ? ` · Qualifié : ${H.escapeHtml(p.qualified_team_name)}` : ""}</small>
-            </div>
-            <div class="score-detail-points">
-              <strong>${p.points_total ?? 0}</strong>
-              <small>${H.escapeHtml(this.predictionReasonLabel(p))}</small>
-            </div>
-          </div>
-        `).join("")}
+        ${latestRows.map(rowHtml).join("")}
       </div>
+      ${olderRows.length ? `
+        <details class="score-detail-more">
+          <summary class="ghost-btn tiny-btn score-detail-more-btn">Voir les ${olderRows.length} autre${olderRows.length > 1 ? "s" : ""} match${olderRows.length > 1 ? "s" : ""}</summary>
+          <div class="score-detail-list score-detail-list-extra">
+            ${olderRows.map(rowHtml).join("")}
+          </div>
+        </details>
+      ` : ""}
     `;
   },
 
-  async renderOverallLeaderboard(targetSelector = "#leaderboardContent") {
+  averagePoints(row = {}) {
+    const played = Number(row.scored_matches || row.matches_played || 0);
+    return played ? Number(row.total_points || 0) / played : 0;
+  },
+
+  withAveragePoints(row = {}) {
+    return {
+      ...row,
+      average_points: Number.isFinite(Number(row.average_points)) && Number(row.average_points) > 0
+        ? Number(row.average_points)
+        : this.averagePoints(row)
+    };
+  },
+
+  sortPlayerRows(rows = [], mode = "points") {
+    const byAverage = mode === "average";
+    const sortedRows = (rows || [])
+      .map((row) => this.withAveragePoints(row))
+      .sort((a, b) =>
+        byAverage
+          ? Number(b.average_points || 0) - Number(a.average_points || 0)
+            || Number(b.total_points || 0) - Number(a.total_points || 0)
+            || Number(b.scored_matches || 0) - Number(a.scored_matches || 0)
+            || String(a.pseudo || "").localeCompare(String(b.pseudo || ""), "fr")
+          : Number(b.total_points || 0) - Number(a.total_points || 0)
+            || Number(b.average_points || 0) - Number(a.average_points || 0)
+            || Number(b.exact_scores || 0) - Number(a.exact_scores || 0)
+            || Number(b.good_results || 0) - Number(a.good_results || 0)
+            || String(a.pseudo || "").localeCompare(String(b.pseudo || ""), "fr")
+      );
+    return this.rankRowsWithTies(sortedRows, (row) => byAverage ? Number(row.average_points || 0) : Number(row.total_points || 0));
+  },
+
+
+  rankRowsWithTies(rows = [], metricGetter = (row) => Number(row.total_points || 0)) {
+    let currentRank = 0;
+    let previousMetric = null;
+    return (rows || []).map((row, index) => {
+      const metric = Number(metricGetter(row) || 0);
+      if (index === 0 || Math.abs(metric - previousMetric) > 0.000001) {
+        currentRank = index + 1;
+        previousMetric = metric;
+      }
+      return { ...row, rank: currentRank };
+    });
+  },
+
+  async renderOverallLeaderboard(targetSelector = "#leaderboardContent", valueMode = "points") {
     await Promise.all([
       this.loadMatches(),
       this.loadVisiblePredictions(),
@@ -4860,21 +7660,25 @@ const App = {
       .order("rank");
 
     const root = H.$(targetSelector);
+    if (!root) return;
     if (error) {
       root.innerHTML = `<p class="error-text">${H.escapeHtml(error.message)}</p>`;
       return;
     }
 
-    const rows = this.liveAdjustedLeaderboardRows(data || []);
+    const officialIds = new Set(this.officialProfiles(this.state.publicProfiles).map((profile) => String(profile.id || profile.user_id)));
+    const officialRows = this.liveAdjustedLeaderboardRows(data || [])
+      .filter((row) => !officialIds.size || officialIds.has(String(row.user_id || row.id)));
+    const rows = this.sortPlayerRows(officialRows, valueMode);
     const liveCount = this.liveOfficialProjectionRows().length;
 
     root.innerHTML = `
       <div class="leaderboard-inner-title">
-        <strong>Général</strong>
-        <small>Classement Coupe du monde, hors matchs test${liveCount ? " · projections live incluses" : ""}</small>
+        <strong>${valueMode === "average" ? "Moyenne par match pronostiqué" : "Général"}</strong>
+        <small>${valueMode === "average" ? "Points ÷ matchs comptés" : "Classement Coupe du monde, hors matchs test"}${liveCount ? " · projections live incluses" : ""}</small>
       </div>
       ${liveCount ? `<div class="live-ranking-note">${H.icon("info")} Classement provisoire pendant le live : il suit le score actuel et se recalera au coup de sifflet final.</div>` : ""}
-      ${this.leaderboardRowsHtml(rows)}
+      ${this.leaderboardRowsHtml(rows, { valueMode })}
     `;
     this.bindAchievementReplay(root);
   },
@@ -4882,10 +7686,16 @@ const App = {
   leaderboardRowsHtml(rows, options = {}) {
     if (!rows.length) return `<p class="muted">Pas encore de points.</p>`;
     const filters = options.filters || {};
+    const valueMode = options.valueMode || "points";
+    const movementContext = options.movementContext || "official";
+    const showRankMovement = options.showRankMovement !== undefined
+      ? Boolean(options.showRankMovement)
+      : (!filters.matchIds && valueMode === "points");
 
     return `
       <div class="leaderboard-list">
-        ${rows.map((r) => {
+        ${rows.map((rawRow) => {
+          const r = this.withAveragePoints(rawRow);
           const playerProfile = this.visualProfile({
             pseudo: r.pseudo,
             office_team_id: r.office_team_id,
@@ -4896,10 +7706,12 @@ const App = {
             badge_shape: r.badge_shape || "rounded",
             badge_color: r.badge_color || "#facc15"
           });
+          const averageValue = Number(r.average_points || 0);
+          const movementHtml = showRankMovement ? this.rankMovementHtml(r, movementContext) : "";
           return `
           <details class="leader-details ${r.user_id === this.state.session.user.id ? "me" : ""}">
             <summary class="leader-row">
-              <div class="rank">#${r.rank}</div>
+              <div class="rank">#${r.rank}${movementHtml}</div>
               <div class="leader-avatar" aria-hidden="true">
                 ${H.profileBadgeHtml(playerProfile, "profile-badge leader")}
               </div>
@@ -4907,8 +7719,11 @@ const App = {
                 <strong>${H.escapeHtml(r.pseudo)}</strong>
                 <small>${H.escapeHtml(r.office_team_name || "Sans team")}</small>
                 ${this.pointsBreakdownHtml(r)}
+                <div class="score-breakdown average-breakdown">
+                  <span title="Moyenne par match pronostiqué">${H.icon("trend")} ${averageValue.toFixed(2)} pts/match</span>
+                </div>
               </div>
-              <div class="points">${r.total_points || 0}<small>pts${r.live_points ? ` · +${r.live_points} live` : ""}</small></div>
+              <div class="points">${valueMode === "average" ? averageValue.toFixed(2) : (r.total_points || 0)}<small>${valueMode === "average" ? "pts/match" : `pts${r.live_points ? ` · +${r.live_points} live` : ""}`}</small></div>
             </summary>
             <div class="leader-expanded">
               <h4>Détail des points</h4>
@@ -4946,7 +7761,7 @@ const App = {
     }
 
     const byUser = new Map();
-    this.state.publicProfiles.forEach((profile) => {
+    this.officialProfiles(this.state.publicProfiles).forEach((profile) => {
       const userId = profile.id || profile.user_id;
       if (!userId) return;
       byUser.set(userId, {
@@ -4966,13 +7781,16 @@ const App = {
     });
     (data || []).forEach((row) => {
       if (!row.user_id) return;
+      const profile = this.profileForUser(row.user_id, row);
+      if (this.isFamily(profile)) return;
       byUser.set(row.user_id, { ...(byUser.get(row.user_id) || {}), ...row });
     });
 
     const matchIds = group.matches.map((m) => m.id);
-    const finishedCount = group.matches.filter((m) => m.status === "finished").length;
-    const rows = [...byUser.values()].map((player) => {
-      const details = this.scoreDetailRowsForUser(player.user_id, { matchIds });
+    const finishedCount = group.matches.filter((m) => ["finished", "live"].includes(m.status)).length;
+    const liveProjectionCount = this.liveProjectionCountForMatchIds(matchIds);
+    const sortedRows = [...byUser.values()].map((player) => {
+      const details = this.scoreDetailRowsForUser(player.user_id, { matchIds, includeTest: false });
       const total = details.reduce((sum, { prediction }) => sum + Number(prediction.points_total || 0), 0);
       const exact = details.filter(({ prediction }) => prediction.is_exact_score).length;
       const goodResults = details.filter(({ prediction }) => prediction.is_good_result).length;
@@ -4994,8 +7812,8 @@ const App = {
         || (b.good_results || 0) - (a.good_results || 0)
         || (b.good_goal_diffs || 0) - (a.good_goal_diffs || 0)
         || String(a.pseudo || "").localeCompare(String(b.pseudo || ""), "fr")
-      )
-      .map((row, index) => ({ ...row, rank: index + 1 }));
+      );
+    const rows = this.rankRowsWithTies(sortedRows, (row) => Number(row.total_points || 0));
 
     const pager = this.phaseNavigatorHtml(groups, activeIndex, "leaderboardPhaseIndex");
 
@@ -5067,17 +7885,9 @@ const App = {
   },
 
   teamPhaseRows(matchIds = [], mode = "average") {
-    const matchIdSet = new Set(matchIds);
     const teams = this.state.officeTeams.map((team) => {
       const players = this.teamPlayers(team.id, { officialOnly: true }).filter((player) => player.profile_setup_done !== false);
-      const playerIds = new Set(players.map((player) => player.id));
-      const details = this.state.visiblePredictions
-        .filter((prediction) => playerIds.has(prediction.user_id) && matchIdSet.has(prediction.match_id))
-        .map((prediction) => {
-          const match = this.state.matches.find((m) => m.id === prediction.match_id);
-          return { prediction: this.predictionForDisplay(prediction, match) || prediction, match };
-        })
-        .filter(({ match, prediction }) => ["finished", "live"].includes(match?.status) && prediction.points_total !== null && prediction.points_total !== undefined);
+      const details = players.flatMap((player) => this.scoreDetailRowsForUser(player.id || player.user_id, { matchIds, includeTest: false }));
 
       const total = details.reduce((sum, { prediction }) => sum + Number(prediction.points_total || 0), 0);
       const exact = details.filter(({ prediction }) => prediction.is_exact_score).length;
@@ -5088,7 +7898,7 @@ const App = {
         office_team_color: team.color,
         active_players: players.length,
         total_points: total,
-        average_points: players.length ? total / players.length : 0,
+        average_points: details.length ? total / details.length : 0,
         exact_scores: exact,
         good_results: goodResults,
         scored_matches: details.length
@@ -5096,7 +7906,7 @@ const App = {
     }).filter((row) => row.active_players > 0);
 
     const byAverage = mode === "average";
-    return teams
+    const sortedRows = teams
       .sort((a, b) =>
         byAverage
           ? (b.average_points || 0) - (a.average_points || 0)
@@ -5105,8 +7915,8 @@ const App = {
           : (b.total_points || 0) - (a.total_points || 0)
             || (b.average_points || 0) - (a.average_points || 0)
             || String(a.office_team_name || "").localeCompare(String(b.office_team_name || ""), "fr")
-      )
-      .map((row, index) => ({ ...row, rank: index + 1 }));
+      );
+    return this.rankRowsWithTies(sortedRows, (row) => byAverage ? Number(row.average_points || 0) : Number(row.total_points || 0));
   },
 
   teamOverallRows(mode = "average", scoreRows = this.liveAdjustedLeaderboardRows(this.state.playerScoreRows)) {
@@ -5139,13 +7949,13 @@ const App = {
         office_team_name: team.name,
         office_team_color: team.color,
         active_players: players.length,
-        average_points: players.length ? totals.total_points / players.length : 0,
+        average_points: totals.scored_matches ? totals.total_points / totals.scored_matches : 0,
         ...totals
       };
     }).filter((row) => row.active_players > 0);
 
     const byAverage = mode === "average";
-    return rows
+    const sortedRows = rows
       .sort((a, b) =>
         byAverage
           ? (b.average_points || 0) - (a.average_points || 0)
@@ -5154,8 +7964,8 @@ const App = {
           : (b.total_points || 0) - (a.total_points || 0)
             || (b.average_points || 0) - (a.average_points || 0)
             || String(a.office_team_name || "").localeCompare(String(b.office_team_name || ""), "fr")
-      )
-      .map((row, index) => ({ ...row, rank: index + 1 }));
+      );
+    return this.rankRowsWithTies(sortedRows, (row) => byAverage ? Number(row.average_points || 0) : Number(row.total_points || 0));
   },
 
   teamLeaderboardRowsHtml(rows = [], options = {}) {
@@ -5165,8 +7975,8 @@ const App = {
       <div class="leaderboard-list team-leaderboard-list">
         ${rows.map((r) => {
           const color = this.safeColor(r.office_team_color || r.color, "#facc15");
-          const mainValue = mode === "average" ? Number(r.average_points || 0).toFixed(1) : Number(r.total_points || 0);
-          const mainLabel = mode === "average" ? "pts/j" : "pts";
+          const mainValue = mode === "average" ? Number(r.average_points || 0).toFixed(2) : Number(r.total_points || 0);
+          const mainLabel = mode === "average" ? "pts/match" : `pts${r.live_points ? ` · +${r.live_points} live` : ""}`;
           return `
             <div class="leader-row team-row nest-team-row" style="--team-color:${color}">
               <div class="rank">#${r.rank}</div>
@@ -5178,7 +7988,7 @@ const App = {
                   <span title="Scores exacts">${H.icon("target")} ${r.exact_scores || 0}</span>
                   <span title="Bons résultats">${H.icon("check")} ${r.good_results || 0}</span>
                   ${r.scored_matches !== undefined ? `<span title="Pronos comptabilisés">${H.icon("list")} ${r.scored_matches || 0}</span>` : ""}
-                  ${mode !== "average" ? `<span title="Moyenne par joueur">${H.icon("trend")} ${Number(r.average_points || 0).toFixed(1)} pts/j</span>` : ""}
+                  ${mode !== "average" ? `<span title="Moyenne par match pronostiqué">${H.icon("trend")} ${Number(r.average_points || 0).toFixed(2)} pts/match</span>` : ""}
                 </div>
               </div>
               <div class="points">${mainValue}<small>${mainLabel}</small></div>
@@ -5205,6 +8015,7 @@ const App = {
   },
 
   async renderTeamLeaderboard() {
+    await Promise.all([this.loadMatches(), this.loadVisiblePredictions(), this.loadPublicProfiles(), this.loadPlayerScoreRows()]);
     const root = H.$("#leaderboardContent");
     const teamTab = ["average", "points", "evolution_average", "evolution_points"].includes(this.state.teamTab) ? this.state.teamTab : "average";
     const scope = this.state.teamLeaderboardScope === "phase" ? "phase" : "overall";
@@ -5239,7 +8050,7 @@ const App = {
           <div class="team-leaderboard-control-stack">${scopeControls}${modeControls}</div>
           ${this.evolutionBlockHtml(series, {
             title: evolutionValueMode === "average" ? "Évolution moyenne · teams bureau" : "Évolution points · teams bureau",
-            description: evolutionValueMode === "average" ? "Moyenne cumulée par joueur dans chaque team." : "Points cumulés par team.",
+            description: evolutionValueMode === "average" ? "Moyenne cumulée par match pronostiqué dans chaque team." : "Points cumulés par team.",
             mode: evolutionMode,
             attrName: "data-team-evolution-mode",
             emptyText: "Pas encore assez de matchs terminés pour dessiner l’évolution des teams."
@@ -5326,10 +8137,21 @@ const App = {
     });
   },
 
-  playerEvolutionSeries(mode = "day") {
+  playerEvolutionSeries(mode = "day", options = {}) {
+    const valueMode = options.valueMode || "points";
+    const allowedOfficialIds = options.officialOnly === false
+      ? null
+      : new Set(this.officialProfiles(this.state.publicProfiles).map((profile) => String(profile.id || profile.user_id)));
     const finishedRows = this.state.visiblePredictions
       .map((prediction) => ({ prediction, match: this.state.matches.find((m) => m.id === prediction.match_id) }))
-      .filter(({ prediction, match }) => match?.status === "finished" && this.graphEvolutionCanUseMatch(match) && prediction.points_total !== null && prediction.points_total !== undefined)
+      .filter(({ prediction, match }) =>
+        match?.status === "finished"
+        && !this.isLiveDemoMatch(match)
+        && (!allowedOfficialIds || allowedOfficialIds.has(String(prediction.user_id)))
+        && this.graphEvolutionCanUseMatch(match)
+        && prediction.points_total !== null
+        && prediction.points_total !== undefined
+      )
       .sort((a, b) => new Date(a.match.kickoff_at || 0) - new Date(b.match.kickoff_at || 0));
 
     const periodKey = (date) => {
@@ -5347,44 +8169,98 @@ const App = {
 
     const periods = [...new Set(finishedRows.map(({ match }) => periodKey(match.kickoff_at)))].sort();
     const totalsByUser = new Map();
+    const countsByUser = new Map();
     const pointsByPeriod = new Map(periods.map((key) => [key, new Map()]));
+    const countsByPeriod = new Map(periods.map((key) => [key, new Map()]));
 
     finishedRows.forEach(({ prediction, match }) => {
       const key = periodKey(match.kickoff_at);
       const map = pointsByPeriod.get(key);
+      const countMap = countsByPeriod.get(key);
       map.set(prediction.user_id, (map.get(prediction.user_id) || 0) + Number(prediction.points_total || 0));
+      countMap.set(prediction.user_id, (countMap.get(prediction.user_id) || 0) + 1);
     });
 
     periods.forEach((key) => {
       const map = pointsByPeriod.get(key);
+      const countMap = countsByPeriod.get(key) || new Map();
       map.forEach((points, userId) => {
         totalsByUser.set(userId, (totalsByUser.get(userId) || 0) + points);
+        countsByUser.set(userId, (countsByUser.get(userId) || 0) + (countMap.get(userId) || 0));
       });
     });
 
+    const valueForUser = (userId, points, count = countsByUser.get(userId) || 0) =>
+      valueMode === "average" ? Math.round((points / Math.max(1, count)) * 100) / 100 : points;
+
     const playerIds = [...totalsByUser.keys()]
-      .sort((a, b) => (totalsByUser.get(b) || 0) - (totalsByUser.get(a) || 0))
+      .sort((a, b) => valueForUser(b, totalsByUser.get(b) || 0) - valueForUser(a, totalsByUser.get(a) || 0))
       .slice(0, 8);
 
     const cumulative = new Map(playerIds.map((userId) => [userId, 0]));
+    const cumulativeCounts = new Map(playerIds.map((userId) => [userId, 0]));
     const snapshots = periods.map((key) => {
       const periodPoints = pointsByPeriod.get(key) || new Map();
-      playerIds.forEach((userId) => cumulative.set(userId, (cumulative.get(userId) || 0) + (periodPoints.get(userId) || 0)));
+      const periodCounts = countsByPeriod.get(key) || new Map();
+      playerIds.forEach((userId) => {
+        cumulative.set(userId, (cumulative.get(userId) || 0) + (periodPoints.get(userId) || 0));
+        cumulativeCounts.set(userId, (cumulativeCounts.get(userId) || 0) + (periodCounts.get(userId) || 0));
+      });
       return {
         key,
         label: periodLabel(key),
-        totals: new Map(playerIds.map((userId) => [userId, cumulative.get(userId) || 0]))
+        totals: new Map(playerIds.map((userId) => [userId, valueForUser(userId, cumulative.get(userId) || 0, cumulativeCounts.get(userId) || 0)]))
       };
     });
 
-    return { playerIds, snapshots, totalsByUser };
+    const finalTotalsByUser = new Map(playerIds.map((userId) => [userId, snapshots[snapshots.length - 1]?.totals.get(userId) || 0]));
+    return { playerIds, snapshots, totalsByUser: finalTotalsByUser, valueMode };
   },
 
-  evolutionChartSvg(series) {
+
+  evolutionFocusKey(attrName = "data-evolution-mode") {
+    return String(attrName || "data-evolution-mode").replace(/^data-/, "").replace(/-mode$/, "");
+  },
+
+  evolutionZoomFor(attrName = "data-evolution-mode") {
+    const key = this.evolutionFocusKey(attrName);
+    const value = Number(this.state.evolutionZoomMap?.[key] || 1);
+    return Math.min(2, Math.max(0.7, value || 1));
+  },
+
+  evolutionFocusFor(attrName = "data-evolution-mode") {
+    const key = this.evolutionFocusKey(attrName);
+    return this.state.evolutionFocusMap?.[key] || "";
+  },
+
+  setEvolutionZoom(attrName = "data-evolution-mode", delta = 0) {
+    const key = this.evolutionFocusKey(attrName);
+    this.state.evolutionZoomMap ||= {};
+    const current = this.evolutionZoomFor(attrName);
+    this.state.evolutionZoomMap[key] = Math.min(2, Math.max(0.7, Math.round((current + Number(delta || 0)) * 10) / 10));
+  },
+
+  setEvolutionFocus(attrName = "data-evolution-mode", id = "") {
+    const key = this.evolutionFocusKey(attrName);
+    this.state.evolutionFocusMap ||= {};
+    this.state.evolutionFocusMap[key] = String(id || "");
+  },
+
+  evolutionColor(index = 0) {
+    const palette = [
+      "#facc15", "#38bdf8", "#a78bfa", "#fb7185",
+      "#34d399", "#fb923c", "#f472b6", "#22c55e",
+      "#60a5fa", "#e879f9", "#f87171", "#2dd4bf"
+    ];
+    return palette[Math.abs(Number(index || 0)) % palette.length];
+  },
+
+  evolutionChartSvg(series, { zoom = 1, focusId = "" } = {}) {
     const { playerIds, snapshots } = series;
     if (!playerIds.length || !snapshots.length) return "";
-    const width = 760;
-    const height = 300;
+    const safeZoom = Math.min(2, Math.max(0.7, Number(zoom || 1)));
+    const width = Math.round(760 * safeZoom);
+    const height = Math.round(300 * safeZoom);
     const pad = { left: 46, right: 22, top: 24, bottom: 42 };
     const graphW = width - pad.left - pad.right;
     const graphH = height - pad.top - pad.bottom;
@@ -5392,18 +8268,24 @@ const App = {
     const x = (index) => pad.left + (snapshots.length === 1 ? graphW / 2 : (index / (snapshots.length - 1)) * graphW);
     const y = (value) => pad.top + graphH - (Number(value || 0) / maxPoints) * graphH;
     const yTicks = [0, Math.ceil(maxPoints / 2), maxPoints];
+    const unitLabel = series.valueMode === "average" ? " pts/match" : " pts";
 
-    const lines = playerIds.map((userId, index) => {
-      const source = series.mockProfiles?.get(userId) || this.state.playerScoreRows.find((row) => row.user_id === userId || row.id === userId);
-      const profile = this.profileForUser(userId, source);
-      const color = this.safeColor(profile.badge_color || profile.office_team_color, ["#facc15", "#38bdf8", "#a78bfa", "#fb7185", "#34d399", "#fb923c", "#f472b6", "#c4b5fd"][index % 8]);
+    const renderIds = focusId
+      ? [...playerIds.filter((id) => String(id) !== String(focusId)), ...playerIds.filter((id) => String(id) === String(focusId))]
+      : playerIds;
+    const lines = renderIds.map((userId) => {
+      const index = Math.max(0, playerIds.findIndex((id) => String(id) === String(userId)));
+      const color = this.evolutionColor(index);
+      const isFocused = focusId && String(userId) === String(focusId);
       const points = snapshots.map((snapshot, i) => `${x(i).toFixed(1)},${y(snapshot.totals.get(userId) || 0).toFixed(1)}`).join(" ");
       const last = snapshots[snapshots.length - 1];
       const lastX = x(snapshots.length - 1);
       const lastY = y(last.totals.get(userId) || 0);
       return `
-        <polyline class="evolution-line" points="${points}" fill="none" stroke="${color}" style="stroke:${color}" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
-        <circle class="evolution-dot" cx="${lastX.toFixed(1)}" cy="${lastY.toFixed(1)}" r="5" fill="${color}" style="fill:${color}" />
+        <g class="evolution-series ${isFocused ? "is-focused" : focusId ? "is-dimmed" : ""}" data-evolution-series="${H.escapeHtml(String(userId))}">
+          <polyline class="evolution-line" points="${points}" fill="none" stroke="${color}" style="stroke:${color}" stroke-width="${isFocused ? 6 : 4}" stroke-linecap="round" stroke-linejoin="round" />
+          <circle class="evolution-dot" cx="${lastX.toFixed(1)}" cy="${lastY.toFixed(1)}" r="${isFocused ? 6.5 : 5}" fill="${color}" style="fill:${color}" />
+        </g>
       `;
     }).join("");
 
@@ -5426,34 +8308,96 @@ const App = {
     `;
   },
 
-  familyPlayerRows(matchIds = null) {
+  officialOverallRowForUser(userId) {
+    if (!userId) return null;
+    return this.state.playerScoreRows.find((row) => String(row.user_id || row.id) === String(userId)) || null;
+  },
+
+  familyPlayerOverallRow(player) {
+    const userId = player.id || player.user_id;
+    const official = this.officialOverallRowForUser(userId);
+
+    // En mode général Famille, un joueur doit avoir exactement les mêmes matchs comptés
+    // que dans le classement général officiel. La famille sert à filtrer l'affichage,
+    // pas à recalculer une source différente.
+    if (official) {
+      return this.withAveragePoints({
+        ...player,
+        ...official,
+        id: userId,
+        user_id: userId,
+        pseudo: official.pseudo || player.pseudo,
+        office_team_id: official.office_team_id || player.office_team_id,
+        office_team_name: official.office_team_name || player.office_team_name,
+        office_team_slug: official.office_team_slug || player.office_team_slug,
+        office_team_color: official.office_team_color || player.office_team_color,
+        avatar_key: official.avatar_key || player.avatar_key,
+        badge_shape: official.badge_shape || player.badge_shape,
+        badge_color: official.badge_color || player.badge_color
+      });
+    }
+
+    const details = this.scoreDetailRowsForUser(userId, { includeTest: false });
+    const total = details.reduce((sum, { prediction }) => sum + Number(prediction.points_total || 0), 0);
+    const livePoints = details
+      .filter(({ prediction }) => prediction.is_live_projection)
+      .reduce((sum, { prediction }) => sum + Number(prediction.points_total || 0), 0);
+    const liveMatchCount = details.filter(({ prediction }) => prediction.is_live_projection).length;
+    const exact = details.filter(({ prediction }) => prediction.is_exact_score).length;
+    const goodResults = details.filter(({ prediction }) => prediction.is_good_result).length;
+    const goodDiffs = details.filter(({ prediction }) => prediction.is_good_goal_diff).length;
+
+    return this.withAveragePoints({
+      ...player,
+      user_id: userId,
+      total_points: total,
+      exact_scores: exact,
+      good_results: goodResults,
+      good_goal_diffs: goodDiffs,
+      scored_matches: details.length,
+      live_points: livePoints,
+      live_match_count: liveMatchCount,
+      has_live_projection: liveMatchCount > 0
+    });
+  },
+
+
+  familyPlayerRows(matchIds = null, mode = "points") {
     const participants = this.familyProfiles(this.state.publicProfiles)
       .filter((player) => this.isFamily(player) || player.profile_setup_done !== false);
+
     const rows = participants.map((player) => {
       const userId = player.id || player.user_id;
-      const details = this.scoreDetailRowsForUser(userId, matchIds ? { matchIds } : {});
+
+      if (!matchIds) {
+        return this.familyPlayerOverallRow(player);
+      }
+
+      const details = this.scoreDetailRowsForUser(userId, { matchIds, includeTest: false });
       const total = details.reduce((sum, { prediction }) => sum + Number(prediction.points_total || 0), 0);
+      const livePoints = details
+        .filter(({ prediction }) => prediction.is_live_projection)
+        .reduce((sum, { prediction }) => sum + Number(prediction.points_total || 0), 0);
+      const liveMatchCount = details.filter(({ prediction }) => prediction.is_live_projection).length;
       const exact = details.filter(({ prediction }) => prediction.is_exact_score).length;
       const goodResults = details.filter(({ prediction }) => prediction.is_good_result).length;
       const goodDiffs = details.filter(({ prediction }) => prediction.is_good_goal_diff).length;
-      return {
+
+      return this.withAveragePoints({
         ...player,
         user_id: userId,
         total_points: total,
         exact_scores: exact,
         good_results: goodResults,
         good_goal_diffs: goodDiffs,
-        scored_matches: details.length
-      };
+        scored_matches: details.length,
+        live_points: livePoints,
+        live_match_count: liveMatchCount,
+        has_live_projection: liveMatchCount > 0
+      });
     });
-    return rows
-      .sort((a, b) =>
-        Number(b.total_points || 0) - Number(a.total_points || 0)
-        || Number(b.exact_scores || 0) - Number(a.exact_scores || 0)
-        || Number(b.good_results || 0) - Number(a.good_results || 0)
-        || String(a.pseudo || "").localeCompare(String(b.pseudo || ""), "fr")
-      )
-      .map((row, index) => ({ ...row, rank: index + 1 }));
+
+    return this.sortPlayerRows(rows, mode);
   },
 
   familyTeamRows(matchIds = null, mode = "average") {
@@ -5465,7 +8409,8 @@ const App = {
       if (!player.office_team_id) return;
       const team = this.state.officeTeams.find((item) => item.id === player.office_team_id) || {};
       const userId = player.id || player.user_id;
-      const details = this.scoreDetailRowsForUser(userId, matchIds ? { matchIds } : {});
+      const overallRow = !matchIds ? this.familyPlayerOverallRow(player) : null;
+      const details = matchIds ? this.scoreDetailRowsForUser(userId, { matchIds, includeTest: false }) : [];
       const row = byTeam.get(player.office_team_id) || {
         office_team_id: player.office_team_id,
         office_team_name: player.office_team_name || team.name || "Team",
@@ -5475,22 +8420,39 @@ const App = {
         exact_scores: 0,
         good_results: 0,
         good_goal_diffs: 0,
-        scored_matches: 0
+        scored_matches: 0,
+        live_points: 0,
+        live_match_count: 0
       };
       row.active_players += 1;
-      details.forEach(({ prediction }) => {
-        row.total_points += Number(prediction.points_total || 0);
-        row.exact_scores += prediction.is_exact_score ? 1 : 0;
-        row.good_results += prediction.is_good_result ? 1 : 0;
-        row.good_goal_diffs += prediction.is_good_goal_diff ? 1 : 0;
-        row.scored_matches += 1;
-      });
+
+      if (overallRow) {
+        row.total_points += Number(overallRow.total_points || 0);
+        row.live_points += Number(overallRow.live_points || 0);
+        row.live_match_count += Number(overallRow.live_match_count || 0);
+        row.exact_scores += Number(overallRow.exact_scores || 0);
+        row.good_results += Number(overallRow.good_results || 0);
+        row.good_goal_diffs += Number(overallRow.good_goal_diffs || 0);
+        row.scored_matches += Number(overallRow.scored_matches || overallRow.matches_played || 0);
+      } else {
+        details.forEach(({ prediction }) => {
+          row.total_points += Number(prediction.points_total || 0);
+          if (prediction.is_live_projection) {
+            row.live_points += Number(prediction.points_total || 0);
+            row.live_match_count += 1;
+          }
+          row.exact_scores += prediction.is_exact_score ? 1 : 0;
+          row.good_results += prediction.is_good_result ? 1 : 0;
+          row.good_goal_diffs += prediction.is_good_goal_diff ? 1 : 0;
+          row.scored_matches += 1;
+        });
+      }
       byTeam.set(player.office_team_id, row);
     });
 
     const byAverage = mode === "average";
-    return [...byTeam.values()]
-      .map((row) => ({ ...row, average_points: row.active_players ? row.total_points / row.active_players : 0 }))
+    const sortedRows = [...byTeam.values()]
+      .map((row) => ({ ...row, average_points: row.scored_matches ? row.total_points / row.scored_matches : 0 }))
       .sort((a, b) =>
         byAverage
           ? (b.average_points || 0) - (a.average_points || 0)
@@ -5499,15 +8461,15 @@ const App = {
           : (b.total_points || 0) - (a.total_points || 0)
             || (b.average_points || 0) - (a.average_points || 0)
             || String(a.office_team_name || "").localeCompare(String(b.office_team_name || ""), "fr")
-      )
-      .map((row, index) => ({ ...row, rank: index + 1 }));
+      );
+    return this.rankRowsWithTies(sortedRows, (row) => byAverage ? Number(row.average_points || 0) : Number(row.total_points || 0));
   },
 
-  familyEvolutionSeries(mode = "day") {
+  familyEvolutionSeries(mode = "day", valueMode = "points") {
     const allowedIds = this.familyProfileIds();
     const finishedRows = this.state.visiblePredictions
       .map((prediction) => ({ prediction, match: this.state.matches.find((m) => m.id === prediction.match_id) }))
-      .filter(({ prediction, match }) => allowedIds.has(String(prediction.user_id)) && match?.status === "finished" && this.graphEvolutionCanUseMatch(match) && prediction.points_total !== null && prediction.points_total !== undefined)
+      .filter(({ prediction, match }) => allowedIds.has(String(prediction.user_id)) && match?.status === "finished" && !this.isLiveDemoMatch(match) && this.graphEvolutionCanUseMatch(match) && prediction.points_total !== null && prediction.points_total !== undefined)
       .sort((a, b) => new Date(a.match.kickoff_at || 0) - new Date(b.match.kickoff_at || 0));
 
     const periodKey = (date) => {
@@ -5524,26 +8486,46 @@ const App = {
     const periodLabel = (key) => mode === "week" ? `Semaine du ${H.formatShortDate(key)}` : H.formatShortDate(key);
     const periods = [...new Set(finishedRows.map(({ match }) => periodKey(match.kickoff_at)))].sort();
     const totalsByUser = new Map();
+    const countsByUser = new Map();
     const pointsByPeriod = new Map(periods.map((key) => [key, new Map()]));
+    const countsByPeriod = new Map(periods.map((key) => [key, new Map()]));
+
     finishedRows.forEach(({ prediction, match }) => {
       const key = periodKey(match.kickoff_at);
       const map = pointsByPeriod.get(key);
+      const countMap = countsByPeriod.get(key);
       map.set(prediction.user_id, (map.get(prediction.user_id) || 0) + Number(prediction.points_total || 0));
+      countMap.set(prediction.user_id, (countMap.get(prediction.user_id) || 0) + 1);
     });
+
     periods.forEach((key) => {
       const map = pointsByPeriod.get(key);
-      map.forEach((points, userId) => totalsByUser.set(userId, (totalsByUser.get(userId) || 0) + points));
+      const countMap = countsByPeriod.get(key) || new Map();
+      map.forEach((points, userId) => {
+        totalsByUser.set(userId, (totalsByUser.get(userId) || 0) + points);
+        countsByUser.set(userId, (countsByUser.get(userId) || 0) + (countMap.get(userId) || 0));
+      });
     });
+
+    const valueForUser = (userId, points, count = countsByUser.get(userId) || 0) =>
+      valueMode === "average" ? Math.round((points / Math.max(1, count)) * 100) / 100 : points;
+
     const playerIds = [...totalsByUser.keys()]
-      .sort((a, b) => (totalsByUser.get(b) || 0) - (totalsByUser.get(a) || 0))
+      .sort((a, b) => valueForUser(b, totalsByUser.get(b) || 0) - valueForUser(a, totalsByUser.get(a) || 0))
       .slice(0, 8);
     const cumulative = new Map(playerIds.map((userId) => [userId, 0]));
+    const cumulativeCounts = new Map(playerIds.map((userId) => [userId, 0]));
     const snapshots = periods.map((key) => {
       const periodPoints = pointsByPeriod.get(key) || new Map();
-      playerIds.forEach((userId) => cumulative.set(userId, (cumulative.get(userId) || 0) + (periodPoints.get(userId) || 0)));
-      return { key, label: periodLabel(key), totals: new Map(playerIds.map((userId) => [userId, cumulative.get(userId) || 0])) };
+      const periodCounts = countsByPeriod.get(key) || new Map();
+      playerIds.forEach((userId) => {
+        cumulative.set(userId, (cumulative.get(userId) || 0) + (periodPoints.get(userId) || 0));
+        cumulativeCounts.set(userId, (cumulativeCounts.get(userId) || 0) + (periodCounts.get(userId) || 0));
+      });
+      return { key, label: periodLabel(key), totals: new Map(playerIds.map((userId) => [userId, valueForUser(userId, cumulative.get(userId) || 0, cumulativeCounts.get(userId) || 0)])) };
     });
-    return { playerIds, snapshots, totalsByUser };
+    const finalTotals = new Map(playerIds.map((userId) => [userId, snapshots[snapshots.length - 1]?.totals.get(userId) || 0]));
+    return { playerIds, snapshots, totalsByUser: finalTotals, valueMode };
   },
 
   bindFamilyLeaderboardControls(root) {
@@ -5624,7 +8606,7 @@ const App = {
             <div class="team-leaderboard-control-stack">${paneControls}${scopeControls}${modeControls}</div>
             ${this.evolutionBlockHtml(series, {
               title: evolutionValueMode === "average" ? "Évolution moyenne · team Famille" : "Évolution points · team Famille",
-              description: evolutionValueMode === "average" ? "Moyenne cumulée par joueur dans chaque team Famille." : "Points cumulés par team dans le classement Famille.",
+              description: evolutionValueMode === "average" ? "Moyenne cumulée par match pronostiqué dans chaque team Famille." : "Points cumulés par team dans le classement Famille.",
               mode: evolutionMode,
               attrName: "data-family-team-evolution-mode",
               emptyText: "Pas encore assez de matchs terminés pour dessiner l’évolution des teams Famille."
@@ -5671,25 +8653,28 @@ const App = {
       return;
     }
 
-    const mode = ["overall", "phase", "evolution"].includes(this.state.familyPlayerLeaderboardMode) ? this.state.familyPlayerLeaderboardMode : "overall";
+    const mode = ["overall", "average", "phase", "evolution_points", "evolution_average"].includes(this.state.familyPlayerLeaderboardMode) ? this.state.familyPlayerLeaderboardMode : "overall";
     this.state.familyPlayerLeaderboardMode = mode;
     const modeControls = `
       <div class="segmented small player-leaderboard-mode leaderboard-view-switch">
         <button class="${mode === "overall" ? "active" : ""}" data-family-player-mode="overall">Général</button>
+        <button class="${mode === "average" ? "active" : ""}" data-family-player-mode="average">Moyenne</button>
         <button class="${mode === "phase" ? "active" : ""}" data-family-player-mode="phase">Par phase</button>
-        <button class="${mode === "evolution" ? "active" : ""}" data-family-player-mode="evolution">Évolution général</button>
+        <button class="${mode === "evolution_points" ? "active" : ""}" data-family-player-mode="evolution_points">Évolution points</button>
+        <button class="${mode === "evolution_average" ? "active" : ""}" data-family-player-mode="evolution_average">Évolution moyenne</button>
       </div>`;
 
-    if (mode === "evolution") {
+    if (mode.startsWith("evolution")) {
       const evolutionMode = this.state.familyLeaderboardEvolutionMode === "week" ? "week" : "day";
-      const series = this.graphMockPreviewEnabled() ? this.mockEvolutionSeries(evolutionMode) : this.familyEvolutionSeries(evolutionMode);
+      const valueMode = mode === "evolution_average" ? "average" : "points";
+      const series = this.graphMockPreviewEnabled() ? this.mockEvolutionSeries(evolutionMode, valueMode) : this.familyEvolutionSeries(evolutionMode, valueMode);
       root.innerHTML = `
         <section class="card player-leaderboard-card family-leaderboard-card">
-          <div class="card-title-row leaderboard-compact-title"><div><h3>Famille · évolution joueurs</h3><p class="muted">Joueurs Famille + joueurs UIS ayant activé le mode Famille.</p></div></div>
+          <div class="card-title-row leaderboard-compact-title"><div><h3>${valueMode === "average" ? "Famille · évolution moyenne" : "Famille · évolution joueurs"}</h3><p class="muted">Joueurs Famille + joueurs UIS ayant activé le mode Famille.</p></div></div>
           <div class="team-leaderboard-control-stack">${paneControls}${modeControls}</div>
           ${this.evolutionBlockHtml(series, {
-            title: "Évolution général · Famille",
-            description: "Points cumulés des meilleurs joueurs Famille.",
+            title: valueMode === "average" ? "Évolution moyenne · Famille" : "Évolution général · Famille",
+            description: valueMode === "average" ? "Moyenne cumulée : points ÷ matchs pronostiqués." : "Points cumulés des meilleurs joueurs Famille.",
             mode: evolutionMode,
             attrName: "data-family-evolution-mode",
             emptyText: "Pas encore assez de matchs terminés pour dessiner l’évolution Famille."
@@ -5705,7 +8690,7 @@ const App = {
       const activeIndex = this.clampPhaseIndex("familyLeaderboardPhaseIndex", groups);
       const group = groups[activeIndex];
       const matchIds = group ? group.matches.map((match) => match.id) : [];
-      const rows = group ? this.familyPlayerRows(matchIds) : [];
+      const rows = group ? this.familyPlayerRows(matchIds, "points") : [];
       const finishedCount = group ? group.matches.filter((match) => ["finished", "live"].includes(match.status)).length : 0;
       const liveProjectionCount = group ? this.liveProjectionCountForMatchIds(matchIds, { userIds: this.familyProfileIds() }) : 0;
       const pager = group ? this.phaseNavigatorHtml(groups, activeIndex, "familyLeaderboardPhaseIndex") : "";
@@ -5716,7 +8701,7 @@ const App = {
           ${pager}
           ${group ? `<div class="team-phase-head"><strong>${H.escapeHtml(group.key)}</strong><small>${finishedCount}/${group.matches.length} match${group.matches.length > 1 ? "s" : ""} terminé/en direct · ${H.matchDateRangeLabel(group.matches)}</small></div>` : `<p class="muted">Aucune phase à afficher pour le moment.</p>`}
           ${liveProjectionCount ? `<div class="live-ranking-note">${H.icon("info")} Classement Famille joueurs provisoire : ${liveProjectionCount} projection${liveProjectionCount > 1 ? "s" : ""} live incluse${liveProjectionCount > 1 ? "s" : ""}.</div>` : ""}
-          ${this.leaderboardRowsHtml(rows)}
+          ${this.leaderboardRowsHtml(rows, { showRankMovement: false, movementContext: "family" })}
           ${pager}
         </section>`;
       this.bindFamilyLeaderboardControls(root);
@@ -5725,7 +8710,8 @@ const App = {
       return;
     }
 
-    const rows = this.familyPlayerRows();
+    const rows = this.familyPlayerRows(null, mode === "average" ? "average" : "points");
+    if (mode === "overall") this.observeRankSentinel("family-leaderboard", "family", rows);
     root.innerHTML = `
       <section class="card player-leaderboard-card family-leaderboard-card">
         <div class="card-title-row leaderboard-compact-title">
@@ -5733,7 +8719,7 @@ const App = {
         </div>
         <div class="team-leaderboard-control-stack">${paneControls}${modeControls}</div>
         ${this.liveProjectionCountForMatchIds(null, { userIds: this.familyProfileIds() }) ? `<div class="live-ranking-note">${H.icon("info")} Classement Famille joueurs provisoire : projections live incluses.</div>` : ""}
-        ${this.leaderboardRowsHtml(rows)}
+        ${this.leaderboardRowsHtml(rows, { valueMode: mode === "average" ? "average" : "points", movementContext: "family", showRankMovement: mode === "overall" })}
       </section>
     `;
     this.bindFamilyLeaderboardControls(root);
@@ -5741,7 +8727,7 @@ const App = {
   },
 
 
-  mockEvolutionSeries(mode = "day") {
+  mockEvolutionSeries(mode = "day", valueMode = "points") {
     const names = ["Parkaf", "Sol141381", "Mimi du Nid", "Coach Hibou", "La Casserole", "Madame Exact", "Le Renard", "Grand Duc"];
     const teams = ["Les SNA", "Les Rapaces", "Les Chouettes", "Les Aiglons"];
     const colors = ["#facc15", "#38bdf8", "#a78bfa", "#fb7185", "#34d399", "#fb923c", "#f472b6", "#c4b5fd"];
@@ -5787,12 +8773,46 @@ const App = {
       badge_shape: "rounded"
     }]));
 
+    if (valueMode === "average") {
+      snapshots.forEach((snapshot, idx) => {
+        snapshot.totals = new Map(playerIds.map((id) => [id, Math.round(((snapshot.totals.get(id) || 0) / (idx + 1)) * 100) / 100]));
+      });
+    }
     const totalsByUser = new Map(playerIds.map((id) => [id, snapshots[snapshots.length - 1].totals.get(id) || 0]));
-    return { playerIds, snapshots, totalsByUser, mockProfiles, isMock: true };
+    return { playerIds, snapshots, totalsByUser, mockProfiles, isMock: true, valueMode };
   },
 
 
+  async refreshEvolutionOwner(attrName = "data-evolution-mode") {
+    const key = this.evolutionFocusKey(attrName);
+    if (key === "player-evolution") return this.renderPlayerLeaderboard();
+    if (key === "team-evolution") return this.renderTeamLeaderboard();
+    if (key === "family-evolution") return this.renderFamilyLeaderboard();
+    if (key === "family-team-evolution") return this.renderFamilyLeaderboard();
+    return this.renderLeaderboardEvolution();
+  },
+
   bindEmbeddedEvolutionControls(root = document) {
+    H.$$('[data-evolution-zoom]', root).forEach((btn) => {
+      if (btn.dataset.evolutionZoomBound === "true") return;
+      btn.dataset.evolutionZoomBound = "true";
+      btn.addEventListener("click", async () => {
+        this.setEvolutionZoom(btn.dataset.evolutionZoomTarget || "data-evolution-mode", Number(btn.dataset.evolutionZoom || 0));
+        await this.refreshEvolutionOwner(btn.dataset.evolutionZoomTarget || "data-evolution-mode");
+      });
+    });
+
+    H.$$('[data-evolution-focus]', root).forEach((btn) => {
+      if (btn.dataset.evolutionFocusBound === "true") return;
+      btn.dataset.evolutionFocusBound = "true";
+      btn.addEventListener("click", async () => {
+        const target = btn.dataset.evolutionFocusTarget || "data-evolution-mode";
+        const next = String(this.evolutionFocusFor(target)) === String(btn.dataset.evolutionFocus) ? "" : btn.dataset.evolutionFocus;
+        this.setEvolutionFocus(target, next);
+        await this.refreshEvolutionOwner(target);
+      });
+    });
+
     H.$$('[data-player-evolution-mode]', root).forEach((btn) => {
       btn.addEventListener("click", async () => {
         this.state.leaderboardEvolutionMode = btn.dataset.playerEvolutionMode;
@@ -5850,23 +8870,30 @@ const App = {
             ${series.isMock ? `<p class="graph-preview-note">${H.icon("info")} Maquette graph active : données fictives, aucun impact sur Supabase.</p>` : ""}
             ${!series.isMock && this.graphPreviewTestMatchesEnabled() ? `<p class="graph-preview-note">${H.icon("info")} Prévisualisation admin active : les matchs test sont inclus dans ce graph.</p>` : ""}
           </div>
-          ${this.evolutionModeControls(mode, attrName)}
+          <div class="evolution-toolbar">
+            ${this.evolutionModeControls(mode, attrName)}
+            <div class="evolution-zoom-controls" aria-label="Zoom du graphique">
+              <button type="button" data-evolution-zoom="-0.1" data-evolution-zoom-target="${H.escapeHtml(attrName)}" aria-label="Dézoomer">−</button>
+              <span>${Math.round(this.evolutionZoomFor(attrName) * 100)}%</span>
+              <button type="button" data-evolution-zoom="0.1" data-evolution-zoom-target="${H.escapeHtml(attrName)}" aria-label="Zoomer">+</button>
+            </div>
+          </div>
         </div>
         ${series.playerIds.length ? `
           <div class="evolution-layout">
-            <div class="evolution-chart-wrap">${this.evolutionChartSvg(series)}</div>
+            <div class="evolution-chart-wrap">${this.evolutionChartSvg(series, { zoom: this.evolutionZoomFor(attrName), focusId: this.evolutionFocusFor(attrName) })}</div>
             <div class="evolution-legend">
               ${series.playerIds.map((userId, index) => {
                 const source = series.mockProfiles?.get(userId) || this.state.playerScoreRows.find((row) => row.user_id === userId || row.id === userId);
                 const profile = this.profileForUser(userId, source);
-                const color = this.safeColor(profile.badge_color || profile.office_team_color, ["#facc15", "#38bdf8", "#a78bfa", "#fb7185", "#34d399", "#fb923c", "#f472b6", "#c4b5fd"][index % 8]);
+                const color = this.evolutionColor(index);
                 const total = latestSnapshot?.totals.get(userId) || 0;
                 return `
-                  <div class="evolution-player" style="--player-color:${color}">
+                  <button type="button" class="evolution-player ${String(this.evolutionFocusFor(attrName)) === String(userId) ? "active" : ""}" style="--player-color:${color}" data-evolution-focus="${H.escapeHtml(String(userId))}" data-evolution-focus-target="${H.escapeHtml(attrName)}">
                     ${H.profileBadgeHtml(profile, "profile-badge mini")}
                     <div><strong>${H.escapeHtml(profile.pseudo)}</strong><small>${H.escapeHtml(profile.office_team_name || "Sans team")}</small></div>
-                    <span>${total} pts</span>
-                  </div>`;
+                    <span>${Number(total || 0).toFixed(series.valueMode === "average" ? 2 : 0)}${series.valueMode === "average" ? " pts/match" : " pts"}</span>
+                  </button>`;
               }).join("")}
             </div>
           </div>
@@ -5877,7 +8904,7 @@ const App = {
 
   teamEvolutionSeries(mode = "day", familyOnly = false, valueMode = "points") {
     const allowedFamilyIds = familyOnly ? this.familyProfileIds() : null;
-    const eligibleProfiles = (this.state.publicProfiles || [])
+    const eligibleProfiles = (familyOnly ? this.familyProfiles(this.state.publicProfiles) : this.officialProfiles(this.state.publicProfiles))
       .filter((profile) => profile.office_team_id)
       .filter((profile) => !familyOnly || allowedFamilyIds.has(String(profile.id || profile.user_id)));
 
@@ -5891,11 +8918,12 @@ const App = {
       .map((prediction) => ({ prediction, match: this.state.matches.find((m) => m.id === prediction.match_id), profile: this.profileForUser(prediction.user_id) }))
       .filter(({ prediction, match, profile }) =>
         match?.status === "finished"
+        && !this.isLiveDemoMatch(match)
         && this.graphEvolutionCanUseMatch(match)
         && prediction.points_total !== null
         && prediction.points_total !== undefined
         && profile.office_team_name
-        && (!familyOnly || allowedFamilyIds.has(String(prediction.user_id)))
+        && (familyOnly ? allowedFamilyIds.has(String(prediction.user_id)) : !this.isFamily(profile))
       )
       .sort((a, b) => new Date(a.match.kickoff_at || 0) - new Date(b.match.kickoff_at || 0));
 
@@ -5915,7 +8943,9 @@ const App = {
     const periods = [...new Set(rows.map(({ match }) => periodKey(match.kickoff_at)))].sort();
     const teamMeta = new Map();
     const totalsByTeamRaw = new Map();
+    const countsByTeamRaw = new Map();
     const pointsByPeriod = new Map(periods.map((key) => [key, new Map()]));
+    const countsByPeriod = new Map(periods.map((key) => [key, new Map()]));
 
     rows.forEach(({ prediction, match, profile }) => {
       const teamId = profile.office_team_id || profile.office_team_name || "sans-team";
@@ -5932,13 +8962,16 @@ const App = {
       if (!teamSizes.has(teamId)) teamSizes.set(teamId, 1);
       const key = periodKey(match.kickoff_at);
       const map = pointsByPeriod.get(key);
+      const countMap = countsByPeriod.get(key);
       const points = Number(prediction.points_total || 0);
       map.set(teamId, (map.get(teamId) || 0) + points);
+      countMap.set(teamId, (countMap.get(teamId) || 0) + 1);
       totalsByTeamRaw.set(teamId, (totalsByTeamRaw.get(teamId) || 0) + points);
+      countsByTeamRaw.set(teamId, (countsByTeamRaw.get(teamId) || 0) + 1);
     });
 
-    const valueForTeam = (teamId, rawValue) => valueMode === "average"
-      ? Math.round((rawValue / Math.max(1, teamSizes.get(teamId) || 1)) * 10) / 10
+    const valueForTeam = (teamId, rawValue, count = countsByTeamRaw.get(teamId) || 0) => valueMode === "average"
+      ? Math.round((rawValue / Math.max(1, count)) * 100) / 100
       : rawValue;
 
     const playerIds = [...totalsByTeamRaw.keys()]
@@ -5946,10 +8979,15 @@ const App = {
       .slice(0, 8);
 
     const cumulative = new Map(playerIds.map((id) => [id, 0]));
+    const cumulativeCounts = new Map(playerIds.map((id) => [id, 0]));
     const snapshots = periods.map((key) => {
       const periodPoints = pointsByPeriod.get(key) || new Map();
-      playerIds.forEach((id) => cumulative.set(id, (cumulative.get(id) || 0) + (periodPoints.get(id) || 0)));
-      return { key, label: periodLabel(key), totals: new Map(playerIds.map((id) => [id, valueForTeam(id, cumulative.get(id) || 0)])) };
+      const periodCounts = countsByPeriod.get(key) || new Map();
+      playerIds.forEach((id) => {
+        cumulative.set(id, (cumulative.get(id) || 0) + (periodPoints.get(id) || 0));
+        cumulativeCounts.set(id, (cumulativeCounts.get(id) || 0) + (periodCounts.get(id) || 0));
+      });
+      return { key, label: periodLabel(key), totals: new Map(playerIds.map((id) => [id, valueForTeam(id, cumulative.get(id) || 0, cumulativeCounts.get(id) || 0)])) };
     });
 
     const totalsByUser = new Map(playerIds.map((id) => [id, snapshots[snapshots.length - 1]?.totals.get(id) || 0]));
@@ -6006,7 +9044,7 @@ const App = {
     const root = H.$("#leaderboardContent");
     const mode = this.state.leaderboardEvolutionMode === "week" ? "week" : "day";
     const useMockGraph = this.graphMockPreviewEnabled();
-    const series = useMockGraph ? this.mockEvolutionSeries(mode) : this.playerEvolutionSeries(mode);
+    const series = useMockGraph ? this.mockEvolutionSeries(mode, "points") : this.playerEvolutionSeries(mode, { valueMode: "points" });
     const latestSnapshot = series.snapshots[series.snapshots.length - 1];
 
     root.innerHTML = `
@@ -6030,7 +9068,7 @@ const App = {
               ${series.playerIds.map((userId, index) => {
                 const source = series.mockProfiles?.get(userId) || this.state.playerScoreRows.find((row) => row.user_id === userId);
                 const profile = this.profileForUser(userId, source);
-                const color = this.safeColor(profile.badge_color || profile.office_team_color, ["#facc15", "#38bdf8", "#a78bfa", "#fb7185", "#34d399", "#fb923c", "#f472b6", "#c4b5fd"][index % 8]);
+                const color = this.evolutionColor(index);
                 const total = latestSnapshot?.totals.get(userId) || 0;
                 return `
                   <div class="evolution-player" style="--player-color:${color}">
@@ -6083,22 +9121,40 @@ const App = {
   },
 
   winnerInfoForPlayer(userId) {
-    const publicWinner = this.state.winnerPredictions.find((row) => row.user_id === userId);
+    const publicWinner = this.state.winnerPredictions.find((row) => String(row.user_id) === String(userId));
     if (publicWinner) return publicWinner;
 
     if (userId === this.state.session.user.id && this.state.winnerPrediction?.predicted_team_id) {
       const team = this.state.footballTeams.find((item) => item.id === this.state.winnerPrediction.predicted_team_id);
-      if (team) {
-        return {
-          user_id: userId,
-          predicted_team_id: team.id,
-          predicted_team_name: team.name,
-          predicted_team_short_name: team.short_name,
-          predicted_team_country_code: team.country_code,
-          predicted_team_flag_url: team.flag_url,
-          points_total: 0
-        };
-      }
+      return {
+        user_id: userId,
+        predicted_team_id: team?.id || this.state.winnerPrediction.predicted_team_id,
+        predicted_team_name: team?.name || "Champion choisi",
+        predicted_team_short_name: team?.short_name,
+        predicted_team_country_code: team?.country_code,
+        predicted_team_flag_url: team?.flag_url,
+        points_total: this.state.winnerPrediction.points_total || 0
+      };
+    }
+
+    return null;
+  },
+
+  secondWinnerInfoForPlayer(playerId) {
+    const publicSecond = this.state.secondWinnerPredictions.find((row) => String(row.user_id) === String(playerId));
+    if (publicSecond) return publicSecond;
+
+    if (String(playerId) === String(this.state.session.user.id) && this.state.secondWinnerPrediction?.predicted_team_id) {
+      const team = this.state.footballTeams.find((item) => item.id === this.state.secondWinnerPrediction.predicted_team_id);
+      return {
+        user_id: playerId,
+        predicted_team_id: team?.id || this.state.secondWinnerPrediction.predicted_team_id,
+        predicted_team_name: team?.name || "2e champion choisi",
+        predicted_team_short_name: team?.short_name,
+        predicted_team_country_code: team?.country_code,
+        predicted_team_flag_url: team?.flag_url,
+        points_total: this.state.secondWinnerPrediction.points_total || 0
+      };
     }
 
     return null;
@@ -6118,22 +9174,35 @@ const App = {
 
   playerChampionPickHtml(playerId) {
     const winner = this.winnerInfoForPlayer(playerId);
+    const secondWinner = this.secondWinnerInfoForPlayer(playerId);
 
-    if (winner) {
+    const pickCard = (pick, label, emptyLabel) => {
+      if (!pick) {
+        return `<div class="player-winner-pick muted-box"><strong>${emptyLabel}</strong><small>Pas encore visible ou pas encore choisi.</small></div>`;
+      }
       const flag = H.flagImgHtml({
-        flagUrl: winner.predicted_team_flag_url,
-        countryCode: winner.predicted_team_country_code,
-        shortName: winner.predicted_team_short_name,
-        name: winner.predicted_team_name,
+        flagUrl: pick.predicted_team_flag_url,
+        countryCode: pick.predicted_team_country_code,
+        shortName: pick.predicted_team_short_name,
+        name: pick.predicted_team_name,
         className: "team-flag-img champion-option-flag"
       });
       return `
         <div class="player-winner-pick picked">
           ${flag}
           <div>
-            <strong>${H.escapeHtml(winner.predicted_team_name || "Équipe choisie")}</strong>
-            <small>Champion du monde choisi${winner.points_total ? ` · +${winner.points_total} pts` : ""}</small>
+            <strong>${H.escapeHtml(pick.predicted_team_name || "Équipe choisie")}</strong>
+            <small>${label}${pick.points_total ? ` · +${pick.points_total} pts` : ""}</small>
           </div>
+        </div>
+      `;
+    };
+
+    if (winner || secondWinner) {
+      return `
+        <div class="player-winner-picks-duo">
+          ${pickCard(winner, "Champion initial", "Champion initial non visible")}
+          ${pickCard(secondWinner, "2e champion bonus", "2e champion non choisi")}
         </div>
       `;
     }
@@ -6149,8 +9218,8 @@ const App = {
 
     return `
       <div class="player-winner-pick muted-box">
-        <strong>Choix champion non visible</strong>
-        <small>Soit le joueur ne l’a pas encore choisi, soit le choix reste masqué jusqu’au verrouillage.</small>
+        <strong>Choix champions non visibles</strong>
+        <small>Soit le joueur ne les a pas encore choisis, soit les choix restent masqués.</small>
       </div>
     `;
   },
@@ -7063,7 +10132,11 @@ const App = {
     await Promise.all([
       this.loadPublicProfiles(),
       this.loadPlayerScoreRows(),
-      this.loadWinnerPredictionsForTeams()
+      this.loadVisiblePredictions(),
+      this.loadWinnerPrediction().catch(() => null),
+      this.loadSecondWinnerPrediction().catch(() => null),
+      this.loadWinnerPredictionsForTeams(),
+      this.loadSecondWinnerPredictionsForTeams()
     ]);
 
     const scopes = this.availableChatScopes();
@@ -7343,7 +10416,7 @@ const App = {
                   name: r.team_name
                 });
                 return `
-                  <tr class="${r.group_rank <= 2 ? "qual-zone" : r.group_rank === 3 ? "third-zone" : ""}">
+                  <tr class="${r.qualification_status === "eliminated" ? "eliminated-zone" : r.group_rank <= 2 ? "qual-zone" : r.group_rank === 3 ? "third-zone" : ""}">
                     <td class="group-rank">${r.group_rank}</td>
                     <td class="team-cell"><span class="group-team-inline">${flag}<span class="group-team-name">${H.escapeHtml(r.team_name)}</span></span></td>
                     <td>${r.played || 0}</td>
@@ -7758,6 +10831,12 @@ const App = {
     const selectedWinnerId = this.state.winnerPrediction?.predicted_team_id || "";
     const selectedWinner = this.state.footballTeams.find((team) => team.id === selectedWinnerId);
     const championTeams = this.championCandidateTeams();
+    const secondChampionTeams = this.secondChampionCandidateTeams();
+    const secondChampionAfterGroups = this.groupStageFinishedForSecondChampion();
+    const secondChampionOpen = this.secondChampionPickOpen();
+    const secondChampionCloseAt = this.secondChampionCloseAt();
+    const selectedSecondWinnerId = this.state.secondWinnerPrediction?.predicted_team_id || "";
+    const selectedSecondWinner = this.secondChampionSelectedTeam();
     const competitionName = this.state.activeCompetition?.name || "la compétition";
     const currentAvatar = H.normalizeAvatarKey(profile.avatar_key);
     const currentShape = profile.badge_shape || "rounded";
@@ -7847,7 +10926,7 @@ const App = {
           </div>
           <div class="profile-account-actions">
             <button class="ghost-btn" id="profileInstallAppBtn" type="button">Installer l’app</button>
-            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.3.28</button>
+            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.8.41</button>
             <button class="danger-btn" id="profileLogoutBtn" type="button">Déconnexion</button>
           </div>
         </div>
@@ -7928,7 +11007,7 @@ const App = {
         <div class="card-title-row">
           <div>
             <h3>${H.icon("trophy")} Mon champion du monde</h3>
-            <p class="muted">Choisis l’équipe qui remportera ${H.escapeHtml(competitionName)}. Si elle gagne la finale : <strong>+100 points</strong>.</p>
+            <p class="muted">Choisis l’équipe qui remportera ${H.escapeHtml(competitionName)}. Si elle gagne la finale : <strong>+${this.championFirstBonusPoints()} points</strong>.</p>
           </div>
           <span class="pill ${championLocked ? "danger" : "success"}">${championLocked ? "Verrouillé" : "Ouvert"}</span>
         </div>
@@ -7975,6 +11054,61 @@ const App = {
           <p class="muted small-note">Verrouillage au premier match officiel : ${startAt ? H.formatDateTime(startAt) : "à confirmer"}</p>
         </div>
       </section>
+
+      <section class="card champion-pick-card second-champion-card ${secondChampionOpen ? "" : "is-locked"}">
+        <div class="card-title-row">
+          <div>
+            <h3>${H.icon("trophy")} Mon 2e champion après les poules</h3>
+            <p class="muted">${secondChampionAfterGroups ? "Les poules sont terminées : seuls les qualifiés restent disponibles." : "Avant la fin des poules, toutes les équipes de la compétition restent disponibles. La liste sera resserrée aux qualifiés après mise à jour."} Ce choix vaut <strong>+${this.championSecondBonusPoints()} points</strong> et ne remplace pas ton champion initial.</p>
+          </div>
+          <span class="pill ${secondChampionOpen ? "success" : "danger"}">${secondChampionOpen ? "Ouvert" : "Verrouillé"}</span>
+        </div>
+
+        ${secondChampionTeams.length ? `
+          <form id="secondChampionPickForm" class="winner-pick-form">
+            <label class="winner-team-label">
+              <span>2e équipe championne possible</span>
+              <div class="champion-picker second-champion-picker ${secondChampionOpen ? "" : "is-disabled"}" id="secondChampionPicker">
+                <input type="hidden" name="predicted_team_id" value="${H.escapeHtml(selectedSecondWinnerId)}">
+                <button class="champion-picker-toggle" type="button" ${secondChampionOpen ? "" : "disabled"} aria-expanded="false">
+                  <span class="champion-picker-current">
+                    ${selectedSecondWinner ? `
+                      ${H.flagImgHtml({ flagUrl: selectedSecondWinner.flag_url, countryCode: selectedSecondWinner.country_code, shortName: selectedSecondWinner.short_name, name: selectedSecondWinner.name, className: "team-flag-img champion-option-flag" })}
+                      <span class="champion-option-name">${H.escapeHtml(selectedSecondWinner.name)}</span>
+                      <small>${H.escapeHtml(selectedSecondWinner.short_name || selectedSecondWinner.country_code || "")}</small>
+                    ` : `<span class="champion-picker-empty">${secondChampionAfterGroups ? "Choisir une équipe qualifiée" : "Choisir une équipe"}</span>`}
+                  </span>
+                  <span class="champion-picker-caret" aria-hidden="true">⌄</span>
+                </button>
+                <div class="champion-picker-menu" hidden>
+                  ${secondChampionTeams.map((team) => `
+                    <button type="button" class="champion-option ${selectedSecondWinnerId === team.id ? "is-selected" : ""}" data-team-id="${H.escapeHtml(team.id)}">
+                      ${H.flagImgHtml({ flagUrl: team.flag_url, countryCode: team.country_code, shortName: team.short_name, name: team.name, className: "team-flag-img champion-option-flag" })}
+                      <span class="champion-option-name">${H.escapeHtml(team.name)}</span>
+                      <small>${H.escapeHtml(team.short_name || team.country_code || "")}</small>
+                    </button>
+                  `).join("")}
+                </div>
+              </div>
+            </label>
+            <button class="primary-btn" type="submit" ${secondChampionOpen ? "" : "disabled"}>Enregistrer mon 2e champion</button>
+          </form>
+        ` : `<div class="empty-state compact"><strong>Liste indisponible</strong><p>Le Hibou ne trouve aucune équipe réelle à proposer. Vérifie les matchs de poule et les équipes qualifiées.</p></div>`}
+
+        <div class="winner-pick-status">
+          ${selectedSecondWinner ? `
+            <div class="winner-team-preview">
+              ${H.flagImgHtml({ flagUrl: selectedSecondWinner.flag_url, countryCode: selectedSecondWinner.country_code, shortName: selectedSecondWinner.short_name, name: selectedSecondWinner.name })}
+              <div>
+                <strong>${H.escapeHtml(selectedSecondWinner.name)}</strong>
+                <small>2e choix bonus enregistré · +${this.championSecondBonusPoints()} pts si cette équipe gagne.</small>
+              </div>
+            </div>
+          ` : `<p class="muted">Aucun 2e champion choisi pour l’instant.</p>`}
+          <p class="muted small-note">Fermeture au premier match des 16èmes : ${secondChampionCloseAt ? H.formatDateTime(secondChampionCloseAt) : "à confirmer"}</p>
+        </div>
+      </section>
+
     `;
 
     const updatePreview = () => {
@@ -8036,6 +11170,17 @@ const App = {
       });
     }
 
+
+
+    const secondChampionForm = H.$("#secondChampionPickForm");
+    if (secondChampionForm && secondChampionOpen) {
+      secondChampionForm.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const formData = new FormData(event.currentTarget);
+        await this.saveSecondChampionPick(formData.get("predicted_team_id"));
+      });
+    }
+
     const championPicker = H.$("#championPicker");
     if (championPicker && !championLocked) {
       const toggle = H.$(".champion-picker-toggle", championPicker);
@@ -8071,6 +11216,42 @@ const App = {
       });
     }
 
+
+    const secondChampionPicker = H.$("#secondChampionPicker");
+    if (secondChampionPicker && secondChampionOpen) {
+      const toggle = H.$(".champion-picker-toggle", secondChampionPicker);
+      const menu = H.$(".champion-picker-menu", secondChampionPicker);
+      const input = H.$('input[name="predicted_team_id"]', secondChampionPicker);
+      const current = H.$(".champion-picker-current", secondChampionPicker);
+      const closeSecondPicker = () => {
+        if (!menu.hidden) {
+          menu.hidden = true;
+          toggle.setAttribute("aria-expanded", "false");
+        }
+      };
+
+      toggle.addEventListener("click", (event) => {
+        event.stopPropagation();
+        menu.hidden = !menu.hidden;
+        toggle.setAttribute("aria-expanded", String(!menu.hidden));
+      });
+
+      H.$$(".champion-option", secondChampionPicker).forEach((button) => {
+        button.addEventListener("click", (event) => {
+          event.stopPropagation();
+          input.value = button.dataset.teamId || "";
+          H.$$(".champion-option", secondChampionPicker).forEach((option) => option.classList.remove("is-selected"));
+          button.classList.add("is-selected");
+          current.innerHTML = button.innerHTML;
+          closeSecondPicker();
+        });
+      });
+
+      document.addEventListener("click", (event) => {
+        if (!secondChampionPicker.contains(event.target)) closeSecondPicker();
+      });
+    }
+
     H.$("#profileInstallAppBtn")?.addEventListener("click", () => this.openPwaInstallGuide());
     H.$("#profileCreditsBtn")?.addEventListener("click", () => this.openCreditsModal());
     H.$("#profileLogoutBtn")?.addEventListener("click", () => Auth.logout());
@@ -8078,11 +11259,12 @@ const App = {
     H.$("#familyHelpBtn")?.addEventListener("click", () => this.openFamilyHelpModal());
 
     H.$("#showFamilyPlayersToggle")?.addEventListener("change", async (event) => {
-      const { error } = await window.sb.rpc("set_show_family_players", { p_enabled: event.currentTarget.checked });
+      const enabled = event.currentTarget?.checked === true;
+      const { error } = await window.sb.rpc("set_show_family_players", { p_enabled: enabled });
       if (error) return H.toast(error.message, "error");
       await this.loadProfile();
       await this.loadPublicProfiles();
-      H.toast(event.currentTarget.checked ? "Mode Famille affiché" : "Mode Famille masqué", "success");
+      H.toast(enabled ? "Mode Famille affiché" : "Mode Famille masqué", "success");
       await this.renderProfile();
     });
 
@@ -8149,7 +11331,9 @@ const App = {
       this.loadGroupStandings(),
       this.loadMyPredictions(),
       this.loadVisiblePredictions(),
-      this.loadWinnerPrediction()
+      this.loadWinnerPrediction(),
+      this.loadPlayerScoreRows(),
+      this.loadOwlMessages()
     ]);
 
     this.syncAchievementNotifications();
@@ -8171,6 +11355,10 @@ const App = {
       .on("postgres_changes", { event: "*", schema: "public", table: "matches" }, async () => {
         await this.refreshCurrentViewFromRealtime("matches");
       })
+      .on("postgres_changes", { event: "*", schema: "public", table: "manual_user_badges" }, async () => {
+        await this.loadManualBadges();
+        if (["achievements", "teams", "leaderboard", "home"].includes(this.state.currentView)) await this.loadView(this.state.currentView);
+      })
       .on("postgres_changes", { event: "*", schema: "public", table: "prediction_points" }, async () => {
         await this.refreshCurrentViewFromRealtime("points");
       })
@@ -8183,6 +11371,13 @@ const App = {
       })
       .on("postgres_changes", { event: "*", schema: "public", table: "winner_predictions" }, async () => {
         await this.refreshCurrentViewFromRealtime("winner");
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "second_winner_predictions" }, async () => {
+        await this.loadSecondWinnerPrediction();
+        await this.refreshCurrentViewFromRealtime("second-winner");
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "app_settings" }, async () => {
+        await this.loadAppSettings();
       })
       .on("postgres_changes", { event: "*", schema: "public", table: "team_chat_messages" }, async (payload) => {
         await this.handleTeamChatRealtime(payload);
