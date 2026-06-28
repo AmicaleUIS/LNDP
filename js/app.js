@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — APP PRINCIPALE V1.8.39
+// LE NID DES PRONOS — APP PRINCIPALE V1.8.40
 // ============================================================
 
 const H = window.Helpers;
@@ -479,7 +479,7 @@ const App = {
           <div>
             <p class="eyebrow">Crédits cachés</p>
             <h2 id="creditsTitle">Le Nid des Pronos</h2>
-            <p class="muted">Version publique <strong>1.8.39</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
+            <p class="muted">Version publique <strong>1.8.40</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
           </div>
         </div>
         <div class="credits-grid">
@@ -496,7 +496,7 @@ const App = {
             <p><strong>1.0.5</strong> — dashboard mobile/desktop stabilisé, sans chevauchement des cartes.</p>
           </section>
           <section>
-            <h3>Évolutions V1.8.39</h3>
+            <h3>Évolutions V1.8.40</h3>
             <ul class="changelog-list">
               <li>Le super admin peut désactiver ou réactiver l’affichage du module préparation.</li>
               <li>Quand la préparation est désactivée, les matchs test disparaissent des matchs/pronos, classements par phase et règles.</li>
@@ -920,7 +920,7 @@ const App = {
       .in("message_id", ids);
 
     if (error) {
-      console.warn("Votes de sondage Hibou indisponibles : lance le patch SQL V1.8.39", error);
+      console.warn("Votes de sondage Hibou indisponibles : lance le patch SQL V1.8.40", error);
       this.state.owlPollVotes = {};
       return;
     }
@@ -968,7 +968,7 @@ const App = {
       .in("message_id", ids);
 
     if (error) {
-      console.warn("Détail des votes Hibou indisponible : lance le patch SQL V1.8.39", error);
+      console.warn("Détail des votes Hibou indisponible : lance le patch SQL V1.8.40", error);
       return;
     }
 
@@ -1131,7 +1131,7 @@ const App = {
       .upsert({ message_id: message.id, user_id: this.state.session?.user?.id, option_key: optionKey }, { onConflict: "message_id,user_id" });
 
     if (error) {
-      H.toast(error.message || "Vote impossible. Lance le patch SQL V1.8.39.", "error");
+      H.toast(error.message || "Vote impossible. Lance le patch SQL V1.8.40.", "error");
       return;
     }
 
@@ -1495,7 +1495,7 @@ const App = {
 
 
   async loadVisiblePredictions() {
-    // V1.8.39 — IMPORTANT : Supabase REST renvoie 1000 lignes max par requête.
+    // V1.8.40 — IMPORTANT : Supabase REST renvoie 1000 lignes max par requête.
     // Le classement général est agrégé en base, mais les détails joueurs et le classement Famille
     // repartent des pronos visibles côté front. On pagine donc toute la vue, sinon les détails
     // s'arrêtent après les premiers paquets de matchs/joueurs.
@@ -5312,6 +5312,32 @@ const App = {
       });
     }
 
+    H.$$('[data-final-match-toggle]').forEach((card) => {
+      if (card.dataset.finalMatchToggleBound === "true") return;
+      card.dataset.finalMatchToggleBound = "true";
+      const activateCard = (event) => {
+        if (event?.target?.closest?.("a, button, input, select, textarea")) return;
+        event?.preventDefault?.();
+        event?.stopPropagation?.();
+        const scroller = H.$("#finalBracketScroll");
+        const round = card.closest("[data-final-stage-round]")?.dataset?.finalStageRound || card.dataset.finalRoundTarget;
+        const currentRound = this.state.finalBracketActiveRound || scroller?.querySelector?.(".final-focus-board")?.dataset?.activeRound;
+        if (round && round !== currentRound) {
+          this.setFinalBracketRound(round);
+          return;
+        }
+        const number = Number(card.dataset.finalMatchToggle || 0);
+        if (!number) return;
+        this.state.finalBracketExpandedMatchNumber = Number(this.state.finalBracketExpandedMatchNumber || 0) === number ? null : number;
+        this.renderWorldCupFinals();
+      };
+      card.addEventListener("click", activateCard);
+      card.addEventListener("keydown", (event) => {
+        if (event.key !== "Enter" && event.key !== " ") return;
+        activateCard(event);
+      });
+    });
+
     H.$$('[data-final-stage-round]').forEach((stage) => {
       if (stage.dataset.finalStageRoundBound === "true") return;
       stage.dataset.finalStageRoundBound = "true";
@@ -6131,10 +6157,10 @@ const App = {
           <span>${H.matchFlagHtml(match, "away")}<strong>${H.escapeHtml(away)}</strong></span>
         </div>
         ${pronoMeta}
-        <footer class="final-focus-card-foot ${expanded ? "is-expanded" : "is-compact"}">
-          ${expanded ? `<span class="final-focus-location">${location ? H.escapeHtml(location) : "Lieu à confirmer"}</span>` : ""}
+        ${expanded ? `<footer class="final-focus-card-foot is-expanded">
+          <span class="final-focus-location">${location ? H.escapeHtml(location) : "Lieu à confirmer"}</span>
           <span class="final-focus-tv">${H.icon("tv")} ${tvHtml}</span>
-        </footer>
+        </footer>` : ""}
         ${expanded ? this.finalFocusAdminScoreShortcutHtml(match) : ""}
       </article>
     `;
@@ -10815,7 +10841,7 @@ const App = {
           </div>
           <div class="profile-account-actions">
             <button class="ghost-btn" id="profileInstallAppBtn" type="button">Installer l’app</button>
-            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.8.39</button>
+            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.8.40</button>
             <button class="danger-btn" id="profileLogoutBtn" type="button">Déconnexion</button>
           </div>
         </div>

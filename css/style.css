@@ -21490,7 +21490,7 @@ body[data-current-view] {
 }
 
 /* =====================================================
-   V1.8.39 — Phase finale desktop : 3 colonnes pleines, clic partout, liaisons simples
+   V1.8.40 — Phase finale desktop : 3 colonnes pleines, clic partout, liaisons simples
    ===================================================== */
 @media (min-width: 901px) {
   .final-tournament-shell.final-focus-shell {
@@ -21664,7 +21664,7 @@ body[data-current-view] {
 }
 
 /* =====================================================
-   V1.8.39 — Correctifs phase finale desktop + admin rouge/or
+   V1.8.40 — Correctifs phase finale desktop + admin rouge/or
    ===================================================== */
 .nav-list .admin-link,
 .mobile-menu-panel .mobile-admin-link {
@@ -21790,7 +21790,7 @@ body[data-current-view] {
 
 
 /* =====================================================
-   V1.8.39 — Phase finale : cartes compactes + ouverture au clic, sans traits
+   V1.8.40 — Phase finale : cartes compactes + ouverture au clic, sans traits
    ===================================================== */
 .final-tournament-board .final-focus-slot::before,
 .final-tournament-board .final-focus-slot::after,
@@ -21978,4 +21978,114 @@ body[data-current-view] {
   .final-tournament-board .final-focus-match.expanded {
     min-height: 150px !important;
   }
+}
+
+/* =====================================================
+   V1.8.40 — Phase finale : nettoyage total traits + clic fiable
+   ===================================================== */
+.final-tournament-shell,
+.final-tournament-window,
+.final-tournament-board,
+.final-focus-stage,
+.final-focus-stage-grid,
+.final-focus-slot,
+.final-focus-match {
+  position: relative;
+}
+
+/* Aucune liaison/artefact tant que les cartes ne sont pas validées */
+.final-tournament-shell *::before,
+.final-tournament-shell *::after,
+.final-tournament-board *::before,
+.final-tournament-board *::after,
+.final-focus-slot::before,
+.final-focus-slot::after,
+.final-focus-stage-grid::before,
+.final-focus-stage-grid::after,
+.final-bracket-lane-connector,
+.final-bracket-lane-connector::before,
+.final-bracket-lane-connector::after,
+.road-flow-line,
+.road-flow-line::before,
+.road-flow-line::after,
+.road-flow-line span,
+.road-quarter-join,
+.road-quarter-join::before,
+.road-quarter-join::after,
+.final-bracket-vertical-link,
+.final-bracket-vertical-link::before,
+.final-bracket-vertical-link::after {
+  display: none !important;
+  content: none !important;
+  width: 0 !important;
+  height: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+/* Le clic doit toujours atteindre la carte, pas une couche fantôme */
+.final-tournament-board .final-focus-stage {
+  z-index: 1 !important;
+}
+.final-tournament-board .final-focus-stage.is-active {
+  z-index: 4 !important;
+}
+.final-tournament-board .final-focus-slot {
+  z-index: 5 !important;
+  pointer-events: auto !important;
+}
+.final-tournament-board .final-focus-match {
+  z-index: 10 !important;
+  pointer-events: auto !important;
+  cursor: pointer !important;
+}
+.final-tournament-board .final-focus-match * {
+  pointer-events: none;
+}
+.final-tournament-board .final-focus-match a,
+.final-tournament-board .final-focus-match button,
+.final-tournament-board .final-focus-match input,
+.final-tournament-board .final-focus-match select,
+.final-tournament-board .final-focus-match textarea,
+.final-tournament-board .final-focus-match a *,
+.final-tournament-board .final-focus-match button * {
+  pointer-events: auto;
+}
+
+/* TV uniquement dans la carte ouverte */
+.final-focus-match.compact .final-focus-card-foot,
+.final-focus-match.compact .final-focus-tv,
+.final-focus-match.active-compact .final-focus-card-foot,
+.final-focus-match.side-compact .final-focus-card-foot {
+  display: none !important;
+}
+
+/* Carte compacte plus claire et moins chargée */
+.final-tournament-board .final-focus-match.compact {
+  overflow: hidden !important;
+}
+.final-tournament-board .final-focus-stage.is-active .final-focus-match.compact.active-compact {
+  min-height: 82px !important;
+}
+.final-tournament-board .final-focus-stage.is-compact .final-focus-match.compact.side-compact {
+  min-height: 58px !important;
+}
+.final-focus-match.compact .final-focus-card-head {
+  margin-bottom: 6px !important;
+}
+.final-focus-match.compact .final-focus-mini-meta {
+  margin-top: 5px !important;
+}
+
+/* Carte ouverte : elle passe bien au-dessus */
+.final-tournament-board .final-focus-slot.is-expanded-slot,
+.final-tournament-board .final-focus-match.expanded {
+  z-index: 30 !important;
+}
+.final-tournament-board .final-focus-match.expanded,
+.final-tournament-board .final-focus-match.expanded * {
+  pointer-events: auto;
 }
