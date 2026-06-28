@@ -1,6 +1,6 @@
 // ============================================================
-// LE NID DES PRONOS — SERVICE WORKER V1.9.0
-// Cache public V1.9.0 : bilan PDF final temps réel.
+// LE NID DES PRONOS — SERVICE WORKER V1.9.1
+// Cache public V1.9.1 : bilan PDF final temps réel.
 // ============================================================
 
 const CACHE_NAME = "le-nid-des-pronos-v1-8-17";
@@ -14,15 +14,15 @@ const ASSETS = [
   "./app.html",
   "./admin.html",
   "./bilan.html",
-  "./css/style.css?v=1.9.0",
-  "./css/bilan.css?v=1.9.0",
-  "./js/supabaseClient.js?v=1.9.0",
-  "./js/auth.js?v=1.9.0",
-  "./js/common.js?v=1.9.0",
-  "./js/app.js?v=1.9.0",
-  "./js/admin.js?v=1.9.0",
-  "./js/bilan.js?v=1.9.0",
-  "./manifest.json?v=1.9.0",
+  "./css/style.css?v=1.9.1",
+  "./css/bilan.css?v=1.9.1",
+  "./js/supabaseClient.js?v=1.9.1",
+  "./js/auth.js?v=1.9.1",
+  "./js/common.js?v=1.9.1",
+  "./js/app.js?v=1.9.1",
+  "./js/admin.js?v=1.9.1",
+  "./js/bilan.js?v=1.9.1",
+  "./manifest.json?v=1.9.1",
   "./assets/icons/icon-192.png",
   "./assets/icons/icon-512.png",
   "./assets/icons/icon-maskable-192.png",

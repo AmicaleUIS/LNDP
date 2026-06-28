@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — APP PRINCIPALE V1.9.0
+// LE NID DES PRONOS — APP PRINCIPALE V1.9.1
 // ============================================================
 
 const H = window.Helpers;
@@ -482,7 +482,7 @@ const App = {
           <div>
             <p class="eyebrow">Crédits cachés</p>
             <h2 id="creditsTitle">Le Nid des Pronos</h2>
-            <p class="muted">Version publique <strong>1.9.0</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
+            <p class="muted">Version publique <strong>1.9.1</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
           </div>
         </div>
         <div class="credits-grid">
@@ -499,7 +499,7 @@ const App = {
             <p><strong>1.0.5</strong> — dashboard mobile/desktop stabilisé, sans chevauchement des cartes.</p>
           </section>
           <section>
-            <h3>Évolutions V1.9.0</h3>
+            <h3>Évolutions V1.9.1</h3>
             <ul class="changelog-list">
               <li>Le super admin peut désactiver ou réactiver l’affichage du module préparation.</li>
               <li>Quand la préparation est désactivée, les matchs test disparaissent des matchs/pronos, classements par phase et règles.</li>
@@ -923,7 +923,7 @@ const App = {
       .in("message_id", ids);
 
     if (error) {
-      console.warn("Votes de sondage Hibou indisponibles : lance le patch SQL V1.9.0", error);
+      console.warn("Votes de sondage Hibou indisponibles : lance le patch SQL V1.9.1", error);
       this.state.owlPollVotes = {};
       return;
     }
@@ -971,7 +971,7 @@ const App = {
       .in("message_id", ids);
 
     if (error) {
-      console.warn("Détail des votes Hibou indisponible : lance le patch SQL V1.9.0", error);
+      console.warn("Détail des votes Hibou indisponible : lance le patch SQL V1.9.1", error);
       return;
     }
 
@@ -1134,7 +1134,7 @@ const App = {
       .upsert({ message_id: message.id, user_id: this.state.session?.user?.id, option_key: optionKey }, { onConflict: "message_id,user_id" });
 
     if (error) {
-      H.toast(error.message || "Vote impossible. Lance le patch SQL V1.9.0.", "error");
+      H.toast(error.message || "Vote impossible. Lance le patch SQL V1.9.1.", "error");
       return;
     }
 
@@ -1498,7 +1498,7 @@ const App = {
 
 
   async loadVisiblePredictions() {
-    // V1.9.0 — IMPORTANT : Supabase REST renvoie 1000 lignes max par requête.
+    // V1.9.1 — IMPORTANT : Supabase REST renvoie 1000 lignes max par requête.
     // Le classement général est agrégé en base, mais les détails joueurs et le classement Famille
     // repartent des pronos visibles côté front. On pagine donc toute la vue, sinon les détails
     // s'arrêtent après les premiers paquets de matchs/joueurs.
@@ -6081,12 +6081,32 @@ const App = {
     `;
   },
 
+  finalFocusSortedNumbers(matchMap, config) {
+    const numbers = [...(config?.numbers || [])];
+    const originalIndex = new Map(numbers.map((number, index) => [Number(number), index]));
+    return numbers.sort((a, b) => {
+      const matchA = this.finalBracketMatchByNumber(matchMap, a);
+      const matchB = this.finalBracketMatchByNumber(matchMap, b);
+      const timeA = matchA?.kickoff_at ? new Date(matchA.kickoff_at).getTime() : Number.POSITIVE_INFINITY;
+      const timeB = matchB?.kickoff_at ? new Date(matchB.kickoff_at).getTime() : Number.POSITIVE_INFINITY;
+      if (timeA !== timeB) return timeA - timeB;
+      return (originalIndex.get(Number(a)) || 0) - (originalIndex.get(Number(b)) || 0);
+    });
+  },
+
+  finalFocusCardTitle(number, config) {
+    if (Number(number) === 103) return "Petite finale";
+    if (Number(number) === 104) return "Finale";
+    return config?.shortLabel || config?.label || "Match";
+  },
+
   finalFocusStageColumnHtml(matchMap, config, activeRound, stageIndex = 0, windowStart = 0) {
     const isActive = config.key === activeRound;
     const complete = this.isFinalRoundComplete(matchMap, config);
     const expandedNumber = Number(this.state.finalBracketExpandedMatchNumber || 0);
+    const displayNumbers = this.finalFocusSortedNumbers(matchMap, config);
     let expandedShift = 0;
-    const rowsHtml = config.numbers.map((number, index) => {
+    const rowsHtml = displayNumbers.map((number, index) => {
       const placement = this.finalFocusVisiblePlacement(config.key, index, windowStart, number);
       const isExpanded = isActive && Number(number) === expandedNumber;
       const rowStart = Number(placement.rowStart || 1) + expandedShift;
@@ -6142,7 +6162,7 @@ const App = {
     const activeColumn = typeof view === "boolean" ? Boolean(view) : Boolean(view?.activeColumn);
     const expanded = typeof view === "boolean" ? false : Boolean(view?.expanded);
     const match = this.finalBracketMatchByNumber(matchMap, number);
-    const title = Number(number) === 103 ? "Petite finale · M103" : Number(number) === 104 ? "Finale · M104" : `${config.shortLabel} · M${number}`;
+    const title = this.finalFocusCardTitle(number, config);
     if (!match) return this.finalFocusPlaceholderHtml(title, { activeColumn, expanded, number });
 
     const isScored = match.status === "finished" || match.status === "live";
@@ -6150,7 +6170,7 @@ const App = {
     const home = this.finalFocusDisplayTeamName(match.home_team_name, number);
     const away = this.finalFocusDisplayTeamName(match.away_team_name, number);
     const date = H.formatDateTime(match.kickoff_at);
-    const compactDate = this.finalFocusCompactDate(match.kickoff_at);
+    const compactDate = this.finalFocusCompactDateTime(match.kickoff_at);
     const location = [match.city, match.venue].filter(Boolean).join(" · ");
     const pronoMeta = this.finalFocusPredictionMetaHtml(match, expanded);
     const tvHtml = H.tvChannelLogosHtml(this.matchTvChannel(match), "tv-logo-strip final-tv-strip");
@@ -6209,7 +6229,8 @@ const App = {
       : "";
 
     if (!detailed) {
-      return `<div class="final-focus-mini-meta"><span>Prono ${H.escapeHtml(predictionText)}</span><span>Rés. ${H.escapeHtml(resultText)}</span></div>`;
+      const tvHtml = H.tvChannelLogosHtml(this.matchTvChannel(match), "tv-logo-strip final-tv-strip final-mini-tv-strip");
+      return `<div class="final-focus-mini-meta"><span>Prono ${H.escapeHtml(predictionText)}</span><span>Rés. ${H.escapeHtml(resultText)}</span><span class="final-focus-mini-tv">${tvHtml}</span></div>`;
     }
 
     return `
@@ -6256,10 +6277,9 @@ const App = {
     `;
   },
 
-  finalFocusCompactDate(value) {
+  finalFocusCompactDateTime(value) {
     if (!value) return "à confirmer";
-    const formatted = H.formatDateTime(value) || "";
-    return formatted.split(",")[0] || formatted;
+    return H.formatDateTime(value) || "à confirmer";
   },
 
   finalBracketHtml(byStage) {
@@ -11021,7 +11041,7 @@ const App = {
           </div>
           <div class="profile-account-actions">
             <button class="ghost-btn" id="profileInstallAppBtn" type="button">Installer l’app</button>
-            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.9.0</button>
+            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.9.1</button>
             <button class="danger-btn" id="profileLogoutBtn" type="button">Déconnexion</button>
           </div>
         </div>
