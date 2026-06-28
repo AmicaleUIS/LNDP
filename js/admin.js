@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — ADMIN V1.8.38
+// LE NID DES PRONOS — ADMIN V1.8.39
 // ============================================================
 
 const H = window.Helpers;
@@ -88,7 +88,7 @@ const Admin = {
       p_category: category,
       p_details: details || {},
       p_metadata: {
-        app_version: "1.8.38",
+        app_version: "1.8.39",
         source: "admin_front"
       }
     });
@@ -876,7 +876,7 @@ const Admin = {
       .in("message_id", messageIds);
 
     if (error) {
-      console.warn("Résultats de sondage Hibou indisponibles : lance le patch SQL V1.8.38", error);
+      console.warn("Résultats de sondage Hibou indisponibles : lance le patch SQL V1.8.39", error);
       this.state.owlPollResults = [];
       return;
     }
@@ -900,7 +900,7 @@ const Admin = {
       .in("message_id", messageIds);
 
     if (error) {
-      console.warn("Détail des votes Hibou indisponible : lance le patch SQL V1.8.38", error);
+      console.warn("Détail des votes Hibou indisponible : lance le patch SQL V1.8.39", error);
       this.state.owlPollVoteDetails = [];
       return;
     }
@@ -2226,7 +2226,7 @@ Je m’en remets au Hibou">${H.escapeHtml(this.owlPollOptionsText(msg))}</textar
       : window.sb.from("owl_messages").insert(payload);
     const { error } = await request;
     if (error) {
-      H.toast(error.message || "Impossible d’enregistrer le message. Lance le patch SQL V1.8.38.", "error");
+      H.toast(error.message || "Impossible d’enregistrer le message. Lance le patch SQL V1.8.39.", "error");
       return;
     }
 
@@ -3195,7 +3195,7 @@ Je m’en remets au Hibou">${H.escapeHtml(this.owlPollOptionsText(msg))}</textar
     });
 
     if (error) {
-      H.toast(error.message || "Impossible d’enregistrer les points bonus. Lance le patch SQL V1.8.38.", "error");
+      H.toast(error.message || "Impossible d’enregistrer les points bonus. Lance le patch SQL V1.8.39.", "error");
       return;
     }
 
@@ -3260,7 +3260,7 @@ Je m’en remets au Hibou">${H.escapeHtml(this.owlPollOptionsText(msg))}</textar
 
     const { data, error } = await window.sb.rpc("admin_clean_start_preserve_predictions", { p_confirm: "DEPART PROPRE" });
     if (error) {
-      H.toast(error.message || "Reset classements impossible. Lance le patch SQL V1.8.38.", "error");
+      H.toast(error.message || "Reset classements impossible. Lance le patch SQL V1.8.39.", "error");
       return;
     }
 

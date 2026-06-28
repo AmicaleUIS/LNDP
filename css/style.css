@@ -21490,7 +21490,7 @@ body[data-current-view] {
 }
 
 /* =====================================================
-   V1.8.38 — Phase finale desktop : 3 colonnes pleines, clic partout, liaisons simples
+   V1.8.39 — Phase finale desktop : 3 colonnes pleines, clic partout, liaisons simples
    ===================================================== */
 @media (min-width: 901px) {
   .final-tournament-shell.final-focus-shell {
@@ -21664,7 +21664,7 @@ body[data-current-view] {
 }
 
 /* =====================================================
-   V1.8.38 — Correctifs phase finale desktop + admin rouge/or
+   V1.8.39 — Correctifs phase finale desktop + admin rouge/or
    ===================================================== */
 .nav-list .admin-link,
 .mobile-menu-panel .mobile-admin-link {
@@ -21785,5 +21785,197 @@ body[data-current-view] {
   .final-tournament-board .final-focus-stage:focus-visible {
     box-shadow: 0 0 0 3px rgba(250,204,21,.24);
     border-radius: 24px;
+  }
+}
+
+
+/* =====================================================
+   V1.8.39 — Phase finale : cartes compactes + ouverture au clic, sans traits
+   ===================================================== */
+.final-tournament-board .final-focus-slot::before,
+.final-tournament-board .final-focus-slot::after,
+.final-tournament-board .final-focus-stage-grid::after,
+.final-focus-slot::before,
+.final-focus-slot::after,
+.final-focus-stage-grid::after {
+  display: none !important;
+  content: none !important;
+  border: 0 !important;
+  background: none !important;
+  box-shadow: none !important;
+}
+
+.final-tournament-board .final-focus-stage,
+.final-tournament-board .final-focus-slot,
+.final-tournament-board .final-focus-match {
+  cursor: pointer;
+}
+
+.final-tournament-board .final-focus-stage:focus-visible,
+.final-tournament-board .final-focus-match:focus-visible {
+  outline: 2px solid rgba(250, 204, 21, .72);
+  outline-offset: 3px;
+}
+
+.final-tournament-board .final-focus-stage.is-active {
+  filter: none;
+}
+
+.final-tournament-board .final-focus-stage.is-compact {
+  opacity: .88 !important;
+}
+
+.final-tournament-board .final-focus-match.compact {
+  min-height: 72px !important;
+  padding: 9px 11px !important;
+  border-radius: 18px !important;
+}
+
+.final-tournament-board .final-focus-stage.is-active .final-focus-match.compact.active-compact {
+  min-height: 88px !important;
+  padding: 11px 13px !important;
+  border-color: rgba(250, 204, 21, .48) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.06), 0 7px 18px rgba(0,0,0,.16) !important;
+}
+
+.final-tournament-board .final-focus-stage.is-compact .final-focus-match.compact.side-compact {
+  min-height: 64px !important;
+  padding: 8px 10px !important;
+}
+
+.final-tournament-board .final-focus-match.expanded {
+  min-height: 178px !important;
+  padding: 14px 16px !important;
+  border-color: rgba(250, 204, 21, .78) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.08), 0 0 0 1px rgba(250,204,21,.18), 0 14px 30px rgba(0,0,0,.30) !important;
+}
+
+.final-focus-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.final-focus-card-head strong {
+  min-width: 0;
+  color: #facc15;
+  font-weight: 900;
+}
+
+.final-focus-card-head small {
+  color: rgba(226, 232, 240, .84);
+  text-align: right;
+  font-size: .76rem;
+  white-space: nowrap;
+}
+
+.final-focus-match.compact .final-focus-compact-teams {
+  margin-bottom: 7px;
+}
+
+.final-focus-match.active-compact .final-focus-compact-teams strong {
+  font-size: .9rem !important;
+}
+
+.final-focus-match.side-compact .final-focus-compact-teams strong {
+  font-size: .78rem !important;
+}
+
+.final-focus-match.expanded .final-focus-detailed-teams {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  margin: 10px 0 12px;
+}
+
+.final-focus-match.expanded .final-focus-detailed-teams span {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.final-focus-match.expanded .final-focus-detailed-teams span:last-child {
+  justify-content: flex-end;
+  text-align: right;
+}
+
+.final-focus-match.expanded .final-focus-detailed-teams strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.final-focus-card-foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 7px;
+  color: rgba(203, 213, 225, .82);
+  font-size: .76rem;
+}
+
+.final-focus-card-foot.is-compact {
+  margin-top: 4px;
+}
+
+.final-focus-card-foot.is-expanded {
+  justify-content: space-between;
+  border-top: 1px solid rgba(148,163,184,.16);
+  padding-top: 9px;
+}
+
+.final-focus-location {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.final-focus-admin-score {
+  margin-top: 10px;
+  padding: 8px 10px;
+  border: 1px solid rgba(248, 113, 113, .24);
+  border-radius: 14px;
+  background: linear-gradient(90deg, rgba(127, 29, 29, .18), rgba(250, 204, 21, .08));
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+.final-focus-admin-score span {
+  color: #fecaca;
+  font-weight: 900;
+  font-size: .78rem;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+
+.final-tournament-board[data-window-start="0"] { --final-row-height: 96px !important; }
+.final-tournament-board[data-window-start="1"] { --final-row-height: 104px !important; }
+.final-tournament-board[data-window-start="2"] { --final-row-height: 116px !important; }
+
+@media (min-width: 901px) {
+  .final-tournament-board[data-window-start="0"][data-active-round="round_of_32"] { grid-template-columns: minmax(0,1.32fr) minmax(0,.95fr) minmax(0,.82fr) !important; }
+  .final-tournament-board[data-window-start="0"][data-active-round="round_of_16"] { grid-template-columns: minmax(0,.82fr) minmax(0,1.32fr) minmax(0,.9fr) !important; }
+  .final-tournament-board[data-window-start="1"][data-active-round="quarter_final"] { grid-template-columns: minmax(0,.88fr) minmax(0,1.3fr) minmax(0,.95fr) !important; }
+  .final-tournament-board[data-window-start="2"][data-active-round="semi_final"] { grid-template-columns: minmax(0,.9fr) minmax(0,1.28fr) minmax(0,1fr) !important; }
+  .final-tournament-board[data-window-start="2"][data-active-round="final"] { grid-template-columns: minmax(0,.85fr) minmax(0,.95fr) minmax(0,1.32fr) !important; }
+}
+
+@media (max-width: 900px) {
+  .final-tournament-board .final-focus-match.compact {
+    min-height: 68px !important;
+  }
+  .final-tournament-board .final-focus-stage.is-active .final-focus-match.compact.active-compact {
+    min-height: 78px !important;
+  }
+  .final-tournament-board .final-focus-match.expanded {
+    min-height: 150px !important;
   }
 }

@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — APP PRINCIPALE V1.8.38
+// LE NID DES PRONOS — APP PRINCIPALE V1.8.39
 // ============================================================
 
 const H = window.Helpers;
@@ -68,6 +68,7 @@ const App = {
     achievementsTab: "mine",
     worldcupTab: "groups",
     finalBracketActiveRound: null,
+    finalBracketExpandedMatchNumber: null,
     matchPhaseIndex: 0,
     myPredictionsPhaseIndex: 0,
     leaderboardPhaseIndex: 0,
@@ -478,7 +479,7 @@ const App = {
           <div>
             <p class="eyebrow">Crédits cachés</p>
             <h2 id="creditsTitle">Le Nid des Pronos</h2>
-            <p class="muted">Version publique <strong>1.8.38</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
+            <p class="muted">Version publique <strong>1.8.39</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
           </div>
         </div>
         <div class="credits-grid">
@@ -495,7 +496,7 @@ const App = {
             <p><strong>1.0.5</strong> — dashboard mobile/desktop stabilisé, sans chevauchement des cartes.</p>
           </section>
           <section>
-            <h3>Évolutions V1.8.38</h3>
+            <h3>Évolutions V1.8.39</h3>
             <ul class="changelog-list">
               <li>Le super admin peut désactiver ou réactiver l’affichage du module préparation.</li>
               <li>Quand la préparation est désactivée, les matchs test disparaissent des matchs/pronos, classements par phase et règles.</li>
@@ -919,7 +920,7 @@ const App = {
       .in("message_id", ids);
 
     if (error) {
-      console.warn("Votes de sondage Hibou indisponibles : lance le patch SQL V1.8.38", error);
+      console.warn("Votes de sondage Hibou indisponibles : lance le patch SQL V1.8.39", error);
       this.state.owlPollVotes = {};
       return;
     }
@@ -967,7 +968,7 @@ const App = {
       .in("message_id", ids);
 
     if (error) {
-      console.warn("Détail des votes Hibou indisponible : lance le patch SQL V1.8.38", error);
+      console.warn("Détail des votes Hibou indisponible : lance le patch SQL V1.8.39", error);
       return;
     }
 
@@ -1130,7 +1131,7 @@ const App = {
       .upsert({ message_id: message.id, user_id: this.state.session?.user?.id, option_key: optionKey }, { onConflict: "message_id,user_id" });
 
     if (error) {
-      H.toast(error.message || "Vote impossible. Lance le patch SQL V1.8.38.", "error");
+      H.toast(error.message || "Vote impossible. Lance le patch SQL V1.8.39.", "error");
       return;
     }
 
@@ -1494,7 +1495,7 @@ const App = {
 
 
   async loadVisiblePredictions() {
-    // V1.8.38 — IMPORTANT : Supabase REST renvoie 1000 lignes max par requête.
+    // V1.8.39 — IMPORTANT : Supabase REST renvoie 1000 lignes max par requête.
     // Le classement général est agrégé en base, mais les détails joueurs et le classement Famille
     // repartent des pronos visibles côté front. On pagine donc toute la vue, sinon les détails
     // s'arrêtent après les premiers paquets de matchs/joueurs.
@@ -5288,6 +5289,23 @@ const App = {
       scroller.dataset.finalDelegationBound = "true";
       scroller.addEventListener("click", (event) => {
         if (event.target.closest("button, a, input, select, textarea")) return;
+
+        const matchCard = event.target.closest("[data-final-match-toggle]");
+        if (matchCard) {
+          const round = matchCard.closest("[data-final-stage-round]")?.dataset?.finalStageRound || matchCard.dataset.finalRoundTarget;
+          const currentRound = this.state.finalBracketActiveRound || scroller.querySelector(".final-focus-board")?.dataset?.activeRound;
+          if (round && round !== currentRound) {
+            this.setFinalBracketRound(round);
+            return;
+          }
+          const number = Number(matchCard.dataset.finalMatchToggle || 0);
+          if (number) {
+            this.state.finalBracketExpandedMatchNumber = Number(this.state.finalBracketExpandedMatchNumber || 0) === number ? null : number;
+            this.renderWorldCupFinals();
+          }
+          return;
+        }
+
         const target = event.target.closest("[data-final-round-target], [data-final-stage-round]");
         const round = target?.dataset?.finalRoundTarget || target?.dataset?.finalStageRound;
         if (round) this.setFinalBracketRound(round);
@@ -5300,6 +5318,22 @@ const App = {
       const activateStage = () => this.setFinalBracketRound(stage.dataset.finalStageRound || null);
       stage.addEventListener("keydown", (event) => {
         if (event.key !== "Enter" && event.key !== " ") return;
+        const matchCard = event.target.closest?.("[data-final-match-toggle]");
+        if (matchCard) {
+          event.preventDefault();
+          const round = matchCard.closest("[data-final-stage-round]")?.dataset?.finalStageRound || matchCard.dataset.finalRoundTarget;
+          const currentRound = this.state.finalBracketActiveRound || H.$("#finalBracketScroll .final-focus-board")?.dataset?.activeRound;
+          if (round && round !== currentRound) {
+            this.setFinalBracketRound(round);
+            return;
+          }
+          const number = Number(matchCard.dataset.finalMatchToggle || 0);
+          if (number) {
+            this.state.finalBracketExpandedMatchNumber = Number(this.state.finalBracketExpandedMatchNumber || 0) === number ? null : number;
+            this.renderWorldCupFinals();
+          }
+          return;
+        }
         event.preventDefault();
         activateStage();
       });
@@ -5401,6 +5435,7 @@ const App = {
     const currentIndex = Math.max(0, configs.findIndex((config) => config.key === currentRound));
     if (configs[targetIndex]?.key === currentRound) return;
     this.state.finalBracketActiveRound = configs[targetIndex].key;
+    this.state.finalBracketExpandedMatchNumber = null;
     this.state.finalBracketSlideDirection = targetIndex < currentIndex ? "left" : "right";
     this.renderWorldCupFinals();
   },
@@ -6007,6 +6042,19 @@ const App = {
   finalFocusStageColumnHtml(matchMap, config, activeRound, stageIndex = 0, windowStart = 0) {
     const isActive = config.key === activeRound;
     const complete = this.isFinalRoundComplete(matchMap, config);
+    const expandedNumber = Number(this.state.finalBracketExpandedMatchNumber || 0);
+    let expandedShift = 0;
+    const rowsHtml = config.numbers.map((number, index) => {
+      const placement = this.finalFocusVisiblePlacement(config.key, index, windowStart, number);
+      const isExpanded = isActive && Number(number) === expandedNumber;
+      const rowStart = Number(placement.rowStart || 1) + expandedShift;
+      const rowSpan = isExpanded ? Math.max(Number(placement.rowSpan || 1), 2) : Number(placement.rowSpan || 1);
+      if (isExpanded) expandedShift += 1;
+      return `<div class="final-focus-slot slot-m${number} ${isExpanded ? "is-expanded-slot" : ""}" data-match-number="${number}" data-final-round-target="${H.escapeHtml(config.key)}" style="grid-row:${rowStart} / span ${rowSpan};">
+        ${this.finalFocusMatchCardHtml(matchMap, number, config, { activeColumn: isActive, expanded: isExpanded })}
+      </div>`;
+    }).join("");
+
     return `
       <section class="final-focus-stage ${isActive ? "is-active" : "is-compact"} stage-${H.escapeHtml(config.key)}"
         data-stage-index="${stageIndex}"
@@ -6020,12 +6068,7 @@ const App = {
           <small>${complete ? "terminé" : H.escapeHtml(config.shortLabel)}</small>
         </button>
         <div class="final-focus-stage-grid" data-final-round-target="${H.escapeHtml(config.key)}">
-          ${config.numbers.map((number, index) => {
-            const placement = this.finalFocusVisiblePlacement(config.key, index, windowStart, number);
-            return `<div class="final-focus-slot slot-m${number}" data-match-number="${number}" data-final-round-target="${H.escapeHtml(config.key)}" style="grid-row:${placement.rowStart} / span ${placement.rowSpan};">
-              ${this.finalFocusMatchCardHtml(matchMap, number, config, isActive)}
-            </div>`;
-          }).join("")}
+          ${rowsHtml}
         </div>
       </section>
     `;
@@ -6053,10 +6096,12 @@ const App = {
     return { rowStart: index + 1, rowSpan: 1 };
   },
 
-  finalFocusMatchCardHtml(matchMap, number, config, detailed) {
+  finalFocusMatchCardHtml(matchMap, number, config, view = {}) {
+    const activeColumn = typeof view === "boolean" ? Boolean(view) : Boolean(view?.activeColumn);
+    const expanded = typeof view === "boolean" ? false : Boolean(view?.expanded);
     const match = this.finalBracketMatchByNumber(matchMap, number);
     const title = Number(number) === 103 ? "Petite finale · M103" : Number(number) === 104 ? "Finale · M104" : `${config.shortLabel} · M${number}`;
-    if (!match) return this.finalFocusPlaceholderHtml(title, detailed);
+    if (!match) return this.finalFocusPlaceholderHtml(title, { activeColumn, expanded, number });
 
     const isScored = match.status === "finished" || match.status === "live";
     const score = isScored ? H.scoreText(match.home_score, match.away_score) : "vs";
@@ -6065,39 +6110,43 @@ const App = {
     const date = H.formatDateTime(match.kickoff_at);
     const compactDate = this.finalFocusCompactDate(match.kickoff_at);
     const location = [match.city, match.venue].filter(Boolean).join(" · ");
-    const pronoMeta = this.finalFocusPredictionMetaHtml(match, detailed);
-
-    if (!detailed) {
-      return `
-        <article class="final-focus-match compact ${match.status || "scheduled"}">
-          <small>${H.escapeHtml(title)} · ${H.escapeHtml(compactDate)}</small>
-          <div class="final-focus-compact-teams">
-            <span>${H.matchFlagHtml(match, "home")}<strong>${H.escapeHtml(home)}</strong></span>
-            <b>${H.escapeHtml(score)}</b>
-            <span>${H.matchFlagHtml(match, "away")}<strong>${H.escapeHtml(away)}</strong></span>
-          </div>
-          ${pronoMeta}
-        </article>
-      `;
-    }
+    const pronoMeta = this.finalFocusPredictionMetaHtml(match, expanded);
+    const tvHtml = H.tvChannelLogosHtml(this.matchTvChannel(match), "tv-logo-strip final-tv-strip");
+    const cardClass = expanded ? "expanded detailed" : `compact ${activeColumn ? "active-compact" : "side-compact"}`;
 
     return `
-      <article class="final-focus-match detailed ${match.status || "scheduled"}">
-        <header>
+      <article class="final-focus-match ${cardClass} ${match.status || "scheduled"}"
+        data-final-match-toggle="${Number(number)}"
+        data-final-round-target="${H.escapeHtml(config.key)}"
+        role="button"
+        tabindex="0"
+        aria-expanded="${expanded ? "true" : "false"}">
+        <header class="final-focus-card-head">
           <strong>${H.escapeHtml(title)}</strong>
-          <small>${H.escapeHtml(date)}</small>
+          <small>${H.escapeHtml(expanded ? date : compactDate)}</small>
         </header>
-        <div class="final-focus-detailed-teams">
-          <div>${H.matchFlagHtml(match, "home")}<strong>${H.escapeHtml(home)}</strong></div>
+        <div class="${expanded ? "final-focus-detailed-teams" : "final-focus-compact-teams"}">
+          <span>${H.matchFlagHtml(match, "home")}<strong>${H.escapeHtml(home)}</strong></span>
           <b>${H.escapeHtml(score)}</b>
-          <div>${H.matchFlagHtml(match, "away")}<strong>${H.escapeHtml(away)}</strong></div>
+          <span>${H.matchFlagHtml(match, "away")}<strong>${H.escapeHtml(away)}</strong></span>
         </div>
         ${pronoMeta}
-        <footer>
-          <span>${location ? H.escapeHtml(location) : "Lieu à confirmer"}</span>
-          <span>${H.icon("tv")} ${H.tvChannelLogosHtml(this.matchTvChannel(match), "tv-logo-strip final-tv-strip")}</span>
+        <footer class="final-focus-card-foot ${expanded ? "is-expanded" : "is-compact"}">
+          ${expanded ? `<span class="final-focus-location">${location ? H.escapeHtml(location) : "Lieu à confirmer"}</span>` : ""}
+          <span class="final-focus-tv">${H.icon("tv")} ${tvHtml}</span>
         </footer>
+        ${expanded ? this.finalFocusAdminScoreShortcutHtml(match) : ""}
       </article>
+    `;
+  },
+
+  finalFocusAdminScoreShortcutHtml(match) {
+    if (!this.isScoreAdmin?.() || !match?.id) return "";
+    return `
+      <div class="final-focus-admin-score">
+        <span>Score admin</span>
+        <a class="ghost-btn small" href="admin.html#scores" title="Ouvrir l’admin pour modifier le score">Modifier le score</a>
+      </div>
     `;
   },
 
@@ -6139,15 +6188,28 @@ const App = {
     return clean;
   },
 
-  finalFocusPlaceholderHtml(title, detailed = false) {
+  finalFocusPlaceholderHtml(title, view = {}) {
+    const expanded = typeof view === "boolean" ? Boolean(view) : Boolean(view?.expanded);
+    const activeColumn = typeof view === "boolean" ? Boolean(view) : Boolean(view?.activeColumn);
+    const number = typeof view === "object" ? Number(view?.number || 0) : 0;
+    const cardClass = expanded ? "expanded detailed" : `compact ${activeColumn ? "active-compact" : "side-compact"}`;
     return `
-      <article class="final-focus-match ${detailed ? "detailed" : "compact"} placeholder">
-        <small>${H.escapeHtml(title)}</small>
-        <div class="final-focus-compact-teams">
+      <article class="final-focus-match ${cardClass} placeholder"
+        ${number ? `data-final-match-toggle="${number}"` : ""}
+        role="button"
+        tabindex="0"
+        aria-expanded="${expanded ? "true" : "false"}">
+        <header class="final-focus-card-head">
+          <strong>${H.escapeHtml(title)}</strong>
+          <small>À confirmer</small>
+        </header>
+        <div class="${expanded ? "final-focus-detailed-teams" : "final-focus-compact-teams"}">
           <span><span class="flag-mini placeholder-flag"></span><strong>Équipe pas encore éclose</strong></span>
           <b>vs</b>
           <span><span class="flag-mini placeholder-flag"></span><strong>Équipe pas encore éclose</strong></span>
         </div>
+        <div class="final-focus-mini-meta"><span>Prono non posé</span><span>Rés. à venir</span></div>
+        ${expanded ? `<footer class="final-focus-card-foot is-expanded"><span>Lieu à confirmer</span></footer>` : ""}
       </article>
     `;
   },
@@ -10753,7 +10815,7 @@ const App = {
           </div>
           <div class="profile-account-actions">
             <button class="ghost-btn" id="profileInstallAppBtn" type="button">Installer l’app</button>
-            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.8.38</button>
+            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.8.39</button>
             <button class="danger-btn" id="profileLogoutBtn" type="button">Déconnexion</button>
           </div>
         </div>
