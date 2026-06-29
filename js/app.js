@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — APP PRINCIPALE V1.9.6
+// LE NID DES PRONOS — APP PRINCIPALE V1.9.10
 // ============================================================
 
 const H = window.Helpers;
@@ -482,7 +482,7 @@ const App = {
           <div>
             <p class="eyebrow">Crédits cachés</p>
             <h2 id="creditsTitle">Le Nid des Pronos</h2>
-            <p class="muted">Version publique <strong>1.9.6</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
+            <p class="muted">Version publique <strong>1.9.10</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
           </div>
         </div>
         <div class="credits-grid">
@@ -499,7 +499,7 @@ const App = {
             <p><strong>1.0.5</strong> — dashboard mobile/desktop stabilisé, sans chevauchement des cartes.</p>
           </section>
           <section>
-            <h3>Évolutions V1.9.6</h3>
+            <h3>Évolutions V1.9.10</h3>
             <ul class="changelog-list">
               <li>Le super admin peut désactiver ou réactiver l’affichage du module préparation.</li>
               <li>Quand la préparation est désactivée, les matchs test disparaissent des matchs/pronos, classements par phase et règles.</li>
@@ -923,7 +923,7 @@ const App = {
       .in("message_id", ids);
 
     if (error) {
-      console.warn("Votes de sondage Hibou indisponibles : lance le patch SQL V1.9.6", error);
+      console.warn("Votes de sondage Hibou indisponibles : lance le patch SQL V1.9.10", error);
       this.state.owlPollVotes = {};
       return;
     }
@@ -971,7 +971,7 @@ const App = {
       .in("message_id", ids);
 
     if (error) {
-      console.warn("Détail des votes Hibou indisponible : lance le patch SQL V1.9.6", error);
+      console.warn("Détail des votes Hibou indisponible : lance le patch SQL V1.9.10", error);
       return;
     }
 
@@ -1134,7 +1134,7 @@ const App = {
       .upsert({ message_id: message.id, user_id: this.state.session?.user?.id, option_key: optionKey }, { onConflict: "message_id,user_id" });
 
     if (error) {
-      H.toast(error.message || "Vote impossible. Lance le patch SQL V1.9.6.", "error");
+      H.toast(error.message || "Vote impossible. Lance le patch SQL V1.9.10.", "error");
       return;
     }
 
@@ -1498,7 +1498,7 @@ const App = {
 
 
   async loadVisiblePredictions() {
-    // V1.9.6 — IMPORTANT : Supabase REST renvoie 1000 lignes max par requête.
+    // V1.9.10 — IMPORTANT : Supabase REST renvoie 1000 lignes max par requête.
     // Le classement général est agrégé en base, mais les détails joueurs et le classement Famille
     // repartent des pronos visibles côté front. On pagine donc toute la vue, sinon les détails
     // s'arrêtent après les premiers paquets de matchs/joueurs.
@@ -1837,6 +1837,25 @@ const App = {
     return match && match.home_score !== null && match.home_score !== undefined && match.away_score !== null && match.away_score !== undefined;
   },
 
+  effectiveWinnerTeamIdFromScores(match = {}) {
+    if (!match || !this.hasLiveScore(match)) return match?.winner_team_id || null;
+    const home = Number(match.home_score);
+    const away = Number(match.away_score);
+    if (!Number.isFinite(home) || !Number.isFinite(away)) return match?.winner_team_id || null;
+    if (home > away) return match.home_team_id || match.winner_team_id || null;
+    if (away > home) return match.away_team_id || match.winner_team_id || null;
+    return match.winner_team_id || null;
+  },
+
+  scoreImpliedQualifiedTeamId(match = {}, homeScore = null, awayScore = null) {
+    const home = Number(homeScore);
+    const away = Number(awayScore);
+    if (!Number.isFinite(home) || !Number.isFinite(away)) return "";
+    if (home > away) return match?.home_team_id || "";
+    if (away > home) return match?.away_team_id || "";
+    return "";
+  },
+
   outcomeFromScores(home, away) {
     if (home > away) return "home";
     if (away > home) return "away";
@@ -1856,7 +1875,8 @@ const App = {
     const isExactScore = predHome === realHome && predAway === realAway;
     const isGoodResult = this.outcomeFromScores(predHome, predAway) === this.outcomeFromScores(realHome, realAway);
     const isGoodGoalDiff = (predHome - predAway) === (realHome - realAway);
-    const isGoodQualified = Boolean(prediction.qualified_team_pred && match.winner_team_id && prediction.qualified_team_pred === match.winner_team_id);
+    const effectiveWinnerTeamId = this.effectiveWinnerTeamIdFromScores(match);
+    const isGoodQualified = Boolean(prediction.qualified_team_pred && effectiveWinnerTeamId && String(prediction.qualified_team_pred) === String(effectiveWinnerTeamId));
 
     let total = 0;
     if (isExactScore) total += 5;
@@ -1877,18 +1897,9 @@ const App = {
 
   predictionForDisplay(prediction, match) {
     if (!prediction) return null;
-    if (match?.status === "live") return this.projectedPredictionPoints(prediction, match) || prediction;
-
-    // V1.8.6 — filet de sécurité :
-    // si prediction_points n'a pas encore été créé/recalculé en base,
-    // on calcule quand même les points affichés à partir du résultat officiel.
-    if (
-      match?.status === "finished"
-      && (prediction.points_total === null || prediction.points_total === undefined)
-    ) {
+    if (["live", "finished"].includes(match?.status)) {
       return this.projectedPredictionPoints(prediction, match) || prediction;
     }
-
     return prediction;
   },
 
@@ -4089,9 +4100,10 @@ const App = {
     const isFinalPhase = form.dataset.finalPhase === "true";
     const qualifiedSelect = form.querySelector('select[name="qualified_team_pred"]');
     if (isFinalPhase && qualifiedSelect) {
-      if (!qualifiedSelect.value && home !== away) {
-        const options = [...qualifiedSelect.options].map((option) => option.value).filter(Boolean);
-        qualifiedSelect.value = home > away ? options[0] || "" : options[1] || "";
+      const match = this.state.matches.find((item) => String(item.id) === String(form.dataset.matchId));
+      const impliedQualified = this.scoreImpliedQualifiedTeamId(match, home, away);
+      if (impliedQualified) {
+        qualifiedSelect.value = impliedQualified;
       }
       if (!qualifiedSelect.value) return false;
     }
@@ -4158,6 +4170,7 @@ const App = {
     const formData = new FormData(form);
     const achievementIdsBeforeSave = new Set(this.computeBadgesForUser(this.state.session.user.id).map((badge) => badge.id));
 
+    const match = this.state.matches.find((item) => String(item.id) === String(matchId));
     const payload = {
       user_id: this.state.session.user.id,
       match_id: matchId,
@@ -4165,6 +4178,15 @@ const App = {
       away_score_pred: Number(formData.get("away_score_pred")),
       qualified_team_pred: isFinalPhase ? formData.get("qualified_team_pred") : null
     };
+
+    if (isFinalPhase) {
+      const impliedQualified = this.scoreImpliedQualifiedTeamId(match, payload.home_score_pred, payload.away_score_pred);
+      if (impliedQualified) {
+        payload.qualified_team_pred = impliedQualified;
+        const qualifiedSelect = form.querySelector('select[name="qualified_team_pred"]');
+        if (qualifiedSelect) qualifiedSelect.value = impliedQualified;
+      }
+    }
 
     if (Number.isNaN(payload.home_score_pred) || Number.isNaN(payload.away_score_pred)) {
       if (!silent) H.toast("Entre deux scores valides.", "error");
@@ -5473,7 +5495,10 @@ const App = {
       const activeStage = scroller.querySelector(`.final-focus-stage.stage-${safeRound}`);
       if (!activeStage) return;
       const maxLeft = Math.max(0, scroller.scrollWidth - scroller.clientWidth);
-      const desiredLeft = activeStage.offsetLeft - Math.max(0, (scroller.clientWidth - activeStage.offsetWidth) / 2);
+      const isMobileFinal = window.matchMedia?.("(max-width: 900px)")?.matches;
+      const desiredLeft = isMobileFinal
+        ? Math.max(0, activeStage.offsetLeft - 10)
+        : activeStage.offsetLeft - Math.max(0, (scroller.clientWidth - activeStage.offsetWidth) / 2);
       scroller.scrollTo({ left: Math.min(maxLeft, Math.max(0, desiredLeft)), behavior: "smooth" });
     }, 70);
   },
@@ -5661,12 +5686,13 @@ const App = {
     const map = new Map();
     const usedMatchKeys = new Set();
     const matchKey = (match) => String(match?.id || `${match?.stage || ""}|${match?.kickoff_at || ""}|${match?.home_team_id || ""}|${match?.away_team_id || ""}`);
+    const cloneMatch = (match, number) => ({ ...match, _finalBracketNumber: Number(number || 0) || undefined });
 
     // 1) Priorité aux numéros explicites ou visibles dans les placeholders (M76, Match 76...).
     Object.values(byStage).flat().forEach((match) => {
       const number = this.finalBracketStableMatchNumber(match, map);
       if (number && !map.has(number)) {
-        map.set(number, match);
+        map.set(number, cloneMatch(match, number));
         usedMatchKeys.add(matchKey(match));
       }
     });
@@ -5688,13 +5714,92 @@ const App = {
       unmatched.forEach((match, index) => {
         const number = freeNumbers[index];
         if (number && !map.has(number)) {
-          map.set(number, match);
+          map.set(number, cloneMatch(match, number));
           usedMatchKeys.add(matchKey(match));
         }
       });
     });
 
+    this.applyFinalBracketProgressionToDisplayMap(map);
     return map;
+  },
+
+  finalBracketTeamById(teamId, matchMap = null) {
+    if (!teamId) return null;
+    const id = String(teamId);
+    const team = (this.state.footballTeams || []).find((item) => String(item.id) === id);
+    if (team) {
+      return {
+        id: team.id,
+        name: team.name,
+        short_name: team.short_name,
+        country_code: team.country_code,
+        flag_url: team.flag_url
+      };
+    }
+
+    const matches = matchMap ? [...matchMap.values()] : this.state.matches || [];
+    for (const match of matches) {
+      for (const side of ["home", "away"]) {
+        if (String(match?.[`${side}_team_id`] || "") !== id) continue;
+        return {
+          id: match[`${side}_team_id`],
+          name: match[`${side}_team_name`],
+          short_name: match[`${side}_team_short_name`],
+          country_code: match[`${side}_team_country_code`],
+          flag_url: match[`${side}_team_flag_url`]
+        };
+      }
+    }
+    return { id: teamId };
+  },
+
+  setFinalBracketMatchTeam(match, side = "home", teamId = null, matchMap = null) {
+    if (!match || !teamId) return;
+    const prefix = side === "away" ? "away" : "home";
+    const team = this.finalBracketTeamById(teamId, matchMap);
+    match[`${prefix}_team_id`] = teamId;
+    if (team?.name) match[`${prefix}_team_name`] = this.displayCountryName(team.name);
+    if (team?.short_name) match[`${prefix}_team_short_name`] = team.short_name;
+    if (team?.country_code) match[`${prefix}_team_country_code`] = team.country_code;
+    if (team?.flag_url) match[`${prefix}_team_flag_url`] = team.flag_url;
+  },
+
+  finalBracketWinnerTeamId(match = {}) {
+    if (!match || match.status !== "finished") return null;
+    return this.effectiveWinnerTeamIdFromScores(match);
+  },
+
+  finalBracketLoserTeamId(match = {}) {
+    if (!match || match.status !== "finished") return null;
+    const winner = this.finalBracketWinnerTeamId(match);
+    if (!winner) return null;
+    if (String(winner) === String(match.home_team_id)) return match.away_team_id || null;
+    if (String(winner) === String(match.away_team_id)) return match.home_team_id || null;
+    return null;
+  },
+
+  finalBracketQualifiedTeamId(match = {}, mode = "winner") {
+    return mode === "loser" ? this.finalBracketLoserTeamId(match) : this.finalBracketWinnerTeamId(match);
+  },
+
+  applyFinalBracketProgressionToDisplayMap(matchMap) {
+    const progression = H.finalBracketProgressionMap?.() || {};
+    const order = H.finalBracketProgressionOrder?.() || Object.keys(progression).map(Number).sort((a, b) => a - b);
+
+    order.forEach((targetNumber) => {
+      const rule = progression[Number(targetNumber)];
+      const target = matchMap.get(Number(targetNumber));
+      if (!rule || !target) return;
+      const [sourceA, sourceB] = rule.sources || [];
+      const matchA = matchMap.get(Number(sourceA));
+      const matchB = matchMap.get(Number(sourceB));
+      if (!matchA || !matchB) return;
+      const homeId = this.finalBracketQualifiedTeamId(matchA, rule.use);
+      const awayId = this.finalBracketQualifiedTeamId(matchB, rule.use);
+      if (homeId) this.setFinalBracketMatchTeam(target, "home", homeId, matchMap);
+      if (awayId) this.setFinalBracketMatchTeam(target, "away", awayId, matchMap);
+    });
   },
 
   finalBracketMatchByNumber(matchMap, number) {
@@ -6148,8 +6253,13 @@ const App = {
     const configs = this.finalBracketRoundConfigs();
     const activeConfig = configs.find((config) => config.key === activeRound) || configs[0];
     const activeIndex = Math.max(0, configs.findIndex((config) => config.key === activeConfig.key));
-    const startIndex = Math.min(Math.max(0, activeIndex - 1), Math.max(0, configs.length - 3));
-    const visibleConfigs = configs.slice(startIndex, startIndex + 3);
+    const isMobileFinal = typeof window !== "undefined" && window.matchMedia?.("(max-width: 900px)")?.matches;
+    const startIndex = isMobileFinal
+      ? activeIndex
+      : Math.min(Math.max(0, activeIndex - 1), Math.max(0, configs.length - 3));
+    const visibleConfigs = isMobileFinal
+      ? configs.slice(startIndex, Math.min(configs.length, startIndex + 3))
+      : configs.slice(startIndex, startIndex + 3);
     const slideClass = this.state.finalBracketSlideDirection === "left" ? "slide-left" : this.state.finalBracketSlideDirection === "right" ? "slide-right" : "";
     const rowCount = this.finalFocusVisibleRowCount(startIndex);
     return `
@@ -11234,7 +11344,7 @@ const App = {
           </div>
           <div class="profile-account-actions">
             <button class="ghost-btn" id="profileInstallAppBtn" type="button">Installer l’app</button>
-            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.9.6</button>
+            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.9.10</button>
             <button class="danger-btn" id="profileLogoutBtn" type="button">Déconnexion</button>
           </div>
         </div>
