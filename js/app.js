@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — APP PRINCIPALE V1.9.10
+// LE NID DES PRONOS — APP PRINCIPALE V1.9.11
 // ============================================================
 
 const H = window.Helpers;
@@ -482,7 +482,7 @@ const App = {
           <div>
             <p class="eyebrow">Crédits cachés</p>
             <h2 id="creditsTitle">Le Nid des Pronos</h2>
-            <p class="muted">Version publique <strong>1.9.10</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
+            <p class="muted">Version publique <strong>1.9.11</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
           </div>
         </div>
         <div class="credits-grid">
@@ -499,7 +499,7 @@ const App = {
             <p><strong>1.0.5</strong> — dashboard mobile/desktop stabilisé, sans chevauchement des cartes.</p>
           </section>
           <section>
-            <h3>Évolutions V1.9.10</h3>
+            <h3>Évolutions V1.9.11</h3>
             <ul class="changelog-list">
               <li>Le super admin peut désactiver ou réactiver l’affichage du module préparation.</li>
               <li>Quand la préparation est désactivée, les matchs test disparaissent des matchs/pronos, classements par phase et règles.</li>
@@ -923,7 +923,7 @@ const App = {
       .in("message_id", ids);
 
     if (error) {
-      console.warn("Votes de sondage Hibou indisponibles : lance le patch SQL V1.9.10", error);
+      console.warn("Votes de sondage Hibou indisponibles : lance le patch SQL V1.9.11", error);
       this.state.owlPollVotes = {};
       return;
     }
@@ -971,7 +971,7 @@ const App = {
       .in("message_id", ids);
 
     if (error) {
-      console.warn("Détail des votes Hibou indisponible : lance le patch SQL V1.9.10", error);
+      console.warn("Détail des votes Hibou indisponible : lance le patch SQL V1.9.11", error);
       return;
     }
 
@@ -1129,16 +1129,42 @@ const App = {
       return;
     }
 
-    const { error } = await window.sb
-      .from("owl_message_votes")
-      .upsert({ message_id: message.id, user_id: this.state.session?.user?.id, option_key: optionKey }, { onConflict: "message_id,user_id" });
-
-    if (error) {
-      H.toast(error.message || "Vote impossible. Lance le patch SQL V1.9.10.", "error");
+    const userId = this.state.session?.user?.id;
+    if (!userId) {
+      H.toast("Connecte-toi pour voter, petit hibou clandestin.", "error");
       return;
     }
 
-    this.state.owlPollVotes[String(message.id)] = { message_id: message.id, option_key: optionKey };
+    const existingVote = this.state.owlPollVotes?.[String(message.id)];
+    let error = null;
+
+    if (existingVote) {
+      const result = await window.sb
+        .from("owl_message_votes")
+        .update({ option_key: optionKey, updated_at: new Date().toISOString() })
+        .eq("message_id", message.id)
+        .eq("user_id", userId);
+      error = result.error;
+    } else {
+      const result = await window.sb
+        .from("owl_message_votes")
+        .insert({ message_id: message.id, user_id: userId, option_key: optionKey });
+      error = result.error;
+    }
+
+    if (error) {
+      const fallback = await window.sb
+        .from("owl_message_votes")
+        .upsert({ message_id: message.id, user_id: userId, option_key: optionKey, updated_at: new Date().toISOString() }, { onConflict: "message_id,user_id" });
+      error = fallback.error;
+    }
+
+    if (error) {
+      H.toast(error.message || "Vote impossible. Lance le patch SQL V1.9.11.", "error");
+      return;
+    }
+
+    this.state.owlPollVotes[String(message.id)] = { message_id: message.id, user_id: userId, option_key: optionKey };
     await this.loadOwlPollResults([message.id]);
     await this.loadOwlPollVoteDetails([message.id]);
     const pollRoot = H.$(this.owlPollRootSelector(message), modal) || H.$(".login-owl-poll", modal);
@@ -1346,10 +1372,32 @@ const App = {
   },
 
   displayMatches() {
-    return this.state.matches.filter((match) => {
-      if (this.isLiveDemoMatch(match)) return this.preparationModuleEnabled() && this.liveDemoMatchEnabled();
-      if (!this.preparationModuleEnabled() && match.is_test_match) return false;
-      return true;
+    const matches = this.state.matches
+      .filter((match) => {
+        if (this.isLiveDemoMatch(match)) return this.preparationModuleEnabled() && this.liveDemoMatchEnabled();
+        if (!this.preparationModuleEnabled() && match.is_test_match) return false;
+        return true;
+      })
+      .map((match) => ({ ...match }));
+    return this.applyFinalBracketProgressionToMatchList(matches);
+  },
+
+  applyFinalBracketProgressionToMatchList(matches = []) {
+    const finals = (matches || []).filter((match) => match && match.stage !== "group");
+    if (!finals.length) return matches;
+
+    const byStage = this.finalBracketStages(finals);
+    const map = this.finalBracketMatchMap(byStage);
+    if (!map?.size) return matches;
+
+    const resolvedById = new Map();
+    [...map.values()].forEach((match) => {
+      if (match?.id) resolvedById.set(String(match.id), match);
+    });
+
+    return matches.map((match) => {
+      const resolved = resolvedById.get(String(match?.id || ""));
+      return resolved ? { ...match, ...resolved } : match;
     });
   },
 
@@ -1498,7 +1546,7 @@ const App = {
 
 
   async loadVisiblePredictions() {
-    // V1.9.10 — IMPORTANT : Supabase REST renvoie 1000 lignes max par requête.
+    // V1.9.11 — IMPORTANT : Supabase REST renvoie 1000 lignes max par requête.
     // Le classement général est agrégé en base, mais les détails joueurs et le classement Famille
     // repartent des pronos visibles côté front. On pagine donc toute la vue, sinon les détails
     // s'arrêtent après les premiers paquets de matchs/joueurs.
@@ -6467,7 +6515,8 @@ const App = {
       : "";
 
     if (!detailed) {
-      return `<div class="final-focus-mini-meta"><span>Prono ${H.escapeHtml(predictionText)}</span><span>Rés. ${H.escapeHtml(resultText)}</span>${tvHtml ? `<span class="final-focus-mini-tv">${tvHtml}</span>` : ""}</div>`;
+      const compactPointsText = pointsText || "— pt";
+      return `<div class="final-focus-mini-meta"><span>Prono ${H.escapeHtml(predictionText)}</span><span>Pts ${H.escapeHtml(compactPointsText)}</span>${tvHtml ? `<span class="final-focus-mini-tv">${tvHtml}</span>` : ""}</div>`;
     }
 
     return `
@@ -6483,7 +6532,9 @@ const App = {
     if (!value) return "--/--";
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) return "--/--";
-    return date.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" });
+    const day = date.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" });
+    const time = date.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+    return `${day} ${time}`;
   },
 
   finalFocusTeamCode(match, side = "home", number = null) {
@@ -11344,7 +11395,7 @@ const App = {
           </div>
           <div class="profile-account-actions">
             <button class="ghost-btn" id="profileInstallAppBtn" type="button">Installer l’app</button>
-            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.9.10</button>
+            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.9.11</button>
             <button class="danger-btn" id="profileLogoutBtn" type="button">Déconnexion</button>
           </div>
         </div>

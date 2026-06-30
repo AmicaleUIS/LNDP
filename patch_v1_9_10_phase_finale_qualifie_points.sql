@@ -1,4 +1,4 @@
--- V1.9.10 — Phase finale : qualifié cohérent avec le score + recalcul points
+-- V1.9.11 — Phase finale : qualifié cohérent avec le score + recalcul points
 -- À lancer une fois dans Supabase SQL Editor.
 
 -- 1) Si le score réel n'est pas nul, le qualifié réel doit suivre le score.
