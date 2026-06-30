@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — APP PRINCIPALE V1.9.12
+// LE NID DES PRONOS — APP PRINCIPALE V1.9.13
 // ============================================================
 
 const H = window.Helpers;
@@ -482,7 +482,7 @@ const App = {
           <div>
             <p class="eyebrow">Crédits cachés</p>
             <h2 id="creditsTitle">Le Nid des Pronos</h2>
-            <p class="muted">Version publique <strong>1.9.12</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
+            <p class="muted">Version publique <strong>1.9.13</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
           </div>
         </div>
         <div class="credits-grid">
@@ -499,7 +499,7 @@ const App = {
             <p><strong>1.0.5</strong> — dashboard mobile/desktop stabilisé, sans chevauchement des cartes.</p>
           </section>
           <section>
-            <h3>Évolutions V1.9.12</h3>
+            <h3>Évolutions V1.9.13</h3>
             <ul class="changelog-list">
               <li>Le super admin peut désactiver ou réactiver l’affichage du module préparation.</li>
               <li>Quand la préparation est désactivée, les matchs test disparaissent des matchs/pronos, classements par phase et règles.</li>
@@ -923,7 +923,7 @@ const App = {
       .in("message_id", ids);
 
     if (error) {
-      console.warn("Votes de sondage Hibou indisponibles : lance le patch SQL V1.9.12", error);
+      console.warn("Votes de sondage Hibou indisponibles : lance le patch SQL V1.9.13", error);
       this.state.owlPollVotes = {};
       return;
     }
@@ -971,7 +971,7 @@ const App = {
       .in("message_id", ids);
 
     if (error) {
-      console.warn("Détail des votes Hibou indisponible : lance le patch SQL V1.9.12", error);
+      console.warn("Détail des votes Hibou indisponible : lance le patch SQL V1.9.13", error);
       return;
     }
 
@@ -1164,7 +1164,7 @@ const App = {
     }
 
     if (error) {
-      H.toast(error.message || "Vote impossible. Lance le patch SQL V1.9.12.", "error");
+      H.toast(error.message || "Vote impossible. Lance le patch SQL V1.9.13.", "error");
       return;
     }
 
@@ -1553,7 +1553,7 @@ const App = {
 
 
   async loadVisiblePredictions() {
-    // V1.9.12 — IMPORTANT : Supabase REST renvoie 1000 lignes max par requête.
+    // V1.9.13 — IMPORTANT : Supabase REST renvoie 1000 lignes max par requête.
     // Le classement général est agrégé en base, mais les détails joueurs et le classement Famille
     // repartent des pronos visibles côté front. On pagine donc toute la vue, sinon les détails
     // s'arrêtent après les premiers paquets de matchs/joueurs.
@@ -11426,7 +11426,7 @@ const App = {
           </div>
           <div class="profile-account-actions">
             <button class="ghost-btn" id="profileInstallAppBtn" type="button">Installer l’app</button>
-            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.9.12</button>
+            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.9.13</button>
             <button class="danger-btn" id="profileLogoutBtn" type="button">Déconnexion</button>
           </div>
         </div>
