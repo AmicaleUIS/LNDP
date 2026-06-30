@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — APP PRINCIPALE V1.9.11
+// LE NID DES PRONOS — APP PRINCIPALE V1.9.12
 // ============================================================
 
 const H = window.Helpers;
@@ -482,7 +482,7 @@ const App = {
           <div>
             <p class="eyebrow">Crédits cachés</p>
             <h2 id="creditsTitle">Le Nid des Pronos</h2>
-            <p class="muted">Version publique <strong>1.9.11</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
+            <p class="muted">Version publique <strong>1.9.12</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
           </div>
         </div>
         <div class="credits-grid">
@@ -499,7 +499,7 @@ const App = {
             <p><strong>1.0.5</strong> — dashboard mobile/desktop stabilisé, sans chevauchement des cartes.</p>
           </section>
           <section>
-            <h3>Évolutions V1.9.11</h3>
+            <h3>Évolutions V1.9.12</h3>
             <ul class="changelog-list">
               <li>Le super admin peut désactiver ou réactiver l’affichage du module préparation.</li>
               <li>Quand la préparation est désactivée, les matchs test disparaissent des matchs/pronos, classements par phase et règles.</li>
@@ -923,7 +923,7 @@ const App = {
       .in("message_id", ids);
 
     if (error) {
-      console.warn("Votes de sondage Hibou indisponibles : lance le patch SQL V1.9.11", error);
+      console.warn("Votes de sondage Hibou indisponibles : lance le patch SQL V1.9.12", error);
       this.state.owlPollVotes = {};
       return;
     }
@@ -971,7 +971,7 @@ const App = {
       .in("message_id", ids);
 
     if (error) {
-      console.warn("Détail des votes Hibou indisponible : lance le patch SQL V1.9.11", error);
+      console.warn("Détail des votes Hibou indisponible : lance le patch SQL V1.9.12", error);
       return;
     }
 
@@ -1136,6 +1136,10 @@ const App = {
     }
 
     const existingVote = this.state.owlPollVotes?.[String(message.id)];
+    if (existingVote && String(existingVote.option_key) === String(optionKey)) {
+      H.toast("Ton vote est déjà posé ici 🦉", "info");
+      return;
+    }
     let error = null;
 
     if (existingVote) {
@@ -1160,7 +1164,7 @@ const App = {
     }
 
     if (error) {
-      H.toast(error.message || "Vote impossible. Lance le patch SQL V1.9.11.", "error");
+      H.toast(error.message || "Vote impossible. Lance le patch SQL V1.9.12.", "error");
       return;
     }
 
@@ -1271,6 +1275,9 @@ const App = {
       </div>
     `;
     document.body.appendChild(modal);
+    messages
+      .filter((message) => message?.poll_enabled)
+      .forEach((message) => this.bindOwlPollButtons(modal, message));
     const close = () => modal.remove();
     H.$("#closeOwlMessagesHistoryBtn", modal)?.addEventListener("click", close);
     modal.addEventListener("click", (event) => { if (event.target === modal) close(); });
@@ -1546,7 +1553,7 @@ const App = {
 
 
   async loadVisiblePredictions() {
-    // V1.9.11 — IMPORTANT : Supabase REST renvoie 1000 lignes max par requête.
+    // V1.9.12 — IMPORTANT : Supabase REST renvoie 1000 lignes max par requête.
     // Le classement général est agrégé en base, mais les détails joueurs et le classement Famille
     // repartent des pronos visibles côté front. On pagine donc toute la vue, sinon les détails
     // s'arrêtent après les premiers paquets de matchs/joueurs.
@@ -3983,6 +3990,9 @@ const App = {
     const myPrediction = this.getMyPrediction(match.id);
     const locked = H.isKickoffPassed(match.kickoff_at);
     const isFinalPhase = match.stage !== "group";
+    const hasKnownHomeTeam = Boolean(match.home_team_id);
+    const hasKnownAwayTeam = Boolean(match.away_team_id);
+    const qualifiedRequired = isFinalPhase && hasKnownHomeTeam && hasKnownAwayTeam;
     const visiblePreds = this.predictionsForMatch(match.id);
     const canSeeOthers = locked;
 
@@ -4024,13 +4034,21 @@ const App = {
           </div>
 
           ${isFinalPhase ? `
-            <label class="qualified-select">
+            <label class="qualified-select ${qualifiedRequired ? "" : "qualified-select-optional"}">
               <small>Qualifié</small>
-              <select name="qualified_team_pred" ${locked ? "disabled" : ""} required>
-                <option value="">Choisir</option>
-                <option value="${match.home_team_id}" ${myPrediction?.qualified_team_pred === match.home_team_id ? "selected" : ""}>${H.escapeHtml(match.home_team_name)}</option>
-                <option value="${match.away_team_id}" ${myPrediction?.qualified_team_pred === match.away_team_id ? "selected" : ""}>${H.escapeHtml(match.away_team_name)}</option>
-              </select>
+              ${qualifiedRequired ? `
+                <select name="qualified_team_pred" ${locked ? "disabled" : ""} required>
+                  <option value="">Choisir</option>
+                  <option value="${H.escapeHtml(match.home_team_id || "")}" ${myPrediction?.qualified_team_pred === match.home_team_id ? "selected" : ""}>${H.escapeHtml(match.home_team_name || "Équipe A")}</option>
+                  <option value="${H.escapeHtml(match.away_team_id || "")}" ${myPrediction?.qualified_team_pred === match.away_team_id ? "selected" : ""}>${H.escapeHtml(match.away_team_name || "Équipe B")}</option>
+                </select>
+              ` : `
+                <select name="qualified_team_pred" ${locked ? "disabled" : ""}>
+                  <option value="">Choix possible quand les équipes sont connues</option>
+                  ${hasKnownHomeTeam ? `<option value="${H.escapeHtml(match.home_team_id || "")}" ${myPrediction?.qualified_team_pred === match.home_team_id ? "selected" : ""}>${H.escapeHtml(match.home_team_name || "Équipe A")}</option>` : ""}
+                  ${hasKnownAwayTeam ? `<option value="${H.escapeHtml(match.away_team_id || "")}" ${myPrediction?.qualified_team_pred === match.away_team_id ? "selected" : ""}>${H.escapeHtml(match.away_team_name || "Équipe B")}</option>` : ""}
+                </select>
+              `}
             </label>
           ` : ""}
 
@@ -4148,12 +4166,14 @@ const App = {
     const isFinalPhase = form.dataset.finalPhase === "true";
     const qualifiedSelect = form.querySelector('select[name="qualified_team_pred"]');
     if (isFinalPhase && qualifiedSelect) {
-      const match = this.state.matches.find((item) => String(item.id) === String(form.dataset.matchId));
+      const match = this.displayMatches().find((item) => String(item.id) === String(form.dataset.matchId))
+        || this.state.matches.find((item) => String(item.id) === String(form.dataset.matchId));
       const impliedQualified = this.scoreImpliedQualifiedTeamId(match, home, away);
       if (impliedQualified) {
         qualifiedSelect.value = impliedQualified;
       }
-      if (!qualifiedSelect.value) return false;
+      const qualifiedRequired = Boolean(match?.home_team_id && match?.away_team_id);
+      if (qualifiedRequired && !qualifiedSelect.value) return false;
     }
 
     return true;
@@ -4218,13 +4238,15 @@ const App = {
     const formData = new FormData(form);
     const achievementIdsBeforeSave = new Set(this.computeBadgesForUser(this.state.session.user.id).map((badge) => badge.id));
 
-    const match = this.state.matches.find((item) => String(item.id) === String(matchId));
+    const match = this.displayMatches().find((item) => String(item.id) === String(matchId))
+      || this.state.matches.find((item) => String(item.id) === String(matchId));
+    const qualifiedRaw = isFinalPhase ? String(formData.get("qualified_team_pred") || "").trim() : "";
     const payload = {
       user_id: this.state.session.user.id,
       match_id: matchId,
       home_score_pred: Number(formData.get("home_score_pred")),
       away_score_pred: Number(formData.get("away_score_pred")),
-      qualified_team_pred: isFinalPhase ? formData.get("qualified_team_pred") : null
+      qualified_team_pred: isFinalPhase ? (qualifiedRaw || null) : null
     };
 
     if (isFinalPhase) {
@@ -5814,12 +5836,14 @@ const App = {
   },
 
   finalBracketWinnerTeamId(match = {}) {
-    if (!match || match.status !== "finished") return null;
-    return this.effectiveWinnerTeamIdFromScores(match);
+    if (!match) return null;
+    if (this.hasLiveScore(match)) return this.effectiveWinnerTeamIdFromScores(match);
+    if (match.status === "finished") return match.winner_team_id || null;
+    return null;
   },
 
   finalBracketLoserTeamId(match = {}) {
-    if (!match || match.status !== "finished") return null;
+    if (!match || (!this.hasLiveScore(match) && match.status !== "finished")) return null;
     const winner = this.finalBracketWinnerTeamId(match);
     if (!winner) return null;
     if (String(winner) === String(match.home_team_id)) return match.away_team_id || null;
@@ -6412,6 +6436,7 @@ const App = {
     const homeCode = this.finalFocusTeamCode(match, "home", number);
     const awayCode = this.finalFocusTeamCode(match, "away", number);
     const mobileDate = this.finalFocusMobileDate(match.kickoff_at);
+    const mobileTime = this.finalFocusMobileTime(match.kickoff_at);
     const cupHtml = Number(number) === 104
       ? `<div class="final-focus-cup-above" aria-hidden="true"><img src="assets/icons/coupe.png" alt=""></div>`
       : "";
@@ -6433,6 +6458,7 @@ const App = {
           <b>${H.escapeHtml(score)}</b>
           <span>${H.matchFlagHtml(match, "away")}<strong class="team-name-full">${H.escapeHtml(away)}</strong><strong class="team-name-code">${H.escapeHtml(awayCode)}</strong></span>
         </div>
+        ${!expanded ? `<small class="final-mobile-time">${H.escapeHtml(mobileTime)}</small>` : ""}
         ${pronoMeta}
         ${expanded ? this.finalFocusExpandedInfoHtml(match, tvHtml) : ""}
         ${expanded ? this.finalFocusPredictionEditorHtml(match) : ""}
@@ -6532,9 +6558,14 @@ const App = {
     if (!value) return "--/--";
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) return "--/--";
-    const day = date.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" });
-    const time = date.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
-    return `${day} ${time}`;
+    return date.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" });
+  },
+
+  finalFocusMobileTime(value) {
+    if (!value) return "--:--";
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return "--:--";
+    return date.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
   },
 
   finalFocusTeamCode(match, side = "home", number = null) {
@@ -11395,7 +11426,7 @@ const App = {
           </div>
           <div class="profile-account-actions">
             <button class="ghost-btn" id="profileInstallAppBtn" type="button">Installer l’app</button>
-            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.9.11</button>
+            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.9.12</button>
             <button class="danger-btn" id="profileLogoutBtn" type="button">Déconnexion</button>
           </div>
         </div>

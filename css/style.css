@@ -21490,7 +21490,7 @@ body[data-current-view] {
 }
 
 /* =====================================================
-   V1.9.11 — Phase finale desktop : 3 colonnes pleines, clic partout, liaisons simples
+   V1.9.12 — Phase finale desktop : 3 colonnes pleines, clic partout, liaisons simples
    ===================================================== */
 @media (min-width: 901px) {
   .final-tournament-shell.final-focus-shell {
@@ -21664,7 +21664,7 @@ body[data-current-view] {
 }
 
 /* =====================================================
-   V1.9.11 — Correctifs phase finale desktop + admin rouge/or
+   V1.9.12 — Correctifs phase finale desktop + admin rouge/or
    ===================================================== */
 .nav-list .admin-link,
 .mobile-menu-panel .mobile-admin-link {
@@ -21790,7 +21790,7 @@ body[data-current-view] {
 
 
 /* =====================================================
-   V1.9.11 — Phase finale : cartes compactes + ouverture au clic, sans traits
+   V1.9.12 — Phase finale : cartes compactes + ouverture au clic, sans traits
    ===================================================== */
 .final-tournament-board .final-focus-slot::before,
 .final-tournament-board .final-focus-slot::after,
@@ -21981,7 +21981,7 @@ body[data-current-view] {
 }
 
 /* =====================================================
-   V1.9.11 — Phase finale : nettoyage total traits + clic fiable
+   V1.9.12 — Phase finale : nettoyage total traits + clic fiable
    ===================================================== */
 .final-tournament-shell,
 .final-tournament-window,
@@ -22091,7 +22091,7 @@ body[data-current-view] {
 }
 
 /* =====================================================
-   V1.9.11 — Accueil compact + graphs zoom/focus
+   V1.9.12 — Accueil compact + graphs zoom/focus
    ===================================================== */
 .home-dashboard-hero-split {
   display: grid !important;
@@ -22224,7 +22224,7 @@ body[data-current-view] {
 }
 
 /* =====================================================
-   V1.9.11 — Graphs : zoom progressif + navigation temporelle
+   V1.9.12 — Graphs : zoom progressif + navigation temporelle
    ===================================================== */
 .evolution-card[data-evolution-level] .card-title-row {
   align-items: flex-start;
@@ -22358,7 +22358,7 @@ body[data-current-view] {
 }
 
 /* =====================================================
-   V1.9.11 — Graphs matchs simultanés + cartes phase finale compactes
+   V1.9.12 — Graphs matchs simultanés + cartes phase finale compactes
    ===================================================== */
 .final-focus-mini-meta {
   align-items: center;
@@ -22413,7 +22413,7 @@ body[data-current-view] {
 }
 
 /* =====================================================
-   V1.9.11 — Phase finale : finale centrée, petite finale plus basse
+   V1.9.12 — Phase finale : finale centrée, petite finale plus basse
    ===================================================== */
 @media (min-width: 901px) {
   .final-tournament-board[data-window-start="2"] .stage-final .final-focus-stage-grid {
@@ -22429,7 +22429,7 @@ body[data-current-view] {
 }
 
 /* =====================================================
-   V1.9.11 — Phase finale : écart entre cartes + clic prioritaire
+   V1.9.12 — Phase finale : écart entre cartes + clic prioritaire
    ===================================================== */
 .final-tournament-board .final-focus-stage-grid {
   gap: 14px !important;
@@ -22490,7 +22490,7 @@ body[data-current-view] {
 }
 
 /* =====================================================
-   V1.9.11 — Finale centrée + coupe + prono direct dans carte ouverte
+   V1.9.12 — Finale centrée + coupe + prono direct dans carte ouverte
    ===================================================== */
 .final-focus-admin-score {
   display: none !important;
@@ -22639,7 +22639,7 @@ body[data-current-view] {
 }
 
 /* =====================================================
-   V1.9.11 — Phase finale : cartes ouvertes non coupées + détails 16èmes + capsule propre
+   V1.9.12 — Phase finale : cartes ouvertes non coupées + détails 16èmes + capsule propre
    ===================================================== */
 .final-tournament-window:has(.is-expanded-slot),
 .final-tournament-shell:has(.is-expanded-slot) {
@@ -22719,7 +22719,7 @@ body[data-current-view] {
 
 
 /* =====================================================
-   V1.9.11 — Réparation CSS conteneur phase finale
+   V1.9.12 — Réparation CSS conteneur phase finale
    Le tableau doit contribuer à la hauteur de la page, sans couper les cartes.
    ===================================================== */
 #worldcupContent,
@@ -22827,7 +22827,7 @@ body[data-current-view] {
 
 
 /* =====================================================
-   V1.9.11 — Réalignement du tableau phase finale
+   V1.9.12 — Réalignement du tableau phase finale
    Les cartes intermédiaires doivent rester centrées entre les tours précédents,
    tout en conservant l’ouverture complète des cartes détaillées.
    ===================================================== */
@@ -22873,7 +22873,7 @@ body[data-current-view] {
 
 
 /* =====================================================
-   V1.9.11 — Connecteurs SVG + libellés propres
+   V1.9.12 — Connecteurs SVG + libellés propres
    ===================================================== */
 .final-tournament-board {
   position: relative !important;
@@ -22922,7 +22922,7 @@ body[data-current-view] {
 
 
 /* =====================================================
-   V1.9.11 — Mobile phase finale UX : cartes compactes lisibles
+   V1.9.12 — Mobile phase finale UX : cartes compactes lisibles
    Desktop conservé, sauf finale légèrement descendue.
    ===================================================== */
 .team-name-code,
@@ -23129,7 +23129,7 @@ body[data-current-view] {
 }
 
 /* =====================================================
-   V1.9.11 — Mobile phase finale : phase active à gauche, navigation propre
+   V1.9.12 — Mobile phase finale : phase active à gauche, navigation propre
    Desktop conservé sauf finale légèrement abaissée.
    ===================================================== */
 @media (min-width: 901px) {
@@ -23204,5 +23204,43 @@ body[data-current-view] {
   }
   .final-focus-connector-line {
     stroke-width: 2.1 !important;
+  }
+}
+
+
+/* =====================================================
+   V1.9.12 — mobile phase finale : heure sous les équipes + sondage clickable
+   ===================================================== */
+.login-owl-poll-option {
+  pointer-events: auto !important;
+  cursor: pointer;
+}
+.login-owl-poll-option[disabled] {
+  cursor: not-allowed;
+}
+.qualified-select-optional select {
+  opacity: .88;
+}
+@media (max-width: 900px) {
+  .final-focus-match.compact .final-date-mobile {
+    white-space: nowrap;
+  }
+  .final-focus-match.compact .final-mobile-time {
+    display: none;
+    color: rgba(226,232,240,.76);
+    font-size: .72rem;
+    font-weight: 800;
+    line-height: 1;
+    letter-spacing: .02em;
+    margin-top: -2px;
+    padding-left: 22px;
+  }
+  .final-focus-match.compact .final-focus-compact-teams + .final-mobile-time {
+    display: block;
+  }
+  .final-focus-match.compact .final-focus-card-head small .final-date-mobile {
+    max-width: 70px;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 }
