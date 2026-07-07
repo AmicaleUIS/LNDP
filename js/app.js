@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — APP PRINCIPALE V1.9.13
+// LE NID DES PRONOS — APP PRINCIPALE V1.9.14
 // ============================================================
 
 const H = window.Helpers;
@@ -482,7 +482,7 @@ const App = {
           <div>
             <p class="eyebrow">Crédits cachés</p>
             <h2 id="creditsTitle">Le Nid des Pronos</h2>
-            <p class="muted">Version publique <strong>1.9.13</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
+            <p class="muted">Version publique <strong>1.9.14</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
           </div>
         </div>
         <div class="credits-grid">
@@ -499,7 +499,7 @@ const App = {
             <p><strong>1.0.5</strong> — dashboard mobile/desktop stabilisé, sans chevauchement des cartes.</p>
           </section>
           <section>
-            <h3>Évolutions V1.9.13</h3>
+            <h3>Évolutions V1.9.14</h3>
             <ul class="changelog-list">
               <li>Le super admin peut désactiver ou réactiver l’affichage du module préparation.</li>
               <li>Quand la préparation est désactivée, les matchs test disparaissent des matchs/pronos, classements par phase et règles.</li>
@@ -923,7 +923,7 @@ const App = {
       .in("message_id", ids);
 
     if (error) {
-      console.warn("Votes de sondage Hibou indisponibles : lance le patch SQL V1.9.13", error);
+      console.warn("Votes de sondage Hibou indisponibles : lance le patch SQL V1.9.14", error);
       this.state.owlPollVotes = {};
       return;
     }
@@ -971,7 +971,7 @@ const App = {
       .in("message_id", ids);
 
     if (error) {
-      console.warn("Détail des votes Hibou indisponible : lance le patch SQL V1.9.13", error);
+      console.warn("Détail des votes Hibou indisponible : lance le patch SQL V1.9.14", error);
       return;
     }
 
@@ -1164,7 +1164,7 @@ const App = {
     }
 
     if (error) {
-      H.toast(error.message || "Vote impossible. Lance le patch SQL V1.9.13.", "error");
+      H.toast(error.message || "Vote impossible. Lance le patch SQL V1.9.14.", "error");
       return;
     }
 
@@ -1553,7 +1553,7 @@ const App = {
 
 
   async loadVisiblePredictions() {
-    // V1.9.13 — IMPORTANT : Supabase REST renvoie 1000 lignes max par requête.
+    // V1.9.14 — IMPORTANT : Supabase REST renvoie 1000 lignes max par requête.
     // Le classement général est agrégé en base, mais les détails joueurs et le classement Famille
     // repartent des pronos visibles côté front. On pagine donc toute la vue, sinon les détails
     // s'arrêtent après les premiers paquets de matchs/joueurs.
@@ -1911,6 +1911,36 @@ const App = {
     return "";
   },
 
+  predictedQualifiedTeamIdForMatch(match = {}, prediction = {}) {
+    if (!match || match.stage === "group" || !prediction) return prediction?.qualified_team_pred || null;
+    const implied = this.scoreImpliedQualifiedTeamId(match, prediction.home_score_pred, prediction.away_score_pred);
+    return implied || prediction.qualified_team_pred || null;
+  },
+
+  predictedQualifiedTeamNameForMatch(match = {}, prediction = {}) {
+    const teamId = this.predictedQualifiedTeamIdForMatch(match, prediction);
+    if (teamId && match?.home_team_id && String(teamId) === String(match.home_team_id)) {
+      return match.home_team_name || match.home_team_short_name || prediction?.qualified_team_name || "";
+    }
+    if (teamId && match?.away_team_id && String(teamId) === String(match.away_team_id)) {
+      return match.away_team_name || match.away_team_short_name || prediction?.qualified_team_name || "";
+    }
+    return prediction?.qualified_team_name || "";
+  },
+
+  normalizedPredictionForDisplay(prediction = {}, match = {}) {
+    if (!prediction) return prediction;
+    if (!match || match.stage === "group") return prediction;
+    const qualifiedId = this.predictedQualifiedTeamIdForMatch(match, prediction);
+    const qualifiedName = this.predictedQualifiedTeamNameForMatch(match, prediction);
+    if (!qualifiedId && !qualifiedName) return prediction;
+    return {
+      ...prediction,
+      qualified_team_pred: qualifiedId || prediction.qualified_team_pred || null,
+      qualified_team_name: qualifiedName || prediction.qualified_team_name || ""
+    };
+  },
+
   outcomeFromScores(home, away) {
     if (home > away) return "home";
     if (away > home) return "away";
@@ -1931,7 +1961,9 @@ const App = {
     const isGoodResult = this.outcomeFromScores(predHome, predAway) === this.outcomeFromScores(realHome, realAway);
     const isGoodGoalDiff = (predHome - predAway) === (realHome - realAway);
     const effectiveWinnerTeamId = this.effectiveWinnerTeamIdFromScores(match);
-    const isGoodQualified = Boolean(prediction.qualified_team_pred && effectiveWinnerTeamId && String(prediction.qualified_team_pred) === String(effectiveWinnerTeamId));
+    const effectivePredictedQualifiedTeamId = match.stage !== "group" ? this.predictedQualifiedTeamIdForMatch(match, prediction) : null;
+    const effectivePredictedQualifiedTeamName = match.stage !== "group" ? this.predictedQualifiedTeamNameForMatch(match, prediction) : prediction.qualified_team_name;
+    const isGoodQualified = Boolean(effectivePredictedQualifiedTeamId && effectiveWinnerTeamId && String(effectivePredictedQualifiedTeamId) === String(effectiveWinnerTeamId));
 
     let total = 0;
     if (isExactScore) total += 5;
@@ -1941,6 +1973,8 @@ const App = {
 
     return {
       ...prediction,
+      qualified_team_pred: effectivePredictedQualifiedTeamId || prediction.qualified_team_pred || null,
+      qualified_team_name: effectivePredictedQualifiedTeamName || prediction.qualified_team_name || "",
       points_total: total,
       is_exact_score: isExactScore,
       is_good_result: isGoodResult,
@@ -1953,9 +1987,9 @@ const App = {
   predictionForDisplay(prediction, match) {
     if (!prediction) return null;
     if (["live", "finished"].includes(match?.status)) {
-      return this.projectedPredictionPoints(prediction, match) || prediction;
+      return this.projectedPredictionPoints(prediction, match) || this.normalizedPredictionForDisplay(prediction, match) || prediction;
     }
-    return prediction;
+    return this.normalizedPredictionForDisplay(prediction, match) || prediction;
   },
 
   liveProjectionCountForMatchIds(matchIds = null, options = {}) {
@@ -7231,12 +7265,14 @@ const App = {
     );
     const perfectKnockouts = perfectKnockoutRows.length;
 
-    const wrongQualifiedRows = rows.filter(({ prediction, match }) =>
-      match.stage !== "group"
-      && prediction.qualified_team_pred
-      && match.winner_team_id
-      && prediction.qualified_team_pred !== match.winner_team_id
-    );
+    const wrongQualifiedRows = rows.filter(({ prediction, match }) => {
+      const predictedQualified = this.predictedQualifiedTeamIdForMatch(match, prediction);
+      const realQualified = this.effectiveWinnerTeamIdFromScores(match) || match.winner_team_id;
+      return match.stage !== "group"
+        && predictedQualified
+        && realQualified
+        && String(predictedQualified) !== String(realQualified);
+    });
     const wrongQualified = wrongQualifiedRows.length;
 
     const smallExactScoreRows = rows.filter(({ prediction, match }) =>
@@ -11426,7 +11462,7 @@ const App = {
           </div>
           <div class="profile-account-actions">
             <button class="ghost-btn" id="profileInstallAppBtn" type="button">Installer l’app</button>
-            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.9.13</button>
+            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.9.14</button>
             <button class="danger-btn" id="profileLogoutBtn" type="button">Déconnexion</button>
           </div>
         </div>
