@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — ADMIN V1.9.15
+// LE NID DES PRONOS — ADMIN V1.9.16
 // ============================================================
 
 const H = window.Helpers;
@@ -88,7 +88,7 @@ const Admin = {
       p_category: category,
       p_details: details || {},
       p_metadata: {
-        app_version: "1.9.15",
+        app_version: "1.9.16",
         source: "admin_front"
       }
     });
@@ -1321,6 +1321,7 @@ const Admin = {
               ${players.map((player) => `<option value="${H.escapeHtml(player.id)}" ${player.id === selectedId ? "selected" : ""}>${H.escapeHtml(player.pseudo || player.email || "Joueur")} · ${H.escapeHtml(this.teamName(player.office_team_id))}</option>`).join("")}
             </select>
             <button class="primary-btn" id="openFinalReportBtn" type="button" ${selected ? "" : "disabled"}>Ouvrir</button>
+            <button class="ghost-btn" id="openAllFinalReportsBtn" type="button" ${players.length ? "" : "disabled"}>Tous les joueurs · 1 PDF</button>
           </div>
           <p class="muted tiny-note">Les fonds de pages sont câblés dans <code>assets/reports/</code>. Ouvre le bilan pour imprimer/exporter en PDF.</p>
         </section>
@@ -1339,6 +1340,11 @@ const Admin = {
     H.$("#openFinalReportBtn", root)?.addEventListener("click", () => {
       if (!selected) return;
       window.open(`bilan.html?player=${encodeURIComponent(selected.id)}&preview=admin`, "_blank", "noopener");
+    });
+
+    H.$("#openAllFinalReportsBtn", root)?.addEventListener("click", () => {
+      if (!players.length) return;
+      window.open("bilan.html?all=1&preview=admin", "_blank", "noopener");
     });
   },
 

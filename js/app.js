@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — APP PRINCIPALE V1.9.15
+// LE NID DES PRONOS — APP PRINCIPALE V1.9.16
 // ============================================================
 
 const H = window.Helpers;
@@ -483,7 +483,7 @@ const App = {
           <div>
             <p class="eyebrow">Crédits cachés</p>
             <h2 id="creditsTitle">Le Nid des Pronos</h2>
-            <p class="muted">Version publique <strong>1.9.15</strong> · finale à points doublés, champions éliminés chambrés par le Hibou et cache PWA fiabilisé.</p>
+            <p class="muted">Version publique <strong>1.9.16</strong> · bilan PDF fiabilisé, historique compact par phase et export groupé des carnets.</p>
           </div>
         </div>
         <div class="credits-grid">
@@ -500,10 +500,11 @@ const App = {
             <p><strong>1.0.5</strong> — dashboard mobile/desktop stabilisé, sans chevauchement des cartes.</p>
           </section>
           <section>
-            <h3>Évolutions V1.9.15</h3>
+            <h3>Évolutions V1.9.16</h3>
             <ul class="changelog-list">
               <li>Les points du match de la grande finale sont doublés, sans toucher à la petite finale.</li>
               <li>Chaque champion éliminé déclenche un message humoristique personnalisé avec les points potentiellement perdus.</li>
+              <li>Le bilan PDF charge tous les pronos, explique ses statistiques et peut être exporté pour tous les joueurs en une fois.</li>
               <li>Ces messages personnels restent consultables dans le grimoire des Messages du Hibou.</li>
               <li>Le service worker utilise un nouveau cache, une installation plus robuste et s’enregistre aussi lors d’un accès direct à l’application.</li>
             </ul>
@@ -11672,7 +11673,7 @@ ${humour} 🦉`,
           </div>
           <div class="profile-account-actions">
             <button class="ghost-btn" id="profileInstallAppBtn" type="button">Installer l’app</button>
-            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.9.15</button>
+            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.9.16</button>
             <button class="danger-btn" id="profileLogoutBtn" type="button">Déconnexion</button>
           </div>
         </div>

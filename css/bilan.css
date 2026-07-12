@@ -1,6 +1,6 @@
 
 /* ============================================================
-   LE NID DES PRONOS — BILAN PDF V1.5.2
+   LE NID DES PRONOS — BILAN PDF V1.9.16
    Aperçu temps réel + impression PDF
    ============================================================ */
 
@@ -736,5 +736,598 @@
 @media print {
   .race-legend {
     grid-template-columns: repeat(3, 1fr) !important;
+  }
+}
+
+
+/* ============================================================
+   V1.9.16 - Bilan PDF propre, compact et export groupé
+   ============================================================ */
+
+.bilan-page,
+.bilan-page * {
+  box-sizing: border-box;
+}
+
+.batch-print-note {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin: 0 0 22px;
+  padding: 16px 18px;
+  border: 1px solid rgba(250, 204, 21, .28);
+  border-radius: 18px;
+  background: rgba(15, 23, 42, .9);
+}
+
+.batch-print-note span { color: var(--bilan-muted); }
+.batch-mode .bilan-document { margin-bottom: 32px; }
+
+.joke-champion {
+  padding: 12px;
+  border: 1px dashed rgba(250, 204, 21, .55);
+  border-radius: 18px;
+  background: rgba(250, 204, 21, .07);
+}
+.italy-joke-flag { font-size: 2.2rem; line-height: 1; }
+.champion-missing-line { margin: 12px 0 0; }
+
+.radar-explain {
+  margin: 10px 0 0;
+  color: var(--bilan-muted);
+  font-size: .78rem;
+  line-height: 1.4;
+}
+
+.mini-record-player-card p > span { display: grid; gap: 3px; }
+.mini-record-player-card small { color: var(--bilan-muted); }
+
+.history-capsule-grid {
+  align-content: start;
+}
+.history-capsule p {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+}
+.history-dense .history-capsule-grid,
+.history-medium .history-capsule-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+.history-roomy .history-capsule-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.history-dense .history-capsule {
+  min-height: 0;
+  padding: 9px;
+  border-radius: 14px;
+  font-size: .78rem;
+}
+.history-dense .history-capsule small { font-size: .68rem; line-height: 1.2; }
+.history-dense .history-capsule strong { font-size: .82rem; line-height: 1.2; }
+.history-dense .history-capsule p { margin: 5px 0; line-height: 1.25; }
+.history-dense .result-pill { padding: 2px 6px; font-size: .69rem; }
+.history-medium .history-capsule { min-height: 108px; padding: 10px; }
+
+.diploma-rank-seal {
+  display: inline-grid;
+  min-width: 170px;
+  margin: 8px auto 4px;
+  padding: 10px 22px;
+  border: 1px solid rgba(250, 204, 21, .58);
+  border-radius: 999px;
+  background: rgba(2, 6, 23, .48);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, .2);
+}
+.diploma-rank-seal span,
+.diploma-rank-seal small { color: var(--bilan-muted); }
+.diploma-rank-seal strong {
+  color: var(--bilan-gold);
+  font-size: 2.2rem;
+  line-height: 1;
+}
+
+@media print {
+  @page { size: A4 portrait; margin: 0; }
+  @page diploma { size: A4 landscape; margin: 0; }
+
+  html,
+  body {
+    width: auto !important;
+    min-width: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #07111f !important;
+  }
+
+  .bilan-root {
+    width: auto !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  .bilan-document {
+    display: block !important;
+    width: auto !important;
+    margin: 0 !important;
+    gap: 0 !important;
+  }
+
+  .bilan-page {
+    page: auto !important;
+    width: 210mm !important;
+    height: 297mm !important;
+    min-height: 297mm !important;
+    max-height: 297mm !important;
+    margin: 0 !important;
+    padding: 12mm !important;
+    box-sizing: border-box !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    overflow: hidden !important;
+    break-after: page !important;
+    page-break-after: always !important;
+    background-size: 100% 100% !important;
+    background-position: center center !important;
+    background-repeat: no-repeat !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  .bilan-page-content {
+    width: 100% !important;
+    max-width: 100% !important;
+    height: 100% !important;
+    min-height: 0 !important;
+    box-sizing: border-box !important;
+  }
+
+  .bilan-page.diploma {
+    page: diploma !important;
+    width: 297mm !important;
+    height: 210mm !important;
+    min-height: 210mm !important;
+    max-height: 210mm !important;
+    padding: 10mm 16mm !important;
+    background-size: 100% 100% !important;
+  }
+
+  .bilan-page.diploma .bilan-page-content {
+    min-height: 190mm !important;
+    height: 190mm !important;
+    display: grid !important;
+    place-items: center !important;
+  }
+
+  .diploma-card {
+    width: 245mm !important;
+    max-width: 245mm !important;
+    padding: 10mm 14mm !important;
+    box-sizing: border-box !important;
+  }
+  .diploma-card .profile-badge { width: 25mm !important; height: 25mm !important; margin-bottom: 3mm !important; }
+  .diploma-card h2 { margin: 2mm 0 !important; font-size: 30pt !important; }
+  .diploma-card h3 { margin: 2mm 0 3mm !important; font-size: 18pt !important; }
+  .diploma-card p { max-width: 205mm; margin: 2mm auto !important; font-size: 10.5pt !important; line-height: 1.4 !important; }
+  .diploma-rank-seal { margin: 1mm auto !important; padding: 2mm 8mm !important; }
+  .diploma-rank-seal strong { font-size: 22pt !important; }
+  .signature-row { margin-top: 7mm !important; }
+
+  .history.bilan-page { padding: 10mm 11mm !important; }
+  .history .bilan-page-head { margin-bottom: 4mm !important; }
+  .history .bilan-page-head h2 { font-size: 25pt !important; }
+  .history .bilan-page-head p { margin-top: 2mm !important; font-size: 9pt !important; }
+  .history-capsule-grid { gap: 2mm !important; }
+  .history-dense .history-capsule-grid,
+  .history-medium .history-capsule-grid { grid-template-columns: repeat(4, minmax(0, 1fr)) !important; }
+  .history-roomy .history-capsule-grid { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }
+  .history-capsule { break-inside: avoid !important; page-break-inside: avoid !important; }
+  .history-dense .history-capsule { padding: 2mm !important; font-size: 7.4pt !important; }
+  .history-dense .history-capsule small { font-size: 6.4pt !important; }
+  .history-dense .history-capsule strong { font-size: 7.4pt !important; }
+  .history-dense .result-pill { font-size: 6.4pt !important; }
+
+  .rich-record-grid .record-card { min-height: 27mm !important; padding: 3mm !important; }
+  .rich-record-grid .record-card .value { font-size: 19pt !important; }
+  .mini-record-player-card { margin-top: 4mm !important; }
+
+  .batch-mode .bilan-document:not(:last-child) .bilan-page:last-child {
+    break-after: page !important;
+    page-break-after: always !important;
+  }
+  .batch-mode .bilan-document:last-child .bilan-page:last-child {
+    break-after: auto !important;
+    page-break-after: auto !important;
+  }
+}
+
+/* ============================================================
+   V1.9.16b — Mise en page d'impression sans éléments coupés
+   ============================================================ */
+@media print {
+  /* Les règles responsive écran ne doivent pas empiler les blocs sur papier. */
+  .two-col {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 3mm !important;
+  }
+
+  /* Tableau de chasse : statistiques plus compactes et champions visibles. */
+  .bilan-page.stats {
+    padding: 10mm 11mm !important;
+  }
+  .stats .bilan-page-head {
+    margin-bottom: 4mm !important;
+  }
+  .stats .stats-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+    gap: 2.5mm !important;
+    margin: 3mm 0 4mm !important;
+  }
+  .stats .stat-card {
+    min-height: 25mm !important;
+    padding: 3mm !important;
+    border-radius: 4mm !important;
+  }
+  .stats .stat-card strong {
+    font-size: 17pt !important;
+  }
+  .stats .stat-card.feature strong {
+    font-size: 25pt !important;
+  }
+  .stats .stat-card span {
+    margin-top: 1.5mm !important;
+    font-size: 8.2pt !important;
+  }
+  .stats .icon-stats-grid .icon-stat {
+    grid-template-columns: 10mm 1fr !important;
+    gap: 2mm !important;
+  }
+  .stats .icon-stat img {
+    width: 9mm !important;
+    height: 9mm !important;
+  }
+  .stats .graph-card {
+    padding: 4mm !important;
+    border-radius: 5mm !important;
+  }
+  .stats .graph-card h3 {
+    margin: 0 0 3mm !important;
+    font-size: 13pt !important;
+  }
+  .stats .rank-row {
+    gap: 3mm !important;
+    padding: 1mm 0 !important;
+  }
+  .stats .rank-row strong,
+  .stats .champion-pick-line strong {
+    font-size: 9pt !important;
+  }
+  .stats .rank-row small,
+  .stats .champion-pick-line span,
+  .stats .champion-pick-line small,
+  .stats .champion-card > p {
+    font-size: 7.2pt !important;
+    line-height: 1.25 !important;
+  }
+  .stats .big-rank {
+    font-size: 17pt !important;
+  }
+  .stats .champion-pick-line {
+    gap: 2mm !important;
+    margin-bottom: 2mm !important;
+  }
+  .stats .joke-champion {
+    padding: 2.5mm !important;
+    border-radius: 4mm !important;
+  }
+  .stats .italy-joke-flag {
+    font-size: 18pt !important;
+  }
+
+  /* Identité : radar et profil côte à côte, détails sur une seule ligne. */
+  .bilan-page.identity {
+    padding: 10mm 11mm !important;
+  }
+  .identity .bilan-page-head {
+    margin-bottom: 4mm !important;
+  }
+  .identity-layout {
+    grid-template-columns: .92fr 1.08fr !important;
+    gap: 3mm !important;
+    margin-top: 0 !important;
+  }
+  .identity-rank-card,
+  .identity-meter-card {
+    padding: 4mm !important;
+    border-radius: 5mm !important;
+  }
+  .identity-rank-card {
+    gap: 2mm !important;
+  }
+  .identity-rank-card .profile-badge {
+    width: 20mm !important;
+    height: 20mm !important;
+  }
+  .identity-rank-card h3 {
+    font-size: 18pt !important;
+    line-height: 1.05 !important;
+  }
+  .identity-rank-card p,
+  .identity-mini-facts {
+    font-size: 8pt !important;
+    line-height: 1.3 !important;
+  }
+  .identity-mini-facts {
+    margin-top: 2mm !important;
+    gap: 1mm !important;
+  }
+  .identity-meter-card h3 {
+    margin: 0 0 2mm !important;
+    font-size: 13pt !important;
+  }
+  .identity-meter-card .mini-title {
+    margin-top: 3mm !important;
+  }
+  .meter-row {
+    grid-template-columns: 29mm 1fr 10mm !important;
+    gap: 2mm !important;
+    margin: 2mm 0 !important;
+    font-size: 8pt !important;
+  }
+  .meter-track {
+    height: 2.5mm !important;
+  }
+  .radar-explain {
+    margin-top: 2mm !important;
+    font-size: 6.5pt !important;
+    line-height: 1.3 !important;
+  }
+  .identity .hour-radar {
+    height: 27mm !important;
+    margin: 2mm 0 0 !important;
+    gap: 2mm !important;
+    font-size: 7pt !important;
+  }
+  .identity-detail-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+    gap: 2mm !important;
+    margin-top: 3mm !important;
+  }
+  .identity .detail-match-card {
+    min-height: 31mm !important;
+    padding: 2.5mm !important;
+    border-radius: 4mm !important;
+    font-size: 7pt !important;
+    line-height: 1.25 !important;
+  }
+  .identity .detail-match-card h4 {
+    margin: 1.5mm 0 !important;
+    font-size: 8pt !important;
+  }
+  .identity .detail-match-card p {
+    margin: 1mm 0 0 !important;
+  }
+
+  /* Vue globale : le Top 3 des mini-records tient réellement sur la page. */
+  .bilan-page.competition {
+    padding: 10mm 11mm !important;
+  }
+  .competition .bilan-page-head {
+    margin-bottom: 4mm !important;
+  }
+  .competition .stats-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    gap: 2.5mm !important;
+    margin: 3mm 0 4mm !important;
+  }
+  .competition .stat-card {
+    min-height: 24mm !important;
+    padding: 3mm !important;
+    border-radius: 4mm !important;
+  }
+  .competition .stat-card strong {
+    font-size: 20pt !important;
+  }
+  .competition .stat-card.feature strong {
+    font-size: 26pt !important;
+  }
+  .competition .stat-card span {
+    margin-top: 1.5mm !important;
+    font-size: 8pt !important;
+  }
+  .competition .graph-card {
+    padding: 3mm !important;
+    border-radius: 4mm !important;
+  }
+  .competition .two-col .graph-card {
+    min-height: 27mm !important;
+  }
+  .competition .graph-card h3 {
+    margin: 0 0 2mm !important;
+    font-size: 12pt !important;
+  }
+  .competition .graph-card p {
+    margin: 1mm 0 !important;
+    font-size: 8pt !important;
+  }
+  .competition .mini-records-podiums {
+    margin-top: 3mm !important;
+  }
+  .competition .mini-record-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    gap: 2mm !important;
+    margin-top: 2mm !important;
+  }
+  .competition .mini-record-grid article {
+    min-height: 28mm !important;
+    padding: 2mm !important;
+    border-radius: 3mm !important;
+    gap: 1mm !important;
+  }
+  .competition .mini-record-grid img {
+    width: 8mm !important;
+    height: 8mm !important;
+  }
+  .competition .mini-record-grid strong {
+    font-size: 7.5pt !important;
+  }
+  .competition .mini-record-grid span {
+    font-size: 6.5pt !important;
+    line-height: 1.2 !important;
+  }
+
+  /* Course : retire les hauteurs écran et garde les deux graphiques du bas. */
+  .bilan-page.race {
+    padding: 10mm 11mm !important;
+  }
+  .race .bilan-page-head {
+    margin-bottom: 4mm !important;
+  }
+  .race-card {
+    min-height: 0 !important;
+    padding: 3mm !important;
+  }
+  .race-card .race-chart {
+    max-height: 58mm !important;
+  }
+  .race-legend {
+    gap: 2mm !important;
+    margin-top: 2mm !important;
+  }
+  .race-legend article {
+    min-height: 12mm !important;
+    padding: 2mm !important;
+    border-radius: 3mm !important;
+    font-size: 7.2pt !important;
+  }
+  .race .two-col {
+    margin-top: 3mm !important;
+  }
+  .race .two-col .graph-card {
+    padding: 3mm !important;
+    min-height: 57mm !important;
+  }
+  .race .two-col .chart-svg {
+    max-height: 46mm !important;
+  }
+  .race .two-col h3 {
+    margin: 0 0 2mm !important;
+    font-size: 11pt !important;
+  }
+
+  /* Le diplôme reste en A4 portrait : Chromium ne coupe plus le côté droit
+     dans un document mêlant pages portrait et paysage. */
+  @page diploma { size: A4 portrait; margin: 0; }
+  .bilan-page.diploma {
+    page: auto !important;
+    width: 210mm !important;
+    height: 297mm !important;
+    min-height: 297mm !important;
+    max-height: 297mm !important;
+    padding: 12mm !important;
+    background:
+      linear-gradient(rgba(2,6,23,.12), rgba(2,6,23,.18)),
+      url("../assets/reports/bg-cover.png"),
+      linear-gradient(135deg, #07111f, #111827) !important;
+    background-size: 100% 100% !important;
+    background-position: center !important;
+  }
+  .bilan-page.diploma .bilan-page-content {
+    width: 100% !important;
+    height: 273mm !important;
+    min-height: 273mm !important;
+    display: grid !important;
+    place-items: center !important;
+  }
+  .diploma-card {
+    width: 165mm !important;
+    max-width: 165mm !important;
+    padding: 10mm 12mm !important;
+    border-radius: 7mm !important;
+    background: rgba(2, 6, 23, .68) !important;
+    backdrop-filter: none !important;
+  }
+  .diploma-card .profile-badge {
+    width: 25mm !important;
+    height: 25mm !important;
+    margin-bottom: 3mm !important;
+  }
+  .diploma-card h2 {
+    margin: 2mm 0 !important;
+    font-size: 29pt !important;
+    line-height: .98 !important;
+  }
+  .diploma-card h3 {
+    margin: 3mm 0 !important;
+    font-size: 18pt !important;
+  }
+  .diploma-card p {
+    max-width: 140mm !important;
+    margin: 3mm auto !important;
+    font-size: 10pt !important;
+    line-height: 1.45 !important;
+  }
+  .diploma-rank-seal {
+    margin: 2mm auto !important;
+    padding: 2.5mm 9mm !important;
+  }
+  .diploma-rank-seal strong {
+    font-size: 24pt !important;
+  }
+  .signature-row {
+    margin-top: 8mm !important;
+    gap: 8mm !important;
+    font-size: 8pt !important;
+  }
+}
+
+/* V1.9.16c — Cartes records : sépare clairement valeur, titre et détail. */
+.record-card.with-icon {
+  display: grid;
+  grid-template-columns: 42px auto minmax(0, 1fr);
+  grid-template-rows: auto auto;
+  align-items: center;
+  justify-content: stretch;
+  column-gap: 10px;
+  row-gap: 6px;
+}
+.record-card.with-icon > img {
+  grid-column: 1;
+  grid-row: 1;
+}
+.record-card.with-icon > .value {
+  grid-column: 2;
+  grid-row: 1;
+  white-space: nowrap;
+}
+.record-card.with-icon > strong {
+  grid-column: 3;
+  grid-row: 1;
+  min-width: 0;
+}
+.record-card.with-icon > small {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  margin-top: 0;
+}
+
+@media print {
+  .record-card.with-icon {
+    grid-template-columns: 9mm auto minmax(0, 1fr) !important;
+    column-gap: 2mm !important;
+    row-gap: 1.5mm !important;
+  }
+  .record-card.with-icon > img {
+    width: 8mm !important;
+    height: 8mm !important;
+  }
+  .record-card.with-icon > .value {
+    margin-right: 0 !important;
+  }
+  .record-card.with-icon > strong {
+    line-height: 1.1 !important;
   }
 }

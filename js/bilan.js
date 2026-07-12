@@ -1,6 +1,6 @@
 
 // ============================================================
-// LE NID DES PRONOS — BILAN PDF V1.9.15
+// LE NID DES PRONOS — BILAN PDF V1.9.16
 // ============================================================
 
 const H = window.Helpers;
@@ -17,9 +17,13 @@ const BilanPDF = {
       matches: [],
       manualBadges: [],
       userBadges: [],
-      secondWinnerPick: null
+      winnerPicks: [],
+      secondWinnerPicks: [],
+      miniRecordCounts: [],
+      settings: {}
     },
     playerId: null,
+    allMode: false,
     refreshTimer: null,
     realtimeChannel: null
   },
@@ -29,22 +33,43 @@ const BilanPDF = {
     if (!this.state.session) return;
 
     const params = new URLSearchParams(window.location.search);
+    this.state.allMode = params.get("all") === "1";
     this.state.playerId = params.get("player") || this.state.session.user.id;
 
     await this.loadAdminProfile();
-    if (!this.isSuperAdmin() && this.state.playerId !== this.state.session.user.id) {
+    if (this.state.allMode && !this.isSuperAdmin()) {
+      this.renderError("Accès réservé", "L’export groupé des bilans est réservé au super admin.");
+      return;
+    }
+    if (!this.state.allMode && !this.isSuperAdmin() && this.state.playerId !== this.state.session.user.id) {
       this.renderError("Accès réservé", "Ce bilan est consultable par le super admin pour le moment.");
       return;
     }
 
-    H.$("#refreshBilanBtn")?.addEventListener("click", () => this.loadAndRender());
+    H.$("#refreshBilanBtn")?.addEventListener("click", () => this.state.allMode ? this.loadAllAndRender() : this.loadAndRender());
     H.$("#printBilanBtn")?.addEventListener("click", () => window.print());
-
-    await this.loadAndRender();
-    if (params.get("print") === "1") {
-      window.setTimeout(() => window.print(), 700);
+    const allButton = H.$("#printAllBilansBtn");
+    if (allButton && this.isSuperAdmin() && !this.state.allMode) {
+      allButton.hidden = false;
+      allButton.addEventListener("click", () => window.open("bilan.html?all=1&preview=admin", "_blank", "noopener"));
     }
-    this.setupRealtime();
+
+    if (this.state.allMode) {
+      document.body.classList.add("bilan-batch-body");
+      const title = H.$(".bilan-toolbar h1");
+      if (title) title.innerHTML = '<img class="owl-icon title-icon" src="assets/icons/owl-png/bilan.png" alt="" aria-hidden="true"> Tous les bilans PDF';
+      const printButton = H.$("#printBilanBtn");
+      if (printButton) printButton.textContent = "Imprimer le lot / PDF";
+      await this.loadAllAndRender();
+    } else {
+      await this.loadAndRender();
+      this.setupRealtime();
+    }
+
+    if (params.get("print") === "1") {
+      await this.waitForImages();
+      window.setTimeout(() => window.print(), 500);
+    }
   },
 
   isSuperAdmin() {
@@ -63,22 +88,82 @@ const BilanPDF = {
 
   async loadAndRender() {
     const root = H.$("#bilanRoot");
-    if (root) root.classList.add("is-loading");
+    if (root) {
+      root.classList.remove("batch-mode");
+      root.classList.add("is-loading");
+    }
 
+    await this.loadCompetitionSnapshot();
+    const report = await this.fetchPlayerReport(this.state.playerId);
+    if (!report) return;
+
+    this.state.report = report;
+    await this.enrichReportWithChampionFallback();
+    this.render();
+    await this.waitForImages();
+    if (root) root.classList.remove("is-loading");
+  },
+
+  async fetchPlayerReport(playerId, { silent = false } = {}) {
     const { data, error } = await window.sb.rpc("admin_get_final_player_report", {
-      p_user_id: this.state.playerId
+      p_user_id: playerId
     });
 
     if (error) {
-      this.renderError("Bilan indisponible", `${error.message || "Erreur inconnue"}<br><br>Lance le patch SQL V1.3.0 si ce n’est pas encore fait.`);
+      if (!silent) this.renderError("Bilan indisponible", `${error.message || "Erreur inconnue"}<br><br>Lance le patch SQL V1.3.0 si ce n’est pas encore fait.`);
+      else console.warn(`Bilan ignoré pour ${playerId}`, error);
+      return null;
+    }
+    return data || {};
+  },
+
+  async loadAllAndRender() {
+    const root = H.$("#bilanRoot");
+    if (!root) return;
+    root.classList.add("is-loading", "batch-mode");
+    root.innerHTML = `<section class="bilan-loading"><div class="loader-owl">🦉</div><h2>Le greffier rassemble tous les carnets...</h2><p class="muted" id="batchProgress">Préparation de la volière.</p></section>`;
+
+    await this.loadCompetitionSnapshot();
+    const competition = this.competitionSnapshot();
+    const players = (competition.leaderboard || [])
+      .map((row) => ({ ...this.profileForUser(row.user_id || row.id, row), ...row, id: row.user_id || row.id }))
+      .filter((row) => row.id);
+
+    if (!players.length) {
+      this.renderError("Aucun joueur", "Aucun joueur officiel n’est disponible pour l’export groupé.");
       return;
     }
 
-    this.state.report = data || {};
-    await this.enrichReportWithChampionFallback();
-    await this.loadCompetitionSnapshot();
-    this.render();
-    if (root) root.classList.remove("is-loading");
+    const documents = [];
+    const originalPlayerId = this.state.playerId;
+    const originalReport = this.state.report;
+    for (let index = 0; index < players.length; index += 1) {
+      const player = players[index];
+      const progress = H.$("#batchProgress");
+      if (progress) progress.textContent = `Carnet ${index + 1}/${players.length} : ${player.pseudo || "Joueur"}`;
+      const report = await this.fetchPlayerReport(player.id, { silent: true });
+      if (!report) continue;
+      this.state.playerId = player.id;
+      this.state.report = report;
+      await this.enrichReportWithChampionFallback();
+      documents.push(this.buildDocumentHtml());
+    }
+
+    this.state.playerId = originalPlayerId;
+    this.state.report = originalReport;
+    root.innerHTML = `<div class="batch-print-note no-print"><strong>${documents.length} carnet(s) prêts.</strong><span>Utilise « Imprimer le lot / PDF » : un seul PDF contiendra tous les joueurs, sans avoir à les ouvrir un par un.</span></div>${documents.join("")}`;
+    root.classList.remove("is-loading");
+    await this.waitForImages();
+  },
+
+  async waitForImages() {
+    const images = [...document.images].filter((img) => !img.complete);
+    if (!images.length) return;
+    await Promise.all(images.map((img) => new Promise((resolve) => {
+      img.addEventListener("load", resolve, { once: true });
+      img.addEventListener("error", resolve, { once: true });
+      window.setTimeout(resolve, 3000);
+    })));
   },
 
   setupRealtime() {
@@ -102,10 +187,11 @@ const BilanPDF = {
 
   async enrichReportWithChampionFallback() {
     const report = this.state.report || {};
-    if (report.champion_prediction || report.winner_prediction || report.winner) return;
-
-    const fromView = await this.fetchChampionFromView().catch(() => null);
+    const competition = this.competitionSnapshot();
+    const dynamic = (competition.winnerPicks || []).find((row) => String(row.user_id) === String(this.state.playerId));
+    const fromView = dynamic || await this.fetchChampionFromView().catch(() => null);
     const fromTable = fromView || await this.fetchChampionFromTable().catch(() => null);
+
     if (fromTable) {
       this.state.report = {
         ...report,
@@ -346,7 +432,7 @@ const BilanPDF = {
 
 
   emptyCompetitionSnapshot() {
-    return { leaderboard: [], predictions: [], profiles: [], matches: [], manualBadges: [], userBadges: [], secondWinnerPick: null };
+    return { leaderboard: [], predictions: [], profiles: [], matches: [], manualBadges: [], userBadges: [], winnerPicks: [], secondWinnerPicks: [], miniRecordCounts: [], settings: {} };
   },
 
   competitionSnapshot() {
@@ -358,8 +444,40 @@ const BilanPDF = {
       matches: Array.isArray(competition.matches) ? competition.matches : [],
       manualBadges: Array.isArray(competition.manualBadges) ? competition.manualBadges : [],
       userBadges: Array.isArray(competition.userBadges) ? competition.userBadges : [],
-      secondWinnerPick: competition.secondWinnerPick || null
+      winnerPicks: Array.isArray(competition.winnerPicks) ? competition.winnerPicks : [],
+      secondWinnerPicks: Array.isArray(competition.secondWinnerPicks) ? competition.secondWinnerPicks : [],
+      miniRecordCounts: Array.isArray(competition.miniRecordCounts) ? competition.miniRecordCounts : [],
+      settings: competition.settings && typeof competition.settings === "object" ? competition.settings : {}
     };
+  },
+
+  async selectAllRows(table, configure = (query) => query, pageSize = 1000) {
+    const rows = [];
+    for (let from = 0; ; from += pageSize) {
+      let query = window.sb.from(table).select("*");
+      query = configure(query).range(from, from + pageSize - 1);
+      const { data, error } = await query;
+      if (error) throw error;
+      const page = data || [];
+      rows.push(...page);
+      if (page.length < pageSize) break;
+    }
+    return rows;
+  },
+
+  settingNumber(key, fallback = 0) {
+    const raw = this.competitionSnapshot().settings?.[key];
+    const value = raw && typeof raw === "object" ? (raw.points ?? raw.value ?? raw.amount) : raw;
+    const number = Number(value);
+    return Number.isFinite(number) ? Math.max(0, Math.round(number)) : fallback;
+  },
+
+  championFirstBonusPoints() {
+    return this.settingNumber("champion_bonus_initial_points", 100);
+  },
+
+  championSecondBonusPoints() {
+    return this.settingNumber("champion_bonus_second_points", 50);
   },
 
   async loadCompetitionSnapshot() {
@@ -370,28 +488,27 @@ const BilanPDF = {
 
     const safe = async (promise, fallback = []) => {
       try {
-        const { data, error } = await promise;
-        if (error) {
-          console.warn("Bilan collector · donnée compétition indisponible", error);
-          return fallback;
-        }
-        return data || fallback;
+        return await promise;
       } catch (error) {
-        console.warn("Bilan collector · chargement compétition interrompu", error);
+        console.warn("Bilan collector · donnée compétition indisponible", error);
         return fallback;
       }
     };
 
-    const [leaderboard, predictions, profiles, matches, manualBadges, secondWinnerRows] = await Promise.all([
-      safe(window.sb.from("v_leaderboard_overall").select("*").order("rank")),
-      safe(window.sb.from("v_visible_predictions").select("*")),
-      safe(window.sb.from("v_public_profiles").select("*")),
-      safe(window.sb.from("v_matches").select("*")),
-      safe(window.sb.from("manual_user_badges").select("*").eq("user_id", this.state.playerId)),
-      safe(window.sb.from("v_second_winner_predictions").select("*").eq("user_id", this.state.playerId))
+    const [leaderboard, predictions, profiles, matches, manualBadges, winnerPicks, secondWinnerPicks, miniRecordCounts, settingRows] = await Promise.all([
+      safe(this.selectAllRows("v_leaderboard_overall", (query) => query.order("rank"))),
+      safe(this.selectAllRows("v_visible_predictions")),
+      safe(this.selectAllRows("v_public_profiles")),
+      safe(this.selectAllRows("v_matches", (query) => query.order("kickoff_at", { ascending: true }))),
+      safe(this.selectAllRows("manual_user_badges")),
+      safe(this.selectAllRows("v_winner_predictions")),
+      safe(this.selectAllRows("v_second_winner_predictions")),
+      safe(this.selectAllRows("v_mini_record_prediction_counts")),
+      safe(this.selectAllRows("app_settings", (query) => query.in("key", ["champion_bonus_initial_points", "champion_bonus_second_points"])))
     ]);
 
-    this.state.competition = { leaderboard, predictions, profiles, matches, manualBadges, userBadges: [], secondWinnerPick: (secondWinnerRows || [])[0] || null };
+    const settings = Object.fromEntries((settingRows || []).map((row) => [row.key, row.value]));
+    this.state.competition = { leaderboard, predictions, profiles, matches, manualBadges, userBadges: [], winnerPicks, secondWinnerPicks, miniRecordCounts, settings };
   },
 
   officialPredictions() {
@@ -425,7 +542,24 @@ const BilanPDF = {
     const bestDay = this.dayDetails(rows, true);
     const worstDay = this.dayDetails(rows, false);
     const casseroleRows = this.casseroleRows(rows);
-    return { rows, total, exact, good, diff, qualified, zeros, best, worst, bestDay, worstDay, casseroleRows, exactRate: rows.length ? exact / rows.length : 0, zeroRate: rows.length ? zeros / rows.length : 0, average: rows.length ? total / rows.length : 0, favoriteHour: this.favoriteHour(this.officialPredictions()), officialMatchCount: this.competitionSnapshot().matches.filter((match) => !match.is_test_match).length };
+    const maximumPoints = rows.reduce((sum, row) => sum + this.maximumMatchPoints(row), 0);
+    return { rows, total, exact, good, diff, qualified, zeros, best, worst, bestDay, worstDay, casseroleRows, maximumPoints, exactRate: rows.length ? exact / rows.length : 0, zeroRate: rows.length ? zeros / rows.length : 0, average: rows.length ? total / rows.length : 0, favoriteHour: this.favoriteHour(this.officialPredictions()), officialMatchCount: this.competitionSnapshot().matches.filter((match) => !match.is_test_match).length };
+  },
+
+  maximumMatchPoints(row = {}) {
+    if (row.stage === "final") return 14;
+    return row.stage && row.stage !== "group" ? 7 : 5;
+  },
+
+  radarMetrics(stats) {
+    const count = Math.max(1, stats.rows.length);
+    const goodOutcomes = stats.rows.filter((row) => row.is_good_result || row.is_exact_score).length;
+    return {
+      exact: Math.round((stats.exact / count) * 100),
+      outcomes: Math.round((goodOutcomes / count) * 100),
+      yield: stats.maximumPoints ? Math.round((stats.total / stats.maximumPoints) * 100) : 0,
+      survival: Math.round(((stats.rows.length - stats.zeros) / count) * 100)
+    };
   },
 
   missDistance(row = {}) {
@@ -501,7 +635,7 @@ const BilanPDF = {
     const rows = [
       ...(competition.manualBadges || []),
       ...(competition.userBadges || [])
-    ];
+    ].filter((row) => !row.user_id || String(row.user_id) === String(this.state.playerId));
     const catalog = this.badgeCatalogLite();
     return rows.map((row) => {
       const id = row.badge_id || row.badge || row.achievement_id || row.id || row.key || row.code;
@@ -540,7 +674,7 @@ const BilanPDF = {
     const officialMatchCount = Math.max(stats.officialMatchCount || 0, (this.competitionSnapshot().matches || []).filter((m) => !m.is_test_match).length);
     const predictionCount = officialPredictions.length;
     const championPicked = Boolean(champion?.predicted_team_id || champion?.predicted_team_name);
-    const secondWinner = this.competitionSnapshot().secondWinnerPick;
+    const secondWinner = (this.competitionSnapshot().secondWinnerPicks || []).find((row) => String(row.user_id) === String(this.state.playerId)) || null;
     const secondChampionPicked = Boolean(secondWinner?.predicted_team_id || secondWinner?.predicted_team_name);
     const nthPredictionDate = (n) => officialPredictions.map((row) => this.predictionActivityDate(row)).filter(Boolean).sort((a, b) => a - b)[Math.max(0, n - 1)]?.toISOString() || null;
 
@@ -551,7 +685,8 @@ const BilanPDF = {
     push("all-picks-in", officialMatchCount > 0 && predictionCount >= officialMatchCount, { acquired_at: nthPredictionDate(officialMatchCount) });
     push("champion-picked", championPicked, { text: `Champion choisi : ${champion?.predicted_team_name || "équipe enregistrée"}.`, acquired_at: champion?.locked_at || champion?.updated_at || champion?.created_at });
     push("second-champion-picked", secondChampionPicked, { text: `2e champion : ${secondWinner?.predicted_team_name || "équipe enregistrée"}.`, acquired_at: secondWinner?.locked_at || secondWinner?.updated_at || secondWinner?.created_at });
-    push("second-final-winner-oracle", secondWinner?.points_total === 50, { text: `Le 2e choix rapporte +50 points : ${secondWinner?.predicted_team_name || "équipe gagnante"}.`, acquired_at: secondWinner?.updated_at || secondWinner?.created_at });
+    const secondBonusPoints = this.championSecondBonusPoints();
+    push("second-final-winner-oracle", secondBonusPoints > 0 && this.n(secondWinner?.points_total) === secondBonusPoints, { text: `Le 2e choix rapporte +${secondBonusPoints} points : ${secondWinner?.predicted_team_name || "équipe gagnante"}.`, acquired_at: secondWinner?.updated_at || secondWinner?.created_at });
     push("preparation-two-picks", testPredictions.length >= 2, { acquired_at: testPredictions[1]?.created_at || testPredictions[1]?.updated_at });
     push("prep-good-pick", testPredictions.some((row) => this.n(row.points_total) > 0 || row.is_exact_score || row.is_good_result || row.is_good_goal_diff || row.is_good_qualified));
     push("first-flight", stats.rows.length >= 1, { acquired_at: stats.rows[0]?.kickoff_at });
@@ -806,6 +941,10 @@ const BilanPDF = {
   render() {
     const root = H.$("#bilanRoot");
     if (!root) return;
+    root.innerHTML = this.buildDocumentHtml();
+  },
+
+  buildDocumentHtml() {
     const report = this.state.report || {};
     const player = report.profile || {};
     const leaderboard = report.leaderboard || {};
@@ -813,7 +952,7 @@ const BilanPDF = {
     const family = report.family_rank || {};
     const familyTeam = report.family_team_rank || {};
     const champion = this.normalizeChampionPrediction(report.champion_prediction || report.winner_prediction || report.winner || null);
-    const secondChampion = this.normalizeSecondChampionPrediction(this.competitionSnapshot().secondWinnerPick);
+    const secondChampion = this.normalizeSecondChampionPrediction((this.competitionSnapshot().secondWinnerPicks || []).find((row) => String(row.user_id) === String(this.state.playerId)) || null);
     const stats = this.stats();
     const badges = this.unlockedBadges(stats, champion);
     const title = this.funnyTitle(stats, leaderboard);
@@ -826,20 +965,19 @@ const BilanPDF = {
       office_team_color: player.office_team_color || player.badge_color || "#facc15"
     };
 
-    root.innerHTML = `
-      <article class="bilan-document collector">
-        ${this.pageCover(player, avatarProfile, leaderboard, stats, title, quote)}
-        ${this.pageStats(player, leaderboard, team, family, familyTeam, champion, secondChampion, stats)}
-        ${this.pageIdentity(player, avatarProfile, stats)}
-        ${this.pageBadges(badges, stats)}
-        ${this.pageRecords(stats)}
-        ${this.pageCompetitionPulse(stats)}
-        ${this.pageRace(stats)}
-        ${this.pageCasseroles(stats)}
-        ${this.pageGraphs(stats)}
-        ${this.predictionHistoryPages(stats.rows)}
-        ${this.pageDiploma(player, avatarProfile, leaderboard, stats, title)}
-      </article>`;
+    return `<article class="bilan-document collector" data-player-id="${this.e(this.state.playerId)}">
+      ${this.pageCover(player, avatarProfile, leaderboard, stats, title, quote)}
+      ${this.pageStats(player, leaderboard, team, family, familyTeam, champion, secondChampion, stats)}
+      ${this.pageIdentity(player, avatarProfile, stats)}
+      ${this.pageBadges(badges, stats)}
+      ${this.pageRecords(stats)}
+      ${this.pageCompetitionPulse(stats)}
+      ${this.pageRace(stats)}
+      ${this.pageCasseroles(stats)}
+      ${this.pageGraphs(stats)}
+      ${this.predictionHistoryPages(stats.rows)}
+      ${this.pageDiploma(player, avatarProfile, leaderboard, stats, title)}
+    </article>`;
   },
 
   pageCover(player, avatarProfile, leaderboard, stats, title, quote) {
@@ -867,7 +1005,7 @@ const BilanPDF = {
   },
 
   predictionActivityDate(row = {}) {
-    const raw = row.predicted_at || row.submitted_at || row.created_at || row.updated_at || row.locked_at;
+    const raw = row.predicted_at || row.submitted_at || row.prediction_created_at || row.prediction_updated_at || row.created_at || row.updated_at || row.locked_at;
     if (!raw) return null;
     const d = new Date(raw);
     return Number.isFinite(d.getTime()) ? d : null;
@@ -949,32 +1087,100 @@ const BilanPDF = {
 
   miniRecordDefinitions() {
     return [
-      { id: "record-points", title: "Banque centrale du Nid", icon: "assets/records/record-points.png", unit: "pts", value: (s) => s.total },
-      { id: "record-exact", title: "Œil laser", icon: "assets/records/record-exact.png", unit: "exacts", value: (s) => s.exact },
-      { id: "record-results", title: "Bons résultats à la chaîne", icon: "assets/records/record-results.png", unit: "bons", value: (s) => s.good },
-      { id: "record-diffs", title: "Géomètre volant", icon: "assets/records/record-diffs.png", unit: "écarts", value: (s) => s.diff },
-      { id: "record-average", title: "Moyenne de rapace", icon: "assets/records/record-average.png", unit: "pts/match", decimals: 2, value: (s) => s.average },
-      { id: "record-zero", title: "Collection de casseroles", icon: "assets/records/record-zero.png", unit: "zéros", value: (s) => s.zeros }
+      { id: "record-points", title: "Grand-duc du classement", icon: "assets/records/record-points.png", unit: "pts", value: (s) => s.total },
+      { id: "record-average", title: "Moyenne de velours", icon: "assets/records/record-average.png", unit: "pts/match", decimals: 2, minRows: 3, value: (s) => s.average },
+      { id: "record-exact", title: "Aimant à scores exacts", icon: "assets/records/record-exact.png", unit: "score(s) exact(s)", value: (s) => s.exact },
+      { id: "record-results", title: "Collectionneur de victoires", icon: "assets/records/record-results.png", unit: "bon(s) résultat(s)", value: (s) => s.good },
+      { id: "record-diffs", title: "Compas du nid", icon: "assets/records/record-diffs.png", unit: "bon(s) écart(s)", value: (s) => s.diff },
+      { id: "record-qualified", title: "Gardien des qualifiés", icon: "assets/records/record-qualified.png", unit: "qualifié(s)", value: (s) => s.qualified },
+      { id: "record-day", title: "Journée stratosphérique", icon: "assets/records/record-day.png", unit: "pts", value: (s) => s.bestDayPoints, detail: (s) => s.bestDayLabel },
+      { id: "record-exact-streak", title: "Série laser", icon: "assets/records/record-exact-streak.png", unit: "d’affilée", value: (s) => s.exactStreak },
+      { id: "record-result-streak", title: "Vol sans trou d’air", icon: "assets/records/record-results.png", unit: "d’affilée", value: (s) => s.resultStreak },
+      { id: "record-predictions", title: "Greffier du grimoire", icon: "assets/records/record-predictions.png", unit: "prono(s)", value: (s) => s.predictionCount },
+      { id: "record-zero", title: "Casserole dorée", icon: "assets/records/record-zero.png", unit: "zéro(s)", value: (s) => s.zeros },
+      { id: "record-zero-streak", title: "Tunnel de brouillard", icon: "assets/records/record-zero-streak.png", unit: "d’affilée", value: (s) => s.zeroStreak }
     ];
   },
 
+  miniRecordCountRow(userId) {
+    return this.competitionSnapshot().miniRecordCounts.find((row) => String(row.user_id) === String(userId)) || null;
+  },
+
   playerSummaryFromRows(userId) {
-    const rows = this.competitionPredictionRows().filter((row) => String(row.user_id) === String(userId));
+    const rows = this.competitionPredictionRows()
+      .filter((row) => String(row.user_id) === String(userId))
+      .sort((a, b) => new Date(a.kickoff_at || 0) - new Date(b.kickoff_at || 0));
     const total = rows.reduce((s, r) => s + this.n(r.points_total), 0);
     const exact = rows.filter((r) => r.is_exact_score).length;
     const good = rows.filter((r) => r.is_good_result).length;
     const diff = rows.filter((r) => r.is_good_goal_diff).length;
+    const qualified = rows.filter((r) => r.is_good_qualified).length;
     const zeros = rows.filter((r) => this.n(r.points_total) === 0).length;
-    return { rows, total, exact, good, diff, zeros, average: rows.length ? total / rows.length : 0 };
+    const dayMap = new Map();
+    rows.forEach((row) => {
+      const label = row.stage === "group" && row.pool_round
+        ? `Journée de poule ${row.pool_round}`
+        : this.phaseKey(row);
+      const item = dayMap.get(label) || { label, points: 0 };
+      item.points += this.n(row.points_total);
+      dayMap.set(label, item);
+    });
+    const bestDay = [...dayMap.values()].sort((a, b) => b.points - a.points || String(a.label).localeCompare(String(b.label), "fr"))[0] || { label: "", points: 0 };
+    const countRow = this.miniRecordCountRow(userId);
+    const predictionCount = Math.max(this.n(countRow?.prediction_count), rows.length);
+    return {
+      rows,
+      total,
+      exact,
+      good,
+      diff,
+      qualified,
+      zeros,
+      average: rows.length ? total / rows.length : 0,
+      scoredMatches: rows.length,
+      predictionCount,
+      bestDayPoints: bestDay.points,
+      bestDayLabel: bestDay.label,
+      exactStreak: this.streak(rows, (row) => row.is_exact_score),
+      resultStreak: this.streak(rows, (row) => row.is_good_result || row.is_exact_score),
+      zeroStreak: this.streak(rows, (row) => this.n(row.points_total) === 0)
+    };
+  },
+
+  miniRecordReachedDate(userId, record, stats) {
+    const countRow = this.miniRecordCountRow(userId);
+    if (record.id === "record-predictions") {
+      const raw = countRow?.record_unlocked_at || countRow?.latest_prediction_at || countRow?.first_prediction_at;
+      const d = raw ? new Date(raw) : null;
+      return d && Number.isFinite(d.getTime()) ? d.getTime() : Number.POSITIVE_INFINITY;
+    }
+    const rows = stats.rows || [];
+    const last = rows[rows.length - 1];
+    const raw = last?.kickoff_at || last?.prediction_updated_at || last?.prediction_created_at;
+    const d = raw ? new Date(raw) : null;
+    return d && Number.isFinite(d.getTime()) ? d.getTime() : Number.POSITIVE_INFINITY;
+  },
+
+  miniRecordStandings(record) {
+    return this.competitionPlayerSummaries()
+      .filter((item) => !record.minRows || item.stats.scoredMatches >= record.minRows)
+      .map((item) => ({
+        ...item,
+        value: Number(record.value(item.stats) || 0),
+        reachedAt: this.miniRecordReachedDate(item.id, record, item.stats)
+      }))
+      .filter((item) => item.value > 0)
+      .sort((a, b) =>
+        b.value - a.value
+        || a.reachedAt - b.reachedAt
+        || String(a.profile.pseudo || "").localeCompare(String(b.profile.pseudo || ""), "fr")
+      );
   },
 
   miniRecordPodiums() {
-    const competition = this.competitionSnapshot();
-    const userIds = [...new Set(this.competitionPredictionRows().map((row) => row.user_id).filter(Boolean))];
-    const summaries = userIds.map((id) => ({ id, profile: this.profileForUser(id, (competition.leaderboard || []).find((row) => String(row.user_id || row.id) === String(id)) || {}), stats: this.playerSummaryFromRows(id) }));
     return this.miniRecordDefinitions().map((record) => ({
       record,
-      podium: summaries.map((item) => ({ ...item, value: Number(record.value(item.stats) || 0) })).filter((item) => item.value > 0).sort((a, b) => b.value - a.value || String(a.profile.pseudo || "").localeCompare(String(b.profile.pseudo || ""), "fr")).slice(0, 3)
+      podium: this.miniRecordStandings(record).slice(0, 3)
     }));
   },
 
@@ -983,11 +1189,105 @@ const BilanPDF = {
     return `${record.decimals ? n.toFixed(record.decimals) : String(Math.round(n * 10) / 10)} ${record.unit || ""}`.trim();
   },
 
+  competitionPlayerSummaries() {
+    const competition = this.competitionSnapshot();
+    const userIds = [...new Set([
+      ...(competition.leaderboard || []).map((row) => row.user_id || row.id),
+      ...this.competitionPredictionRows().map((row) => row.user_id),
+      ...(competition.miniRecordCounts || []).map((row) => row.user_id)
+    ].filter(Boolean))];
+    return userIds.map((id) => ({
+      id,
+      profile: this.profileForUser(id, (competition.leaderboard || []).find((row) => String(row.user_id || row.id) === String(id)) || {}),
+      stats: this.playerSummaryFromRows(id)
+    }));
+  },
+
+  playerMiniRecords() {
+    return this.miniRecordDefinitions().map((record) => {
+      const winner = this.miniRecordStandings(record)[0];
+      if (!winner || String(winner.id) !== String(this.state.playerId)) return null;
+      return {
+        record,
+        value: winner.value,
+        detail: record.detail ? record.detail(winner.stats) : ""
+      };
+    }).filter(Boolean);
+  },
+
+  rankHistory() {
+    const competition = this.competitionSnapshot();
+    const players = this.competitionPlayerSummaries();
+    const finishedMatches = (competition.matches || []).filter((match) => !match.is_test_match && match.status === "finished").sort((a, b) => new Date(a.kickoff_at || 0) - new Date(b.kickoff_at || 0));
+    if (!players.length || !finishedMatches.length) return [];
+
+    const rowsByMatch = new Map();
+    this.competitionPredictionRows().forEach((row) => {
+      const list = rowsByMatch.get(String(row.match_id)) || [];
+      list.push(row);
+      rowsByMatch.set(String(row.match_id), list);
+    });
+    const totals = new Map(players.map((p) => [String(p.id), { points: 0, exact: 0, good: 0 }]));
+    const groups = [];
+    finishedMatches.forEach((match) => {
+      const key = match.kickoff_at || match.match_day || match.id;
+      const last = groups[groups.length - 1];
+      if (last && last.key === key) last.matches.push(match);
+      else groups.push({ key, matches: [match] });
+    });
+
+    let matchCount = 0;
+    const history = [];
+    groups.forEach((group) => {
+      group.matches.forEach((match) => {
+        matchCount += 1;
+        (rowsByMatch.get(String(match.id)) || []).forEach((row) => {
+          const item = totals.get(String(row.user_id));
+          if (!item) return;
+          item.points += this.n(row.points_total);
+          if (row.is_exact_score) item.exact += 1;
+          if (row.is_good_result || row.is_exact_score) item.good += 1;
+        });
+      });
+      if (group.matches.some((match) => match.stage === "final")) {
+        [...(competition.winnerPicks || []), ...(competition.secondWinnerPicks || [])].forEach((pick) => {
+          const item = totals.get(String(pick.user_id));
+          if (item) item.points += this.n(pick.points_total);
+        });
+      }
+      const playerTotal = totals.get(String(this.state.playerId));
+      if (playerTotal) {
+        const ahead = players.filter((item) => {
+          if (String(item.id) === String(this.state.playerId)) return false;
+          const other = totals.get(String(item.id)) || {};
+          return (other.points || 0) > (playerTotal.points || 0)
+            || ((other.points || 0) === (playerTotal.points || 0) && (other.exact || 0) > (playerTotal.exact || 0))
+            || ((other.points || 0) === (playerTotal.points || 0) && (other.exact || 0) === (playerTotal.exact || 0) && (other.good || 0) > (playerTotal.good || 0));
+        }).length;
+        history.push({ rank: ahead + 1, matchCount, date: group.key });
+      }
+    });
+    return history;
+  },
+
+  rankMilestones() {
+    const history = this.rankHistory();
+    if (!history.length) return { best: null, worst: null };
+    return {
+      best: history.reduce((best, item) => item.rank < best.rank ? item : best, history[0]),
+      worst: history.reduce((worst, item) => item.rank > worst.rank ? item : worst, history[0])
+    };
+  },
 
   pageStats(player, leaderboard, team, family, familyTeam, champion, secondChampion, stats) {
     const showFamily = this.showFamilyContext();
+    const firstBonus = this.championFirstBonusPoints();
+    const secondBonus = this.championSecondBonusPoints();
     const familyRows = showFamily ? `<div class="rank-row"><div><strong>Famille joueur</strong><small>classement parallèle</small></div><span class="big-rank">#${this.e(family.rank || "—")}</span></div><div class="rank-row"><div><strong>Famille team</strong><small>moyenne équipe famille</small></div><span class="big-rank">#${this.e(familyTeam.rank || "—")}</span></div>` : "";
-    const championLine = (pick, title, pts) => pick ? `<div class="champion-pick-line">${pick.predicted_team_flag_url || pick.predicted_team_country_code ? H.flagImgHtml({ flagUrl: pick.predicted_team_flag_url, countryCode: pick.predicted_team_country_code, shortName: pick.predicted_team_short_name, name: pick.predicted_team_name, className: "team-flag-img champion-option-flag" }) : ""}<p><span>${this.e(title)}</span><strong>${this.e(pick.predicted_team_name)}</strong><small>${this.e(pts)} pts possibles · actuellement ${this.e(pick.points_total || 0)} pt(s)</small></p></div>` : `<p class="muted">${this.e(title)} : non choisi ou indisponible.</p>`;
+    const championLine = (pick, title, pts) => pick ? `<div class="champion-pick-line">${pick.predicted_team_flag_url || pick.predicted_team_country_code ? H.flagImgHtml({ flagUrl: pick.predicted_team_flag_url, countryCode: pick.predicted_team_country_code, shortName: pick.predicted_team_short_name, name: pick.predicted_team_name, className: "team-flag-img champion-option-flag" }) : ""}<p><span>${this.e(title)}</span><strong>${this.e(pick.predicted_team_name)}</strong><small>${this.e(pts)} pts possibles · actuellement ${this.e(pick.points_total || 0)} pt(s)</small></p></div>` : "";
+    const initialLine = champion ? championLine(champion, "Choix initial", firstBonus) : `<div class="champion-pick-line joke-champion"><span class="italy-joke-flag" aria-hidden="true">🇮🇹</span><p><span>Choix automatique du Hibou</span><strong>Italie</strong><small>Quitte à ne rien choisir, autant prendre une équipe qui n’était même pas qualifiée. Aucun impact sur le classement, évidemment.</small></p></div>`;
+    const secondLine = secondChampion ? championLine(secondChampion, "2e choix bonus", secondBonus) : `<p class="muted champion-missing-line">2e choix bonus non posé : le Hibou a rangé son plan B avant de se blesser avec.</p>`;
+    const sameTeam = champion && secondChampion && champion.predicted_team_id === secondChampion.predicted_team_id;
     return `<section class="bilan-page stats"><div class="bilan-page-content">
       <div class="bilan-page-head"><div><h2>Tableau de chasse</h2><p>Les chiffres froids, les plumes chaudes, et les casseroles assumées avec panache.</p></div><span class="page-number">02</span></div>
       <div class="stats-grid icon-stats-grid">
@@ -1002,16 +1302,14 @@ const BilanPDF = {
       </div>
       <div class="two-col">
         <div class="graph-card"><h3>Classements</h3><div class="ranking-list"><div class="rank-row"><div><strong>Joueur officiel</strong><small>${this.e(player.pseudo)}</small></div><span class="big-rank">#${this.e(leaderboard.rank || "—")}</span></div><div class="rank-row"><div><strong>Team officielle</strong><small>${this.e(team.office_team_name || player.office_team_name || "Sans team")}</small></div><span class="big-rank">#${this.e(team.rank || "—")}</span></div>${familyRows}</div></div>
-        <div class="graph-card champion-card"><h3>Champions choisis</h3>${championLine(champion, "Choix initial", 100)}${championLine(secondChampion, "2e choix bonus", 50)}<p class="muted">${champion && secondChampion && champion.predicted_team_id === secondChampion.predicted_team_id ? "Même équipe choisie deux fois : jackpot potentiel à 150 points." : "Le 2e choix ne remplace pas le champion initial : il ajoute un filet de sécurité."}</p></div>
+        <div class="graph-card champion-card"><h3>Champions choisis</h3>${initialLine}${secondLine}<p class="muted">${sameTeam ? `Même équipe choisie deux fois : jackpot potentiel à ${firstBonus + secondBonus} points.` : `Barème actuel : ${firstBonus} pts pour le choix initial et ${secondBonus} pts pour le 2e choix.`}</p></div>
       </div>
     </div></section>`;
   },
 
   pageIdentity(player, avatarProfile, stats) {
     const signature = stats.signature || this.playerSignature(stats);
-    const exactPct = stats.rows.length ? Math.round(stats.exactRate * 100) : 0;
-    const zeroPct = stats.rows.length ? Math.round(stats.zeroRate * 100) : 0;
-    const instinct = Math.min(100, Math.round(stats.average * 22));
+    const radar = this.radarMetrics(stats);
     const registeredAt = player.created_at || player.inserted_at || this.state.report.profile?.created_at || null;
     const bestDay = stats.bestDay;
     const worstDay = stats.worstDay;
@@ -1019,7 +1317,7 @@ const BilanPDF = {
       <div class="bilan-page-head"><div><h2>Carte d’identité du pronostiqueur</h2><p>Rang collector, rythme de prono, match rentable et vraie casserole certifiée par le Nid.</p></div><span class="page-number">03</span></div>
       <div class="identity-layout">
         <div class="identity-rank-card ${this.e(signature.tone)}">${H.profileBadgeHtml(avatarProfile, "profile-badge leader")}<p class="eyebrow">Rang collector</p><h3>${this.e(signature.title)}</h3><p>${this.e(signature.subtitle)}</p><div class="identity-mini-facts"><span>Inscription : <b>${this.e(registeredAt ? this.dateLabel(registeredAt) : "non disponible")}</b></span><span>Créneau préféré : <b>${this.e(stats.favoriteHour)}</b></span></div></div>
-        <div class="identity-meter-card"><h3>Radar de plumes</h3>${this.meterHtml("Précision", exactPct)}${this.meterHtml("Instinct à points", instinct)}${this.meterHtml("Goût du risque", Math.min(100, zeroPct + 25))}${this.meterHtml("Résistance aux casseroles", Math.max(0, 100 - zeroPct))}<h3 class="mini-title">Heures de vol</h3>${this.hourRadarHtml(this.officialPredictions())}</div>
+        <div class="identity-meter-card"><h3>Radar de plumes</h3>${this.meterHtml("Scores exacts", radar.exact)}${this.meterHtml("Bons résultats", radar.outcomes)}${this.meterHtml("Rendement points", radar.yield)}${this.meterHtml("Anti-casserole", radar.survival)}<p class="radar-explain">Exacts = scores exacts / matchs · Résultats = bon sens du match · Rendement = points gagnés / maximum possible · Anti-casserole = matchs avec au moins 1 point.</p><h3 class="mini-title">Heures de vol</h3>${this.hourRadarHtml(this.officialPredictions())}</div>
       </div>
       <div class="identity-detail-grid">${this.rowDetailCard(stats.best, "Score officiel le plus rentable")}${this.rowDetailCard(stats.casseroleRows?.[0], "Casserole spectaculaire")}<article class="detail-match-card"><strong>Journée de grâce</strong><h4>${this.e(bestDay?.key || "—")} · ${this.e(bestDay?.points ?? "—")} pts</h4><p>${this.e(bestDay?.matches || 0)} match(s), ${this.e(bestDay?.exact || 0)} exact(s), ${this.e(bestDay?.zeros || 0)} zéro(s).</p></article><article class="detail-match-card"><strong>Journée du désespoir</strong><h4>${this.e(worstDay?.key || "—")} · ${this.e(worstDay?.zeros ?? "—")} zéro(s)</h4><p>${this.e(worstDay?.matches || 0)} match(s), ${this.e(worstDay?.points ?? 0)} point(s), une plume qui grince.</p></article></div>
     </div></section>`;
@@ -1046,10 +1344,12 @@ const BilanPDF = {
   pageRecords(stats) {
     const best = stats.best, worst = stats.worst;
     const exactStreak = this.streak(stats.rows, (row) => row.is_exact_score);
-    const goodStreak = this.streak(stats.rows, (row) => row.is_good_result);
+    const goodStreak = this.streak(stats.rows, (row) => row.is_good_result || row.is_exact_score);
     const zeroStreak = this.streak(stats.rows, (row) => this.n(row.points_total) === 0);
-    const playerMiniRecords = this.miniRecordPodiums().filter((item) => item.podium[0] && String(item.podium[0].id) === String(this.state.playerId));
-    return `<section class="bilan-page records"><div class="bilan-page-content"><div class="bilan-page-head"><div><h2>Records & casseroles</h2><p>Les moments que le hibou racontera au coin du perchoir, avec drapeaux et dossiers.</p></div><span class="page-number">05</span></div><div class="record-grid rich-record-grid"><article class="record-card with-icon"><img src="assets/records/record-points.png" alt=""><span class="value">${best ? this.e(best.points_total) : "—"}</span><strong>Meilleur match</strong><small>${best ? `${this.matchTitleHtml(best)} · ${this.matchMetaHtml(best)}` : "En attente"}</small></article><article class="record-card with-icon"><img src="assets/records/record-day.png" alt=""><span class="value">${stats.bestDay ? this.e(stats.bestDay.points) : "—"}</span><strong>Journée de grâce</strong><small>${stats.bestDay ? `${this.e(stats.bestDay.key)} · ${stats.bestDay.matches} match(s) · ${stats.bestDay.exact} exact(s)` : "En attente"}</small></article><article class="record-card with-icon"><img src="assets/records/record-exact-streak.png" alt=""><span class="value">${exactStreak}</span><strong>Série scores exacts</strong><small>Le pic de précision du tournoi.</small></article><article class="record-card with-icon"><img src="assets/records/record-results.png" alt=""><span class="value">${goodStreak}</span><strong>Série bons résultats</strong><small>Le mode pilote automatique.</small></article><article class="record-card with-icon"><img src="assets/records/record-zero-streak.png" alt=""><span class="value">${zeroStreak}</span><strong>Traversée du brouillard</strong><small>Le tunnel zéro, version plumes mouillées.</small></article><article class="record-card with-icon"><img src="assets/records/record-zero.png" alt=""><span class="value">${worst ? this.e(worst.points_total) : "—"}</span><strong>Casserole favorite</strong><small>${worst ? `${this.matchTitleHtml(worst)} · prono ${this.e(this.predText(worst))} · réel ${this.e(this.scoreText(worst))}` : "Aucune casserole officielle"}</small></article></div><div class="graph-card mini-record-player-card"><h3>Mini-records détenus</h3>${playerMiniRecords.length ? playerMiniRecords.map(({ record, podium }) => `<p><img src="${this.e(record.icon)}" alt=""> <strong>${this.e(record.title)}</strong> · ${this.e(this.formatRecordValue(podium[0].value, record))}</p>`).join("") : `<p class="muted">Aucun mini-record détenu actuellement. Le perchoir reste ouvert.</p>`}</div></div></section>`;
+    const playerMiniRecords = this.playerMiniRecords();
+    const ranks = this.rankMilestones();
+    const rankCard = (item, bestRank = true) => `<article class="record-card with-icon"><img src="${bestRank ? "assets/icons/owl-png/classements.png" : "assets/records/record-zero.png"}" alt=""><span class="value">${item ? `#${this.e(item.rank)}` : "—"}</span><strong>${bestRank ? "Meilleur classement" : "Pire classement"}</strong><small>${item ? `atteint après ${this.e(item.matchCount)} match(s) du tournoi` : "Historique indisponible"}</small></article>`;
+    return `<section class="bilan-page records"><div class="bilan-page-content"><div class="bilan-page-head"><div><h2>Records & casseroles</h2><p>Les moments que le hibou racontera au coin du perchoir, avec drapeaux et dossiers.</p></div><span class="page-number">05</span></div><div class="record-grid rich-record-grid"><article class="record-card with-icon"><img src="assets/records/record-points.png" alt=""><span class="value">${best ? this.e(best.points_total) : "—"}</span><strong>Meilleur match</strong><small>${best ? `${this.matchTitleHtml(best)} · ${this.matchMetaHtml(best)}` : "En attente"}</small></article><article class="record-card with-icon"><img src="assets/records/record-day.png" alt=""><span class="value">${stats.bestDay ? this.e(stats.bestDay.points) : "—"}</span><strong>Journée de grâce</strong><small>${stats.bestDay ? `${this.e(stats.bestDay.key)} · ${stats.bestDay.matches} match(s) · ${stats.bestDay.exact} exact(s)` : "En attente"}</small></article><article class="record-card with-icon"><img src="assets/records/record-exact-streak.png" alt=""><span class="value">${exactStreak}</span><strong>Série scores exacts</strong><small>Le pic de précision du tournoi.</small></article><article class="record-card with-icon"><img src="assets/records/record-results.png" alt=""><span class="value">${goodStreak}</span><strong>Série bons résultats</strong><small>Le mode pilote automatique.</small></article><article class="record-card with-icon"><img src="assets/records/record-zero-streak.png" alt=""><span class="value">${zeroStreak}</span><strong>Traversée du brouillard</strong><small>Le tunnel zéro, version plumes mouillées.</small></article><article class="record-card with-icon"><img src="assets/records/record-zero.png" alt=""><span class="value">${worst ? this.e(worst.points_total) : "—"}</span><strong>Casserole favorite</strong><small>${worst ? `${this.matchTitleHtml(worst)} · prono ${this.e(this.predText(worst))} · réel ${this.e(this.scoreText(worst))}` : "Aucune casserole officielle"}</small></article>${rankCard(ranks.best, true)}${rankCard(ranks.worst, false)}</div><div class="graph-card mini-record-player-card"><h3>Mini-records détenus</h3>${playerMiniRecords.length ? playerMiniRecords.map(({ record, value, detail }) => `<p><img src="${this.e(record.icon)}" alt=""> <span><strong>${this.e(record.title)}</strong> · ${this.e(this.formatRecordValue(value, record))}${detail ? `<small>${this.e(detail)}</small>` : `<small>Détenteur actuel du trophée.</small>`}</span></p>`).join("") : `<p class="muted">Aucun mini-record détenu actuellement. Le perchoir reste ouvert.</p>`}</div></div></section>`;
   },
 
   pageCompetitionPulse(stats) {
@@ -1086,28 +1386,45 @@ const BilanPDF = {
   },
 
   predictionHistoryPages(rows) {
-    const sorted = rows.slice().sort((a, b) => {
-      const phaseOrder = (row) => { const stage = row.stage || "group"; const order = { group: 1, round_of_32: 2, round_of_16: 3, quarter: 4, semi: 5, third_place: 6, final: 7 }; return (order[stage] || 99) * 100 + Number(row.pool_round || 0); };
-      return phaseOrder(a) - phaseOrder(b) || new Date(a.kickoff_at || 0) - new Date(b.kickoff_at || 0);
+    const stageOrder = { group: 1, round_of_32: 2, round_of_16: 3, quarter: 4, semi: 5, third_place: 6, final: 7 };
+    const sorted = rows.slice().sort((a, b) => (stageOrder[a.stage || "group"] || 99) - (stageOrder[b.stage || "group"] || 99) || Number(a.pool_round || 0) - Number(b.pool_round || 0) || new Date(a.kickoff_at || 0) - new Date(b.kickoff_at || 0));
+    const groups = new Map();
+    sorted.forEach((row) => {
+      const stage = row.stage || "group";
+      const key = stage === "group" ? `group-${row.pool_round || "?"}` : stage;
+      const label = stage === "group" ? `Phase de poules · journée ${row.pool_round || "?"}` : this.phaseKey(row);
+      if (!groups.has(key)) groups.set(key, { key, label, order: (stageOrder[stage] || 99) * 10 + Number(row.pool_round || 0), rows: [] });
+      groups.get(key).rows.push(row);
     });
-    const chunks = this.chunk(sorted, 9);
-    if (!chunks.length) return `<section class="bilan-page history"><div class="bilan-page-content"><div class="bilan-page-head"><div><h2>Historique des pronos</h2><p>Encore vierge.</p></div><span class="page-number">10</span></div><p class="muted">Aucun prono terminé à afficher.</p></div></section>`;
-    return chunks.map((chunk, index) => `<section class="bilan-page history"><div class="bilan-page-content"><div class="bilan-page-head"><div><h2>Historique des pronos</h2><p>Page ${index + 1}/${chunks.length} · capsules de matchs, 3 par ligne.</p></div><span class="page-number">H-${index + 1}</span></div><div class="history-capsule-grid">${chunk.map((row) => { const result = this.resultLabel(row); return `<article class="history-capsule ${result.cls}"><small>${this.e(this.phaseKey(row))} · ${this.e(H.formatDateTime?.(row.kickoff_at) || row.match_day || "")}</small><strong>${this.matchTitleHtml(row)}</strong><p>Prono <b>${this.e(this.predText(row))}</b> · Réel <b>${this.e(this.scoreText(row))}</b></p><span class="result-pill ${result.cls}">${this.e(result.text)} · ${this.e(row.points_total ?? 0)} pt(s)</span></article>`; }).join("")}</div></div></section>`).join("");
+    const phaseGroups = [...groups.values()].sort((a, b) => a.order - b.order);
+    if (!phaseGroups.length) return `<section class="bilan-page history"><div class="bilan-page-content"><div class="bilan-page-head"><div><h2>Historique des pronos</h2><p>Encore vierge.</p></div><span class="page-number">H-1</span></div><p class="muted">Aucun prono terminé à afficher.</p></div></section>`;
+
+    const pages = [];
+    phaseGroups.forEach((group) => {
+      this.chunk(group.rows, 24).forEach((chunk, chunkIndex) => {
+        const dense = chunk.length >= 13 ? "history-dense" : chunk.length >= 9 ? "history-medium" : "history-roomy";
+        const suffix = group.rows.length > 24 ? ` · suite ${chunkIndex + 1}` : "";
+        pages.push({ label: `${group.label}${suffix}`, rows: chunk, dense });
+      });
+    });
+    return pages.map((page, index) => `<section class="bilan-page history ${page.dense}"><div class="bilan-page-content"><div class="bilan-page-head"><div><h2>Historique des pronos</h2><p>${this.e(page.label)} · ${page.rows.length} match(s) sur cette feuille.</p></div><span class="page-number">H-${index + 1}</span></div><div class="history-capsule-grid">${page.rows.map((row) => { const result = this.resultLabel(row); return `<article class="history-capsule ${result.cls}"><small>${this.e(H.formatDateTime?.(row.kickoff_at) || row.match_day || "")}</small><strong>${this.matchTitleHtml(row)}</strong><p><span>Prono <b>${this.e(this.predText(row))}</b></span><span>Réel <b>${this.e(this.scoreText(row))}</b></span></p><span class="result-pill ${result.cls}">${this.e(result.text)} · ${this.e(row.points_total ?? 0)} pt(s)</span></article>`; }).join("")}</div></div></section>`).join("");
   },
 
-
   pageDiploma(player, avatarProfile, leaderboard, stats, title) {
+    const totalPlayers = this.competitionSnapshot().leaderboard.length || "—";
     return `<section class="bilan-page diploma"><div class="bilan-page-content">
       <div class="diploma-card">
         ${H.profileBadgeHtml(avatarProfile, "profile-badge leader")}
         <div class="diploma-kicker">Diplôme officiel du Nid</div>
         <h2>Décerné à<br>${this.e(player.pseudo || "Joueur")}</h2>
+        <div class="diploma-rank-seal"><span>Classement final</span><strong>#${this.e(leaderboard.rank || "—")}</strong><small>sur ${this.e(totalPlayers)} joueur(s)</small></div>
         <h3>${this.e(title)}</h3>
         <p>Pour avoir survécu à la Coupe du monde 2026 avec <strong>${this.e(leaderboard.total_points ?? stats.total)} points</strong>, <strong>${stats.exact} score(s) exact(s)</strong>, et une capacité remarquable à transformer les pronostics en grand spectacle de plumes.</p>
         <div class="signature-row"><div class="signature-line">Le Grand Hibou du Nid</div><div class="signature-line">Cachet officiel anti-casserole</div></div>
       </div>
     </div></section>`;
   }
+
 };
 
 window.addEventListener("DOMContentLoaded", () => {

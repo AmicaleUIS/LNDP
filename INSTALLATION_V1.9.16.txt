@@ -1,0 +1,31 @@
+LE NID DES PRONOS — INSTALLATION V1.9.16
+================================================
+
+1. Déployer tous les fichiers de cette archive en remplacement de la V1.9.15.
+
+2. Aucun nouveau script SQL n’est nécessaire.
+   La V1.9.16 utilise les vues et réglages déjà installés :
+   - v_winner_predictions
+   - v_second_winner_predictions
+   - v_mini_record_prediction_counts
+   - champion_bonus_initial_points
+   - champion_bonus_second_points
+
+3. Vider une fois le cache du navigateur ou recharger avec Ctrl+F5.
+   Le service worker créera automatiquement le cache :
+   le-nid-des-pronos-v1-9-16
+
+4. Dans Admin > Bilan PDF :
+   - « Ouvrir » génère le carnet du joueur sélectionné ;
+   - « Tous les joueurs · 1 PDF » prépare tous les carnets dans un seul document ;
+   - cliquer ensuite sur « Imprimer le lot / PDF » et choisir « Enregistrer au format PDF ».
+
+CONTRÔLES INTÉGRÉS
+-------------------
+- pagination Supabase au-delà de 1 000 pronostics ;
+- bonus champions lus depuis les réglages actuels ;
+- heures de saisie basées sur prediction_created_at / prediction_updated_at ;
+- mini-records identiques au site (12 trophées, détenteur unique) ;
+- historique regroupé par journée de poule et par phase ;
+- impression A4 portrait sans fond ni texte coupé ;
+- diplôme avec classement final visible.
