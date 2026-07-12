@@ -1,0 +1,13 @@
+LE NID DES PRONOS - CORRECTIF V1.9.16d
+
+Corrections :
+- fonds des pages 01, 02, 04, B-2, 05 et 09 affichés en entier, sans recadrage CSS ;
+- diplôme final rétabli en A4 paysage avec son fond bg-diplome.png ;
+- cache du service worker renouvelé pour charger immédiatement le nouveau CSS.
+
+Installation :
+1. Remplacer les fichiers du site par ceux de cette archive.
+2. Recharger une fois la page avec Ctrl + F5.
+3. Dans la fenêtre d'impression, conserver "Graphiques d'arrière-plan" activé.
+
+Aucun script SQL n'est nécessaire.

@@ -1,9 +1,9 @@
 // ============================================================
-// LE NID DES PRONOS — SERVICE WORKER V1.9.16
-// Cache public V1.9.16 : installation robuste + mise à jour fiable.
+// LE NID DES PRONOS — SERVICE WORKER V1.9.16d
+// Cache public V1.9.16d : installation robuste + mise à jour fiable.
 // ============================================================
 
-const CACHE_NAME = "le-nid-des-pronos-v1-9-16";
+const CACHE_NAME = "le-nid-des-pronos-v1-9-16d";
 
 // Le cœur de l’application doit impérativement être disponible hors ligne.
 const CORE_ASSETS = [
@@ -15,7 +15,7 @@ const CORE_ASSETS = [
   "./admin.html",
   "./bilan.html",
   "./css/style.css?v=1.9.16",
-  "./css/bilan.css?v=1.9.16",
+  "./css/bilan.css?v=1.9.16d",
   "./js/config.js?v=1.9.16",
   "./js/supabaseClient.js?v=1.9.16",
   "./js/auth.js?v=1.9.16",

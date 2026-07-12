@@ -1331,3 +1331,177 @@
     line-height: 1.1 !important;
   }
 }
+
+/* ============================================================
+   V1.9.16d - Fonds A4 sans recadrage + diplôme A4 paysage
+   ============================================================ */
+
+/*
+ * Les images de fond portrait font toutes 1055 x 1491 px, soit le ratio A4.
+ * On les étire donc exactement sur la feuille au lieu d'utiliser `cover`,
+ * qui rogne légèrement les bords dans l'aperçu et selon le moteur PDF.
+ */
+.bilan-page.cover,
+.bilan-page.stats,
+.bilan-page.badges,
+.bilan-page.records,
+.bilan-page.graphs {
+  background-color: #07111f;
+  background-position: 0 0, 0 0;
+  background-repeat: no-repeat, no-repeat;
+  background-size: 100% 100%, 100% 100%;
+  background-origin: border-box;
+  background-clip: border-box;
+}
+
+.bilan-page.cover {
+  background-image:
+    linear-gradient(rgba(2, 6, 23, .18), rgba(2, 6, 23, .20)),
+    url("../assets/reports/bg-cover.png");
+}
+
+.bilan-page.stats {
+  background-image:
+    linear-gradient(rgba(2, 6, 23, .20), rgba(2, 6, 23, .24)),
+    url("../assets/reports/bg-stats.png");
+}
+
+.bilan-page.badges {
+  background-image:
+    linear-gradient(rgba(2, 6, 23, .20), rgba(2, 6, 23, .24)),
+    url("../assets/reports/bg-badges.png");
+}
+
+.bilan-page.records {
+  background-image:
+    linear-gradient(rgba(2, 6, 23, .20), rgba(2, 6, 23, .24)),
+    url("../assets/reports/bg-records.png");
+}
+
+.bilan-page.graphs {
+  background-image:
+    linear-gradient(rgba(2, 6, 23, .20), rgba(2, 6, 23, .24)),
+    url("../assets/reports/bg-graphs.png");
+}
+
+/* Aperçu écran du diplôme au vrai format paysage. */
+.bilan-page.diploma {
+  width: min(1120px, 100%);
+  min-height: 0;
+  aspect-ratio: 1491 / 1055;
+  background-color: #07111f;
+  background-image:
+    linear-gradient(rgba(2, 6, 23, .12), rgba(2, 6, 23, .16)),
+    url("../assets/reports/bg-diplome.png");
+  background-position: 0 0, 0 0;
+  background-repeat: no-repeat, no-repeat;
+  background-size: 100% 100%, 100% 100%;
+  background-origin: border-box;
+  background-clip: border-box;
+}
+
+@media print {
+  /* Pages ordinaires : A4 portrait bord à bord. */
+  @page {
+    size: A4 portrait;
+    margin: 0;
+  }
+
+  /* Le diplôme est la seule page A4 paysage. */
+  @page diploma {
+    size: A4 landscape;
+    margin: 0;
+  }
+
+  .bilan-page.cover,
+  .bilan-page.stats,
+  .bilan-page.badges,
+  .bilan-page.records,
+  .bilan-page.graphs {
+    width: 210mm !important;
+    height: 297mm !important;
+    min-height: 297mm !important;
+    max-height: 297mm !important;
+    background-position: 0 0, 0 0 !important;
+    background-repeat: no-repeat, no-repeat !important;
+    background-size: 210mm 297mm, 210mm 297mm !important;
+    background-origin: border-box !important;
+    background-clip: border-box !important;
+  }
+
+  .bilan-page.diploma {
+    page: diploma !important;
+    width: 297mm !important;
+    height: 210mm !important;
+    min-height: 210mm !important;
+    max-height: 210mm !important;
+    aspect-ratio: auto !important;
+    margin: 0 !important;
+    padding: 10mm 14mm !important;
+    overflow: hidden !important;
+    background-color: #07111f !important;
+    background-image:
+      linear-gradient(rgba(2, 6, 23, .12), rgba(2, 6, 23, .16)),
+      url("../assets/reports/bg-diplome.png") !important;
+    background-position: 0 0, 0 0 !important;
+    background-repeat: no-repeat, no-repeat !important;
+    background-size: 297mm 210mm, 297mm 210mm !important;
+    background-origin: border-box !important;
+    background-clip: border-box !important;
+    break-after: auto !important;
+    page-break-after: auto !important;
+  }
+
+  .bilan-page.diploma .bilan-page-content {
+    width: 100% !important;
+    height: 190mm !important;
+    min-height: 190mm !important;
+    display: grid !important;
+    place-items: center !important;
+  }
+
+  .diploma-card {
+    width: 245mm !important;
+    max-width: 245mm !important;
+    padding: 9mm 14mm !important;
+    border-radius: 7mm !important;
+    background: rgba(2, 6, 23, .60) !important;
+  }
+
+  .diploma-card .profile-badge {
+    width: 24mm !important;
+    height: 24mm !important;
+    margin-bottom: 2mm !important;
+  }
+
+  .diploma-card h2 {
+    margin: 1.5mm 0 !important;
+    font-size: 30pt !important;
+    line-height: .98 !important;
+  }
+
+  .diploma-card h3 {
+    margin: 2mm 0 2.5mm !important;
+    font-size: 18pt !important;
+  }
+
+  .diploma-card p {
+    max-width: 205mm !important;
+    margin: 2mm auto !important;
+    font-size: 10.5pt !important;
+    line-height: 1.38 !important;
+  }
+
+  .diploma-rank-seal {
+    margin: 1mm auto !important;
+    padding: 2mm 8mm !important;
+  }
+
+  .diploma-rank-seal strong {
+    font-size: 22pt !important;
+  }
+
+  .signature-row {
+    margin-top: 6mm !important;
+  }
+}
