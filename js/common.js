@@ -683,6 +683,17 @@ function resultIcon(row) {
   return "";
 }
 
+function registerNidServiceWorker() {
+  if (!("serviceWorker" in navigator)) return;
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("service-worker.js?v=1.9.15").catch((error) => {
+      console.warn("Service worker indisponible", error);
+    });
+  }, { once: true });
+}
+
+registerNidServiceWorker();
+
 window.Helpers = {
   $,
   $$,

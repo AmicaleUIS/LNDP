@@ -1,0 +1,30 @@
+LE NID DES PRONOS — INSTALLATION V1.9.15
+=========================================
+
+1. Déployer l’ensemble des fichiers de cette archive en remplacement de la V1.9.14.
+
+2. Dans Supabase > SQL Editor, exécuter une seule fois :
+   patch_v1_9_15_finale_points_doubles.sql
+
+3. Recharger le site. Le nouveau service worker utilise le cache :
+   le-nid-des-pronos-v1-9-15
+   L’ancien cache sera supprimé automatiquement.
+
+MODIFICATIONS
+-------------
+- Grande finale uniquement : tous les points du match sont multipliés par 2.
+- Petite finale : barème inchangé.
+- L’affichage live applique également le multiplicateur x2.
+- Lorsqu’un champion choisi est éliminé, son joueur reçoit un popup humoristique
+  indiquant les points potentiellement perdus pour ce choix.
+- Si les deux choix désignent la même équipe, les deux bonus sont additionnés dans
+  un seul message.
+- Le message personnel reste ensuite visible dans « Messages du Hibou ».
+- Aucun changement n’a été apporté au bilan PDF dans cette version.
+
+TESTS RAPIDES CONSEILLÉS
+------------------------
+- Finale, score exact + bon qualifié : 14 points au lieu de 7.
+- Petite finale, score exact + bon qualifié : toujours 7 points.
+- Champion initial éliminé : popup avec le bonus initial configuré.
+- Deuxième champion éliminé : popup avec le bonus du deuxième choix.

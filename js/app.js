@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — APP PRINCIPALE V1.9.14
+// LE NID DES PRONOS — APP PRINCIPALE V1.9.15
 // ============================================================
 
 const H = window.Helpers;
@@ -23,6 +23,7 @@ const App = {
     blockedUserIds: new Set(),
     appSettings: {},
     owlMessages: [],
+    championEliminationMessages: [],
     owlPollVotes: {},
     owlPollResults: {},
     owlPollVoteDetails: {},
@@ -144,7 +145,7 @@ const App = {
     const mustCompleteProfile = !this.profileSetupComplete();
     this.syncAchievementNotifications({ silent: !this.hasAchievementNotificationStore() });
     await this.loadView((mustChangePassword || mustCompleteProfile) ? "profile" : requestedView);
-    this.maybeShowLoginOwlMessage();
+    if (!this.maybeShowChampionEliminationMessage()) this.maybeShowLoginOwlMessage();
     await this.refreshTeamChatUnreadIndicator();
     if (mustChangePassword) {
       H.toast("Mot de passe temporaire : choisis ton nouveau mot de passe.", "info");
@@ -482,7 +483,7 @@ const App = {
           <div>
             <p class="eyebrow">Crédits cachés</p>
             <h2 id="creditsTitle">Le Nid des Pronos</h2>
-            <p class="muted">Version publique <strong>1.9.14</strong> · Teams du Nid réorganisées : onglets clairs, MP par destinataire et messages teintés par team.</p>
+            <p class="muted">Version publique <strong>1.9.15</strong> · finale à points doublés, champions éliminés chambrés par le Hibou et cache PWA fiabilisé.</p>
           </div>
         </div>
         <div class="credits-grid">
@@ -499,12 +500,12 @@ const App = {
             <p><strong>1.0.5</strong> — dashboard mobile/desktop stabilisé, sans chevauchement des cartes.</p>
           </section>
           <section>
-            <h3>Évolutions V1.9.14</h3>
+            <h3>Évolutions V1.9.15</h3>
             <ul class="changelog-list">
-              <li>Le super admin peut désactiver ou réactiver l’affichage du module préparation.</li>
-              <li>Quand la préparation est désactivée, les matchs test disparaissent des matchs/pronos, classements par phase et règles.</li>
-              <li>Les 2 badges de préparation restent visibles dans les exploits.</li>
-              <li>La barre admin desktop affiche aussi les icônes Retour, Rafraîchir et Déconnexion.</li>
+              <li>Les points du match de la grande finale sont doublés, sans toucher à la petite finale.</li>
+              <li>Chaque champion éliminé déclenche un message humoristique personnalisé avec les points potentiellement perdus.</li>
+              <li>Ces messages personnels restent consultables dans le grimoire des Messages du Hibou.</li>
+              <li>Le service worker utilise un nouveau cache, une installation plus robuste et s’enregistre aussi lors d’un accès direct à l’application.</li>
             </ul>
           </section>
           <section>
@@ -631,6 +632,7 @@ const App = {
           <article><strong>Bon résultat</strong><span>Tu trouves le bon sens du match : victoire, nul ou défaite, même si le score n’est pas exact.</span><b>+3 pts</b></article>
           <article><strong>Bon écart</strong><span>Tu ne trouves pas forcément le score, mais tu trouves le bon écart de buts. Exemple : tu pronostiques 2-0 et le match finit 3-1.</span><b>+1 pt</b></article>
           <article><strong>Phase finale</strong><span>Dans un match couperet, l’important est aussi de deviner quel oiseau reste perché. Si tu choisis la bonne équipe qualifiée, même après prolongation ou tirs au but, tu gagnes le bonus.</span><b>+2 pts</b></article>
+          <article><strong>Grande finale</strong><span>Le barème complet du match est multiplié par deux : score exact, résultat, écart et bon qualifié. La petite finale garde le barème normal.</span><b>Points ×2</b></article>
           <article><strong>Champion du monde</strong><span>Ton grand favori, choisi avant le début de la Coupe du monde, soulève le trophée à la fin.</span><b>+${this.championFirstBonusPoints()} pts</b></article>
           <article><strong>2e choix champion</strong><span>Avant la phase finale, tu peux remettre une pièce sur le futur champion. Bonus plus petit, mais toujours piquant.</span><b>+${this.championSecondBonusPoints()} pts</b></article>
           ${preparationEnabled ? `<article><strong>Matchs test</strong><span>France–Côte d’Ivoire et France–Irlande du Nord servent uniquement à tester le nid avant le vrai envol.</span><b>0 pt classement</b></article>` : ""}
@@ -675,6 +677,7 @@ const App = {
       this.loadPlayerScoreRows(),
       this.loadMyFamilyInvites()
     ]);
+    this.refreshChampionEliminationMessages();
     this.renderShell();
   },
 
@@ -1015,12 +1018,207 @@ const App = {
 
   maybeShowLoginOwlMessage() {
     const message = this.activeLoginOwlMessage();
-    if (!message) return;
+    if (!message) return false;
     const key = this.loginOwlMessageDismissKey(message);
     try {
-      if (localStorage.getItem(key) === "dismissed") return;
+      if (localStorage.getItem(key) === "dismissed") return false;
     } catch (error) {}
     window.setTimeout(() => this.openLoginOwlMessageModal(message, key), 180);
+    return true;
+  },
+
+  championKnockoutEliminationMatch(teamId) {
+    if (!teamId) return null;
+    const competitionId = this.state.activeCompetition?.id || null;
+    return this.competitionMatches()
+      .filter((match) => !competitionId || String(match.competition_id || "") === String(competitionId))
+      .filter((match) => match.stage !== "group" && match.status === "finished")
+      .filter((match) => String(match.home_team_id || "") === String(teamId) || String(match.away_team_id || "") === String(teamId))
+      .filter((match) => {
+        const winnerId = this.effectiveWinnerTeamIdFromScores(match);
+        return winnerId && String(winnerId) !== String(teamId);
+      })
+      .sort((a, b) => new Date(a.kickoff_at || a.updated_at || 0) - new Date(b.kickoff_at || b.updated_at || 0))[0] || null;
+  },
+
+  championEliminationInfo(pick = {}) {
+    const teamId = pick?.predicted_team_id;
+    if (!teamId) return null;
+
+    const knockoutMatch = this.championKnockoutEliminationMatch(teamId);
+    if (knockoutMatch) {
+      return {
+        sourceId: knockoutMatch.id || knockoutMatch.match_number || knockoutMatch.kickoff_at || "knockout",
+        eliminatedAt: this.matchResultDate(knockoutMatch) || new Date(knockoutMatch.kickoff_at || Date.now()),
+        match: knockoutMatch,
+        reason: "knockout"
+      };
+    }
+
+    const groupExitDate = this.championGroupExitDate(pick);
+    if (groupExitDate) {
+      return {
+        sourceId: `groups-${this.state.activeCompetition?.id || "active"}`,
+        eliminatedAt: groupExitDate,
+        match: null,
+        reason: "groups"
+      };
+    }
+
+    return null;
+  },
+
+  stillAliveChampionTeams() {
+    const competitionId = this.state.activeCompetition?.id || null;
+    const activeMatches = this.competitionMatches().filter((match) => !competitionId || String(match.competition_id || "") === String(competitionId));
+    const groupMatches = activeMatches.filter((match) => match.stage === "group" && !["cancelled", "postponed"].includes(match.status));
+    const groupsFinished = Boolean(groupMatches.length) && groupMatches.every((match) => match.status === "finished");
+    const qualifiedStatuses = new Set(["qualified", "qualified_best_third"]);
+    let aliveIds = new Set(
+      groupsFinished && this.state.groupStandings?.length
+        ? this.state.groupStandings.filter((row) => qualifiedStatuses.has(row.qualification_status)).map((row) => String(row.team_id))
+        : this.championCandidateTeams().map((team) => String(team.id))
+    );
+
+    activeMatches
+      .filter((match) => match.stage !== "group" && match.status === "finished")
+      .forEach((match) => {
+        const winnerId = this.effectiveWinnerTeamIdFromScores(match);
+        if (!winnerId) return;
+        [match.home_team_id, match.away_team_id]
+          .filter(Boolean)
+          .filter((teamId) => String(teamId) !== String(winnerId))
+          .forEach((teamId) => aliveIds.delete(String(teamId)));
+      });
+
+    const final = activeMatches.find((match) => match.stage === "final" && match.status === "finished")
+      || activeMatches.find((match) => match.stage === "final")
+      || null;
+    if (final?.status === "finished" && final?.winner_team_id) aliveIds = new Set([String(final.winner_team_id)]);
+
+    return this.state.footballTeams
+      .filter((team) => aliveIds.has(String(team.id)))
+      .sort((a, b) => String(a.name || "").localeCompare(String(b.name || ""), "fr"));
+  },
+
+  stableChampionSuggestion(excludedTeamId, signature = "") {
+    const candidates = this.stillAliveChampionTeams().filter((team) => String(team.id) !== String(excludedTeamId));
+    if (!candidates.length) return null;
+    let hash = 0;
+    for (const char of String(signature || excludedTeamId || "hibou")) hash = ((hash * 31) + char.charCodeAt(0)) | 0;
+    return candidates[Math.abs(hash) % candidates.length] || candidates[0];
+  },
+
+  championCountryLabel(name = "") {
+    const clean = String(name || "").trim();
+    if (!clean) return "cette équipe";
+    if (/^(états-unis|pays-bas|philippines|émirats arabes unis)$/i.test(clean)) return `les ${clean}`;
+    if (/^[aeiouyàâäéèêëîïôöùûüÿœ]/i.test(clean)) return `l’${clean}`;
+    const masculineEndingE = /^(mexique|mozambique|belize|cambodge|zimbabwe)$/i.test(clean);
+    const feminine = !masculineEndingE && (/[eE]$/.test(clean) || /^(côte|république|corée|guinée)/i.test(clean));
+    return `${feminine ? "la" : "le"} ${clean}`;
+  },
+
+  championEliminationHumour(teamName, suggestionName, signature = "") {
+    const teamLabel = this.championCountryLabel(teamName);
+    const suggestionLabel = suggestionName ? this.championCountryLabel(suggestionName) : "";
+    const endings = suggestionName ? [
+      `Tu aurais dû choisir ${suggestionLabel}… Facile à dire après le coup de sifflet, évidemment.`,
+      `Le Hibou conseille maintenant ${suggestionLabel}. Il avait juste oublié de le dire avant.`,
+      `${suggestionLabel} semblait pourtant être le choix évident… surtout depuis que ${teamLabel} est éliminé.`,
+      `Le Hibou avait écrit « ${suggestionName} » sur son carnet. Bien sûr, il ne le montre qu’après l’élimination.`
+    ] : [
+      "Le Hibou avait un meilleur choix en tête. Il refuse toutefois de produire la moindre preuve.",
+      "Le service après-vente des champions est malheureusement fermé jusqu’à la prochaine Coupe.",
+      "Le Hibou compatit. Enfin… entre deux petits ricanements."
+    ];
+    let hash = 0;
+    for (const char of String(signature || teamName || "hibou")) hash = ((hash * 33) + char.charCodeAt(0)) | 0;
+    return endings[Math.abs(hash) % endings.length];
+  },
+
+  refreshChampionEliminationMessages() {
+    const picks = [
+      {
+        key: "initial",
+        label: "ton champion initial",
+        points: this.championFirstBonusPoints(),
+        pick: this.state.winnerPrediction
+      },
+      {
+        key: "second",
+        label: "ton 2e champion",
+        points: this.championSecondBonusPoints(),
+        pick: this.state.secondWinnerPrediction
+      }
+    ].filter((entry) => entry.pick?.predicted_team_id);
+
+    const byTeam = new Map();
+    picks.forEach((entry) => {
+      const teamId = String(entry.pick.predicted_team_id);
+      if (!byTeam.has(teamId)) byTeam.set(teamId, []);
+      byTeam.get(teamId).push(entry);
+    });
+
+    const messages = [];
+    byTeam.forEach((entries, teamId) => {
+      const info = this.championEliminationInfo(entries[0].pick);
+      if (!info) return;
+      const team = this.state.footballTeams.find((item) => String(item.id) === teamId);
+      const teamName = team?.name || entries[0].pick.predicted_team_name || "Ton champion";
+      const teamLabel = this.championCountryLabel(teamName);
+      const totalLost = entries.reduce((sum, entry) => sum + Number(entry.points || 0), 0);
+      const pickKeys = entries.map((entry) => entry.key).sort().join("+");
+      const signature = `${this.state.activeCompetition?.id || "competition"}:${pickKeys}:${teamId}:${info.sourceId}`;
+      const suggestion = this.stableChampionSuggestion(teamId, signature);
+      const pointsText = totalLost === 1 ? "1 point potentiel vient de s’envoler" : `${totalLost} points potentiels viennent de s’envoler`;
+      const choiceText = entries.length > 1
+        ? `Tu avais misé deux fois sur ${teamLabel} — champion initial et 2e champion. Double mise, même sortie de piste : ${pointsText}`
+        : `${entries[0].label.charAt(0).toUpperCase()}${entries[0].label.slice(1)}, ${teamLabel}, vient de quitter la compétition. Résultat : ${pointsText}`;
+      const breakdown = entries.length > 1
+        ? ` (${entries.map((entry) => `${entry.points} pour ${entry.key === "initial" ? "le premier choix" : "le deuxième"}`).join(" + ")})`
+        : "";
+      const humour = this.championEliminationHumour(teamName, suggestion?.name || "", signature);
+      const eliminatedAt = info.eliminatedAt instanceof Date ? info.eliminatedAt : new Date(info.eliminatedAt || Date.now());
+
+      messages.push({
+        id: `champion-eliminated:${signature}`,
+        title: `Aïe… ${teamLabel} tombe du perchoir`,
+        body: `${choiceText}${breakdown}.
+
+${humour} 🦉`,
+        importance: "warning",
+        enabled: true,
+        show_in_history: true,
+        start_at: eliminatedAt.toISOString(),
+        created_at: eliminatedAt.toISOString(),
+        updated_at: eliminatedAt.toISOString(),
+        personal_champion_message: true
+      });
+    });
+
+    this.state.championEliminationMessages = messages.sort((a, b) => new Date(b.start_at || 0) - new Date(a.start_at || 0));
+    return this.state.championEliminationMessages;
+  },
+
+  maybeShowChampionEliminationMessage() {
+    this.refreshChampionEliminationMessages();
+    const pending = (this.state.championEliminationMessages || [])
+      .slice()
+      .sort((a, b) => new Date(a.start_at || 0) - new Date(b.start_at || 0))
+      .find((message) => {
+        const key = this.loginOwlMessageDismissKey(message);
+        try { return localStorage.getItem(key) !== "dismissed"; } catch (error) { return true; }
+      });
+
+    if (!pending) return false;
+    const key = this.loginOwlMessageDismissKey(pending);
+    window.setTimeout(() => this.openLoginOwlMessageModal(pending, key, {
+      onClose: () => {
+        if (!this.maybeShowChampionEliminationMessage()) this.maybeShowLoginOwlMessage();
+      }
+    }), 120);
+    return true;
   },
 
   owlPollOpen(message = {}) {
@@ -1189,8 +1387,8 @@ const App = {
     });
   },
 
-  openLoginOwlMessageModal(message, storageKey) {
-    if (document.querySelector(".login-owl-message-modal")) return;
+  openLoginOwlMessageModal(message, storageKey, options = {}) {
+    if (document.querySelector(".login-owl-message-modal")) return false;
     const importance = message.importance || "info";
     const title = message.title || "Message du Hibou masqué";
     const body = message.body || message.message || "";
@@ -1221,10 +1419,12 @@ const App = {
         try { localStorage.setItem(storageKey, "dismissed"); } catch (error) {}
       }
       modal.remove();
+      if (typeof options.onClose === "function") window.setTimeout(() => options.onClose(), 30);
     };
     H.$("#closeLoginOwlMessageBtn", modal)?.addEventListener("click", close);
     H.$(".modal-close", modal)?.addEventListener("click", close);
     modal.addEventListener("click", (event) => { if (event.target === modal) close(); });
+    return true;
   },
 
 
@@ -1233,6 +1433,7 @@ const App = {
     H.$("#owlMessagesHistoryModal")?.remove();
     const messages = [
       ...this.rankSentinelHistoryMessages(),
+      ...(this.state.championEliminationMessages || []),
       ...(this.state.owlMessages || [])
     ]
       .slice()
@@ -1892,6 +2093,12 @@ const App = {
     return match && match.home_score !== null && match.home_score !== undefined && match.away_score !== null && match.away_score !== undefined;
   },
 
+  isMainFinalMatch(match = {}) {
+    const stage = String(match?.stage || "").toLowerCase();
+    const number = Number(match?.match_number || match?._finalBracketNumber || 0);
+    return stage === "final" || (number === 104 && stage !== "third_place");
+  },
+
   effectiveWinnerTeamIdFromScores(match = {}) {
     if (!match || !this.hasLiveScore(match)) return match?.winner_team_id || null;
     const home = Number(match.home_score);
@@ -1970,6 +2177,7 @@ const App = {
     else if (isGoodResult) total += 3;
     if (!isExactScore && isGoodGoalDiff) total += 1;
     if (isGoodQualified) total += 2;
+    if (this.isMainFinalMatch(match)) total *= 2;
 
     return {
       ...prediction,
@@ -4037,6 +4245,7 @@ const App = {
             <span class="pill ${match.status}">${H.statusLabel(match.status)}</span>
             ${match.is_test_match ? `<span class="pill warning test-match-pill">MATCH TEST</span>` : ""}
             ${match.stage !== "group" ? `<span class="pill neutral">${H.stageLabel(match.stage)}</span>` : ""}
+            ${this.isMainFinalMatch(match) ? `<span class="pill warning">POINTS ×2</span>` : ""}
           </div>
           <span class="match-time">${H.formatDateTime(match.kickoff_at)}</span>
         </div>
@@ -6454,7 +6663,7 @@ const App = {
     const activeColumn = typeof view === "boolean" ? Boolean(view) : Boolean(view?.activeColumn);
     const expanded = typeof view === "boolean" ? false : Boolean(view?.expanded);
     const match = this.finalBracketMatchByNumber(matchMap, number);
-    const title = Number(number) === 103 ? "Petite finale" : Number(number) === 104 ? "Finale" : `${config.shortLabel}`;
+    const title = Number(number) === 103 ? "Petite finale" : Number(number) === 104 ? "Finale · points ×2" : `${config.shortLabel}`;
     if (!match) return this.finalFocusPlaceholderHtml(title, { activeColumn, expanded, number });
 
     const isScored = match.status === "finished" || match.status === "live";
@@ -6697,7 +6906,8 @@ const App = {
   finalBracketMatchHtml(match, extraClass = "", customTitle = "") {
     const isScored = match.status === "finished" || match.status === "live";
     const score = isScored ? H.scoreText(match.home_score, match.away_score) : "vs";
-    const title = customTitle || H.stageLabel(match.stage);
+    const baseTitle = customTitle || H.stageLabel(match.stage);
+    const title = this.isMainFinalMatch(match) && !/points\s*×?\s*2/i.test(baseTitle) ? `${baseTitle} · points ×2` : baseTitle;
     const date = H.formatDateTime(match.kickoff_at);
     const location = [match.city, match.venue].filter(Boolean).join(" · ");
     const bracketNumber = H.officialBracketMatchNumber?.(match);
@@ -7055,7 +7265,7 @@ const App = {
         ...this.state.winnerPrediction,
         predicted_team_name: predictedTeam?.name || this.state.winnerPrediction.predicted_team_name,
         competition_id: this.state.winnerPrediction.competition_id,
-        points_total: final?.status === "finished" && final?.winner_team_id === this.state.winnerPrediction.predicted_team_id ? 100 : 0
+        points_total: final?.status === "finished" && final?.winner_team_id === this.state.winnerPrediction.predicted_team_id ? this.championFirstBonusPoints() : 0
       };
     }
 
@@ -11462,7 +11672,7 @@ const App = {
           </div>
           <div class="profile-account-actions">
             <button class="ghost-btn" id="profileInstallAppBtn" type="button">Installer l’app</button>
-            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.9.14</button>
+            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.9.15</button>
             <button class="danger-btn" id="profileLogoutBtn" type="button">Déconnexion</button>
           </div>
         </div>
@@ -11868,10 +12078,12 @@ const App = {
       this.loadMyPredictions(),
       this.loadVisiblePredictions(),
       this.loadWinnerPrediction(),
+      this.loadSecondWinnerPrediction(),
       this.loadPlayerScoreRows(),
       this.loadOwlMessages()
     ]);
 
+    this.refreshChampionEliminationMessages();
     this.syncAchievementNotifications();
 
     if (["home", "matches", "worldcup", "mypredictions", "leaderboard", "teams", "achievements", "profile"].includes(this.state.currentView)) {
@@ -11882,6 +12094,7 @@ const App = {
 
     if (reason === "matches") {
       H.toast("Scores / matchs mis à jour", "info");
+      this.maybeShowChampionEliminationMessage();
     }
   },
 
