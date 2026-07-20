@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — APP PRINCIPALE V1.9.16
+// LE NID DES PRONOS — APP PRINCIPALE V1.9.17
 // ============================================================
 
 const H = window.Helpers;
@@ -483,7 +483,7 @@ const App = {
           <div>
             <p class="eyebrow">Crédits cachés</p>
             <h2 id="creditsTitle">Le Nid des Pronos</h2>
-            <p class="muted">Version publique <strong>1.9.16</strong> · bilan PDF fiabilisé, historique compact par phase et export groupé des carnets.</p>
+            <p class="muted">Version publique <strong>1.9.17</strong> · carnets finaux accessibles aux joueurs, classements complets et impression collector stabilisée.</p>
           </div>
         </div>
         <div class="credits-grid">
@@ -500,7 +500,7 @@ const App = {
             <p><strong>1.0.5</strong> — dashboard mobile/desktop stabilisé, sans chevauchement des cartes.</p>
           </section>
           <section>
-            <h3>Évolutions V1.9.16</h3>
+            <h3>Évolutions V1.9.17</h3>
             <ul class="changelog-list">
               <li>Les points du match de la grande finale sont doublés, sans toucher à la petite finale.</li>
               <li>Chaque champion éliminé déclenche un message humoristique personnalisé avec les points potentiellement perdus.</li>
@@ -2567,6 +2567,8 @@ ${humour} 🦉`,
     const myFamilyRank = familyRows.find((row) => String(row.user_id || row.id) === String(this.state.session.user.id));
     const myFamilyRankTieCount = myFamilyRank ? this.tieCountForRank(familyRows, myFamilyRank.rank) : 0;
     const familyTeamRows = this.canSeeFamily() ? this.familyTeamRows(null, "average") : [];
+    const officialMatches = this.displayMatches().filter((match) => !match.is_test_match && !this.isLiveDemoMatch(match));
+    const competitionFinished = officialMatches.length > 0 && officialMatches.every((match) => match.status === "finished");
 
     root.innerHTML = `
       <section class="home-dashboard-screen" aria-label="Tableau de bord accueil">
@@ -2598,6 +2600,18 @@ ${humour} 🦉`,
             <button class="primary-btn" type="button" data-action="go-worldcup-finals">Voir la phase finale</button>
           </aside>
         </section>
+
+        ${competitionFinished ? `
+          <section class="card home-final-pdf-card" aria-label="Carnet collector final">
+            <div class="home-final-pdf-art">${H.icon("bilan")}</div>
+            <div>
+              <p class="eyebrow">La compétition est terminée</p>
+              <h3>Ton carnet collector est prêt 🏆</h3>
+              <p>Classement final, champions, records, casseroles, historique complet et diplôme : le Hibou a relié toutes tes plumes dans un seul PDF.</p>
+            </div>
+            <button class="primary-btn" type="button" data-action="open-final-pdf">Récupérer mon PDF</button>
+          </section>
+        ` : ""}
 
         <section class="home-dashboard-grid">
           <section class="home-dashboard-left" aria-label="Match et mini-records">
@@ -2650,6 +2664,10 @@ ${humour} 🦉`,
       </section>
     `;
 
+    H.$('[data-action="open-final-pdf"]', root)?.addEventListener("click", () => {
+      const playerId = encodeURIComponent(this.state.session.user.id);
+      window.open(`bilan.html?player=${playerId}`, "_blank", "noopener");
+    });
     H.$("#rulesHomeBtn")?.addEventListener("click", () => this.openRulesModal());
     H.$("#owlMessagesHomeBtn")?.addEventListener("click", async () => {
       await this.loadOwlMessages();
@@ -11673,7 +11691,7 @@ ${humour} 🦉`,
           </div>
           <div class="profile-account-actions">
             <button class="ghost-btn" id="profileInstallAppBtn" type="button">Installer l’app</button>
-            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.9.16</button>
+            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.9.17</button>
             <button class="danger-btn" id="profileLogoutBtn" type="button">Déconnexion</button>
           </div>
         </div>

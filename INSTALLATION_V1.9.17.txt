@@ -1,0 +1,18 @@
+LE NID DES PRONOS — INSTALLATION V1.9.17
+
+1. Remplacer les fichiers du site par ceux de cette archive.
+2. Dans Supabase > SQL Editor, exécuter une fois : patch_v1_9_17_bilan_pdf_joueur.sql
+3. Vider le cache avec Ctrl + F5 après déploiement.
+4. Pour publier le message final, copier le contenu de MESSAGE_HIBOU_FIN_COMPETITION.txt dans l’administration > Messages.
+
+Principales corrections :
+- PDF personnel accessible depuis l’accueil pour chaque joueur.
+- Chargement public des données finales nécessaires au carnet.
+- Bonus champions recalculés avec les réglages actuels et inclus dans les totaux/rangs.
+- Classements complets officiels et Famille avec rang/points/moyenne par phase.
+- Petite finale et finale regroupées sur la même feuille, après les demi-finales.
+- Mur des exploits paginé sans cartes coupées.
+- Capsules historiques et casseroles compactées et stabilisées à l’impression.
+- Records enrichis avec le temps passé en tête du classement.
+- Images chargées en mode eager avant impression (avatars et drapeaux).
+- Diplôme paysage reconstruit pour éviter les coupures et le fond tronqué.

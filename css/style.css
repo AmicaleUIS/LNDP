@@ -23291,3 +23291,11 @@ body[data-current-view] {
     display: none !important;
   }
 }
+
+
+/* V1.9.17 - Carte PDF final sur l'accueil */
+.home-final-pdf-card { display:grid; grid-template-columns:auto minmax(0,1fr) auto; gap:18px; align-items:center; border-color:rgba(250,204,21,.42); background:linear-gradient(135deg,rgba(250,204,21,.14),rgba(15,23,42,.94)); }
+.home-final-pdf-card h3 { margin:3px 0 7px; }
+.home-final-pdf-card p { margin:0; }
+.home-final-pdf-card .home-final-pdf-art .owl-icon { width:58px; height:58px; }
+@media (max-width:760px){.home-final-pdf-card{grid-template-columns:auto minmax(0,1fr)}.home-final-pdf-card>.primary-btn{grid-column:1/-1;width:100%}}

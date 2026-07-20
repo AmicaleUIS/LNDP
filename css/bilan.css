@@ -1,6 +1,6 @@
 
 /* ============================================================
-   LE NID DES PRONOS — BILAN PDF V1.9.16
+   LE NID DES PRONOS — BILAN PDF V1.9.17
    Aperçu temps réel + impression PDF
    ============================================================ */
 
@@ -1504,4 +1504,272 @@
   .signature-row {
     margin-top: 6mm !important;
   }
+}
+
+
+/* ============================================================
+   V1.9.17 - Collector final : chargement, pagination et paysages
+   ============================================================ */
+
+.bilan-page.ranking-sheet {
+  width: min(1120px, 100%);
+  min-height: 0;
+  aspect-ratio: 1491 / 1055;
+  background-color: #07111f;
+  background-image: linear-gradient(rgba(2,6,23,.18), rgba(2,6,23,.24)), url("../assets/reports/bg-graphs.png");
+  background-size: 100% 100%, 100% 100%;
+  background-position: 0 0, 0 0;
+  background-repeat: no-repeat;
+}
+
+.final-ranking-table-wrap { overflow: hidden; border: 1px solid rgba(250,204,21,.25); border-radius: 18px; background: rgba(2,6,23,.58); }
+.final-ranking-table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: .68rem; }
+.final-ranking-table th, .final-ranking-table td { padding: 4px 5px; border-bottom: 1px solid rgba(226,232,240,.10); border-right: 1px solid rgba(226,232,240,.07); vertical-align: middle; }
+.final-ranking-table th { color: #facc15; background: rgba(2,6,23,.76); text-align: center; }
+.final-ranking-table th:nth-child(1) { width: 4.5%; }
+.final-ranking-table th:nth-child(2) { width: 15%; text-align: left; }
+.final-ranking-table th:nth-child(3) { width: 10%; text-align: left; }
+.final-ranking-table th:nth-child(4), .final-ranking-table th:nth-child(5) { width: 6%; }
+.final-ranking-table td { text-align: center; }
+.final-ranking-table td:nth-child(2), .final-ranking-table td:nth-child(3) { text-align: left; }
+.final-ranking-table td:nth-child(2) { display: flex; align-items: center; gap: 5px; min-width: 0; }
+.final-ranking-table td:nth-child(2) > span { display: grid; min-width: 0; }
+.final-ranking-table td:nth-child(2) strong { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.final-ranking-table small { display: block; color: var(--bilan-muted); font-size: .58rem; line-height: 1.15; }
+.final-ranking-table .profile-badge.mini { width: 24px; height: 24px; flex: 0 0 auto; }
+.final-ranking-table tr.is-current-player { background: rgba(250,204,21,.10); box-shadow: inset 3px 0 0 #facc15; }
+
+.diploma-final-layout { display: grid; grid-template-columns: .88fr 1.12fr; align-items: center; gap: 34px; text-align: left; }
+.diploma-awardee { text-align: center; }
+.diploma-honours h3 { color: var(--bilan-gold); font-size: 2.25rem; margin: 0 0 14px; }
+.diploma-honours p { font-size: 1.05rem; line-height: 1.5; margin: 0; }
+.diploma-key-stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin: 20px 0 0; }
+.diploma-key-stats span { padding: 10px 12px; border: 1px solid rgba(250,204,21,.22); border-radius: 14px; background: rgba(2,6,23,.35); color: var(--bilan-muted); }
+.diploma-key-stats b { color: var(--bilan-gold); font-size: 1.25rem; }
+
+.home-final-pdf-card { display: grid; grid-template-columns: auto 1fr auto; gap: 18px; align-items: center; padding: 22px; border-color: rgba(250,204,21,.42); background: linear-gradient(135deg, rgba(250,204,21,.14), rgba(15,23,42,.92)); box-shadow: 0 18px 45px rgba(250,204,21,.08); }
+.home-final-pdf-card h3 { margin: 3px 0 7px; }
+.home-final-pdf-card p { margin: 0; }
+.home-final-pdf-art .owl-icon { width: 58px; height: 58px; }
+
+@media (max-width: 760px) {
+  .home-final-pdf-card { grid-template-columns: auto 1fr; }
+  .home-final-pdf-card .primary-btn { grid-column: 1 / -1; width: 100%; }
+}
+
+@media print {
+  @page { size: A4 portrait; margin: 0; }
+  @page landscapeCollector { size: A4 landscape; margin: 0; }
+
+  html, body, .bilan-root, .bilan-document, .bilan-document.collector {
+    width: auto !important;
+    max-width: none !important;
+    min-width: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  .bilan-page:not(.landscape-page) {
+    page: auto !important;
+    width: 210mm !important;
+    height: 297mm !important;
+    min-height: 297mm !important;
+    max-height: 297mm !important;
+    box-sizing: border-box !important;
+  }
+
+  .bilan-page.landscape-page {
+    page: landscapeCollector !important;
+    width: 297mm !important;
+    height: 210mm !important;
+    min-width: 297mm !important;
+    max-width: 297mm !important;
+    min-height: 210mm !important;
+    max-height: 210mm !important;
+    box-sizing: border-box !important;
+    margin: 0 !important;
+    overflow: hidden !important;
+    break-after: page !important;
+    page-break-after: always !important;
+    background-size: 297mm 210mm, 297mm 210mm !important;
+    background-position: 0 0, 0 0 !important;
+  }
+
+  .bilan-page.diploma {
+    padding: 9mm 14mm !important;
+    background-image: linear-gradient(rgba(2,6,23,.10), rgba(2,6,23,.14)), url("../assets/reports/bg-diplome.png") !important;
+  }
+  .bilan-page.diploma .bilan-page-content { width: 269mm !important; height: 192mm !important; min-height: 192mm !important; display: grid !important; place-items: center !important; }
+  .diploma-card.diploma-final-layout { width: 246mm !important; max-width: 246mm !important; min-height: 116mm !important; padding: 8mm 11mm !important; grid-template-columns: 86mm 1fr !important; gap: 9mm !important; background: rgba(2,6,23,.56) !important; }
+  .diploma-awardee .profile-badge { width: 22mm !important; height: 22mm !important; margin: 0 auto 2mm !important; }
+  .diploma-awardee h2 { margin: 2mm 0 !important; font-size: 25pt !important; line-height: 1 !important; }
+  .diploma-honours h3 { margin: 0 0 3mm !important; font-size: 18pt !important; }
+  .diploma-honours p { max-width: none !important; margin: 0 !important; font-size: 9.5pt !important; line-height: 1.4 !important; }
+  .diploma-key-stats { gap: 2mm !important; margin-top: 4mm !important; }
+  .diploma-key-stats span { padding: 2mm 3mm !important; border-radius: 3mm !important; font-size: 8pt !important; }
+  .diploma-key-stats b { font-size: 11pt !important; }
+  .diploma-honours .signature-row { margin-top: 7mm !important; gap: 7mm !important; font-size: 7.5pt !important; }
+
+  .bilan-page.ranking-sheet { padding: 8mm 10mm !important; }
+  .ranking-sheet .bilan-page-content { width: 277mm !important; height: 194mm !important; }
+  .ranking-sheet .bilan-page-head { margin-bottom: 3mm !important; }
+  .ranking-sheet .bilan-page-head h2 { font-size: 23pt !important; }
+  .ranking-sheet .bilan-page-head p { margin-top: 1.5mm !important; font-size: 8pt !important; }
+  .final-ranking-table-wrap { border-radius: 3mm !important; }
+  .final-ranking-table { font-size: 6.15pt !important; }
+  .final-ranking-table th, .final-ranking-table td { padding: 1.05mm 1.15mm !important; line-height: 1.08 !important; }
+  .final-ranking-table small { font-size: 5.2pt !important; line-height: 1.05 !important; }
+  .final-ranking-table .profile-badge.mini { width: 5mm !important; height: 5mm !important; }
+
+  /* Les règles responsive écran ne doivent plus gonfler les casseroles. */
+  .casserole-list { gap: 2mm !important; }
+  .casserole-card {
+    grid-template-columns: 10mm minmax(0, 1fr) 23mm 23mm minmax(38mm, .9fr) !important;
+    gap: 2mm !important;
+    min-height: 22mm !important;
+    padding: 2.5mm !important;
+    border-radius: 4mm !important;
+    font-size: 7.2pt !important;
+  }
+  .casserole-rank { width: 8mm !important; height: 8mm !important; border-radius: 2.5mm !important; font-size: 7pt !important; }
+  .casserole-card small, .casserole-card span, .casserole-card p { font-size: 6.6pt !important; line-height: 1.2 !important; }
+
+  /* Mur des exploits : cartes plus courtes et jamais coupées. */
+  .badges .badge-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 2.5mm !important; }
+  .badges .featured-badges { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }
+  .badges .badge-card { min-height: 0 !important; height: auto !important; padding: 3mm !important; border-radius: 4mm !important; gap: 1.2mm !important; break-inside: avoid !important; page-break-inside: avoid !important; }
+  .badges .badge-png { width: 10mm !important; height: 10mm !important; }
+  .badges .badge-card strong { font-size: 9pt !important; line-height: 1.15 !important; }
+  .badges .badge-card small { margin: 0 !important; font-size: 6.6pt !important; }
+  .badges .badge-card p { font-size: 7pt !important; line-height: 1.25 !important; }
+  .badges .badge-section-title { margin: 3mm 0 2mm !important; font-size: 12pt !important; }
+
+  /* Records : 9 cartes sur une grille 3x3, sans débordement. */
+  .records .rich-record-grid { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; gap: 2mm !important; }
+  .records .rich-record-grid .record-card { min-height: 23mm !important; padding: 2.5mm !important; }
+  .records .record-card.with-icon { grid-template-columns: 7mm auto minmax(0, 1fr) !important; column-gap: 1.5mm !important; row-gap: 1mm !important; }
+  .records .record-card.with-icon > img { width: 6.5mm !important; height: 6.5mm !important; }
+  .records .record-card.with-icon > .value { font-size: 15pt !important; }
+  .records .record-card.with-icon > strong { font-size: 7.5pt !important; }
+  .records .record-card.with-icon > small { font-size: 6.2pt !important; line-height: 1.18 !important; }
+  .records .mini-record-player-card { margin-top: 3mm !important; padding: 3mm !important; }
+  .records .mini-record-player-card p { margin: 1.5mm 0 !important; font-size: 7pt !important; }
+
+  /* Historique : hauteurs bornées, textes compacts, finale + petite finale ensemble. */
+  .history-capsule { min-height: 0 !important; height: auto !important; overflow: hidden !important; }
+  .history-dense .history-capsule-grid { grid-template-columns: repeat(4, minmax(0, 1fr)) !important; grid-auto-rows: minmax(27mm, auto) !important; }
+  .history-medium .history-capsule-grid { grid-template-columns: repeat(4, minmax(0, 1fr)) !important; grid-auto-rows: minmax(31mm, auto) !important; }
+  .history-roomy .history-capsule-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; grid-auto-rows: minmax(38mm, auto) !important; }
+  .history-capsule { padding: 1.8mm !important; border-radius: 3mm !important; font-size: 6.9pt !important; line-height: 1.16 !important; }
+  .history-capsule small { font-size: 5.9pt !important; }
+  .history-capsule strong { display: block !important; margin: 1mm 0 !important; font-size: 7pt !important; line-height: 1.14 !important; }
+  .history-capsule p { margin: 1mm 0 !important; gap: 1mm 2mm !important; }
+  .history-capsule .result-pill { padding: .6mm 1.2mm !important; font-size: 5.9pt !important; }
+}
+
+/* V1.9.17b - cartes records robustes et grand classement réellement complet. */
+.record-card.record-card-final {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  min-width: 0;
+  overflow: hidden;
+}
+.record-card-final .record-card-top {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+}
+.record-card-final .record-card-top img {
+  width: 38px;
+  height: 38px;
+  flex: 0 0 auto;
+  object-fit: contain;
+}
+.record-card-final .record-card-top .value {
+  flex: 0 0 auto;
+  font-size: 1.75rem;
+  line-height: 1;
+  white-space: nowrap;
+}
+.record-card-final .record-card-top strong {
+  min-width: 0;
+  line-height: 1.1;
+  overflow-wrap: anywhere;
+}
+.record-card-final .record-card-detail {
+  margin-top: 9px;
+  color: var(--bilan-muted);
+  font-size: .78rem;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+.record-card-final .record-card-detail .team-flag-img {
+  width: 22px;
+  height: 15px;
+  vertical-align: middle;
+}
+
+@media print {
+  .records .record-card.record-card-final {
+    display: flex !important;
+    flex-direction: column !important;
+    min-height: 30mm !important;
+    height: 30mm !important;
+    padding: 2.4mm !important;
+    overflow: hidden !important;
+  }
+  .records .record-card-final .record-card-top {
+    display: flex !important;
+    align-items: center !important;
+    gap: 1.5mm !important;
+    min-height: 7mm !important;
+  }
+  .records .record-card-final .record-card-top img {
+    width: 6mm !important;
+    height: 6mm !important;
+  }
+  .records .record-card-final .record-card-top .value {
+    font-size: 14pt !important;
+    line-height: 1 !important;
+  }
+  .records .record-card-final .record-card-top strong {
+    font-size: 7.2pt !important;
+    line-height: 1.05 !important;
+  }
+  .records .record-card-final .record-card-detail {
+    margin-top: 1.5mm !important;
+    font-size: 6.2pt !important;
+    line-height: 1.18 !important;
+  }
+  .records .record-card-final .record-card-detail small {
+    font-size: 5.7pt !important;
+    line-height: 1.15 !important;
+  }
+  .records .record-card-final .team-flag-img {
+    width: 5mm !important;
+    height: 3.3mm !important;
+  }
+
+  /* 19 à 30 joueurs : une seule page paysage, sans rogner les dernières lignes. */
+  .ranking-sheet.ranking-many .bilan-page-head { margin-bottom: 1.5mm !important; }
+  .ranking-sheet.ranking-many .bilan-page-head h2 { font-size: 17pt !important; }
+  .ranking-sheet.ranking-many .bilan-page-head p { margin-top: .5mm !important; font-size: 6pt !important; }
+  .ranking-sheet.ranking-many .final-ranking-table { font-size: 4.55pt !important; }
+  .ranking-sheet.ranking-many .final-ranking-table th,
+  .ranking-sheet.ranking-many .final-ranking-table td {
+    padding: .28mm .55mm !important;
+    line-height: 1 !important;
+    height: 4.65mm !important;
+  }
+  .ranking-sheet.ranking-many .final-ranking-table small { font-size: 3.85pt !important; line-height: 1 !important; }
+  .ranking-sheet.ranking-many .final-ranking-table .profile-badge.mini { display: none !important; }
+  .ranking-sheet.ranking-many .final-ranking-table td:nth-child(2) { gap: 0 !important; }
+
+  .ranking-sheet.ranking-medium .final-ranking-table { font-size: 5.25pt !important; }
+  .ranking-sheet.ranking-medium .final-ranking-table th,
+  .ranking-sheet.ranking-medium .final-ranking-table td { padding: .65mm .8mm !important; }
+  .ranking-sheet.ranking-medium .final-ranking-table small { font-size: 4.45pt !important; }
+  .ranking-sheet.ranking-medium .final-ranking-table .profile-badge.mini { width: 4mm !important; height: 4mm !important; }
 }
