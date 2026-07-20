@@ -1,0 +1,11 @@
+LE NID DES PRONOS — CORRECTIF V1.9.17c
+
+1. Remplacer les fichiers du site par ceux de cette version.
+2. Aucun nouveau patch SQL n’est nécessaire si le patch V1.9.17 a déjà été lancé.
+3. Faire Ctrl + F5 puis rouvrir le bilan.
+
+Corrections :
+- classement général en portrait sur 2 feuilles de 11 joueurs maximum ;
+- classement Famille en portrait, paginé de la même façon si nécessaire ;
+- colonnes regroupées pour conserver rang, points et moyenne de chaque phase ;
+- diplôme paysage forcé sur toute la largeur 297 mm dans Chromium.

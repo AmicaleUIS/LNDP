@@ -1773,3 +1773,235 @@
   .ranking-sheet.ranking-medium .final-ranking-table small { font-size: 4.45pt !important; }
   .ranking-sheet.ranking-medium .final-ranking-table .profile-badge.mini { width: 4mm !important; height: 4mm !important; }
 }
+
+
+/* ============================================================
+   V1.9.17c — Classements portrait en plusieurs feuilles
+   et diplôme paysage sans zone rognée dans Chromium
+   ============================================================ */
+
+/* Aperçu écran : les classements reprennent le vrai ratio A4 portrait. */
+.bilan-page.ranking-sheet.ranking-portrait {
+  width: min(790px, 100%);
+  min-height: 0;
+  aspect-ratio: 210 / 297;
+  background-color: #07111f;
+  background-image:
+    linear-gradient(rgba(2, 6, 23, .16), rgba(2, 6, 23, .22)),
+    url("../assets/reports/bg-graphs.png");
+  background-position: 0 0, 0 0;
+  background-repeat: no-repeat, no-repeat;
+  background-size: 100% 100%, 100% 100%;
+}
+
+.portrait-ranking-table { table-layout: fixed; }
+.portrait-ranking-table th:nth-child(1) { width: 7%; }
+.portrait-ranking-table th:nth-child(2) { width: 26%; text-align: left; }
+.portrait-ranking-table th:nth-child(3) { width: 13%; }
+.portrait-ranking-table th:nth-child(n+4) { width: 9%; }
+.portrait-ranking-table td:nth-child(2) { text-align: left; }
+.ranking-player-cell { display: flex; align-items: center; gap: 7px; min-width: 0; }
+.ranking-player-cell > span { display: grid; min-width: 0; }
+.ranking-player-cell strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ranking-player-cell em { color: #facc15; font-size: .56rem; font-style: normal; line-height: 1.1; }
+.ranking-total-cell strong, .ranking-phase-cell b { display: block; color: #fff7cc; }
+.ranking-phase-cell small, .ranking-total-cell small { white-space: nowrap; }
+
+@media print {
+  /* Les classements ne sont plus des pages paysage. */
+  .bilan-page.ranking-sheet.ranking-portrait {
+    page: auto !important;
+    width: 210mm !important;
+    min-width: 210mm !important;
+    max-width: 210mm !important;
+    height: 297mm !important;
+    min-height: 297mm !important;
+    max-height: 297mm !important;
+    padding: 10mm 9mm !important;
+    box-sizing: border-box !important;
+    overflow: hidden !important;
+    aspect-ratio: auto !important;
+    background-position: 0 0, 0 0 !important;
+    background-repeat: no-repeat, no-repeat !important;
+    background-size: 210mm 297mm, 210mm 297mm !important;
+  }
+
+  .ranking-sheet.ranking-portrait .bilan-page-content {
+    width: 192mm !important;
+    height: 277mm !important;
+    min-height: 277mm !important;
+  }
+
+  .ranking-sheet.ranking-portrait .bilan-page-head {
+    margin-bottom: 4mm !important;
+  }
+  .ranking-sheet.ranking-portrait .bilan-page-head h2 {
+    font-size: 20pt !important;
+    line-height: 1.05 !important;
+  }
+  .ranking-sheet.ranking-portrait .bilan-page-head p {
+    max-width: 155mm !important;
+    margin-top: 1.5mm !important;
+    font-size: 7.4pt !important;
+    line-height: 1.25 !important;
+  }
+  .ranking-sheet.ranking-portrait .page-number {
+    font-size: 8.5pt !important;
+  }
+
+  .ranking-sheet.ranking-portrait .final-ranking-table-wrap {
+    width: 100% !important;
+    overflow: hidden !important;
+    border-radius: 3mm !important;
+  }
+  .ranking-sheet.ranking-portrait .portrait-ranking-table {
+    width: 100% !important;
+    table-layout: fixed !important;
+    font-size: 6.35pt !important;
+  }
+  .ranking-sheet.ranking-portrait .portrait-ranking-table thead tr {
+    height: 9mm !important;
+  }
+  .ranking-sheet.ranking-portrait .portrait-ranking-table tbody tr {
+    height: 18.2mm !important;
+  }
+  .ranking-sheet.ranking-portrait .portrait-ranking-table th,
+  .ranking-sheet.ranking-portrait .portrait-ranking-table td {
+    padding: 1.15mm .7mm !important;
+    line-height: 1.08 !important;
+    overflow: hidden !important;
+    vertical-align: middle !important;
+  }
+  .ranking-sheet.ranking-portrait .portrait-ranking-table th {
+    font-size: 6.2pt !important;
+  }
+  .ranking-sheet.ranking-portrait .portrait-ranking-table th:nth-child(1) { width: 7% !important; }
+  .ranking-sheet.ranking-portrait .portrait-ranking-table th:nth-child(2) { width: 26% !important; }
+  .ranking-sheet.ranking-portrait .portrait-ranking-table th:nth-child(3) { width: 13% !important; }
+  .ranking-sheet.ranking-portrait .portrait-ranking-table th:nth-child(n+4) { width: 9% !important; }
+  .ranking-sheet.ranking-portrait .portrait-ranking-table small {
+    display: block !important;
+    font-size: 5.05pt !important;
+    line-height: 1.08 !important;
+  }
+  .ranking-sheet.ranking-portrait .ranking-player-cell {
+    display: flex !important;
+    align-items: center !important;
+    gap: 1.3mm !important;
+  }
+  .ranking-sheet.ranking-portrait .ranking-player-cell .profile-badge.mini {
+    display: block !important;
+    width: 7mm !important;
+    height: 7mm !important;
+    flex: 0 0 7mm !important;
+  }
+  .ranking-sheet.ranking-portrait .ranking-player-cell strong {
+    font-size: 7pt !important;
+    line-height: 1.08 !important;
+  }
+  .ranking-sheet.ranking-portrait .ranking-player-cell em {
+    display: block !important;
+    color: #facc15 !important;
+    font-size: 4.8pt !important;
+    line-height: 1.05 !important;
+  }
+  .ranking-sheet.ranking-portrait .ranking-rank-cell strong {
+    font-size: 8.2pt !important;
+  }
+  .ranking-sheet.ranking-portrait .ranking-total-cell strong,
+  .ranking-sheet.ranking-portrait .ranking-phase-cell b {
+    font-size: 7.2pt !important;
+    line-height: 1.05 !important;
+  }
+
+  /*
+   * Chromium garde parfois le bloc du diplôme à 210 mm malgré une page
+   * paysage. Le fond et le contenu sont donc positionnés explicitement sur
+   * 297 × 210 mm, et autorisés à dépasser le contenant portrait calculé.
+   */
+  @page diplomaFinal {
+    size: 297mm 210mm;
+    margin: 0;
+  }
+  .bilan-document.collector {
+    overflow: visible !important;
+  }
+  .bilan-page.diploma.landscape-page {
+    page: diplomaFinal !important;
+    position: relative !important;
+    width: 297mm !important;
+    min-width: 297mm !important;
+    max-width: 297mm !important;
+    height: 210mm !important;
+    min-height: 210mm !important;
+    max-height: 210mm !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+    box-sizing: border-box !important;
+    background: none !important;
+    isolation: isolate !important;
+  }
+  .bilan-page.diploma.landscape-page::before {
+    display: none !important;
+  }
+  .bilan-page.diploma.landscape-page::after {
+    content: "" !important;
+    position: absolute !important;
+    z-index: 0 !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 297mm !important;
+    height: 210mm !important;
+    background-color: #07111f !important;
+    background-image:
+      linear-gradient(rgba(2, 6, 23, .08), rgba(2, 6, 23, .12)),
+      url("../assets/reports/bg-diplome.png") !important;
+    background-position: 0 0, 0 0 !important;
+    background-repeat: no-repeat, no-repeat !important;
+    background-size: 297mm 210mm, 297mm 210mm !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  .bilan-page.diploma.landscape-page .bilan-page-content {
+    position: absolute !important;
+    z-index: 1 !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 297mm !important;
+    min-width: 297mm !important;
+    max-width: 297mm !important;
+    height: 210mm !important;
+    min-height: 210mm !important;
+    max-height: 210mm !important;
+    padding: 14mm 20mm 15mm !important;
+    box-sizing: border-box !important;
+    display: grid !important;
+    place-items: center !important;
+    overflow: visible !important;
+  }
+  .bilan-page.diploma.landscape-page .diploma-card.diploma-final-layout {
+    width: 250mm !important;
+    max-width: 250mm !important;
+    min-height: 120mm !important;
+    padding: 9mm 12mm !important;
+    box-sizing: border-box !important;
+    grid-template-columns: 88mm minmax(0, 1fr) !important;
+    gap: 10mm !important;
+    overflow: visible !important;
+  }
+  .bilan-page.diploma.landscape-page .diploma-honours {
+    min-width: 0 !important;
+    overflow: visible !important;
+  }
+  .bilan-page.diploma.landscape-page .diploma-honours p {
+    width: auto !important;
+    max-width: none !important;
+    white-space: normal !important;
+    overflow-wrap: anywhere !important;
+  }
+}
+
+/* Lisibilité garantie des en-têtes, y compris selon le moteur PDF. */
+.bilan-page.ranking-sheet.ranking-portrait .bilan-page-head h2 { color: #ffffff !important; }
+.bilan-page.ranking-sheet.ranking-portrait .bilan-page-head p { color: rgba(226, 232, 240, .82) !important; }

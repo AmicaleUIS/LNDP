@@ -1,6 +1,6 @@
 
 // ============================================================
-// LE NID DES PRONOS — BILAN PDF V1.9.17
+// LE NID DES PRONOS — BILAN PDF V1.9.17c
 // ============================================================
 
 const H = window.Helpers;
@@ -1585,14 +1585,27 @@ const BilanPDF = {
   standingsTableHtml(rows = [], title = "Classement officiel") {
     const defs = this.rankingPhaseDefinitions();
     const phaseMaps = Object.fromEntries(defs.map((def) => [def.key, new Map(this.phaseStandingRows(rows, def).map((row) => [String(row.user_id), row]))]));
-    return `<div class="final-ranking-table-wrap"><table class="final-ranking-table"><thead><tr><th>Rang</th><th>Joueur</th><th>Team</th><th>Total</th><th>Moy.</th>${defs.map((def) => `<th>${this.e(def.label)}</th>`).join("")}</tr></thead><tbody>${rows.map((row) => `<tr class="${String(row.user_id) === String(this.state.playerId) ? "is-current-player" : ""}"><td><strong>#${this.e(row.rank)}</strong></td><td>${H.profileBadgeHtml({ ...row, office_team_color: row.office_team_color || row.badge_color }, "profile-badge mini")}<span><strong>${this.e(row.pseudo)}</strong><small>${row.champion_points ? `+${this.e(row.champion_points)} champion` : ""}</small></span></td><td>${this.e(row.office_team_name || "—")}</td><td><strong>${this.e(row.total_points)}</strong><small>${this.e(row.match_points)} + ${this.e(row.champion_points)}</small></td><td>${this.e(Number(row.average_points || 0).toFixed(2))}</td>${defs.map((def) => { const phase = phaseMaps[def.key].get(String(row.user_id)); return `<td><b>#${this.e(phase?.phase_rank || "—")}</b><small>${this.e(phase?.phase_points || 0)} pt · ${this.e(Number(phase?.phase_average || 0).toFixed(2))}</small></td>`; }).join("")}</tr>`).join("")}</tbody></table></div>`;
+    return `<div class="final-ranking-table-wrap"><table class="final-ranking-table portrait-ranking-table" aria-label="${this.e(title)}"><thead><tr><th>Rang</th><th>Joueur / Team</th><th>Total / Moy.</th>${defs.map((def) => `<th>${this.e(def.label)}</th>`).join("")}</tr></thead><tbody>${rows.map((row) => `<tr class="${String(row.user_id) === String(this.state.playerId) ? "is-current-player" : ""}"><td class="ranking-rank-cell"><strong>#${this.e(row.rank)}</strong></td><td class="ranking-player-cell">${H.profileBadgeHtml({ ...row, office_team_color: row.office_team_color || row.badge_color }, "profile-badge mini")}<span><strong>${this.e(row.pseudo)}</strong><small>${this.e(row.office_team_name || "Sans team")}</small>${row.champion_points ? `<em>+${this.e(row.champion_points)} champion</em>` : ""}</span></td><td class="ranking-total-cell"><strong>${this.e(row.total_points)}</strong><small>${this.e(row.match_points)} + ${this.e(row.champion_points)}</small><small>${this.e(Number(row.average_points || 0).toFixed(2))} pt/m.</small></td>${defs.map((def) => { const phase = phaseMaps[def.key].get(String(row.user_id)); return `<td class="ranking-phase-cell"><b>#${this.e(phase?.phase_rank || "—")}</b><small>${this.e(phase?.phase_points || 0)} pt</small><small>${this.e(Number(phase?.phase_average || 0).toFixed(2))} moy.</small></td>`; }).join("")}</tr>`).join("")}</tbody></table></div>`;
   },
 
   pageFinalStandings() {
     const official = this.finalStandings({ family: false });
     const family = this.finalStandings({ family: true });
-    const page = (rows, familyMode = false) => `<section class="bilan-page ranking-sheet landscape-page ${rows.length > 18 ? "ranking-many" : rows.length > 12 ? "ranking-medium" : ""}"><div class="bilan-page-content"><div class="bilan-page-head"><div><h2>${familyMode ? "Classement final · Famille" : "Classement final · tous les joueurs"}</h2><p>${familyMode ? "Univers Famille : classement général, classement et moyenne de chaque phase." : "Classement officiel complet, bonus champion inclus dans le total. Chaque phase affiche rang, points et moyenne."}</p></div><span class="page-number">${familyMode ? "CL-F" : "CL"}</span></div>${this.standingsTableHtml(rows, familyMode ? "Classement Famille" : "Classement officiel")}</div></section>`;
-    return `${official.length ? page(official, false) : ""}${family.length ? page(family, true) : ""}`;
+    const pageSize = 11;
+    const renderPages = (rows, familyMode = false) => {
+      const chunks = this.chunk(rows, pageSize);
+      return chunks.map((chunk, index) => {
+        const from = index * pageSize + 1;
+        const to = from + chunk.length - 1;
+        const prefix = familyMode ? "CL-F" : "CL";
+        const title = familyMode ? "Classement final · Famille" : "Classement final · tous les joueurs";
+        const intro = familyMode
+          ? `Univers Famille · joueurs ${from} à ${to} sur ${rows.length}. Classement général et résultats par phase.`
+          : `Joueurs ${from} à ${to} sur ${rows.length} · bonus champion inclus. Rang, points et moyenne pour chaque phase.`;
+        return `<section class="bilan-page ranking-sheet ranking-portrait"><div class="bilan-page-content"><div class="bilan-page-head"><div><h2>${title}</h2><p>${this.e(intro)}</p></div><span class="page-number">${prefix}-${index + 1}/${chunks.length}</span></div>${this.standingsTableHtml(chunk, familyMode ? "Classement Famille" : "Classement officiel")}</div></section>`;
+      }).join("");
+    };
+    return `${official.length ? renderPages(official, false) : ""}${family.length ? renderPages(family, true) : ""}`;
   },
 
   pageRace(stats) {
