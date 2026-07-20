@@ -686,7 +686,7 @@ function resultIcon(row) {
 function registerNidServiceWorker() {
   if (!("serviceWorker" in navigator)) return;
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("service-worker.js?v=1.9.17").catch((error) => {
+    navigator.serviceWorker.register("service-worker.js?v=1.9.18").catch((error) => {
       console.warn("Service worker indisponible", error);
     });
   }, { once: true });

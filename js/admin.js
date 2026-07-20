@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — ADMIN V1.9.17
+// LE NID DES PRONOS — ADMIN V1.9.18
 // ============================================================
 
 const H = window.Helpers;
@@ -37,7 +37,9 @@ const Admin = {
     auditLogs: [],
     healthSnapshot: null,
     healthError: null,
-    finalReportSelectedUserId: null
+    finalReportSelectedUserId: null,
+    feedbackEntries: [],
+    feedbackError: null
   },
 
 
@@ -66,7 +68,7 @@ const Admin = {
   },
 
   initialAdminSection() {
-    const allowedSections = ["quick", "teams", "messages", "scores", "backups", "health", "audit", "final-report", "users", "family"];
+    const allowedSections = ["quick", "teams", "messages", "scores", "backups", "health", "audit", "feedback", "final-report", "users", "family"];
     const params = new URLSearchParams(window.location.search);
     const requested = params.get("section") || this.readLastAdminSection() || "quick";
     return allowedSections.includes(requested) ? requested : "quick";
@@ -88,7 +90,7 @@ const Admin = {
       p_category: category,
       p_details: details || {},
       p_metadata: {
-        app_version: "1.9.17",
+        app_version: "1.9.18",
         source: "admin_front"
       }
     });
@@ -164,6 +166,7 @@ const Admin = {
     H.$("#cleanStartPreservePredictionsBtn")?.addEventListener("click", () => this.cleanStartPreservePredictions());
     H.$("#refreshHealthBtn")?.addEventListener("click", async () => { await this.loadHealthSnapshot(); this.renderHealth(); });
     H.$("#refreshAuditBtn")?.addEventListener("click", async () => { await this.loadAuditLogs(); this.renderAudit(); });
+    H.$("#refreshFeedbackBtn")?.addEventListener("click", async () => { await this.loadFeedbackEntries(); this.renderFeedbackAdmin(); });
 
     const scrollTopBtn = H.$("#adminScrollTopOwl");
     if (scrollTopBtn && scrollTopBtn.dataset.bound !== "true") {
@@ -243,6 +246,7 @@ const Admin = {
       backups: ["Sauvegardes", "Sauvegarder, restaurer ou remettre à zéro les pronostics."],
       health: ["Santé du Nid", "Contrôler rapidement les voyants essentiels de l’application."],
       audit: ["Journal du Nid", "Consulter les actions sensibles effectuées dans l’administration."],
+      feedback: ["Livre d’or", "Consulter les notes et retours laissés par les joueurs."],
       "final-report": ["Bilan PDF final", "Prévisualiser les carnets de vol et diplômes de fin de compétition."],
       users: ["Joueurs", "Gérer les joueurs, rôles, teams et statuts actif/inactif."],
       family: ["Mode Famille", "Invitations, inscriptions Famille et droits associés."]
@@ -261,6 +265,7 @@ const Admin = {
       backups: "verrouille",
       health: "sante",
       audit: "journal",
+      feedback: "bilan",
       "final-report": "bilan",
       users: "profil",
       family: "famille"
@@ -435,7 +440,8 @@ const Admin = {
         this.loadFamilyModeSetting(),
         this.loadOwlMessagesAdmin(),
         this.loadAuditLogs(),
-        this.loadHealthSnapshot()
+        this.loadHealthSnapshot(),
+        this.loadFeedbackEntries()
       ]);
 
       this.renderUsers();
@@ -447,6 +453,7 @@ const Admin = {
       this.renderFamilyAdmin();
       this.renderHealth();
       this.renderAudit();
+      this.renderFeedbackAdmin();
       this.renderFinalReportAdmin();
     } else {
       await Promise.all([
@@ -939,6 +946,62 @@ const Admin = {
     this.state.championFirstBonusPoints = Math.max(0, Math.round(this.settingNumber(settings.champion_bonus_initial_points, 100)));
     this.state.championSecondBonusPoints = Math.max(0, Math.round(this.settingNumber(settings.champion_bonus_second_points, 50)));
     this.state.loginOwlMessage = settings.login_owl_message || null;
+  },
+
+  async loadFeedbackEntries() {
+    const { data, error } = await window.sb
+      .from("competition_feedback")
+      .select("id,user_id,rating,liked,improve,thanks,created_at,updated_at")
+      .order("updated_at", { ascending: false });
+    if (error) {
+      this.state.feedbackEntries = [];
+      this.state.feedbackError = error;
+      console.warn("competition_feedback indisponible", error);
+      return;
+    }
+    this.state.feedbackEntries = data || [];
+    this.state.feedbackError = null;
+  },
+
+  feedbackCupsHtml(rating = 0) {
+    const score = Number(rating || 0);
+    return `<span class="admin-feedback-cups" aria-label="${score} sur 5">${[1, 2, 3, 4, 5].map((value) => `<img class="${value <= score ? "active" : ""}" src="assets/icons/coupe.png" alt="" aria-hidden="true">`).join("")}</span>`;
+  },
+
+  renderFeedbackAdmin() {
+    const root = H.$("#feedbackAdmin");
+    if (!root) return;
+    if (this.state.feedbackError) {
+      root.innerHTML = `<div class="empty-state"><h3>Livre d’or indisponible</h3><p>Lance le patch SQL V1.9.18 dans Supabase puis recharge l’administration.</p></div>`;
+      return;
+    }
+    const entries = this.state.feedbackEntries || [];
+    if (!entries.length) {
+      root.innerHTML = `<div class="empty-state"><h3>Le perchoir attend ses premiers mots</h3><p>Aucun joueur n’a encore laissé d’avis.</p></div>`;
+      return;
+    }
+    const average = entries.reduce((sum, row) => sum + Number(row.rating || 0), 0) / entries.length;
+    const counts = [5, 4, 3, 2, 1].map((rating) => ({ rating, count: entries.filter((row) => Number(row.rating) === rating).length }));
+    const userById = new Map((this.state.users || []).map((user) => [String(user.id), user]));
+    root.innerHTML = `
+      <div class="feedback-admin-summary">
+        <article><strong>${average.toFixed(2)}/5</strong><span>note moyenne</span>${this.feedbackCupsHtml(Math.round(average))}</article>
+        <article><strong>${entries.length}</strong><span>retour${entries.length > 1 ? "s" : ""}</span></article>
+        <article class="feedback-distribution">${counts.map((item) => `<span><b>${item.rating}</b><img src="assets/icons/coupe.png" alt=""> ${item.count}</span>`).join("")}</article>
+      </div>
+      <div class="feedback-admin-list">
+        ${entries.map((entry) => {
+          const user = userById.get(String(entry.user_id)) || { pseudo: "Joueur inconnu", id: entry.user_id };
+          return `<article class="feedback-admin-card">
+            <header>${H.profileBadgeHtml(user, "profile-badge small")}<div><h3>${H.escapeHtml(user.pseudo || user.email || "Joueur")}</h3><small>Mis à jour le ${H.escapeHtml(H.formatDateTime?.(entry.updated_at) || entry.updated_at || "")}</small></div>${this.feedbackCupsHtml(entry.rating)}</header>
+            <div class="feedback-admin-columns">
+              <section class="liked"><h4>Ce qui a été aimé</h4><p>${entry.liked ? H.escapeHtml(entry.liked).replace(/\n/g, "<br>") : "<em>Pas de réponse.</em>"}</p></section>
+              <section class="improve"><h4>À améliorer</h4><p>${entry.improve ? H.escapeHtml(entry.improve).replace(/\n/g, "<br>") : "<em>Pas de réponse.</em>"}</p></section>
+            </div>
+            ${entry.thanks ? `<section class="feedback-admin-thanks"><h4>Petit mot</h4><p>${H.escapeHtml(entry.thanks).replace(/\n/g, "<br>")}</p></section>` : ""}
+          </article>`;
+        }).join("")}
+      </div>`;
   },
 
   async loadAuditLogs() {

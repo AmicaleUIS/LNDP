@@ -2005,3 +2005,83 @@
 /* Lisibilité garantie des en-têtes, y compris selon le moteur PDF. */
 .bilan-page.ranking-sheet.ranking-portrait .bilan-page-head h2 { color: #ffffff !important; }
 .bilan-page.ranking-sheet.ranking-portrait .bilan-page-head p { color: rgba(226, 232, 240, .82) !important; }
+
+
+/* ============================================================
+   V1.9.18 — Correctif final Chromium : document large de 297 mm
+   pour empêcher le diplôme paysage d'être rogné à 210 mm.
+   ============================================================ */
+@media print {
+  html,
+  body,
+  .bilan-root,
+  .bilan-document,
+  .bilan-document.collector {
+    width: 297mm !important;
+    min-width: 297mm !important;
+    max-width: none !important;
+    overflow: visible !important;
+  }
+
+  .bilan-page:not(.diploma) {
+    width: 210mm !important;
+    min-width: 210mm !important;
+    max-width: 210mm !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+  }
+
+  .bilan-page.diploma.landscape-page {
+    page: diplomaFinal !important;
+    display: block !important;
+    position: relative !important;
+    left: 0 !important;
+    width: 297mm !important;
+    min-width: 297mm !important;
+    max-width: 297mm !important;
+    height: 210mm !important;
+    min-height: 210mm !important;
+    max-height: 210mm !important;
+    overflow: hidden !important;
+    background-color: #07111f !important;
+    background-image:
+      linear-gradient(rgba(2, 6, 23, .08), rgba(2, 6, 23, .12)),
+      url("../assets/reports/bg-diplome.png") !important;
+    background-position: left top, left top !important;
+    background-repeat: no-repeat, no-repeat !important;
+    background-size: 297mm 210mm, 297mm 210mm !important;
+  }
+
+  .bilan-page.diploma.landscape-page::after { display:none !important; }
+
+  .bilan-page.diploma.landscape-page .bilan-page-content {
+    position: relative !important;
+    inset: auto !important;
+    width: 297mm !important;
+    min-width: 297mm !important;
+    max-width: 297mm !important;
+    height: 210mm !important;
+    min-height: 210mm !important;
+    max-height: 210mm !important;
+    padding: 13mm 17mm 14mm !important;
+    overflow: hidden !important;
+  }
+
+  .bilan-page.diploma.landscape-page .diploma-card.diploma-final-layout {
+    width: 256mm !important;
+    min-width: 256mm !important;
+    max-width: 256mm !important;
+    min-height: 122mm !important;
+    grid-template-columns: 88mm 1fr !important;
+    gap: 9mm !important;
+    padding: 9mm 11mm !important;
+    overflow: hidden !important;
+  }
+
+  .bilan-page.diploma.landscape-page .diploma-honours,
+  .bilan-page.diploma.landscape-page .diploma-honours * {
+    min-width: 0 !important;
+    max-width: 100% !important;
+    overflow-wrap: anywhere !important;
+  }
+}

@@ -1,0 +1,11 @@
+LE NID DES PRONOS — V1.9.18
+
+1. Remplacer les fichiers du site par ceux de cette version.
+2. Dans Supabase > SQL Editor, exécuter : patch_v1_9_18_livre_or_feedback.sql
+3. Faire Ctrl + F5 dans le navigateur.
+
+NOUVEAUTÉS
+- Classement Famille : 12 joueurs sur une seule feuille portrait.
+- Diplôme conservé en A4 paysage, avec correction de la largeur d’impression Chromium.
+- Livre d’or : note de 1 à 5 coupes, ce qui a été aimé, ce qui doit être amélioré et petit mot/remerciements.
+- Consultation de tous les retours dans une nouvelle rubrique Livre d’or de l’administration.

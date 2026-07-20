@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — APP PRINCIPALE V1.9.17
+// LE NID DES PRONOS — APP PRINCIPALE V1.9.18
 // ============================================================
 
 const H = window.Helpers;
@@ -119,7 +119,7 @@ const App = {
   },
 
   initialRequestedView() {
-    const allowedViews = ["home", "matches", "worldcup", "leaderboard", "teams", "achievements", "profile"];
+    const allowedViews = ["home", "matches", "worldcup", "leaderboard", "teams", "achievements", "feedback", "profile"];
     const params = new URLSearchParams(window.location.search);
     const fromQuery = params.get("view");
     const raw = fromQuery || this.readLastView() || "home";
@@ -483,7 +483,7 @@ const App = {
           <div>
             <p class="eyebrow">Crédits cachés</p>
             <h2 id="creditsTitle">Le Nid des Pronos</h2>
-            <p class="muted">Version publique <strong>1.9.17</strong> · carnets finaux accessibles aux joueurs, classements complets et impression collector stabilisée.</p>
+            <p class="muted">Version publique <strong>1.9.18</strong> · carnet final, diplôme paysage et Livre d’or de fin de compétition.</p>
           </div>
         </div>
         <div class="credits-grid">
@@ -500,13 +500,13 @@ const App = {
             <p><strong>1.0.5</strong> — dashboard mobile/desktop stabilisé, sans chevauchement des cartes.</p>
           </section>
           <section>
-            <h3>Évolutions V1.9.17</h3>
+            <h3>Évolutions V1.9.18</h3>
             <ul class="changelog-list">
-              <li>Les points du match de la grande finale sont doublés, sans toucher à la petite finale.</li>
-              <li>Chaque champion éliminé déclenche un message humoristique personnalisé avec les points potentiellement perdus.</li>
-              <li>Le bilan PDF charge tous les pronos, explique ses statistiques et peut être exporté pour tous les joueurs en une fois.</li>
-              <li>Ces messages personnels restent consultables dans le grimoire des Messages du Hibou.</li>
-              <li>Le service worker utilise un nouveau cache, une installation plus robuste et s’enregistre aussi lors d’un accès direct à l’application.</li>
+              <li>Le classement Famille tient désormais sur une seule feuille portrait avec 12 joueurs.</li>
+              <li>Le diplôme reste en A4 paysage et n’est plus limité à la largeur d’une page portrait.</li>
+              <li>Ajout du Livre d’or avec une note de 1 à 5 coupes.</li>
+              <li>Chaque joueur peut indiquer ce qu’il a aimé, ce qui doit être amélioré et laisser un petit mot.</li>
+              <li>Le super administrateur retrouve la note moyenne et tous les retours dans une rubrique dédiée.</li>
             </ul>
           </section>
           <section>
@@ -1937,6 +1937,7 @@ ${humour} 🦉`,
       leaderboard: "Classements",
       teams: "Les teams du nid",
       achievements: "Exploits",
+      feedback: "Livre d’or du Nid",
       profile: "Profil"
     };
 
@@ -1952,6 +1953,7 @@ ${humour} 🦉`,
     if (viewName === "leaderboard") await this.renderLeaderboard();
     if (viewName === "teams") await this.renderTeamsPage();
     if (viewName === "achievements") await this.renderAchievements();
+    if (viewName === "feedback") await this.renderFeedback();
     if (viewName === "profile") await this.renderProfile();
     if (passwordChangeRequired) setTimeout(() => this.openForcedPasswordChangeModal(), 80);
     else if (profileWasIncomplete) setTimeout(() => this.openFirstLoginModal(), 80);
@@ -2547,6 +2549,130 @@ ${humour} 🦉`,
     await this.renderProfile();
   },
 
+  feedbackStarsHtml(rating = 0) {
+    const selected = Number(rating || 0);
+    return `<div class="feedback-rating" role="radiogroup" aria-label="Note de 1 à 5 coupes">${[1, 2, 3, 4, 5].map((value) => `<button class="feedback-star ${value <= selected ? "selected" : ""}" type="button" data-feedback-rating="${value}" role="radio" aria-checked="${value === selected ? "true" : "false"}" aria-label="${value} coupe${value > 1 ? "s" : ""}"><img src="assets/icons/coupe.png" alt="" aria-hidden="true"></button>`).join("")}</div>`;
+  },
+
+  async loadMyFeedback() {
+    const { data, error } = await window.sb
+      .from("competition_feedback")
+      .select("id,user_id,rating,liked,improve,thanks,created_at,updated_at")
+      .eq("user_id", this.state.session.user.id)
+      .maybeSingle();
+    if (error) throw error;
+    return data || null;
+  },
+
+  async renderFeedback() {
+    const root = H.$("#viewRoot");
+    let feedback = null;
+    let loadError = null;
+    try {
+      feedback = await this.loadMyFeedback();
+    } catch (error) {
+      loadError = error;
+      console.warn("Livre d’or indisponible", error);
+    }
+
+    const rating = Number(feedback?.rating || 0);
+    root.innerHTML = `
+      <section class="feedback-page">
+        <section class="hero-card feedback-hero">
+          <div>
+            <p class="eyebrow"><img src="assets/icons/coupe.png" alt="" aria-hidden="true"> Livre d’or du Nid</p>
+            <h2>À toi de juger le Hibou.</h2>
+            <p>Une note, ce que tu as aimé, ce qui doit évoluer et éventuellement un petit mot. La mauvaise foi est acceptée, tant qu’elle reste plumée avec tendresse.</p>
+          </div>
+          <div class="feedback-hero-cups" aria-hidden="true"><img src="assets/icons/coupe.png" alt=""><img src="assets/icons/coupe.png" alt=""><img src="assets/icons/coupe.png" alt=""></div>
+        </section>
+
+        ${loadError ? `<section class="card"><h3>Le Livre d’or n’est pas encore ouvert</h3><p class="muted">Lance le patch SQL V1.9.18 dans Supabase, puis recharge la page.</p></section>` : `
+        <form class="card feedback-form" id="feedbackForm">
+          <div class="feedback-title-row">
+            <div><h3>${feedback ? "Modifier mon retour" : "Laisser mon retour"}</h3><p class="muted">Tu peux revenir le modifier plus tard.</p></div>
+            ${feedback ? `<span class="pill success">Avis enregistré</span>` : ""}
+          </div>
+
+          <fieldset class="feedback-rating-field">
+            <legend>Ta note générale</legend>
+            ${this.feedbackStarsHtml(rating)}
+            <input id="feedbackRatingValue" name="rating" type="hidden" value="${rating || ""}">
+            <p class="feedback-rating-label" id="feedbackRatingLabel">${rating ? `${rating}/5 coupe${rating > 1 ? "s" : ""}` : "Choisis de 1 à 5 coupes"}</p>
+          </fieldset>
+
+          <label class="feedback-field liked">
+            <span>Ce que j’ai aimé</span>
+            <textarea name="liked" rows="5" maxlength="2500" placeholder="L’ambiance, les classements, les messages du Hibou, les casseroles…">${H.escapeHtml(feedback?.liked || "")}</textarea>
+          </label>
+
+          <label class="feedback-field improve">
+            <span>Ce qui doit être amélioré ou modifié</span>
+            <textarea name="improve" rows="5" maxlength="2500" placeholder="Ce qui t’a manqué, gêné ou ce que tu voudrais pour une prochaine édition…">${H.escapeHtml(feedback?.improve || "")}</textarea>
+          </label>
+
+          <label class="feedback-field thanks">
+            <span>Un petit mot ou des remerciements</span>
+            <textarea name="thanks" rows="4" maxlength="1800" placeholder="Facultatif, mais le Hibou accepte les compliments sans trop protester.">${H.escapeHtml(feedback?.thanks || "")}</textarea>
+          </label>
+
+          <div class="feedback-submit-row">
+            <p class="muted">Ton retour est visible uniquement par toi et le super administrateur.</p>
+            <button class="primary-btn" type="submit">${feedback ? "Mettre à jour mon avis" : "Signer le Livre d’or"}</button>
+          </div>
+        </form>`}
+      </section>`;
+
+    if (loadError) return;
+    const form = H.$("#feedbackForm", root);
+    const ratingInput = H.$("#feedbackRatingValue", root);
+    const ratingLabel = H.$("#feedbackRatingLabel", root);
+    const stars = H.$$("[data-feedback-rating]", root);
+    const setRating = (value) => {
+      const safe = Math.max(1, Math.min(5, Number(value || 0)));
+      ratingInput.value = String(safe);
+      if (ratingLabel) ratingLabel.textContent = `${safe}/5 coupe${safe > 1 ? "s" : ""}`;
+      stars.forEach((button) => {
+        const selected = Number(button.dataset.feedbackRating) <= safe;
+        button.classList.toggle("selected", selected);
+        button.setAttribute("aria-checked", Number(button.dataset.feedbackRating) === safe ? "true" : "false");
+      });
+    };
+    stars.forEach((button) => button.addEventListener("click", () => setRating(button.dataset.feedbackRating)));
+
+    form?.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const formData = new FormData(form);
+      const payload = {
+        user_id: this.state.session.user.id,
+        rating: Number(formData.get("rating") || 0),
+        liked: String(formData.get("liked") || "").trim(),
+        improve: String(formData.get("improve") || "").trim(),
+        thanks: String(formData.get("thanks") || "").trim(),
+        updated_at: new Date().toISOString()
+      };
+      if (!payload.rating) {
+        H.toast("Choisis une note de 1 à 5 coupes.", "error");
+        return;
+      }
+      if (!payload.liked && !payload.improve && !payload.thanks) {
+        H.toast("Écris au moins un petit quelque chose au Hibou.", "error");
+        return;
+      }
+      const button = form.querySelector('button[type="submit"]');
+      if (button) { button.disabled = true; button.textContent = "Enregistrement…"; }
+      const { error } = await window.sb.from("competition_feedback").upsert(payload, { onConflict: "user_id" });
+      if (button) button.disabled = false;
+      if (error) {
+        H.toast(error.message || "Impossible d’enregistrer le retour.", "error");
+        if (button) button.textContent = feedback ? "Mettre à jour mon avis" : "Signer le Livre d’or";
+        return;
+      }
+      H.toast("Ton retour a rejoint le Livre d’or 🏆", "success");
+      await this.renderFeedback();
+    });
+  },
+
   async renderHome() {
     const root = H.$("#viewRoot");
     await Promise.all([this.loadPlayerScoreRows(), this.loadVisiblePredictions()]);
@@ -2609,7 +2735,10 @@ ${humour} 🦉`,
               <h3>Ton carnet collector est prêt 🏆</h3>
               <p>Classement final, champions, records, casseroles, historique complet et diplôme : le Hibou a relié toutes tes plumes dans un seul PDF.</p>
             </div>
-            <button class="primary-btn" type="button" data-action="open-final-pdf">Récupérer mon PDF</button>
+            <div class="home-final-actions">
+              <button class="primary-btn" type="button" data-action="open-final-pdf">Récupérer mon PDF</button>
+              <button class="ghost-btn" type="button" data-action="open-feedback">Donner mon avis</button>
+            </div>
           </section>
         ` : ""}
 
@@ -2668,6 +2797,7 @@ ${humour} 🦉`,
       const playerId = encodeURIComponent(this.state.session.user.id);
       window.open(`bilan.html?player=${playerId}`, "_blank", "noopener");
     });
+    H.$('[data-action="open-feedback"]', root)?.addEventListener("click", () => this.loadView("feedback"));
     H.$("#rulesHomeBtn")?.addEventListener("click", () => this.openRulesModal());
     H.$("#owlMessagesHomeBtn")?.addEventListener("click", async () => {
       await this.loadOwlMessages();
@@ -11691,7 +11821,7 @@ ${humour} 🦉`,
           </div>
           <div class="profile-account-actions">
             <button class="ghost-btn" id="profileInstallAppBtn" type="button">Installer l’app</button>
-            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.9.17</button>
+            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.9.18</button>
             <button class="danger-btn" id="profileLogoutBtn" type="button">Déconnexion</button>
           </div>
         </div>

@@ -1,6 +1,6 @@
 
 // ============================================================
-// LE NID DES PRONOS — BILAN PDF V1.9.17c
+// LE NID DES PRONOS — BILAN PDF V1.9.18
 // ============================================================
 
 const H = window.Helpers;
@@ -1591,8 +1591,10 @@ const BilanPDF = {
   pageFinalStandings() {
     const official = this.finalStandings({ family: false });
     const family = this.finalStandings({ family: true });
-    const pageSize = 11;
+    const officialPageSize = 11;
+    const familyPageSize = 12;
     const renderPages = (rows, familyMode = false) => {
+      const pageSize = familyMode ? familyPageSize : officialPageSize;
       const chunks = this.chunk(rows, pageSize);
       return chunks.map((chunk, index) => {
         const from = index * pageSize + 1;
