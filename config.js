@@ -8,6 +8,6 @@ window.APP_CONFIG = {
   SUPABASE_URL: "https://hizghpxrrjsopwubomvo.supabase.co",
   SUPABASE_ANON_KEY: "sb_publishable_A1D7lkRznuwivNlAqZqOAg_OZSR8tDE",
   APP_NAME: "Le Nid des Pronos",
-  APP_VERSION: "2.0.0",
+  APP_VERSION: "2.0.1",
   ARCHIVE_MODE: true
 };

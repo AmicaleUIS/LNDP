@@ -1,0 +1,17 @@
+LE NID DES PRONOS — V2.0.1 ÉDITION HOMMAGE
+CORRECTIF D’ACCÈS AUX CARNETS PDF
+
+1. Remplacer les fichiers du site par ceux de cette archive.
+2. Dans Supabase > SQL Editor, lancer :
+   patch_v2_0_1_acces_pdf_joueurs.sql
+3. Faire Ctrl + F5 sur le site.
+
+CORRECTION
+- Chaque joueur connecté peut ouvrir et imprimer son propre carnet PDF collector.
+- Un joueur ne peut pas consulter le carnet d’un autre joueur.
+- Le super admin conserve l’accès à tous les carnets et à l’export groupé.
+- Si un ancien lien contient un mauvais identifiant de joueur, l’application ouvre
+  automatiquement le carnet du compte connecté au lieu d’afficher « accès réservé ».
+- Le cache PWA passe en V2.0.1 afin de charger immédiatement le JavaScript corrigé.
+
+Aucun changement n’est apporté aux scores, classements ou données de la compétition.

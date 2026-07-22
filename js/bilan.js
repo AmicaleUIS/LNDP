@@ -1,6 +1,6 @@
 
 // ============================================================
-// LE NID DES PRONOS — BILAN PDF V2.0.0
+// LE NID DES PRONOS — BILAN PDF V2.0.1
 // ============================================================
 
 const H = window.Helpers;
@@ -34,17 +34,19 @@ const BilanPDF = {
 
     const params = new URLSearchParams(window.location.search);
     this.state.allMode = params.get("all") === "1";
-    this.state.playerId = params.get("player") || this.state.session.user.id;
+    const requestedPlayerId = params.get("player");
 
     await this.loadAdminProfile();
     if (this.state.allMode && !this.isSuperAdmin()) {
       this.renderError("Accès réservé", "L’export groupé des bilans est réservé au super admin.");
       return;
     }
-    if (!this.state.allMode && !this.isSuperAdmin() && this.state.playerId !== this.state.session.user.id) {
-      this.renderError("Accès réservé", "Ce bilan est consultable par le super admin pour le moment.");
-      return;
-    }
+
+    // Un joueur ouvre toujours son propre carnet, même si un ancien lien contient
+    // par erreur l’identifiant d’un autre profil. Le super admin peut choisir un joueur.
+    this.state.playerId = this.isSuperAdmin()
+      ? (requestedPlayerId || this.state.session.user.id)
+      : this.state.session.user.id;
 
     H.$("#refreshBilanBtn")?.addEventListener("click", () => this.state.allMode ? this.loadAllAndRender() : this.loadAndRender());
     H.$("#printBilanBtn")?.addEventListener("click", async () => {
@@ -114,7 +116,7 @@ const BilanPDF = {
     });
 
     if (error) {
-      if (!silent) this.renderError("Bilan indisponible", `${error.message || "Erreur inconnue"}<br><br>Lance le patch SQL V1.9.17 si ce n’est pas encore fait.`);
+      if (!silent) this.renderError("Bilan indisponible", `${error.message || "Erreur inconnue"}<br><br>Lance le patch SQL V2.0.1 d’accès aux carnets si ce n’est pas encore fait.`);
       else console.warn(`Bilan ignoré pour ${playerId}`, error);
       return null;
     }

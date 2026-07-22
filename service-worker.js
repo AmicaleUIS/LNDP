@@ -1,9 +1,9 @@
 // ============================================================
-// LE NID DES PRONOS — SERVICE WORKER V2.0.0 — ÉDITION HOMMAGE
-// Cache public V2.0.0 : installation robuste + mise à jour fiable.
+// LE NID DES PRONOS — SERVICE WORKER V2.0.1 — ÉDITION HOMMAGE
+// Cache public V2.0.1 : installation robuste + mise à jour fiable.
 // ============================================================
 
-const CACHE_NAME = "le-nid-des-pronos-v2-0-0";
+const CACHE_NAME = "le-nid-des-pronos-v2-0-1";
 
 // Le cœur de l’application doit impérativement être disponible hors ligne.
 const CORE_ASSETS = [
@@ -14,16 +14,16 @@ const CORE_ASSETS = [
   "./app.html",
   "./admin.html",
   "./bilan.html",
-  "./css/style.css?v=2.0.0",
-  "./css/bilan.css?v=2.0.0",
-  "./js/config.js?v=2.0.0",
-  "./js/supabaseClient.js?v=2.0.0",
-  "./js/auth.js?v=2.0.0",
-  "./js/common.js?v=2.0.0",
-  "./js/app.js?v=2.0.0",
-  "./js/admin.js?v=2.0.0",
-  "./js/bilan.js?v=2.0.0",
-  "./manifest.json?v=2.0.0",
+  "./css/style.css?v=2.0.1",
+  "./css/bilan.css?v=2.0.1",
+  "./js/config.js?v=2.0.1",
+  "./js/supabaseClient.js?v=2.0.1",
+  "./js/auth.js?v=2.0.1",
+  "./js/common.js?v=2.0.1",
+  "./js/app.js?v=2.0.1",
+  "./js/admin.js?v=2.0.1",
+  "./js/bilan.js?v=2.0.1",
+  "./manifest.json?v=2.0.1",
   "./assets/icons/icon-192.png",
   "./assets/icons/icon-512.png",
   "./assets/icons/icon-maskable-192.png",
