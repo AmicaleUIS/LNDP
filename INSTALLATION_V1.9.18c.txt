@@ -1,0 +1,19 @@
+LE NID DES PRONOS — V1.9.18c
+
+CORRECTIF MARGES / ÉCHELLE DU PDF
+
+Le document complet était forcé à 297 mm de large pour le diplôme paysage.
+Chromium réduisait alors toutes les pages à 70,7 %, laissant une énorme bande
+vide à droite et en bas.
+
+La V1.9.18c attribue désormais :
+- A4 portrait 210 × 297 mm à toutes les pages ordinaires ;
+- A4 paysage 297 × 210 mm uniquement au diplôme.
+
+INSTALLATION
+1. Remplacer les fichiers du site par cette version, ou déposer les fichiers du correctif.
+2. Faire Ctrl + F5.
+3. Dans Imprimer : échelle 100 %, marges « Aucune » ou « Par défaut »,
+   1 page par feuille et Graphiques d’arrière-plan activé.
+
+Aucun script SQL n’est nécessaire.
