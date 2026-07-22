@@ -1,7 +1,7 @@
 {
-  "name": "Le Nid des Pronos",
-  "short_name": "Pronos",
-  "description": "Application de pronostics entre collègues.",
+  "name": "Le Nid des Pronos — Édition hommage",
+  "short_name": "Nid 2026",
+  "description": "Archive souvenir de la Coupe du monde 2026 : classements, badges, records, casseroles et carnets PDF.",
   "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#07111f",

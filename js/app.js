@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — APP PRINCIPALE V1.9.18
+// LE NID DES PRONOS — APP PRINCIPALE V2.0.0
 // ============================================================
 
 const H = window.Helpers;
@@ -91,6 +91,10 @@ const App = {
     homeCountdownTimer: null,
     lastAchievementIds: null,
     predictionAutoSaveTimers: new Map()
+  },
+
+  archiveMode() {
+    return window.APP_CONFIG?.ARCHIVE_MODE === true;
   },
 
 
@@ -483,7 +487,7 @@ const App = {
           <div>
             <p class="eyebrow">Crédits cachés</p>
             <h2 id="creditsTitle">Le Nid des Pronos</h2>
-            <p class="muted">Version publique <strong>1.9.18</strong> · carnet final, diplôme paysage et Livre d’or de fin de compétition.</p>
+            <p class="muted">Version publique <strong>2.0.0</strong> · carnet final, diplôme paysage et Livre d’or de fin de compétition.</p>
           </div>
         </div>
         <div class="credits-grid">
@@ -500,7 +504,7 @@ const App = {
             <p><strong>1.0.5</strong> — dashboard mobile/desktop stabilisé, sans chevauchement des cartes.</p>
           </section>
           <section>
-            <h3>Évolutions V1.9.18</h3>
+            <h3>Évolutions V2.0.0</h3>
             <ul class="changelog-list">
               <li>Le classement Famille tient désormais sur une seule feuille portrait avec 12 joueurs.</li>
               <li>Le diplôme reste en A4 paysage et n’est plus limité à la largeur d’une page portrait.</li>
@@ -1931,9 +1935,9 @@ ${humour} 🦉`,
     this.setActiveNav(viewName);
 
     const titleMap = {
-      home: "Tableau de bord",
-      matches: "Matchs & pronos",
-      worldcup: "Coupe du monde",
+      home: "Édition hommage",
+      matches: "Archives des matchs",
+      worldcup: "Tableau final",
       leaderboard: "Classements",
       teams: "Les teams du nid",
       achievements: "Exploits",
@@ -2587,7 +2591,7 @@ ${humour} 🦉`,
           <div class="feedback-hero-cups" aria-hidden="true"><img src="assets/icons/coupe.png" alt=""><img src="assets/icons/coupe.png" alt=""><img src="assets/icons/coupe.png" alt=""></div>
         </section>
 
-        ${loadError ? `<section class="card"><h3>Le Livre d’or n’est pas encore ouvert</h3><p class="muted">Lance le patch SQL V1.9.18 dans Supabase, puis recharge la page.</p></section>` : `
+        ${loadError ? `<section class="card"><h3>Le Livre d’or n’est pas encore ouvert</h3><p class="muted">Lance le patch SQL V2.0.0 dans Supabase, puis recharge la page.</p></section>` : `
         <form class="card feedback-form" id="feedbackForm">
           <div class="feedback-title-row">
             <div><h3>${feedback ? "Modifier mon retour" : "Laisser mon retour"}</h3><p class="muted">Tu peux revenir le modifier plus tard.</p></div>
@@ -2695,6 +2699,95 @@ ${humour} 🦉`,
     const familyTeamRows = this.canSeeFamily() ? this.familyTeamRows(null, "average") : [];
     const officialMatches = this.displayMatches().filter((match) => !match.is_test_match && !this.isLiveDemoMatch(match));
     const competitionFinished = officialMatches.length > 0 && officialMatches.every((match) => match.status === "finished");
+
+    if (this.archiveMode()) {
+      const finalScoreRow = liveAdjustedRows.find((row) => String(row.user_id || row.id) === String(this.state.session.user.id)) || {};
+      const exactCount = Number(finalScoreRow.exact_scores || finalScoreRow.exact_count || 0);
+      const finalMatch = officialMatches
+        .filter((match) => match.status === "finished")
+        .sort((a, b) => new Date(b.kickoff_at || 0) - new Date(a.kickoff_at || 0))[0];
+
+      root.innerHTML = `
+        <section class="home-dashboard-screen archive-home-screen" aria-label="Édition hommage">
+          <section class="hero-card archive-tribute-hero">
+            <div class="archive-tribute-copy">
+              <p class="eyebrow">${H.icon("nest")} Édition hommage 2026</p>
+              <h2>Le tournoi est terminé.<br>Le Nid garde la mémoire.</h2>
+              <p class="muted">Plus aucun pronostic à poser : place aux classements définitifs, aux exploits, aux casseroles et aux souvenirs de cette aventure.</p>
+              <div class="archive-tribute-actions">
+                <button class="primary-btn" type="button" data-archive-view="leaderboard">Voir le classement final</button>
+                <button class="ghost-btn" type="button" data-archive-view="achievements">Revoir les exploits</button>
+                <button class="ghost-btn" id="owlMessagesHomeBtn" type="button">${H.icon("diffusion")} Messages du Hibou</button>
+              </div>
+            </div>
+            <aside class="archive-tribute-summary">
+              <span class="archive-tribute-icon">${H.icon("worldcup")}</span>
+              <strong>${officialMatches.filter((match) => match.status === "finished").length}</strong>
+              <small>matchs archivés</small>
+              ${finalMatch ? `<p>${H.matchFlagHtml(finalMatch, "home")} ${H.escapeHtml(finalMatch.home_team_short_name || finalMatch.home_team_name)} <b>${H.scoreText(finalMatch.home_score, finalMatch.away_score)}</b> ${H.matchFlagHtml(finalMatch, "away")} ${H.escapeHtml(finalMatch.away_team_short_name || finalMatch.away_team_name)}</p>` : ""}
+            </aside>
+          </section>
+
+          <section class="card home-final-pdf-card archive-pdf-card" aria-label="Carnet collector final">
+            <div class="home-final-pdf-art">${H.icon("bilan")}</div>
+            <div class="home-final-pdf-copy">
+              <p class="eyebrow">Ton souvenir personnel</p>
+              <h3>Récupère ton carnet PDF collector 🏆</h3>
+              <p>Classement final, champions, records, casseroles, historique complet et diplôme : toute ta compétition est réunie dans un seul document.</p>
+            </div>
+            <div class="home-final-actions">
+              <button class="primary-btn" type="button" data-action="open-final-pdf">Récupérer mon PDF</button>
+              <button class="ghost-btn" type="button" data-action="open-feedback">Signer le Livre d’or</button>
+            </div>
+          </section>
+
+          <section class="archive-memory-grid">
+            <div class="archive-memory-column">
+              <div class="archive-section-heading">
+                <div><p class="eyebrow">Ton bilan</p><h3>Une dernière vue depuis le perchoir</h3></div>
+                <span class="pill success">${Number(finalScoreRow.total_points || 0)} pts${exactCount ? ` · ${exactCount} exacts` : ""}</span>
+              </div>
+              <section class="home-standing-stack" aria-label="Classements finaux">
+                ${this.homeRankCardHtml(myRank, myRankTieCount)}
+                ${this.homeTeamAverageCardHtml(teamAverageRows)}
+              </section>
+              ${this.canSeeFamily() ? `
+                <section class="home-standing-stack home-family-stack" aria-label="Classements Famille finaux">
+                  ${this.homeFamilyRankCardHtml(myFamilyRank, myFamilyRankTieCount)}
+                  ${this.homeFamilyTeamAverageCardHtml(familyTeamRows)}
+                </section>
+              ` : ""}
+            </div>
+            <div class="archive-memory-column archive-record-column">
+              <div class="archive-section-heading"><div><p class="eyebrow">Souvenirs du Nid</p><h3>Records, casseroles et mini-records</h3></div></div>
+              ${this.homeRecordCarouselHtml(liveAdjustedRows, teamAverageRows)}
+            </div>
+          </section>
+
+          <section class="archive-link-grid" aria-label="Explorer l’édition hommage">
+            <button class="card archive-link-card" type="button" data-archive-view="matches">${H.icon("matchs")}<span><strong>Résultats</strong><small>Les 104 matchs, scores et pronostics révélés</small></span></button>
+            <button class="card archive-link-card" type="button" data-archive-view="worldcup">${H.icon("worldcup")}<span><strong>Tableau final</strong><small>Revivre le parcours jusqu’à la finale</small></span></button>
+            <button class="card archive-link-card" type="button" data-archive-view="achievements">${H.icon("exploits")}<span><strong>Exploits</strong><small>Badges, records et casseroles mémorables</small></span></button>
+            <button class="card archive-link-card" type="button" data-archive-view="feedback">${H.icon("bilan")}<span><strong>Livre d’or</strong><small>Lire ou compléter ton dernier mot</small></span></button>
+          </section>
+        </section>
+      `;
+
+      H.$('[data-action="open-final-pdf"]', root)?.addEventListener("click", () => {
+        const playerId = encodeURIComponent(this.state.session.user.id);
+        window.open(`bilan.html?player=${playerId}`, "_blank", "noopener");
+      });
+      H.$('[data-action="open-feedback"]', root)?.addEventListener("click", () => this.loadView("feedback"));
+      H.$("#owlMessagesHomeBtn", root)?.addEventListener("click", async () => {
+        await this.loadOwlMessages();
+        this.openOwlMessagesHistoryModal();
+      });
+      H.$$('[data-archive-view]', root).forEach((button) => button.addEventListener("click", () => this.loadView(button.dataset.archiveView)));
+      this.bindHomeClickableCards(root);
+      this.bindNavigation();
+      this.bindHomeRecordCarousel(root);
+      return;
+    }
 
     root.innerHTML = `
       <section class="home-dashboard-screen" aria-label="Tableau de bord accueil">
@@ -3776,6 +3869,29 @@ ${humour} 🦉`,
       .filter((match) => match.status === "finished")
       .sort((a, b) => new Date(b.kickoff_at || 0) - new Date(a.kickoff_at || 0));
 
+    if (this.archiveMode()) {
+      this.state.matchesTab = "played";
+      root.innerHTML = `
+        <section class="toolbar-card archive-results-toolbar">
+          <div>
+            <p class="eyebrow">Édition hommage</p>
+            <h2>Archives des matchs</h2>
+            <p class="muted">Tous les scores sont définitifs. Ouvre une rencontre pour retrouver ton pronostic, tes points et les choix révélés du Nid.</p>
+          </div>
+          <button class="ghost-btn" id="refreshMatchesBtn">Rafraîchir</button>
+        </section>
+        <div class="archive-results-count">${H.icon("matchs")} <strong>${playedMatches.length}</strong> matchs archivés</div>
+        <section class="played-matches-board archive-played-matches-board">
+          ${playedMatches.length ? playedMatches.map((match) => this.playedMatchCardHtml(match)).join("") : `<section class="card"><p class="muted">Aucun match archivé.</p></section>`}
+        </section>
+      `;
+      H.$("#refreshMatchesBtn")?.addEventListener("click", async () => {
+        await this.renderMatches();
+        H.toast("Archives rafraîchies", "success");
+      });
+      return;
+    }
+
     if (matchesTab === "played") {
       root.innerHTML = `
         <section class="toolbar-card">
@@ -4074,6 +4190,10 @@ ${humour} 🦉`,
   },
 
   async goToMatchPrediction(matchId, options = {}) {
+    if (this.archiveMode()) {
+      await this.loadView("matches");
+      return;
+    }
     const targetId = String(matchId ?? "");
     const match = this.state.matches.find((item) => String(item.id) === targetId);
     if (!match) {
@@ -11821,7 +11941,7 @@ ${humour} 🦉`,
           </div>
           <div class="profile-account-actions">
             <button class="ghost-btn" id="profileInstallAppBtn" type="button">Installer l’app</button>
-            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v1.9.18</button>
+            <button class="ghost-btn" id="profileCreditsBtn" type="button">Crédits · v2.0.0</button>
             <button class="danger-btn" id="profileLogoutBtn" type="button">Déconnexion</button>
           </div>
         </div>

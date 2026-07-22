@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Connexion — Le Nid des Pronos</title>
   <meta name="theme-color" content="#07111f">
-  <link rel="manifest" href="manifest.json?v=1.9.18">
+  <link rel="manifest" href="manifest.json?v=2.0.0">
   <link rel="icon" href="assets/icons/icon-192.png">
   <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png">
-  <link rel="stylesheet" href="css/style.css?v=1.9.18">
+  <link rel="stylesheet" href="css/style.css?v=2.0.0">
 </head>
 <body class="auth-layout">
   <main class="auth-card">
@@ -16,12 +16,12 @@
       <img src="assets/icons/icon-192.png" alt="Icône Le Nid des Pronos">
       <div>
         <h1>Le Nid des Pronos</h1>
-        <p>Connexion au nid.</p>
+        <p>Accès à l’édition hommage.</p>
       </div>
     </div>
 
-    <h2>Connexion</h2>
-    <p class="muted">Entre ton identifiant <strong>prenom.nom</strong> et ton mot de passe. Pour la Famille, le site ajoute automatiquement <strong>.famille@uis.fr</strong>.</p>
+    <h2>Retrouver mes souvenirs</h2>
+    <p class="muted">Connecte-toi avec le compte utilisé pendant la compétition pour retrouver ton classement, tes exploits et ton PDF collector.</p>
 
     <form id="loginForm" class="form-stack">
       <div class="segmented auth-mode-switch" aria-label="Type de compte">
@@ -39,14 +39,14 @@
       <button class="primary-btn" type="submit">Entrer dans le nid</button>
     </form>
 
-    <p class="auth-switch">Pas encore de compte ? <a href="register.html">Créer un compte</a></p>
+    <p class="auth-switch">Les inscriptions sont closes pour cette édition. <a href="index.html">Retour à l’accueil</a></p>
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="js/config.js?v=1.9.18"></script>
-  <script src="js/supabaseClient.js?v=1.9.18"></script>
-  <script src="js/auth.js?v=1.9.18"></script>
-  <script src="js/common.js?v=1.9.18"></script>
+  <script src="js/config.js?v=2.0.0"></script>
+  <script src="js/supabaseClient.js?v=2.0.0"></script>
+  <script src="js/auth.js?v=2.0.0"></script>
+  <script src="js/common.js?v=2.0.0"></script>
   <script>
     window.addEventListener('DOMContentLoaded', async () => {
       await Auth.redirectIfLoggedIn();

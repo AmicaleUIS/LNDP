@@ -1,0 +1,16 @@
+LE NID DES PRONOS — V2.0.0 ÉDITION HOMMAGE
+
+1. Remplacer les fichiers du site par ceux de cette archive.
+2. Dans Supabase > SQL Editor, lancer : patch_v2_0_0_export_supabase_archive.sql
+3. Faire Ctrl + F5 sur le site et l'administration.
+
+NOUVEAUTÉS
+- Le site passe en mode hommage : aucune saisie de pronostic et aucun onglet matchs à venir.
+- La page Matchs devient Archives des matchs et affiche uniquement les résultats terminés.
+- L'accueil met en avant le PDF collector, les classements, les badges, les records et le Livre d'or.
+- Les inscriptions sont closes.
+- La capsule PDF mobile a été reconstruite pour ne plus déborder ni casser sa grille.
+- Le super admin peut télécharger une archive JSON de toutes les tables publiques Supabase, des métadonnées Auth et de l'inventaire Storage.
+
+IMPORTANT
+L'export Storage contient l'inventaire et les métadonnées des fichiers, pas les octets binaires eux-mêmes.

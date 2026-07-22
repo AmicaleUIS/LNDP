@@ -3,12 +3,12 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Admin — Le Nid des Pronos</title>
+  <title>Admin — Édition hommage — Le Nid des Pronos</title>
   <meta name="theme-color" content="#07111f">
-  <link rel="manifest" href="manifest.json?v=1.9.18">
+  <link rel="manifest" href="manifest.json?v=2.0.0">
   <link rel="icon" href="assets/icons/icon-192.png">
   <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png">
-  <link rel="stylesheet" href="css/style.css?v=1.9.18">
+  <link rel="stylesheet" href="css/style.css?v=2.0.0">
 </head>
 <body>
   <div class="admin-shell">
@@ -67,7 +67,7 @@
     <main class="admin-main-area">
       <header class="admin-header admin-page-header">
         <div>
-          <p class="eyebrow">Administration · v1.9.18</p>
+          <p class="eyebrow">Administration · v2.0.0</p>
           <h1 id="adminPageTitle"><img class="owl-icon title-icon" src="assets/icons/owl-png/admin.png" alt="" aria-hidden="true" loading="lazy"> Saisie rapide des scores</h1>
           <p class="muted" id="adminPageSubtitle">Prochains matchs en haut, scores manuels, classement recalculé automatiquement.</p>
         </div>
@@ -147,6 +147,14 @@
           </div>
 
           <div class="backup-panel-grid">
+            <section class="backup-box supabase-export-box" id="supabaseExportBox" hidden>
+              <p class="backup-box-kicker">Archive définitive</p>
+              <h3>Exporter toutes les données Supabase</h3>
+              <p class="muted">Télécharge un fichier JSON complet : toutes les tables du schéma public, les métadonnées des comptes Auth et l’inventaire Storage.</p>
+              <button class="primary-btn" id="exportSupabaseArchiveBtn" type="button">Télécharger l’archive Supabase</button>
+              <p class="muted tiny-note" id="supabaseExportStatus">Réservé au super administrateur.</p>
+            </section>
+
             <section class="backup-box">
               <h3>Charger une sauvegarde</h3>
               <p class="muted">Choisis une sauvegarde, puis restaure les pronos et les résultats des matchs.</p>
@@ -339,10 +347,10 @@
   </button>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="js/config.js?v=1.9.18"></script>
-  <script src="js/supabaseClient.js?v=1.9.18"></script>
-  <script src="js/auth.js?v=1.9.18"></script>
-  <script src="js/common.js?v=1.9.18"></script>
-  <script src="js/admin.js?v=1.9.18"></script>
+  <script src="js/config.js?v=2.0.0"></script>
+  <script src="js/supabaseClient.js?v=2.0.0"></script>
+  <script src="js/auth.js?v=2.0.0"></script>
+  <script src="js/common.js?v=2.0.0"></script>
+  <script src="js/admin.js?v=2.0.0"></script>
 </body>
 </html>

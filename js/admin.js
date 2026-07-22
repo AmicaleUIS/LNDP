@@ -1,5 +1,5 @@
 // ============================================================
-// LE NID DES PRONOS — ADMIN V1.9.18
+// LE NID DES PRONOS — ADMIN V2.0.0
 // ============================================================
 
 const H = window.Helpers;
@@ -90,7 +90,7 @@ const Admin = {
       p_category: category,
       p_details: details || {},
       p_metadata: {
-        app_version: "1.9.18",
+        app_version: "2.0.0",
         source: "admin_front"
       }
     });
@@ -136,6 +136,9 @@ const Admin = {
       return;
     }
 
+    const exportBox = H.$("#supabaseExportBox");
+    if (exportBox) exportBox.hidden = !this.isSuperAdmin();
+
     this.bindActions();
     await this.reloadAll();
     this.setAdminSection(this.initialAdminSection());
@@ -152,6 +155,7 @@ const Admin = {
     H.$("#recalcAllBtn")?.addEventListener("click", () => this.recalcAll());
     H.$("#addOfficeTeamForm")?.addEventListener("submit", (event) => this.addOfficeTeam(event));
     H.$("#createBackupBtn")?.addEventListener("click", () => this.createBackup());
+    H.$("#exportSupabaseArchiveBtn")?.addEventListener("click", () => this.exportSupabaseArchive());
     H.$("#restoreBackupBtn")?.addEventListener("click", () => this.restoreSelectedBackup());
     H.$("#resetPredictionsBtn")?.addEventListener("click", () => this.resetAllPredictions());
     H.$("#resetPreparationScoresBtn")?.addEventListener("click", () => this.resetPreparationScores());
@@ -972,7 +976,7 @@ const Admin = {
     const root = H.$("#feedbackAdmin");
     if (!root) return;
     if (this.state.feedbackError) {
-      root.innerHTML = `<div class="empty-state"><h3>Livre d’or indisponible</h3><p>Lance le patch SQL V1.9.18 dans Supabase puis recharge l’administration.</p></div>`;
+      root.innerHTML = `<div class="empty-state"><h3>Livre d’or indisponible</h3><p>Lance le patch SQL V2.0.0 dans Supabase puis recharge l’administration.</p></div>`;
       return;
     }
     const entries = this.state.feedbackEntries || [];
@@ -3274,6 +3278,98 @@ Je m’en remets au Hibou">${H.escapeHtml(this.owlPollOptionsText(msg))}</textar
     this.renderBackups();
     await this.logAdminAction("set_champion_bonus_points", "settings", { initial_points: first, second_points: second });
     H.toast(`Bonus champion réglés : ${first} pts / ${second} pts`, "success");
+  },
+
+  downloadJsonFile(filename, payload) {
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1500);
+  },
+
+  async exportSupabaseArchive() {
+    if (!this.isSuperAdmin()) {
+      H.toast("Export réservé au super administrateur.", "error");
+      return;
+    }
+
+    const button = H.$("#exportSupabaseArchiveBtn");
+    const status = H.$("#supabaseExportStatus");
+    const setStatus = (message) => { if (status) status.textContent = message; };
+    if (button) { button.disabled = true; button.textContent = "Préparation de l’archive…"; }
+
+    try {
+      setStatus("Lecture de la liste des tables…");
+      const { data: tableRows, error: tableError } = await window.sb.rpc("export_nid_table_list");
+      if (tableError) throw tableError;
+
+      const tableNames = (tableRows || []).map((row) => row.table_name).filter(Boolean);
+      const archive = {
+        metadata: {
+          app: "Le Nid des Pronos",
+          app_version: "2.0.0",
+          export_format: "nid_supabase_archive_v1",
+          generated_at: new Date().toISOString(),
+          generated_by: this.state.profile?.pseudo || this.state.session?.user?.id || "super_admin",
+          note: "Les fichiers binaires de Storage ne sont pas intégrés ; leur inventaire et leurs métadonnées sont fournis."
+        },
+        public_tables: {},
+        auth_users: [],
+        storage_objects: []
+      };
+
+      const pageSize = 500;
+      for (let tableIndex = 0; tableIndex < tableNames.length; tableIndex += 1) {
+        const tableName = tableNames[tableIndex];
+        const rows = [];
+        let offset = 0;
+        setStatus(`Export ${tableIndex + 1}/${tableNames.length} : ${tableName}…`);
+        while (true) {
+          const { data, error } = await window.sb.rpc("export_nid_table_page", {
+            p_table_name: tableName,
+            p_offset: offset,
+            p_limit: pageSize
+          });
+          if (error) throw new Error(`${tableName} : ${error.message || error}`);
+          const page = Array.isArray(data) ? data : [];
+          rows.push(...page);
+          if (page.length < pageSize) break;
+          offset += pageSize;
+        }
+        archive.public_tables[tableName] = rows;
+      }
+
+      setStatus("Export des comptes Auth…");
+      const { data: authUsers, error: authError } = await window.sb.rpc("export_nid_auth_users");
+      if (authError) throw authError;
+      archive.auth_users = Array.isArray(authUsers) ? authUsers : [];
+
+      setStatus("Inventaire du Storage…");
+      const { data: storageObjects, error: storageError } = await window.sb.rpc("export_nid_storage_objects");
+      if (storageError) throw storageError;
+      archive.storage_objects = Array.isArray(storageObjects) ? storageObjects : [];
+
+      const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+      this.downloadJsonFile(`le-nid-des-pronos-supabase-v2.0.0-${stamp}.json`, archive);
+      setStatus(`${tableNames.length} tables, ${archive.auth_users.length} comptes Auth et ${archive.storage_objects.length} objets Storage exportés.`);
+      H.toast("Archive Supabase téléchargée", "success");
+      await this.logAdminAction("export_supabase_archive", "backup", {
+        tables_count: tableNames.length,
+        auth_users_count: archive.auth_users.length,
+        storage_objects_count: archive.storage_objects.length
+      });
+    } catch (error) {
+      console.error(error);
+      setStatus(`Échec : ${error.message || error}`);
+      H.toast(error.message || "Impossible d’exporter Supabase", "error");
+    } finally {
+      if (button) { button.disabled = false; button.textContent = "Télécharger l’archive Supabase"; }
+    }
   },
 
   async createBackup() {
