@@ -2008,51 +2008,114 @@
 
 
 /* ============================================================
-   V1.9.18 — Correctif final Chromium : document large de 297 mm
-   pour empêcher le diplôme paysage d'être rogné à 210 mm.
+   V1.9.18c — Impression A4 à l'échelle réelle
+
+   Important : ne jamais imposer 297 mm au document complet.
+   Chromium réduisait alors toutes les feuilles à 210/297 = 70,7 %,
+   ce qui créait les énormes bandes vides à droite et en bas.
+   Chaque feuille possède maintenant son propre format de page.
    ============================================================ */
 @media print {
+  @page portraitCollector {
+    size: 210mm 297mm;
+    margin: 0;
+  }
+
+  @page diplomaFinal {
+    size: 297mm 210mm;
+    margin: 0;
+  }
+
   html,
-  body,
+  body {
+    width: auto !important;
+    min-width: 0 !important;
+    max-width: none !important;
+    height: auto !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+    background: #07111f !important;
+    zoom: 1 !important;
+  }
+
   .bilan-root,
   .bilan-document,
   .bilan-document.collector {
-    width: 297mm !important;
-    min-width: 297mm !important;
+    display: block !important;
+    width: auto !important;
+    min-width: 0 !important;
     max-width: none !important;
+    height: auto !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
     overflow: visible !important;
   }
 
+  .bilan-page {
+    margin: 0 !important;
+    box-shadow: none !important;
+    transform: none !important;
+    scale: 1 !important;
+    break-inside: avoid-page !important;
+    page-break-inside: avoid !important;
+    break-after: page !important;
+    page-break-after: always !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  .bilan-page:last-child {
+    break-after: auto !important;
+    page-break-after: auto !important;
+  }
+
+  /* Toutes les feuilles ordinaires remplissent exactement un A4 portrait. */
   .bilan-page:not(.diploma) {
+    page: portraitCollector !important;
     width: 210mm !important;
     min-width: 210mm !important;
     max-width: 210mm !important;
-    margin-left: 0 !important;
-    margin-right: 0 !important;
+    height: 297mm !important;
+    min-height: 297mm !important;
+    max-height: 297mm !important;
+    margin: 0 !important;
+    box-sizing: border-box !important;
+    overflow: hidden !important;
   }
 
+  /* Le diplôme conserve son vrai A4 paysage sans influencer les autres pages. */
   .bilan-page.diploma.landscape-page {
     page: diplomaFinal !important;
     display: block !important;
     position: relative !important;
-    left: 0 !important;
+    left: auto !important;
+    top: auto !important;
     width: 297mm !important;
     min-width: 297mm !important;
     max-width: 297mm !important;
     height: 210mm !important;
     min-height: 210mm !important;
     max-height: 210mm !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    box-sizing: border-box !important;
     overflow: hidden !important;
     background-color: #07111f !important;
     background-image:
       linear-gradient(rgba(2, 6, 23, .08), rgba(2, 6, 23, .12)),
       url("../assets/reports/bg-diplome.png") !important;
-    background-position: left top, left top !important;
+    background-position: 0 0, 0 0 !important;
     background-repeat: no-repeat, no-repeat !important;
     background-size: 297mm 210mm, 297mm 210mm !important;
   }
 
-  .bilan-page.diploma.landscape-page::after { display:none !important; }
+  .bilan-page.diploma.landscape-page::before,
+  .bilan-page.diploma.landscape-page::after {
+    display: none !important;
+  }
 
   .bilan-page.diploma.landscape-page .bilan-page-content {
     position: relative !important;
@@ -2063,7 +2126,9 @@
     height: 210mm !important;
     min-height: 210mm !important;
     max-height: 210mm !important;
+    margin: 0 !important;
     padding: 13mm 17mm 14mm !important;
+    box-sizing: border-box !important;
     overflow: hidden !important;
   }
 
@@ -2072,9 +2137,10 @@
     min-width: 256mm !important;
     max-width: 256mm !important;
     min-height: 122mm !important;
-    grid-template-columns: 88mm 1fr !important;
+    grid-template-columns: 88mm minmax(0, 1fr) !important;
     gap: 9mm !important;
     padding: 9mm 11mm !important;
+    box-sizing: border-box !important;
     overflow: hidden !important;
   }
 
